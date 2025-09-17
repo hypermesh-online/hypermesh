@@ -1,0 +1,622 @@
+# Web3 Ecosystem Kubernetes Deployment Manifests
+# Comprehensive staging deployment with monitoring
+# STOQ Performance: 2.95 Gbps (optimization ongoing)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: web3-ecosystem
+  labels:
+    project: hypermesh-web3
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    project: hypermesh-web3
+    environment: monitoring
+---
+# TrustChain Certificate Authority Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trustchain
+  namespace: web3-ecosystem
+  labels:
+    app: trustchain
+    component: certificate-authority
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: trustchain
+  template:
+    metadata:
+      labels:
+        app: trustchain
+        component: certificate-authority
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8443"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: trustchain
+        image: ghcr.io/hypermesh-online/trustchain:staging
+        ports:
+        - containerPort: 8443
+          name: https
+        - containerPort: 6962
+          name: ct-log
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: ENVIRONMENT
+          value: "staging"
+        - name: FALCON_CRYPTO_ENABLED
+          value: "true"
+        - name: FOUR_PROOF_CONSENSUS
+          value: "true"
+        - name: IPV6_ONLY
+          value: "true"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: cert-storage
+          mountPath: /app/certs
+        - name: config
+          mountPath: /app/config
+      volumes:
+      - name: cert-storage
+        persistentVolumeClaim:
+          claimName: trustchain-certs
+      - name: config
+        configMap:
+          name: trustchain-config
+---
+# STOQ Transport Protocol Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stoq
+  namespace: web3-ecosystem
+  labels:
+    app: stoq
+    component: transport-protocol
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: stoq
+  template:
+    metadata:
+      labels:
+        app: stoq
+        component: transport-protocol
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8454"
+        prometheus.io/path: "/metrics"
+        performance.monitoring/critical: "true"
+        performance.monitoring/target-gbps: "40"
+        performance.monitoring/current-gbps: "2.95"
+    spec:
+      containers:
+      - name: stoq
+        image: ghcr.io/hypermesh-online/stoq:staging
+        ports:
+        - containerPort: 8454
+          name: quic
+        env:
+        - name: RUST_LOG
+          value: "debug"
+        - name: QUIC_OPTIMIZATION
+          value: "enabled"
+        - name: PERFORMANCE_MONITORING
+          value: "enabled"
+        - name: TARGET_THROUGHPUT_GBPS
+          value: "40"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          tcpSocket:
+            port: 8454
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 8454
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# HyperMesh Asset Management Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hypermesh
+  namespace: web3-ecosystem
+  labels:
+    app: hypermesh
+    component: asset-management
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hypermesh
+  template:
+    metadata:
+      labels:
+        app: hypermesh
+        component: asset-management
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8445"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: hypermesh
+        image: ghcr.io/hypermesh-online/hypermesh:staging
+        ports:
+        - containerPort: 8445
+          name: http
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: NAT_PROXY_ENABLED
+          value: "true"
+        - name: ASSET_ADAPTERS_ENABLED
+          value: "true"
+        - name: CONSENSUS_VALIDATION
+          value: "four-proof"
+        - name: REMOTE_ADDRESSING
+          value: "enabled"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8445
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8445
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+# Catalog Asset SDK Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog
+  namespace: web3-ecosystem
+  labels:
+    app: catalog
+    component: asset-sdk
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: catalog
+  template:
+    metadata:
+      labels:
+        app: catalog
+        component: asset-sdk
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8446"
+        prometheus.io/path: "/metrics"
+        performance.monitoring/target-ms: "10"
+        performance.monitoring/current-ms: "1.69"
+    spec:
+      containers:
+      - name: catalog
+        image: ghcr.io/hypermesh-online/catalog:staging
+        ports:
+        - containerPort: 8446
+          name: http
+        env:
+        - name: JULIA_NUM_THREADS
+          value: "4"
+        - name: PERFORMANCE_MONITORING
+          value: "enabled"
+        - name: VM_INTEGRATION
+          value: "enabled"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8446
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8446
+          initialDelaySeconds: 15
+          periodSeconds: 5
+---
+# Caesar Economic Layer Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caesar
+  namespace: web3-ecosystem
+  labels:
+    app: caesar
+    component: economic-layer
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: caesar
+  template:
+    metadata:
+      labels:
+        app: caesar
+        component: economic-layer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8447"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: caesar
+        image: ghcr.io/hypermesh-online/caesar:staging
+        ports:
+        - containerPort: 8447
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "staging"
+        - name: LAYERZERO_V2_ENABLED
+          value: "true"
+        - name: DEMURRAGE_CALCULATION
+          value: "enabled"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8447
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8447
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+# NGauge Engagement Platform Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngauge
+  namespace: web3-ecosystem
+  labels:
+    app: ngauge
+    component: engagement-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ngauge
+  template:
+    metadata:
+      labels:
+        app: ngauge
+        component: engagement-platform
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8448"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: ngauge
+        image: ghcr.io/hypermesh-online/ngauge:staging
+        ports:
+        - containerPort: 8448
+          name: http
+        env:
+        - name: ENVIRONMENT
+          value: "staging"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8448
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8448
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Services for each component
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain
+  namespace: web3-ecosystem
+  labels:
+    app: trustchain
+spec:
+  selector:
+    app: trustchain
+  ports:
+  - port: 8443
+    targetPort: 8443
+    name: https
+  - port: 6962
+    targetPort: 6962
+    name: ct-log
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stoq
+  namespace: web3-ecosystem
+  labels:
+    app: stoq
+spec:
+  selector:
+    app: stoq
+  ports:
+  - port: 8454
+    targetPort: 8454
+    name: quic
+    protocol: UDP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypermesh
+  namespace: web3-ecosystem
+  labels:
+    app: hypermesh
+spec:
+  selector:
+    app: hypermesh
+  ports:
+  - port: 8445
+    targetPort: 8445
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog
+  namespace: web3-ecosystem
+  labels:
+    app: catalog
+spec:
+  selector:
+    app: catalog
+  ports:
+  - port: 8446
+    targetPort: 8446
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: caesar
+  namespace: web3-ecosystem
+  labels:
+    app: caesar
+spec:
+  selector:
+    app: caesar
+  ports:
+  - port: 8447
+    targetPort: 8447
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ngauge
+  namespace: web3-ecosystem
+  labels:
+    app: ngauge
+spec:
+  selector:
+    app: ngauge
+  ports:
+  - port: 8448
+    targetPort: 8448
+    name: http
+  type: ClusterIP
+---
+# Ingress Controller for External Access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web3-ecosystem-ingress
+  namespace: web3-ecosystem
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - trust.staging.hypermesh.online
+    - stoq.staging.hypermesh.online
+    - assets.staging.hypermesh.online
+    - catalog.staging.hypermesh.online
+    - caesar.staging.hypermesh.online
+    - ngauge.staging.hypermesh.online
+    secretName: web3-ecosystem-tls
+  rules:
+  - host: trust.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: trustchain
+            port:
+              number: 8443
+  - host: stoq.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stoq
+            port:
+              number: 8454
+  - host: assets.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hypermesh
+            port:
+              number: 8445
+  - host: catalog.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: catalog
+            port:
+              number: 8446
+  - host: caesar.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: caesar
+            port:
+              number: 8447
+  - host: ngauge.staging.hypermesh.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ngauge
+            port:
+              number: 8448
+---
+# PersistentVolumeClaim for TrustChain certificates
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trustchain-certs
+  namespace: web3-ecosystem
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: gp3
+---
+# ConfigMap for TrustChain configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trustchain-config
+  namespace: web3-ecosystem
+data:
+  trustchain.toml: |
+    [server]
+    bind_addr = "::"
+    port = 8443
+    
+    [ca]
+    organization = "HyperMesh Online"
+    country = "US"
+    validity_days = 365
+    
+    [ct]
+    log_id = "hypermesh-ct-log"
+    max_merge_delay = 86400
+    
+    [security]
+    falcon_crypto = true
+    post_quantum = true
+    ipv6_only = true
+    
+    [consensus]
+    four_proof_enabled = true
+    pos_space_validation = true
+    pos_stake_validation = true
+    pos_work_validation = true
+    pos_time_validation = true
+    
+    [performance]
+    target_latency_ms = 5
+    current_latency_ms = 35
+    monitoring_enabled = true

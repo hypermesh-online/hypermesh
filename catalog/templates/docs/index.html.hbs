@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{asset.name}} - Documentation</title>
+    <style>
+        :root {
+            --primary-color: {{theme.primary_color}};
+            --secondary-color: {{theme.secondary_color}};
+            --font-family: {{theme.font_family}};
+        }
+        
+        body {
+            font-family: var(--font-family);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem 0;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        {{#if theme.logo_url}}
+        .logo {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+        }
+        {{/if}}
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+        }
+        
+        nav {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background-color: #f1f5f9;
+        }
+        
+        main {
+            padding: 2rem 0;
+        }
+        
+        .section {
+            background: white;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .badges {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        
+        .badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: #f8fafc;
+        }
+        
+        .card h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        code {
+            background: #f1f5f9;
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875em;
+        }
+        
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .status-valid {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-invalid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        footer {
+            background: #1e293b;
+            color: #94a3b8;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+        
+        {{#if theme.custom_css}}
+        {{{theme.custom_css}}}
+        {{/if}}
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                {{#if theme.logo_url}}
+                <img src="{{theme.logo_url}}" alt="Logo" class="logo">
+                {{/if}}
+                <div>
+                    <h1>{{asset.name}}</h1>
+                    <p class="subtitle">{{#if asset.description}}{{asset.description}}{{else}}Catalog Asset Package{{/if}}</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <div class="nav-links">
+                <a href="#overview">Overview</a>
+                <a href="#installation">Installation</a>
+                {{#if examples}}<a href="#examples">Examples</a>{{/if}}
+                {{#if api}}<a href="#api">API</a>{{/if}}
+                <a href="#configuration">Configuration</a>
+                {{#if deployment}}<a href="#deployment">Deployment</a>{{/if}}
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <section id="overview" class="section">
+                <h2>Overview</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Package Information</h3>
+                        <p><strong>Version:</strong> {{asset.version}}</p>
+                        <p><strong>Type:</strong> {{asset.type}}</p>
+                        {{#if asset.author}}<p><strong>Author:</strong> {{asset.author}}</p>{{/if}}
+                        {{#if asset.license}}<p><strong>License:</strong> {{asset.license}}</p>{{/if}}
+                    </div>
+                    
+                    {{#if validation}}
+                    <div class="card">
+                        <h3>Validation Status</h3>
+                        <div class="status-indicator {{#if validation.is_valid}}status-valid{{else}}status-invalid{{/if}}">
+                            {{#if validation.is_valid}}✅ Valid{{else}}❌ Invalid{{/if}}
+                        </div>
+                        <p><strong>Security Score:</strong> {{validation.security_score}}/100</p>
+                        {{#if validation.errors.length}}<p><strong>Errors:</strong> {{validation.errors.length}}</p>{{/if}}
+                        {{#if validation.warnings.length}}<p><strong>Warnings:</strong> {{validation.warnings.length}}</p>{{/if}}
+                    </div>
+                    {{/if}}
+                </div>
+                
+                {{#if asset.tags}}
+                <div class="badges">
+                    {{#each asset.tags}}
+                    <span class="badge">{{this}}</span>
+                    {{/each}}
+                </div>
+                {{/if}}
+            </section>
+
+            <section id="installation" class="section">
+                <h2>Installation</h2>
+                <pre><code># Install from Catalog registry
+catalog install {{asset.name}}
+
+# Or install specific version
+catalog install {{asset.name}}@{{asset.version}}</code></pre>
+            </section>
+
+            {{#if examples}}
+            <section id="examples" class="section">
+                <h2>Examples</h2>
+                {{#each examples}}
+                <h3>{{this.title}}</h3>
+                <pre><code>{{this.code}}</code></pre>
+                {{/each}}
+            </section>
+            {{/if}}
+
+            {{#if api}}
+            <section id="api" class="section">
+                <h2>API Reference</h2>
+                
+                {{#if api.functions}}
+                <h3>Functions</h3>
+                {{#each api.functions}}
+                <div class="card">
+                    <h4><code>{{this.name}}({{this.parameters}})</code></h4>
+                    {{#if this.description}}<p>{{this.description}}</p>{{/if}}
+                    <p><strong>Type:</strong> {{this.type}}</p>
+                </div>
+                {{/each}}
+                {{/if}}
+
+                {{#if api.constants}}
+                <h3>Constants</h3>
+                {{#each api.constants}}
+                <div class="card">
+                    <h4><code>{{this.name}}</code></h4>
+                    <p><strong>Value:</strong> <code>{{this.value}}</code></p>
+                    <p><strong>Type:</strong> {{this.type}}</p>
+                </div>
+                {{/each}}
+                {{/if}}
+            </section>
+            {{/if}}
+
+            <section id="configuration" class="section">
+                <h2>Configuration</h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Resource Requirements</h3>
+                        <p><strong>CPU:</strong> {{resources.cpu_limit}}</p>
+                        <p><strong>Memory:</strong> {{resources.memory_limit}}</p>
+                        <p><strong>Timeout:</strong> {{resources.execution_timeout}}</p>
+                        {{#if resources.gpu_required}}<p><strong>GPU:</strong> Required</p>{{/if}}
+                    </div>
+
+                    <div class="card">
+                        <h3>Security Settings</h3>
+                        <p><strong>Sandbox Level:</strong> {{security.sandbox_level}}</p>
+                        <p><strong>Consensus:</strong> {{#if security.consensus_required}}Required{{else}}Not Required{{/if}}</p>
+                        <p><strong>Hash Validation:</strong> {{security.hash_validation}}</p>
+                        <p><strong>Network Access:</strong> {{#if security.network_access.enabled}}Enabled{{else}}Disabled{{/if}}</p>
+                        <p><strong>File Access:</strong> {{security.file_access.level}}</p>
+                    </div>
+                </div>
+            </section>
+
+            {{#if deployment}}
+            <section id="deployment" class="section">
+                <h2>Deployment Guide</h2>
+                
+                <h3>Deployment Steps</h3>
+                <ol>
+                    {{#each deployment.steps}}
+                    <li>{{this}}</li>
+                    {{/each}}
+                </ol>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Monitoring Metrics</h3>
+                        <ul>
+                            {{#each deployment.monitoring.metrics}}
+                            <li>{{this}}</li>
+                            {{/each}}
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Alert Conditions</h3>
+                        <ul>
+                            {{#each deployment.monitoring.alerts}}
+                            <li>{{this}}</li>
+                            {{/each}}
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            {{/if}}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Generated by {{generator}} v{{version}} on {{generated_at}}</p>
+        </div>
+    </footer>
+</body>
+</html>

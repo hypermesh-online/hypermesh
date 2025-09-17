@@ -1,0 +1,4406 @@
+{
+  "audit_date": "2025-09-16",
+  "auditor": "Claude Security Specialist",
+  "production_ready": false,
+  "total_violations": 549,
+  "severity_breakdown": {
+    "critical": 132,
+    "high": 250,
+    "medium": 167,
+    "low": 0
+  },
+  "violations": [
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 673,
+      "type": "todo!\\(",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: todo!\\(",
+      "evidence": "todo!(\"STOQ transport integration for DNS\")"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 678,
+      "type": "todo!\\(",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: todo!\\(",
+      "evidence": "todo!(\"STOQ DNS server connection\")"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 526,
+      "type": "todo!\\(",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: todo!\\(",
+      "evidence": "todo!(\"HyperMesh asset metadata retrieval\")"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 585,
+      "type": "todo!\\(",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: todo!\\(",
+      "evidence": "todo!(\"HSM integration not yet implemented - requires AWS CloudHSM setup\")"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 709,
+      "type": "todo!\\(",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: todo!\\(",
+      "evidence": "todo!(\"CloudHSM client implementation\")"
+    },
+    {
+      "file": "trustchain/src/consensus/validator.rs",
+      "line": 7,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Consensus validator (placeholder)"
+    },
+    {
+      "file": "trustchain/src/consensus/block_matrix.rs",
+      "line": 7,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Block matrix (placeholder)"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 258,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for Prometheus metrics server"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 264,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for health check server"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 343,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "Ok(TrustChainConfig::localhost_testing()) // Placeholder"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 239,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Process DNS query (placeholder - actual DNS processing happens in resolver)"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 321,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// This is a placeholder - actual DNS query processing should be done"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 24,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Authentication middleware (placeholder implementation)"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 32,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "debug!(\"Authentication middleware (placeholder)\");"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 50,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "if token == \"admin_token_placeholder\" {"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 546,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Update configuration (placeholder)"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 587,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Get logs (placeholder)"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 525,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for asset metadata retrieval"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 542,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for Byzantine behavior analysis"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 554,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for alert sending"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 570,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for proxy candidate discovery"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 575,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for proxy selection"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 577,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "public_key: \"placeholder\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 584,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for proxy connection establishment"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 589,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "session_id: \"placeholder\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 623,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for trust score calculation"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_manager.rs",
+      "line": 7,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "/// Certificate manager (placeholder)"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 584,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// For now, create a placeholder that would be replaced with real HSM integration"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 708,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for CloudHSM client initialization"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 737,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for four-proof validation"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 743,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for consensus validation"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 762,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for rotation logic"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 772,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder types that need proper implementation"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 231,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for actual S3 client"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 479,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Sign SCT (placeholder - would use actual signing key)"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 522,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for entry signing"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 529,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for tree head signing"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 535,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for data signing"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 614,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for S3 storage"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 619,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for S3 search"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 639,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for monitoring task startup"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 665,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for consistency verification"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 676,
+      "type": "placeholder",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: placeholder",
+      "evidence": "// Placeholder for consistency checking task"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 667,
+      "type": "stub",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: stub",
+      "evidence": "// Implementation stubs for supporting types"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 326,
+      "type": "stub",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: stub",
+      "evidence": "// Implementation stubs for supporting types"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 495,
+      "type": "stub",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: stub",
+      "evidence": "// Implementation stubs for supporting components"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 704,
+      "type": "stub",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: stub",
+      "evidence": "// Implementation stubs for dependencies that need to be created"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 601,
+      "type": "stub",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: stub",
+      "evidence": "// Implementation stubs for supporting components"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 388,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "// For now, we'll test that the handler can be created with mock data"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 80,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "// For now, return a mock response"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 93,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "// Mock issued certificate"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 96,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "serial_number: \"mock_serial_123\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 97,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "certificate_der: format!(\"mock_certificate_for_{}\", ca_request.common_name).into_bytes(),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 98,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "fingerprint: [0u8; 32], // Mock fingerprint"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 102,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "issuer_ca_id: \"mock_ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 107,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "// Mock SCT"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 111,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "log_id: [0u8; 32], // Mock log ID"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 113,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "signature: vec![0u8; 64], // Mock signature"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 122,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"Certificate issued successfully (mock)\");"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 137,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"common_name\": \"mock.example.com\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 140,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock certificate data - integrate with CA service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 164,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock revocation - integrate with CA service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 167,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"Certificate revoked successfully (mock): {}\", serial);"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 179,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"ca_certificate\": \"mock_ca_certificate_der_base64\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 180,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"fingerprint\": \"mock_ca_fingerprint\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 183,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock CA root certificate - integrate with CA service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 205,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "log_id: [0u8; 32], // Mock log ID"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 207,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "signature: vec![0u8; 64], // Mock signature"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 211,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"Certificate logged in CT successfully (mock)\");"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 244,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"log_id\": \"mock_log_id\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 246,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"inclusion_proof\": [\"mock_proof_hash_1\", \"mock_proof_hash_2\"],"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 248,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"root_hash\": \"mock_root_hash\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 249,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock inclusion proof - integrate with CT service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 270,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"consistency_proof\": [\"mock_consistency_hash_1\", \"mock_consistency_hash_2\"],"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 271,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock consistency proof - integrate with CT service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 292,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"certificate\": format!(\"mock_certificate_{}\", i),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 294,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"common_name\": format!(\"mock{}.example.com\", i),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 302,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock CT entries - integrate with CT service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 316,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"log_id\": \"mock_ct_log\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 320,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"root_hash\": \"mock_root_hash\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 322,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock CT stats - integrate with CT service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 366,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "RecordType::TXT => DnsRecordData::TXT(\"mock DNS response\".to_string()),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 376,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"DNS resolution completed (mock)\");"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 390,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock cache clear - integrate with DNS service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 404,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"server_id\": \"mock_dns_server\","
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 410,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "\"message\": \"Mock DNS stats - integrate with DNS service\""
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 437,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"Certificate validation completed (mock)\");"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 461,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "// Mock successful resolution"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 521,
+      "type": "mock",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: mock",
+      "evidence": "info!(\"Consensus proof validation completed (mock)\");"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 524,
+      "type": "dummy",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: dummy",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 530,
+      "type": "dummy",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: dummy",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 536,
+      "type": "dummy",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: dummy",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 478,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST, // TODO: Extract from QUIC connection"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 405,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "let client_ip = \"127.0.0.1\"; // TODO: Extract real client IP"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 30,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Implement actual authentication"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 49,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Validate admin token"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 27,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "ca: true,  // TODO: Actual health checks"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 47,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "uptime_seconds: 0, // TODO: Calculate actual uptime"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 79,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CA service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 133,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CA service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 158,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CA service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 177,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CA service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 202,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 222,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 241,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 266,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 288,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 314,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CT service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 349,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual DNS service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 386,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual DNS service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 402,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual DNS service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 429,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual CA and CT services"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 449,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "let client_id = \"bulk_client\"; // TODO: Extract real client ID"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 458,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual DNS service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 507,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Integrate with actual consensus service"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 553,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Implement configuration updates"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 571,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Implement actual maintenance operations"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 594,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "// TODO: Implement log retrieval"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 200,
+      "type": "// TODO",
+      "severity": "CRITICAL",
+      "description": "Placeholder implementation detected: // TODO",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(), // TODO: Use actual proof"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 524,
+      "type": "Ok\\(vec!\\[0u8; 64\\]\\)",
+      "severity": "CRITICAL",
+      "description": "Dummy cryptographic signature detected - complete security bypass",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 530,
+      "type": "Ok\\(vec!\\[0u8; 64\\]\\)",
+      "severity": "CRITICAL",
+      "description": "Dummy cryptographic signature detected - complete security bypass",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 536,
+      "type": "Ok\\(vec!\\[0u8; 64\\]\\)",
+      "severity": "CRITICAL",
+      "description": "Dummy cryptographic signature detected - complete security bypass",
+      "evidence": "Ok(vec![0u8; 64]) // Dummy signature"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 114,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 145,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 179,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 210,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 241,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 275,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 304,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 333,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 362,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Error, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 393,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 555,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let deserialized: CAError = serde_json::from_str(&json).unwrap();"
+    },
+    {
+      "file": "trustchain/src/errors.rs",
+      "line": 557,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "match deserialized {"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 14,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 31,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 83,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 155,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 210,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 237,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 247,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 255,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 280,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 286,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Log output destination"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 292,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 306,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 316,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 461,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let deserialized: TrustChainConfig = toml::from_str(&toml_str).unwrap();"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 463,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "assert_eq!(config.ca.ca_id, deserialized.ca.ca_id);"
+    },
+    {
+      "file": "trustchain/src/lib.rs",
+      "line": 4,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "//! for the Web3 ecosystem. Provides CA, CT, and DNS services with real-time"
+    },
+    {
+      "file": "trustchain/src/consensus/validator.rs",
+      "line": 5,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/consensus/validator.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 6,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 19,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 96,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 153,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Deserialize from network transmission"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 159,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize network_time_offset (bytes 0-15)"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 164,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize timestamp (bytes 16-31)"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 170,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize nonce (bytes 32-39)"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 175,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize proof_hash (remaining bytes)"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 210,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 278,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 298,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 314,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 407,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let deserialized = TimeProof::from_bytes(&bytes).unwrap();"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 409,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "assert_eq!(time_proof, deserialized);"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 6,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 23,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 100,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Deserialize from network transmission"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 102,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "bincode::deserialize(data).map_err(|e| anyhow!(\"Failed to deserialize ConsensusProof: {}\", e))"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 115,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 125,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Byzantine fault tolerance (fraction of malicious nodes)"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 165,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 235,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let deserialized = ConsensusProof::from_bytes(&bytes).unwrap();"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 237,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "assert_eq!(proof.stake_proof.stake_amount, deserialized.stake_proof.stake_amount);"
+    },
+    {
+      "file": "trustchain/src/consensus/block_matrix.rs",
+      "line": 5,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/consensus/block_matrix.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 11,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 60,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 77,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 96,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 111,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 560,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 32,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 18,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 84,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 265,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Find entry with lowest access count and oldest last access time"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 24,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 34,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 207,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 36,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 3,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "//! Provides secure DNS resolution using QUIC transport with IPv6-only networking,"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 11,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 89,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 138,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 149,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 165,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 179,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 189,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 215,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// DNS response codes"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 216,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 254,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 264,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 583,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize DNS response"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 584,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let response = self.deserialize_dns_response(&response_bytes)?;"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 642,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Deserialize DNS response from bytes"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 643,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "fn deserialize_dns_response(&self, bytes: &[u8]) -> TrustChainResult<DNSResponse> {"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 644,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Simplified DNS wire format deserialization"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 654,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 744,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "self.evict_oldest_entry().await;"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 753,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "async fn evict_oldest_entry(&self) {"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 754,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Simple LRU eviction - remove oldest accessed entry"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 755,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let mut oldest_key: Option<String> = None;"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 756,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "let mut oldest_time = SystemTime::now();"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 759,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "if entry.last_accessed < oldest_time {"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 760,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "oldest_time = entry.last_accessed;"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 761,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "oldest_key = Some(entry.key().clone());"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 765,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "if let Some(key) = oldest_key {"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 4,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "//! operations. Provides integration points for STOQ and HyperMesh systems."
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 62,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 242,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 250,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 258,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 266,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 274,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 283,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 289,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 294,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 299,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 305,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 311,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 317,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 322,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 328,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 334,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 342,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 348,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 354,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 363,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 368,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 375,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 382,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 388,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 542,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "async fn test_certificate_request_deserialization() {"
+    },
+    {
+      "file": "trustchain/src/api/validators.rs",
+      "line": 5,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/api/rate_limiter.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/api/rate_limiter.rs",
+      "line": 241,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/rate_limiter.rs",
+      "line": 250,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/rate_limiter.rs",
+      "line": 307,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 11,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/api/middleware_auth.rs",
+      "line": 17,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/mod.rs",
+      "line": 3,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "//! Provides trust validation, Byzantine fault detection, and remote proxy management"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 11,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 46,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Byzantine fault detector for malicious nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 72,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Trust scoring engine for assets and nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 85,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 93,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 100,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Entity ID for trust scoring (assets or nodes)"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 101,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 108,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 116,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 129,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 138,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "/// Trust score for assets and nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 139,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 149,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 159,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 171,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 174,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "EquivocationAttack,      // Sending different messages to different nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 182,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "IdentitySpoofing,        // Impersonating other nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 186,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 190,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "pub witness_nodes: Vec<NodeId>,"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 195,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 205,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 215,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 224,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 235,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 243,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 253,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 269,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 289,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 298,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 308,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 316,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 451,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Find suitable proxy nodes"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 485,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/policy.rs",
+      "line": 5,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 10,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 47,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 65,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 103,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 120,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 142,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_manager.rs",
+      "line": 5,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 10,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 105,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 113,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 133,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 153,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 176,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 184,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 191,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 197,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 203,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 210,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 226,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 237,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 250,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 263,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 276,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 693,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_store.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 8,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 27,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 280,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "\"SELECT timestamp FROM ct_entries ORDER BY sequence_number DESC LIMIT 1\""
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 484,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// Deserialize consensus proof"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 487,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "operation: \"deserialize_consensus_proof\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 10,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 55,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 91,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 106,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 483,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 493,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 10,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 35,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 54,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 75,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 458,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 467,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 7,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 43,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 273,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/simple_storage.rs",
+      "line": 9,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/simple_storage.rs",
+      "line": 153,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 10,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 63,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 84,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 101,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 109,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 124,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 139,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 156,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 165,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 178,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 215,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 588,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 7,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "use serde::{Serialize, Deserialize};"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 35,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 249,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "// CT leaf hash includes a prefix to prevent second preimage attacks"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 258,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 265,
+      "type": "DES",
+      "severity": "HIGH",
+      "description": "Weak cryptographic algorithm detected: DES",
+      "evidence": "#[derive(Clone, Debug, Serialize, Deserialize)]"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 585,
+      "type": "HSM integration not yet implemented",
+      "severity": "CRITICAL",
+      "description": "HSM integration missing - production security requirement",
+      "evidence": "todo!(\"HSM integration not yet implemented - requires AWS CloudHSM setup\")"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 709,
+      "type": "CloudHSM client implementation",
+      "severity": "CRITICAL",
+      "description": "CloudHSM client not implemented",
+      "evidence": "todo!(\"CloudHSM client implementation\")"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 739,
+      "type": "Ok\\(ConsensusResult::Valid\\)",
+      "severity": "CRITICAL",
+      "description": "Automatic consensus approval - security bypass",
+      "evidence": "Ok(ConsensusResult::Valid)"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 744,
+      "type": "Ok\\(ConsensusResult::Valid\\)",
+      "severity": "CRITICAL",
+      "description": "Automatic consensus approval - security bypass",
+      "evidence": "Ok(ConsensusResult::Valid)"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 52,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "pub fn default_for_testing() -> Self {"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 227,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "let proof = ConsensusProof::default_for_testing();"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 233,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "let proof = ConsensusProof::default_for_testing();"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 242,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "let proof = ConsensusProof::default_for_testing();"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 250,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "let proof = ConsensusProof::default_for_testing();"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 644,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: crate::consensus::ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 378,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 397,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 824,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 853,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 883,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 527,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ct/mod.rs",
+      "line": 200,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(), // TODO: Use actual proof"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 697,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 306,
+      "type": "default_for_testing\\(\\)",
+      "severity": "HIGH",
+      "description": "Test consensus proofs in production code",
+      "evidence": "consensus_proof: ConsensusProof::default_for_testing(),"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 36,
+      "type": "STOQ transport integration for DNS",
+      "severity": "CRITICAL",
+      "description": "STOQ transport not implemented",
+      "evidence": "/// STOQ transport integration for DNS queries"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 673,
+      "type": "STOQ transport integration for DNS",
+      "severity": "CRITICAL",
+      "description": "STOQ transport not implemented",
+      "evidence": "todo!(\"STOQ transport integration for DNS\")"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 678,
+      "type": "STOQ DNS server connection",
+      "severity": "CRITICAL",
+      "description": "STOQ DNS connection not implemented",
+      "evidence": "todo!(\"STOQ DNS server connection\")"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 614,
+      "type": "Placeholder for S3",
+      "severity": "CRITICAL",
+      "description": "S3 storage implementation missing",
+      "evidence": "// Placeholder for S3 storage"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 619,
+      "type": "Placeholder for S3",
+      "severity": "CRITICAL",
+      "description": "S3 storage implementation missing",
+      "evidence": "// Placeholder for S3 search"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 659,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "name: \"test.example.com\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 377,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let name = Name::from_utf8(\"test.example.com\").unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 385,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "assert_eq!(dns_record.name, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 332,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let response = create_test_response(1234, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 333,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.set(\"test.example.com\", RecordType::AAAA, &response, 300).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 335,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 355,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let response = create_test_response(1234, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 356,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.set(\"test.example.com\", RecordType::AAAA, &response, 1).await.unwrap(); // 1 second TTL"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 359,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 366,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 374,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let response = create_test_response(1234, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 375,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.set(\"test.example.com\", RecordType::AAAA, &response, 300).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 378,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 382,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let removed = cache.remove(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 386,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 414,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let response = create_test_response(1234, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 415,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.set(\"test.example.com\", RecordType::AAAA, &response, 300).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 418,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 458,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let response = create_test_response(1234, \"Test.Example.COM\");"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 459,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "cache.set(\"Test.Example.COM\", RecordType::AAAA, &response, 300).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 462,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"test.example.com\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 466,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let cached = cache.get(\"TeSt.ExAmPlE.cOm\", RecordType::AAAA).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 838,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "domain: \"test.example.com\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 847,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "domain: \"test.example.com\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 544,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "\"common_name\": \"test.example.com\","
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 545,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "\"san_entries\": [\"test.example.com\", \"alt.example.com\"],"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 579,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "assert_eq!(request.common_name, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/api/validators.rs",
+      "line": 77,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "assert!(validate_domain_name(\"test.example.com\").is_ok());"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 640,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "common_name: \"test.example.com\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 641,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "san_entries: vec![\"test.example.com\".to_string()],"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 651,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "assert_eq!(response.certificate.common_name, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 538,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let common_name = \"test.example.com\".to_string();"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 545,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "assert_eq!(metadata.common_name, \"test.example.com\");"
+    },
+    {
+      "file": "trustchain/src/ct/fingerprint_tracker.rs",
+      "line": 554,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "let common_name = \"test.example.com\".to_string();"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 692,
+      "type": "test\\.example\\.com",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test\\.example\\.com",
+      "evidence": "common_name: \"test.example.com\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 54,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "log_id: \"trustchain-ct-localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 55,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 61,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 108,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "server_id: \"trustchain-dns-localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 109,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 124,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 178,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "server_id: \"trustchain-api-localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 179,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 181,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "enable_tls: false, // Disabled for localhost testing"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 185,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 339,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "Self::localhost_testing()"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 344,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "/// Configuration for localhost testing"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 345,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "pub fn localhost_testing() -> Self {"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 459,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let config = TrustChainConfig::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 468,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let config = TrustChainConfig::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 479,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let mut config = TrustChainConfig::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/config.rs",
+      "line": 486,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let mut config = TrustChainConfig::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/lib.rs",
+      "line": 159,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let config = TrustChainConfig::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 43,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "stake_holder: \"localhost_test\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 240,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "node_id: \"localhost_node\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/consensus/proof.rs",
+      "line": 345,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "owner_id: \"localhost_test\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 153,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "pub fn localhost_testing() -> Self {"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 202,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "pub fn localhost_testing(validator_id: String) -> Self {"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 205,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "network_id: \"localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 206,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/consensus/mod.rs",
+      "line": 243,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let requirements = ConsensusRequirements::localhost_testing();"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 283,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "\"testing\" => CAMode::LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 343,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "Ok(TrustChainConfig::localhost_testing()) // Placeholder"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 400,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "mode: CAMode::LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 405,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: trustchain::consensus::ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 407,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 410,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 412,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "domain: \"test.localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 416,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(config.domain, \"test.localhost\");"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 432,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "mode: CAMode::LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 437,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: trustchain::consensus::ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 439,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 442,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 444,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "domain: \"test.localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 270,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "// For localhost testing, return localhost"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 277,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 289,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 313,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 478,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST, // TODO: Extract from QUIC connection"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 579,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "config.bind_address = Ipv6Addr::LOCALHOST;"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 589,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(resolver.server_id, \"trustchain-dns-localhost\");"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 612,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 621,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(*addr, Ipv6Addr::LOCALHOST);"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 636,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 650,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(stats.server_id, \"trustchain-dns-localhost\");"
+    },
+    {
+      "file": "trustchain/src/dns/mod.rs",
+      "line": 663,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 309,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/resolver.rs",
+      "line": 378,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let ipv6_addr = Ipv6Addr::LOCALHOST;"
+    },
+    {
+      "file": "trustchain/src/dns/cache.rs",
+      "line": 312,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 185,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "// Accept localhost and test domains"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 186,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "if domain == \"localhost\" ||"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 187,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "domain.ends_with(\".localhost\") ||"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 314,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "async fn test_localhost_validation() {"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 317,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "// Localhost should be valid"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 318,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let result = validator.validate_domain_certificate(\"localhost\").await;"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 347,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "validator.validate_domain_certificate(\"localhost\").await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 350,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "validator.validate_domain_certificate(\"localhost\").await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 362,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "validator.validate_domain_certificate(\"localhost\").await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 368,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "validator.validate_domain_certificate(\"localhost\").await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/cert_validator.rs",
+      "line": 386,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let result = validator.validate_domain_certificate(\"localhost\").await;"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 65,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let cert_key = generate_simple_self_signed(vec![\"localhost\".to_string()])"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 345,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let server = QuicDnsServer::new(Ipv6Addr::LOCALHOST, 0).await;"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 349,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(server.bind_address, Ipv6Addr::LOCALHOST);"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 354,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let server = QuicDnsServer::new(Ipv6Addr::LOCALHOST, 0).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 366,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let server = QuicDnsServer::new(Ipv6Addr::LOCALHOST, 0).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 378,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let server = QuicDnsServer::new(Ipv6Addr::LOCALHOST, 0).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/quic_server.rs",
+      "line": 394,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let _server = QuicDnsServer::new(Ipv6Addr::LOCALHOST, 0).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 291,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 812,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 840,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "client_addr: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 855,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "resolver_addr: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 882,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let ipv6_data = DNSRecordData::AAAA(Ipv6Addr::LOCALHOST);"
+    },
+    {
+      "file": "trustchain/src/dns/dns_over_quic.rs",
+      "line": 884,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "DNSRecordData::AAAA(addr) => assert_eq!(addr, Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 478,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 484,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: crate::consensus::ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 494,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(server.bind_address, Ipv6Addr::LOCALHOST);"
+    },
+    {
+      "file": "trustchain/src/api/validators.rs",
+      "line": 89,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "let addresses = vec![Ipv6Addr::LOCALHOST];"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 364,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "RecordType::AAAA => DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 474,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "data: DnsRecordData::AAAA(std::net::Ipv6Addr::LOCALHOST),"
+    },
+    {
+      "file": "trustchain/src/api/handlers.rs",
+      "line": 643,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 578,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "network_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/trust/hypermesh_integration.rs",
+      "line": 587,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "proxy_address: Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 4,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "//! Supports both localhost testing and production deployment with IPv6-only networking"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 67,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "/// Localhost testing with self-signed root"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 68,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 76,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ca_id: \"trustchain-ca-localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 77,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 81,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "mode: CAMode::LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 82,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 156,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "CAMode::LocalhostTesting => {"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 157,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "info!(\"Creating self-signed root CA for localhost testing\");"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 374,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "common_name: \"test.localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 375,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "san_entries: vec![\"test.localhost\".to_string()],"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 377,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 383,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "assert_eq!(issued_cert.common_name, \"test.localhost\");"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 393,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "common_name: \"test.localhost\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 394,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "san_entries: vec![\"test.localhost\".to_string()],"
+    },
+    {
+      "file": "trustchain/src/ca/mod.rs",
+      "line": 396,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 205,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 313,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "CAMode::LocalhostTesting => {"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 314,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "info!(\"Creating self-signed root CA for localhost testing\");"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 793,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "mode: CAMode::LocalhostTesting,"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 798,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "consensus_requirements: ConsensusRequirements::localhost_testing(),"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 800,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "bind_address: std::net::Ipv6Addr::LOCALHOST,"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 822,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 851,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 881,
+      "type": "localhost",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: localhost",
+      "evidence": "ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],"
+    },
+    {
+      "file": "trustchain/src/api/mod.rs",
+      "line": 405,
+      "type": "127\\.0\\.0\\.1",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: 127\\.0\\.0\\.1",
+      "evidence": "let client_ip = \"127.0.0.1\"; // TODO: Extract real client IP"
+    },
+    {
+      "file": "trustchain/src/bin/trustchain-server.rs",
+      "line": 399,
+      "type": "test-ca",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-ca",
+      "evidence": "ca_id: \"test-ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ca/certificate_authority.rs",
+      "line": 792,
+      "type": "test-ca",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-ca",
+      "evidence": "ca_id: \"test-ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ct/storage.rs",
+      "line": 526,
+      "type": "test-ca",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-ca",
+      "evidence": "issuer_ca_id: \"test-ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ct/certificate_transparency.rs",
+      "line": 696,
+      "type": "test-ca",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-ca",
+      "evidence": "issuer_ca_id: \"test-ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 305,
+      "type": "test-ca",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-ca",
+      "evidence": "issuer_ca_id: \"test-ca\".to_string(),"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 463,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let manager = SCTManager::new(\"test-log\".to_string()).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 464,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "assert_eq!(manager.log_id, \"test-log\");"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 470,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let manager = SCTManager::new(\"test-log\".to_string()).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 488,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let manager = SCTManager::new(\"test-log\".to_string()).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 506,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let manager = SCTManager::new(\"test-log\".to_string()).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/sct_manager.rs",
+      "line": 527,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let manager = SCTManager::new(\"test-log\".to_string()).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 314,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 315,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "assert_eq!(log.log_id, \"test-log\");"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 321,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 333,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 351,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 375,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 397,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 2).await.unwrap();"
+    },
+    {
+      "file": "trustchain/src/ct/merkle_log.rs",
+      "line": 412,
+      "type": "test-log",
+      "severity": "MEDIUM",
+      "description": "Test data in production code: test-log",
+      "evidence": "let mut log = MerkleLog::new(\"test-log\".to_string(), 1000).await.unwrap();"
+    },
+    {
+      "file": "Cargo.toml",
+      "line": 1,
+      "type": "COMPILATION_FAILURE",
+      "severity": "CRITICAL",
+      "description": "Code does not compile - production deployment impossible",
+      "evidence": "    Checking trustchain v0.1.0 (/home/persist/repos/projects/web3/trustchain)\nerror[E0432]: unresolved import `rustls::pki_types`\n  --> src/ca/certificate_authority.rs:16:13\n   |\n16 | use rustls::pki_types::{CertificateDer, PrivateKeyDer};\n   |             ^^^^^^^^^ could not find `pki_types` in `rustls`\n\nerror[E0432]: unresolved imports `merkletree::MerkleTree`, `merkletree::Proof`\n  --> src/ct/certificate_transparency.rs:15:18\n   |\n15 | use merkletree::{MerkleTree, Proof};\n   |                "
+    }
+  ]
+}

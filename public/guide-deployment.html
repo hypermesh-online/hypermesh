@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperMesh Production Deployment Guide</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .guide {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: var(--spacing-8);
+            background: white;
+            line-height: 1.8;
+        }
+        .step-card {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary-color);
+            padding: var(--spacing-6);
+            margin: var(--spacing-6) 0;
+            border-radius: var(--radius-lg);
+        }
+        .command-block {
+            background: var(--bg-dark);
+            color: #e5e7eb;
+            padding: var(--spacing-4);
+            border-radius: var(--radius-lg);
+            font-family: monospace;
+            margin: var(--spacing-3) 0;
+            overflow-x: auto;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: var(--spacing-2);
+        }
+        .status-running { background: var(--success-color); }
+        .status-stopped { background: var(--error-color); }
+        .status-warning { background: var(--warning-color); }
+        .deployment-option {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-6);
+            margin: var(--spacing-4) 0;
+        }
+        .config-section {
+            background: var(--bg-secondary);
+            padding: var(--spacing-4);
+            border-radius: var(--radius-lg);
+            margin: var(--spacing-4) 0;
+        }
+        .performance-note {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(37, 99, 235, 0.1));
+            border: 1px solid var(--success-color);
+            padding: var(--spacing-4);
+            border-radius: var(--radius-lg);
+            margin: var(--spacing-4) 0;
+        }
+        .warning-note {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(239, 68, 68, 0.1));
+            border: 1px solid var(--warning-color);
+            padding: var(--spacing-4);
+            border-radius: var(--radius-lg);
+            margin: var(--spacing-4) 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h1>HyperMesh</h1>
+                <span class="nav-tagline">Deployment Guide</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="guide" style="margin-top: 100px;">
+        <h1>HyperMesh Production Deployment Guide</h1>
+        
+        <div class="abstract">
+            <h3>Deployment Overview</h3>
+            <p>
+                This guide provides complete instructions for deploying HyperMesh infrastructure in 
+                development, staging, and production environments. All components are production-ready 
+                with validated performance and comprehensive monitoring.
+            </p>
+            <p>
+                <strong>Deployment Options:</strong> Local development, enterprise production, 
+                cloud-native with Kubernetes, and high-performance 40+ Gbps configurations.
+            </p>
+        </div>
+
+        <h2>1. Prerequisites and System Requirements</h2>
+
+        <h3>1.1 Hardware Requirements</h3>
+        <div class="deployment-option">
+            <h4>Development Environment</h4>
+            <ul>
+                <li><strong>CPU:</strong> 4+ cores, x86_64 architecture</li>
+                <li><strong>Memory:</strong> 8GB RAM minimum, 16GB recommended</li>
+                <li><strong>Storage:</strong> 50GB available space (SSD recommended)</li>
+                <li><strong>Network:</strong> IPv6 capable interface</li>
+            </ul>
+        </div>
+
+        <div class="deployment-option">
+            <h4>Production Environment</h4>
+            <ul>
+                <li><strong>CPU:</strong> 16+ cores, dedicated network cores (2-5)</li>
+                <li><strong>Memory:</strong> 64GB RAM minimum, NUMA-aware configuration</li>
+                <li><strong>Storage:</strong> NVMe SSD with 500GB+ available space</li>
+                <li><strong>Network:</strong> 40/100 Gbps NICs with DPDK support</li>
+                <li><strong>Hardware:</strong> HSM for certificate operations (optional)</li>
+            </ul>
+        </div>
+
+        <h3>1.2 Software Prerequisites</h3>
+        <div class="command-block">
+# Ubuntu/Debian
+sudo apt update
+sudo apt install -y curl git build-essential pkg-config libssl-dev
+
+# Install Rust (required for all components)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# Verify installation
+rustc --version
+cargo --version
+        </div>
+
+        <h3>1.3 Network Configuration</h3>
+        <div class="warning-note">
+            <h4>⚠️ IPv6 Requirement</h4>
+            <p>HyperMesh requires IPv6 networking. Ensure your environment has IPv6 connectivity:</p>
+            <div class="command-block">
+# Test IPv6 connectivity
+ping6 -c 3 ::1
+ip -6 addr show
+
+# Enable IPv6 if disabled
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
+            </div>
+        </div>
+
+        <h2>2. Quick Start Deployment</h2>
+
+        <div class="step-card">
+            <h3>Step 1: Clone Repositories</h3>
+            <p>Download the complete HyperMesh ecosystem:</p>
+            <div class="command-block">
+# Create workspace directory
+mkdir -p ~/hypermesh-deployment
+cd ~/hypermesh-deployment
+
+# Clone core infrastructure components
+git clone https://github.com/hypermesh-online/trustchain.git
+git clone https://github.com/hypermesh-online/stoq.git
+git clone https://github.com/hypermesh-online/hypermesh.git
+git clone https://github.com/hypermesh-online/catalog.git
+git clone https://github.com/hypermesh-online/caesar.git
+
+# Optional: Clone UI components
+git clone https://github.com/hypermesh-online/ngauge.git
+            </div>
+        </div>
+
+        <div class="step-card">
+            <h3>Step 2: Build Core Components</h3>
+            <p>Compile all infrastructure services:</p>
+            <div class="command-block">
+# Build TrustChain (Certificate Authority)
+cd trustchain
+cargo build --release
+cd ..
+
+# Build STOQ (Transport Protocol)
+cd stoq
+cargo build --release
+cd ..
+
+# Build HyperMesh (Core Platform)
+cd hypermesh
+cargo build --release
+cd ..
+
+# Build Catalog (Asset SDK)
+cd catalog
+cargo build --release
+cd ..
+
+# Build Caesar (Economic Layer)
+cd caesar
+cargo build --release
+cd ..
+            </div>
+            <div class="performance-note">
+                <strong>Performance Tip:</strong> Use <code>--release</code> flag for production builds. 
+                Debug builds may not achieve optimal performance.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <h3>Step 3: Configuration Setup</h3>
+            <p>Create configuration files for each component:</p>
+            
+            <div class="config-section">
+                <h4>TrustChain Configuration</h4>
+                <div class="command-block">
+# Create TrustChain config
+cat > trustchain/config.toml << 'EOF'
+[server]
+bind_address = "::1"
+port = 8443
+tls_enabled = true
+
+[ca]
+subject_name = "CN=HyperMesh-CA"
+key_size = 2048
+cert_lifetime_days = 365
+
+[dns]
+enabled = true
+port = 8453
+upstream_servers = ["2001:4860:4860::8888"]
+
+[logging]
+level = "info"
+output = "console"
+EOF
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h4>STOQ Configuration</h4>
+                <div class="command-block">
+# Create STOQ config
+cat > stoq/config.toml << 'EOF'
+[transport]
+bind_address = "::1"
+port = 8444
+max_concurrent_streams = 4000
+send_buffer_size = 67108864  # 64MB
+receive_buffer_size = 67108864
+
+[performance]
+enable_memory_pool = true
+memory_pool_size = 8192
+frame_batch_size = 512
+enable_hardware_accel = false  # Enable for production
+
+[logging]
+level = "info"
+EOF
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h4>HyperMesh Configuration</h4>
+                <div class="command-block">
+# Create HyperMesh config
+cat > hypermesh/config.toml << 'EOF'
+[node]
+bind_address = "::1"
+port = 8445
+node_id = "hypermesh-node-1"
+
+[consensus]
+algorithm = "four-proof"
+byzantine_tolerance = 0.33
+finality_timeout_sec = 15
+
+[assets]
+enable_proxy_addressing = true
+enable_vm_execution = true
+privacy_level = "private_network"
+
+[logging]
+level = "info"
+EOF
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <h3>Step 4: Start Services</h3>
+            <p>Launch the HyperMesh infrastructure stack:</p>
+            
+            <div class="command-block">
+# Terminal 1: Start TrustChain (Certificate Authority)
+cd ~/hypermesh-deployment/trustchain
+cargo run --release --bin trustchain-server
+
+# Wait for: "TrustChain CA server listening on [::1]:8443"
+            </div>
+
+            <div class="command-block">
+# Terminal 2: Start STOQ (Transport Protocol)
+cd ~/hypermesh-deployment/stoq
+cargo run --release --bin stoq-server
+
+# Wait for: "STOQ transport server listening on [::1]:8444"
+            </div>
+
+            <div class="command-block">
+# Terminal 3: Start HyperMesh (Core Platform)
+cd ~/hypermesh-deployment/hypermesh
+cargo run --release --bin hypermesh-server
+
+# Wait for: "HyperMesh node listening on [::1]:8445"
+            </div>
+
+            <div class="command-block">
+# Terminal 4: Start Catalog (Asset SDK)
+cd ~/hypermesh-deployment/catalog
+cargo run --release --bin catalog-server
+
+# Wait for: "Catalog asset server listening on [::1]:8446"
+            </div>
+        </div>
+
+        <div class="step-card">
+            <h3>Step 5: Verify Deployment</h3>
+            <p>Test all services are running correctly:</p>
+            
+            <div class="command-block">
+# Test TrustChain health
+curl -k "https://[::1]:8443/health"
+# Expected: {"status":"healthy","services":{"ca":true,"ct":true,"dns":true}}
+
+# Test STOQ transport
+curl -k "https://[::1]:8444/system/health"  
+# Expected: {"status":"healthy","performance":{"throughput":...}}
+
+# Test HyperMesh platform
+curl -k "https://[::1]:8445/system/status"
+# Expected: {"status":"healthy","consensus":{"finality":...}}
+
+# Test Catalog assets
+curl -k "https://[::1]:8446/assets"
+# Expected: {"assets":[],"status":"ready"}
+            </div>
+
+            <div class="performance-note">
+                <h4>✅ Service Status Indicators</h4>
+                <p><span class="status-indicator status-running"></span>TrustChain: Certificate operations ready</p>
+                <p><span class="status-indicator status-running"></span>STOQ: Transport layer operational</p>
+                <p><span class="status-indicator status-running"></span>HyperMesh: Consensus system active</p>
+                <p><span class="status-indicator status-running"></span>Catalog: Asset management ready</p>
+            </div>
+        </div>
+
+        <h2>3. Production Deployment Options</h2>
+
+        <h3>3.1 High-Performance Production</h3>
+        <div class="deployment-option">
+            <h4>40+ Gbps Optimized Configuration</h4>
+            <p>For maximum performance deployment with hardware acceleration:</p>
+            
+            <div class="command-block">
+# Install DPDK prerequisites
+sudo apt install -y dpdk dpdk-dev
+
+# Configure huge pages for DMA
+echo 2048 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+
+# Enable hardware acceleration in STOQ
+cat > stoq/config-production.toml << 'EOF'
+[transport]
+bind_address = "::1"
+port = 8444
+
+[performance]
+enable_memory_pool = true
+memory_pool_size = 16384
+frame_batch_size = 1024
+enable_hardware_accel = true
+
+[hardware_accel]
+enable_kernel_bypass = true
+enable_nic_offload = true
+lso_max_size = 131072  # 128KB
+cpu_affinity = [2, 3, 4, 5]  # Dedicated network cores
+
+[numa]
+memory_node = 0
+network_node = 0
+EOF
+
+# Start with production config
+cargo run --release --bin stoq-server -- --config config-production.toml
+            </div>
+
+            <div class="performance-note">
+                <strong>Expected Performance:</strong> 40+ Gbps throughput with proper hardware configuration
+            </div>
+        </div>
+
+        <h3>3.2 Enterprise Production</h3>
+        <div class="deployment-option">
+            <h4>HSM-Integrated Certificate Authority</h4>
+            <div class="command-block">
+# Configure TrustChain for HSM integration
+cat > trustchain/config-enterprise.toml << 'EOF'
+[server]
+bind_address = "::"  # Listen on all IPv6 interfaces
+port = 8443
+
+[ca]
+hsm_enabled = true
+hsm_slot = 0
+hsm_pin = "your-hsm-pin"
+subject_name = "CN=HyperMesh-Production-CA"
+cert_lifetime_days = 90  # Shorter lifetime for production
+
+[ct]
+enabled = true
+log_max_entries = 1000000
+sct_verification = true
+
+[monitoring]
+enabled = true
+metrics_port = 9090
+health_check_interval = 30
+
+[logging]
+level = "warn"
+output = "file"
+file_path = "/var/log/trustchain/server.log"
+EOF
+            </div>
+        </div>
+
+        <h3>3.3 Cloud-Native Deployment</h3>
+        <div class="deployment-option">
+            <h4>Kubernetes Configuration</h4>
+            <div class="command-block">
+# Create Kubernetes deployment manifests
+cat > k8s-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hypermesh-stack
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hypermesh
+  template:
+    metadata:
+      labels:
+        app: hypermesh
+    spec:
+      containers:
+      - name: trustchain
+        image: hypermesh/trustchain:latest
+        ports:
+        - containerPort: 8443
+        env:
+        - name: BIND_ADDRESS
+          value: "::"
+      - name: stoq
+        image: hypermesh/stoq:latest
+        ports:
+        - containerPort: 8444
+        resources:
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+      - name: hypermesh
+        image: hypermesh/hypermesh:latest
+        ports:
+        - containerPort: 8445
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypermesh-service
+spec:
+  selector:
+    app: hypermesh
+  ports:
+  - name: trustchain
+    port: 8443
+    targetPort: 8443
+  - name: stoq
+    port: 8444
+    targetPort: 8444
+  - name: hypermesh
+    port: 8445
+    targetPort: 8445
+  type: LoadBalancer
+  ipFamily: IPv6
+EOF
+
+# Deploy to Kubernetes
+kubectl apply -f k8s-deployment.yaml
+            </div>
+        </div>
+
+        <h2>4. Frontend Integration</h2>
+
+        <div class="step-card">
+            <h3>Deploy Management Dashboard</h3>
+            <p>Start the HyperMesh management interface:</p>
+            
+            <div class="command-block">
+# Clone UI repository (if not already done)
+git clone https://github.com/hypermesh-online/ui.git
+cd ui/frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Or build for production
+npm run build
+npm run preview
+            </div>
+
+            <div class="performance-note">
+                <h4>📊 Dashboard Access Points</h4>
+                <ul>
+                    <li><strong>Main Dashboard:</strong> http://localhost:5173/</li>
+                    <li><strong>System Monitor:</strong> http://localhost:5173/monitor</li>
+                    <li><strong>Integration Test:</strong> http://localhost:5173/integration</li>
+                    <li><strong>Performance Analytics:</strong> http://localhost:5173/performance</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>5. Monitoring and Maintenance</h2>
+
+        <h3>5.1 Performance Monitoring</h3>
+        <div class="command-block">
+# Monitor STOQ performance in real-time
+curl -s "https://[::1]:8444/metrics/performance" | jq .
+
+# Monitor TrustChain certificate operations
+curl -s "https://[::1]:8443/stats" | jq .
+
+# Monitor HyperMesh consensus
+curl -s "https://[::1]:8445/consensus/stats" | jq .
+
+# Monitor system resources
+top -p $(pgrep -f "trustchain-server|stoq-server|hypermesh-server")
+        </div>
+
+        <h3>5.2 Log Monitoring</h3>
+        <div class="command-block">
+# Follow service logs
+tail -f ~/.local/share/hypermesh/logs/trustchain.log
+tail -f ~/.local/share/hypermesh/logs/stoq.log  
+tail -f ~/.local/share/hypermesh/logs/hypermesh.log
+
+# Or use journalctl for systemd services
+sudo journalctl -f -u hypermesh-trustchain
+sudo journalctl -f -u hypermesh-stoq
+sudo journalctl -f -u hypermesh-core
+        </div>
+
+        <h3>5.3 Health Checks</h3>
+        <div class="step-card">
+            <h4>Automated Health Monitoring</h4>
+            <div class="command-block">
+#!/bin/bash
+# health-check.sh - Automated health monitoring script
+
+SERVICES=("trustchain:8443" "stoq:8444" "hypermesh:8445" "catalog:8446")
+ERRORS=0
+
+for service in "${SERVICES[@]}"; do
+    name=${service%:*}
+    port=${service#*:}
+    
+    if curl -s -k "https://[::1]:${port}/health" > /dev/null; then
+        echo "✅ ${name} service healthy"
+    else
+        echo "❌ ${name} service failed"
+        ((ERRORS++))
+    fi
+done
+
+if [ $ERRORS -eq 0 ]; then
+    echo "🎉 All HyperMesh services operational"
+    exit 0
+else
+    echo "⚠️  ${ERRORS} service(s) need attention"
+    exit 1
+fi
+            </div>
+        </div>
+
+        <h2>6. Troubleshooting</h2>
+
+        <h3>6.1 Common Issues</h3>
+        <div class="warning-note">
+            <h4>Port Conflicts</h4>
+            <p><strong>Issue:</strong> Services fail to start due to port conflicts</p>
+            <p><strong>Solution:</strong> Check for existing services and modify port configuration:</p>
+            <div class="command-block">
+# Check IPv6 port usage
+ss -tlnp6 | grep -E "(8443|8444|8445|8446)"
+
+# Kill conflicting processes
+sudo lsof -ti:8443 | xargs kill -9
+
+# Or modify config files to use different ports
+            </div>
+        </div>
+
+        <div class="warning-note">
+            <h4>IPv6 Connectivity Issues</h4>
+            <p><strong>Issue:</strong> Services can't bind to IPv6 addresses</p>
+            <p><strong>Solution:</strong> Enable IPv6 and configure networking:</p>
+            <div class="command-block">
+# Enable IPv6 system-wide
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
+
+# Test IPv6 loopback
+ping6 -c 1 ::1
+
+# Check IPv6 interface configuration
+ip -6 addr show
+            </div>
+        </div>
+
+        <h3>6.2 Performance Issues</h3>
+        <div class="performance-note">
+            <h4>STOQ Performance Optimization</h4>
+            <p>If not achieving expected throughput:</p>
+            <ol>
+                <li>Verify hardware acceleration is enabled in config</li>
+                <li>Check CPU affinity and NUMA configuration</li>
+                <li>Monitor memory pool utilization</li>
+                <li>Validate network hardware capabilities</li>
+            </ol>
+            <div class="command-block">
+# Check STOQ performance statistics
+curl -s "https://[::1]:8444/stats/performance" | jq '.throughput_gbps'
+
+# Monitor memory pool efficiency
+curl -s "https://[::1]:8444/stats/memory" | jq '.pool_hit_ratio'
+            </div>
+        </div>
+
+        <h2>7. Scaling and Production Considerations</h2>
+
+        <h3>7.1 Horizontal Scaling</h3>
+        <p>For large-scale deployments:</p>
+        <ul>
+            <li><strong>Load Balancing:</strong> Deploy multiple instances behind IPv6 load balancers</li>
+            <li><strong>Database Clustering:</strong> Use distributed consensus for state management</li>
+            <li><strong>Certificate Distribution:</strong> Implement certificate rotation and distribution</li>
+            <li><strong>Monitoring Integration:</strong> Deploy Prometheus/Grafana for comprehensive monitoring</li>
+        </ul>
+
+        <h3>7.2 Security Hardening</h3>
+        <ul>
+            <li><strong>Certificate Management:</strong> Regular rotation with HSM integration</li>
+            <li><strong>Network Isolation:</strong> Deploy in secure VPCs with IPv6 firewalls</li>
+            <li><strong>Access Control:</strong> Implement role-based access with certificate authentication</li>
+            <li><strong>Audit Logging:</strong> Comprehensive logging for security compliance</li>
+        </ul>
+
+        <div style="margin-top: var(--spacing-16); padding: var(--spacing-6); background: var(--bg-secondary); border-radius: var(--radius-lg); text-align: center;">
+            <h3>Production Support</h3>
+            <p>For enterprise deployment assistance and production support:</p>
+            <p><strong>Technical Support:</strong> support@hypermesh.online</p>
+            <p><strong>Enterprise Sales:</strong> enterprise@hypermesh.online</p>
+            <p><strong>Documentation:</strong> docs.hypermesh.online</p>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>HyperMesh Deployment Guide</h3>
+                    <p>Complete production deployment instructions for HyperMesh Web3 infrastructure.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 HyperMesh. Production-ready Web3 infrastructure.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

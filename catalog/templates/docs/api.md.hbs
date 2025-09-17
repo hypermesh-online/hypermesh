@@ -1,0 +1,54 @@
+# API Documentation - {{asset.name}}
+
+{{#if api.functions}}
+## Functions
+
+{{#each api.functions}}
+### {{this.name}}
+
+```{{../language}}
+{{this.name}}({{this.parameters}})
+```
+
+{{#if this.description}}
+**Description**: {{this.description}}
+{{/if}}
+
+**Type**: {{this.type}}
+
+{{/each}}
+{{/if}}
+
+{{#if api.constants}}
+## Constants
+
+{{#each api.constants}}
+### {{this.name}}
+
+**Value**: `{{this.value}}`  
+**Type**: {{this.type}}
+
+{{/each}}
+{{/if}}
+
+{{#if api.modules}}
+## Modules
+
+{{#each api.modules}}
+### {{this.name}}
+
+{{#if this.description}}{{this.description}}{{/if}}
+
+{{/each}}
+{{/if}}
+
+{{#if api.classes}}
+## Classes
+
+{{#each api.classes}}
+### {{this.name}}
+
+{{#if this.description}}{{this.description}}{{/if}}
+
+{{/each}}
+{{/if}}

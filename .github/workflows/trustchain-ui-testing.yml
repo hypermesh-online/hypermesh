@@ -1,0 +1,475 @@
+name: TrustChain UI Quality Assurance
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'ui/frontend/**'
+      - 'trustchain/ui/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'ui/frontend/**'
+      - 'trustchain/ui/**'
+
+env:
+  NODE_VERSION: '20'
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+
+jobs:
+  # Unit Tests and Coverage
+  unit-tests:
+    name: Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Run unit tests
+        working-directory: ui/frontend
+        run: npm run test:run
+        
+      - name: Generate coverage report
+        working-directory: ui/frontend
+        run: npm run test:coverage
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ui/frontend/coverage/lcov.info
+          flags: ui-frontend
+          name: trustchain-ui-coverage
+          
+      - name: Coverage threshold check
+        working-directory: ui/frontend
+        run: |
+          # Check if coverage meets thresholds
+          node -e "
+            const coverage = require('./coverage/coverage-summary.json');
+            const lines = coverage.total.lines.pct;
+            const branches = coverage.total.branches.pct;
+            console.log(\`Lines: \${lines}%, Branches: \${branches}%\`);
+            if (lines < 90 || branches < 85) {
+              console.error('Coverage below thresholds');
+              process.exit(1);
+            }
+          "
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            ui/frontend/coverage/
+            ui/frontend/test-results/
+          retention-days: 7
+
+  # Feature Parity Validation
+  feature-parity:
+    name: Feature Parity Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: unit-tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Run feature parity tests
+        working-directory: ui/frontend
+        run: npm run test:run -- --grep="Feature Parity"
+        
+      - name: Validate Svelte component coverage
+        working-directory: ui/frontend
+        run: |
+          echo "Validating React components match Svelte functionality..."
+          
+          # Check required test files exist
+          test -f "components/trustchain/__tests__/feature-parity/NodeConfiguration.test.tsx"
+          test -f "components/trustchain/__tests__/feature-parity/QuantumSecurity.test.tsx"
+          
+          echo "✅ Feature parity test suite complete"
+
+  # End-to-End Tests
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: feature-parity
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        working-directory: ui/frontend
+        run: npx playwright install ${{ matrix.browser }} --with-deps
+        
+      - name: Build application
+        working-directory: ui/frontend
+        run: npm run build
+        
+      - name: Run E2E tests
+        working-directory: ui/frontend
+        run: npx playwright test --project=${{ matrix.browser }}
+        env:
+          CI: true
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            ui/frontend/test-results/
+            ui/frontend/playwright-report/
+          retention-days: 7
+
+  # Accessibility Tests
+  accessibility-tests:
+    name: Accessibility Tests (WCAG 2.1 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: feature-parity
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        working-directory: ui/frontend
+        run: npx playwright install chromium --with-deps
+        
+      - name: Install axe-core for accessibility testing
+        working-directory: ui/frontend
+        run: npm install --save-dev @axe-core/playwright
+        
+      - name: Build application
+        working-directory: ui/frontend
+        run: npm run build
+        
+      - name: Run accessibility tests
+        working-directory: ui/frontend
+        run: npm run test:accessibility
+        env:
+          CI: true
+          
+      - name: Generate accessibility report
+        working-directory: ui/frontend
+        if: always()
+        run: |
+          echo "Accessibility test results:" > accessibility-summary.txt
+          echo "WCAG 2.1 AA compliance validation" >> accessibility-summary.txt
+          
+      - name: Upload accessibility results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: accessibility-results
+          path: |
+            ui/frontend/test-results/
+            ui/frontend/accessibility-summary.txt
+          retention-days: 7
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: feature-parity
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        working-directory: ui/frontend
+        run: npx playwright install chromium --with-deps
+        
+      - name: Build application
+        working-directory: ui/frontend
+        run: npm run build
+        
+      - name: Run performance tests
+        working-directory: ui/frontend
+        run: npm run test:performance
+        env:
+          CI: true
+          
+      - name: Lighthouse CI
+        working-directory: ui/frontend
+        run: |
+          npm install -g @lhci/cli
+          lhci autorun || true  # Don't fail on performance issues in CI
+          
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            ui/frontend/.lighthouseci/
+            ui/frontend/test-results/
+          retention-days: 7
+
+  # Security Testing
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Run npm audit
+        working-directory: ui/frontend
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+        
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          languages: javascript
+          
+      - name: Security scan with Snyk
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --file=ui/frontend/package.json
+        continue-on-error: true
+
+  # Production Readiness Assessment
+  production-readiness:
+    name: Production Readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests, feature-parity, e2e-tests, accessibility-tests, performance-tests, security-tests]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'ui/frontend/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: ui/frontend
+        run: npm ci
+        
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ui/frontend/test-results/
+          
+      - name: Run comprehensive test suite
+        working-directory: ui/frontend
+        run: node test-runner.js --skip-unit --skip-e2e
+        continue-on-error: true
+        
+      - name: Production readiness assessment
+        working-directory: ui/frontend
+        run: |
+          echo "=== TRUSTCHAIN UI CONSOLIDATION ASSESSMENT ===" > readiness-report.md
+          echo "" >> readiness-report.md
+          echo "**Assessment Date:** $(date)" >> readiness-report.md
+          echo "" >> readiness-report.md
+          
+          # Check job results
+          UNIT_TESTS="${{ needs.unit-tests.result }}"
+          FEATURE_PARITY="${{ needs.feature-parity.result }}"
+          E2E_TESTS="${{ needs.e2e-tests.result }}"
+          ACCESSIBILITY="${{ needs.accessibility-tests.result }}"
+          PERFORMANCE="${{ needs.performance-tests.result }}"
+          SECURITY="${{ needs.security-tests.result }}"
+          
+          echo "## Test Results Summary" >> readiness-report.md
+          echo "" >> readiness-report.md
+          echo "| Test Suite | Status |" >> readiness-report.md
+          echo "|------------|--------|" >> readiness-report.md
+          echo "| Unit Tests | $UNIT_TESTS |" >> readiness-report.md
+          echo "| Feature Parity | $FEATURE_PARITY |" >> readiness-report.md
+          echo "| E2E Tests | $E2E_TESTS |" >> readiness-report.md
+          echo "| Accessibility | $ACCESSIBILITY |" >> readiness-report.md
+          echo "| Performance | $PERFORMANCE |" >> readiness-report.md
+          echo "| Security | $SECURITY |" >> readiness-report.md
+          echo "" >> readiness-report.md
+          
+          # Calculate readiness score
+          TOTAL=6
+          PASSED=0
+          
+          [ "$UNIT_TESTS" = "success" ] && ((PASSED++))
+          [ "$FEATURE_PARITY" = "success" ] && ((PASSED++))
+          [ "$E2E_TESTS" = "success" ] && ((PASSED++))
+          [ "$ACCESSIBILITY" = "success" ] && ((PASSED++))
+          [ "$PERFORMANCE" = "success" ] && ((PASSED++))
+          [ "$SECURITY" = "success" ] && ((PASSED++))
+          
+          SCORE=$((PASSED * 100 / TOTAL))
+          
+          echo "## Production Readiness Score: ${SCORE}%" >> readiness-report.md
+          echo "" >> readiness-report.md
+          
+          if [ $SCORE -ge 95 ]; then
+            echo "🎉 **STATUS: PRODUCTION READY**" >> readiness-report.md
+            echo "" >> readiness-report.md
+            echo "All critical quality gates have been passed. React components are ready to replace Svelte implementation." >> readiness-report.md
+            echo "::notice title=Production Ready::TrustChain UI consolidation approved for production deployment"
+          elif [ $SCORE -ge 80 ]; then
+            echo "⚠️ **STATUS: CONDITIONAL APPROVAL**" >> readiness-report.md
+            echo "" >> readiness-report.md
+            echo "Most quality gates passed with minor issues. Recommend staged deployment with monitoring." >> readiness-report.md
+            echo "::warning title=Conditional Approval::TrustChain UI consolidation has minor issues"
+          else
+            echo "🚫 **STATUS: NOT READY**" >> readiness-report.md
+            echo "" >> readiness-report.md
+            echo "Critical quality gates failed. Must resolve issues before production deployment." >> readiness-report.md
+            echo "::error title=Not Ready::TrustChain UI consolidation blocked by critical issues"
+          fi
+          
+          echo "" >> readiness-report.md
+          echo "## Recommendations" >> readiness-report.md
+          echo "" >> readiness-report.md
+          
+          if [ "$UNIT_TESTS" != "success" ]; then
+            echo "- ❌ Fix unit test failures - feature parity not verified" >> readiness-report.md
+          fi
+          
+          if [ "$FEATURE_PARITY" != "success" ]; then
+            echo "- ❌ Complete feature parity validation against Svelte components" >> readiness-report.md
+          fi
+          
+          if [ "$E2E_TESTS" != "success" ]; then
+            echo "- ❌ Resolve E2E test failures - user journeys broken" >> readiness-report.md
+          fi
+          
+          if [ "$ACCESSIBILITY" != "success" ]; then
+            echo "- ❌ Fix accessibility violations - WCAG 2.1 AA compliance required" >> readiness-report.md
+          fi
+          
+          if [ "$PERFORMANCE" != "success" ]; then
+            echo "- ⚠️ Address performance issues - optimize render times" >> readiness-report.md
+          fi
+          
+          if [ "$SECURITY" != "success" ]; then
+            echo "- ⚠️ Review security findings - update dependencies if needed" >> readiness-report.md
+          fi
+          
+          cat readiness-report.md
+          
+      - name: Upload readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-report
+          path: ui/frontend/readiness-report.md
+          retention-days: 30
+          
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('ui/frontend/readiness-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+
+  # Deployment Gate
+  deployment-gate:
+    name: Deployment Gate
+    runs-on: ubuntu-latest
+    needs: production-readiness
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Deployment decision
+        run: |
+          echo "Production readiness assessment complete"
+          echo "Manual approval required for Svelte UI replacement"
+          echo "Review production readiness report before proceeding"

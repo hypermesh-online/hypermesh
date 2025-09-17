@@ -1,0 +1,696 @@
+//! Security and Sandboxing System
+//!
+//! Provides security sandbox implementation for safe execution of asset packages.
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+/// Security sandbox for asset execution
+pub struct SecuritySandbox {
+    /// Sandbox configuration
+    config: SandboxConfig,
+    /// Active execution contexts
+    active_contexts: HashMap<String, ExecutionContext>,
+}
+
+/// Sandbox configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxConfig {
+    /// Default sandbox level
+    pub default_level: SandboxLevel,
+    /// Resource limits
+    pub resource_limits: ResourceLimits,
+    /// Network restrictions
+    pub network_restrictions: NetworkRestrictions,
+    /// File system restrictions
+    pub filesystem_restrictions: FilesystemRestrictions,
+    /// System call restrictions
+    pub syscall_restrictions: SyscallRestrictions,
+    /// Isolation settings
+    pub isolation: IsolationConfig,
+}
+
+/// Sandbox security levels
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SandboxLevel {
+    /// Minimal restrictions - development mode
+    Minimal,
+    /// Standard restrictions - default production
+    Standard,
+    /// Strict restrictions - high security
+    Strict,
+    /// Paranoid restrictions - maximum security
+    Paranoid,
+}
+
+/// Resource limits for sandbox
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLimits {
+    /// Maximum CPU time in seconds
+    pub max_cpu_time: Option<u64>,
+    /// Maximum memory usage in bytes
+    pub max_memory_bytes: Option<u64>,
+    /// Maximum number of file descriptors
+    pub max_file_descriptors: Option<u32>,
+    /// Maximum number of processes/threads
+    pub max_processes: Option<u32>,
+    /// Maximum disk usage in bytes
+    pub max_disk_usage: Option<u64>,
+    /// Maximum network bandwidth (bytes/sec)
+    pub max_network_bandwidth: Option<u64>,
+}
+
+/// Network access restrictions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkRestrictions {
+    /// Allow network access
+    pub allow_network: bool,
+    /// Allowed IP addresses/ranges
+    pub allowed_ips: Vec<String>,
+    /// Allowed hostnames
+    pub allowed_hostnames: Vec<String>,
+    /// Allowed ports
+    pub allowed_ports: Vec<u16>,
+    /// Require TLS/SSL
+    pub require_tls: bool,
+    /// Block local network access
+    pub block_local_network: bool,
+}
+
+/// File system access restrictions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilesystemRestrictions {
+    /// Allow file system access
+    pub allow_filesystem: bool,
+    /// Read-only paths
+    pub readonly_paths: Vec<PathBuf>,
+    /// Read-write paths
+    pub readwrite_paths: Vec<PathBuf>,
+    /// Blocked paths
+    pub blocked_paths: Vec<PathBuf>,
+    /// Allow temporary files
+    pub allow_temp_files: bool,
+    /// Temporary directory
+    pub temp_directory: Option<PathBuf>,
+    /// Maximum file size
+    pub max_file_size: Option<u64>,
+}
+
+/// System call restrictions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyscallRestrictions {
+    /// Enable syscall filtering
+    pub enable_filtering: bool,
+    /// Allowed system calls
+    pub allowed_syscalls: Vec<String>,
+    /// Blocked system calls
+    pub blocked_syscalls: Vec<String>,
+    /// Default action for unlisted syscalls
+    pub default_action: SyscallAction,
+}
+
+/// System call actions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SyscallAction {
+    /// Allow the system call
+    Allow,
+    /// Block the system call
+    Block,
+    /// Kill the process
+    Kill,
+    /// Return errno
+    Errno(i32),
+}
+
+/// Isolation configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IsolationConfig {
+    /// Use containers (if available)
+    pub use_containers: bool,
+    /// Use chroot/jail
+    pub use_chroot: bool,
+    /// Use namespaces
+    pub use_namespaces: bool,
+    /// Isolate network
+    pub isolate_network: bool,
+    /// Isolate process tree
+    pub isolate_processes: bool,
+    /// Isolate file system
+    pub isolate_filesystem: bool,
+}
+
+/// Execution context for sandboxed execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionContext {
+    /// Context identifier
+    pub id: String,
+    /// Sandbox level
+    pub sandbox_level: SandboxLevel,
+    /// Resource usage tracking
+    pub resource_usage: ResourceUsage,
+    /// Security violations
+    pub violations: Vec<SecurityViolation>,
+    /// Execution start time
+    pub start_time: chrono::DateTime<chrono::Utc>,
+    /// Execution status
+    pub status: ExecutionStatus,
+    /// Process ID (if applicable)
+    pub process_id: Option<u32>,
+    /// Container ID (if applicable)
+    pub container_id: Option<String>,
+}
+
+/// Resource usage tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceUsage {
+    /// CPU time used (seconds)
+    pub cpu_time_secs: f64,
+    /// Memory usage (bytes)
+    pub memory_bytes: u64,
+    /// Peak memory usage (bytes)
+    pub peak_memory_bytes: u64,
+    /// File descriptors used
+    pub file_descriptors: u32,
+    /// Network bytes sent
+    pub network_bytes_sent: u64,
+    /// Network bytes received
+    pub network_bytes_received: u64,
+    /// Files created
+    pub files_created: u32,
+    /// System calls made
+    pub syscalls_made: u64,
+}
+
+/// Security violation record
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityViolation {
+    /// Violation type
+    pub violation_type: ViolationType,
+    /// Violation description
+    pub description: String,
+    /// Timestamp
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// Severity level
+    pub severity: ViolationSeverity,
+    /// Action taken
+    pub action_taken: ViolationAction,
+    /// Additional context
+    pub context: HashMap<String, String>,
+}
+
+/// Types of security violations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ViolationType {
+    /// Resource limit exceeded
+    ResourceLimitExceeded,
+    /// Unauthorized network access
+    UnauthorizedNetworkAccess,
+    /// Unauthorized file access
+    UnauthorizedFileAccess,
+    /// Blocked system call attempted
+    BlockedSyscallAttempted,
+    /// Escape attempt detected
+    EscapeAttemptDetected,
+    /// Malicious behavior detected
+    MaliciousBehaviorDetected,
+}
+
+/// Violation severity levels
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ViolationSeverity {
+    /// Low severity
+    Low,
+    /// Medium severity
+    Medium,
+    /// High severity
+    High,
+    /// Critical severity
+    Critical,
+}
+
+/// Actions taken for violations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ViolationAction {
+    /// Warning logged
+    Warning,
+    /// Request blocked
+    Blocked,
+    /// Process terminated
+    Terminated,
+    /// Context invalidated
+    ContextInvalidated,
+}
+
+/// Execution status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ExecutionStatus {
+    /// Starting up
+    Starting,
+    /// Currently running
+    Running,
+    /// Completed successfully
+    Completed,
+    /// Failed with error
+    Failed,
+    /// Terminated due to violation
+    Terminated,
+    /// Timed out
+    TimedOut,
+}
+
+/// Sandbox execution result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxExecutionResult {
+    /// Execution success
+    pub success: bool,
+    /// Exit code
+    pub exit_code: Option<i32>,
+    /// Execution time (milliseconds)
+    pub execution_time_ms: u64,
+    /// Resource usage
+    pub resource_usage: ResourceUsage,
+    /// Security violations
+    pub violations: Vec<SecurityViolation>,
+    /// Output data
+    pub output: Option<String>,
+    /// Error data
+    pub error: Option<String>,
+}
+
+impl Default for SandboxConfig {
+    fn default() -> Self {
+        Self {
+            default_level: SandboxLevel::Standard,
+            resource_limits: ResourceLimits {
+                max_cpu_time: Some(300), // 5 minutes
+                max_memory_bytes: Some(1024 * 1024 * 1024), // 1GB
+                max_file_descriptors: Some(100),
+                max_processes: Some(10),
+                max_disk_usage: Some(100 * 1024 * 1024), // 100MB
+                max_network_bandwidth: Some(10 * 1024 * 1024), // 10MB/s
+            },
+            network_restrictions: NetworkRestrictions {
+                allow_network: false,
+                allowed_ips: vec![],
+                allowed_hostnames: vec![],
+                allowed_ports: vec![],
+                require_tls: true,
+                block_local_network: true,
+            },
+            filesystem_restrictions: FilesystemRestrictions {
+                allow_filesystem: true,
+                readonly_paths: vec![PathBuf::from("/usr"), PathBuf::from("/lib")],
+                readwrite_paths: vec![],
+                blocked_paths: vec![
+                    PathBuf::from("/etc"),
+                    PathBuf::from("/root"),
+                    PathBuf::from("/proc"),
+                    PathBuf::from("/sys"),
+                ],
+                allow_temp_files: true,
+                temp_directory: Some(PathBuf::from("/tmp/catalog_sandbox")),
+                max_file_size: Some(10 * 1024 * 1024), // 10MB
+            },
+            syscall_restrictions: SyscallRestrictions {
+                enable_filtering: true,
+                allowed_syscalls: vec![
+                    "read".to_string(),
+                    "write".to_string(),
+                    "open".to_string(),
+                    "close".to_string(),
+                    "mmap".to_string(),
+                    "munmap".to_string(),
+                    "brk".to_string(),
+                    "exit".to_string(),
+                    "exit_group".to_string(),
+                ],
+                blocked_syscalls: vec![
+                    "execve".to_string(),
+                    "fork".to_string(),
+                    "clone".to_string(),
+                    "ptrace".to_string(),
+                    "mount".to_string(),
+                    "umount".to_string(),
+                ],
+                default_action: SyscallAction::Block,
+            },
+            isolation: IsolationConfig {
+                use_containers: true,
+                use_chroot: false,
+                use_namespaces: true,
+                isolate_network: true,
+                isolate_processes: true,
+                isolate_filesystem: true,
+            },
+        }
+    }
+}
+
+impl SecuritySandbox {
+    /// Create a new security sandbox
+    pub fn new(config: SandboxConfig) -> Self {
+        Self {
+            config,
+            active_contexts: HashMap::new(),
+        }
+    }
+    
+    /// Create a new execution context
+    pub fn create_context(&mut self, sandbox_level: SandboxLevel) -> Result<String> {
+        let context_id = uuid::Uuid::new_v4().to_string();
+        
+        let context = ExecutionContext {
+            id: context_id.clone(),
+            sandbox_level,
+            resource_usage: ResourceUsage {
+                cpu_time_secs: 0.0,
+                memory_bytes: 0,
+                peak_memory_bytes: 0,
+                file_descriptors: 0,
+                network_bytes_sent: 0,
+                network_bytes_received: 0,
+                files_created: 0,
+                syscalls_made: 0,
+            },
+            violations: vec![],
+            start_time: chrono::Utc::now(),
+            status: ExecutionStatus::Starting,
+            process_id: None,
+            container_id: None,
+        };
+        
+        self.active_contexts.insert(context_id.clone(), context);
+        
+        Ok(context_id)
+    }
+    
+    /// Execute code in sandbox
+    pub async fn execute_in_sandbox(
+        &mut self,
+        context_id: &str,
+        command: &str,
+        args: &[String],
+        working_dir: Option<&std::path::Path>,
+    ) -> Result<SandboxExecutionResult> {
+        let start_time = std::time::Instant::now();
+        
+        // Get sandbox level for restrictions
+        let sandbox_level = {
+            let context = self.active_contexts.get_mut(context_id)
+                .ok_or_else(|| anyhow::anyhow!("Context not found: {}", context_id))?;
+            context.status = ExecutionStatus::Running;
+            context.sandbox_level.clone()
+        };
+        
+        // Prepare sandboxed execution
+        let mut cmd = tokio::process::Command::new(command);
+        cmd.args(args);
+        
+        if let Some(work_dir) = working_dir {
+            cmd.current_dir(work_dir);
+        }
+        
+        // Apply sandbox restrictions based on level
+        self.apply_sandbox_restrictions(&mut cmd, &sandbox_level)?;
+        
+        // Execute with monitoring
+        let execution_result = {
+            // Clone the context to avoid borrowing issues
+            let context = self.active_contexts.get(context_id).unwrap().clone();
+            let mut temp_context = context;
+            self.execute_with_monitoring(cmd, &mut temp_context).await?
+        };
+        
+        let execution_time = start_time.elapsed().as_millis() as u64;
+        
+        // Update context status and get result data
+        let (resource_usage, violations) = {
+            let context = self.active_contexts.get_mut(context_id).unwrap();
+            context.status = if execution_result.success {
+                ExecutionStatus::Completed
+            } else {
+                ExecutionStatus::Failed
+            };
+            (context.resource_usage.clone(), context.violations.clone())
+        };
+        
+        Ok(SandboxExecutionResult {
+            success: execution_result.success,
+            exit_code: execution_result.exit_code,
+            execution_time_ms: execution_time,
+            resource_usage,
+            violations,
+            output: execution_result.output,
+            error: execution_result.error,
+        })
+    }
+    
+    /// Apply sandbox restrictions to command
+    fn apply_sandbox_restrictions(
+        &self,
+        cmd: &mut tokio::process::Command,
+        level: &SandboxLevel,
+    ) -> Result<()> {
+        match level {
+            SandboxLevel::Minimal => {
+                // Minimal restrictions - mainly for development
+                self.apply_basic_limits(cmd)?;
+            }
+            SandboxLevel::Standard => {
+                // Standard production restrictions
+                self.apply_basic_limits(cmd)?;
+                self.apply_network_restrictions(cmd)?;
+                self.apply_filesystem_restrictions(cmd)?;
+            }
+            SandboxLevel::Strict => {
+                // Strict security restrictions
+                self.apply_basic_limits(cmd)?;
+                self.apply_network_restrictions(cmd)?;
+                self.apply_filesystem_restrictions(cmd)?;
+                self.apply_syscall_restrictions(cmd)?;
+            }
+            SandboxLevel::Paranoid => {
+                // Maximum security restrictions
+                self.apply_basic_limits(cmd)?;
+                self.apply_network_restrictions(cmd)?;
+                self.apply_filesystem_restrictions(cmd)?;
+                self.apply_syscall_restrictions(cmd)?;
+                self.apply_isolation(cmd)?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Apply basic resource limits
+    fn apply_basic_limits(&self, cmd: &mut tokio::process::Command) -> Result<()> {
+        // Set environment variables for resource limits
+        if let Some(max_memory) = self.config.resource_limits.max_memory_bytes {
+            cmd.env("CATALOG_MAX_MEMORY", max_memory.to_string());
+        }
+        
+        if let Some(max_cpu_time) = self.config.resource_limits.max_cpu_time {
+            cmd.env("CATALOG_MAX_CPU_TIME", max_cpu_time.to_string());
+        }
+        
+        Ok(())
+    }
+    
+    /// Apply network restrictions
+    fn apply_network_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
+        if !self.config.network_restrictions.allow_network {
+            cmd.env("CATALOG_DISABLE_NETWORK", "1");
+        }
+        
+        Ok(())
+    }
+    
+    /// Apply filesystem restrictions
+    fn apply_filesystem_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
+        if !self.config.filesystem_restrictions.allow_filesystem {
+            cmd.env("CATALOG_DISABLE_FILESYSTEM", "1");
+        }
+        
+        // Set temp directory
+        if let Some(temp_dir) = &self.config.filesystem_restrictions.temp_directory {
+            cmd.env("TMPDIR", temp_dir);
+            cmd.env("TEMP", temp_dir);
+            cmd.env("TMP", temp_dir);
+        }
+        
+        Ok(())
+    }
+    
+    /// Apply system call restrictions
+    fn apply_syscall_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
+        if self.config.syscall_restrictions.enable_filtering {
+            cmd.env("CATALOG_SYSCALL_FILTER", "1");
+        }
+        
+        Ok(())
+    }
+    
+    /// Apply isolation settings
+    fn apply_isolation(&self, cmd: &mut tokio::process::Command) -> Result<()> {
+        if self.config.isolation.use_namespaces {
+            cmd.env("CATALOG_USE_NAMESPACES", "1");
+        }
+        
+        if self.config.isolation.isolate_network {
+            cmd.env("CATALOG_ISOLATE_NETWORK", "1");
+        }
+        
+        Ok(())
+    }
+    
+    /// Execute command with monitoring
+    async fn execute_with_monitoring(
+        &mut self,
+        mut cmd: tokio::process::Command,
+        context: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        
+        let mut child = cmd.spawn()?;
+        context.process_id = child.id();
+        
+        // Monitor resource usage in background
+        let context_id = context.id.clone();
+        let monitor_handle = tokio::spawn(async move {
+            // TODO: Implement actual resource monitoring
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        });
+        
+        // Wait for process completion
+        let output = child.wait_with_output().await?;
+        
+        // Cancel monitoring
+        monitor_handle.abort();
+        
+        let success = output.status.success();
+        let exit_code = output.status.code();
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        
+        Ok(ExecutionResult {
+            success,
+            exit_code,
+            output: if stdout.is_empty() { None } else { Some(stdout) },
+            error: if stderr.is_empty() { None } else { Some(stderr) },
+        })
+    }
+    
+    /// Get execution context
+    pub fn get_context(&self, context_id: &str) -> Option<&ExecutionContext> {
+        self.active_contexts.get(context_id)
+    }
+    
+    /// Terminate execution context
+    pub fn terminate_context(&mut self, context_id: &str) -> Result<()> {
+        if let Some(context) = self.active_contexts.get_mut(context_id) {
+            context.status = ExecutionStatus::Terminated;
+            
+            // Terminate process if running
+            if let Some(pid) = context.process_id {
+                // TODO: Implement process termination
+                tracing::info!("Terminating process: {}", pid);
+            }
+        }
+        
+        self.active_contexts.remove(context_id);
+        
+        Ok(())
+    }
+    
+    /// Clean up inactive contexts
+    pub fn cleanup_contexts(&mut self) {
+        let now = chrono::Utc::now();
+        let cutoff = now - chrono::Duration::hours(1); // 1 hour timeout
+        
+        self.active_contexts.retain(|_, context| {
+            context.start_time > cutoff && 
+            !matches!(context.status, ExecutionStatus::Completed | ExecutionStatus::Failed | ExecutionStatus::Terminated)
+        });
+    }
+    
+    /// Record security violation
+    pub fn record_violation(
+        &mut self,
+        context_id: &str,
+        violation_type: ViolationType,
+        description: String,
+        severity: ViolationSeverity,
+        action: ViolationAction,
+    ) {
+        if let Some(context) = self.active_contexts.get_mut(context_id) {
+            let violation = SecurityViolation {
+                violation_type,
+                description,
+                timestamp: chrono::Utc::now(),
+                severity,
+                action_taken: action,
+                context: HashMap::new(),
+            };
+            
+            context.violations.push(violation);
+        }
+    }
+}
+
+/// Internal execution result
+struct ExecutionResult {
+    success: bool,
+    exit_code: Option<i32>,
+    output: Option<String>,
+    error: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_sandbox_creation() {
+        let config = SandboxConfig::default();
+        let mut sandbox = SecuritySandbox::new(config);
+        
+        let context_id = sandbox.create_context(SandboxLevel::Standard).unwrap();
+        assert!(sandbox.get_context(&context_id).is_some());
+    }
+    
+    #[tokio::test]
+    async fn test_sandbox_execution() {
+        let config = SandboxConfig::default();
+        let mut sandbox = SecuritySandbox::new(config);
+        
+        let context_id = sandbox.create_context(SandboxLevel::Minimal).unwrap();
+        
+        // Test with a simple echo command
+        let result = sandbox.execute_in_sandbox(
+            &context_id,
+            "echo",
+            &["Hello, Sandbox!".to_string()],
+            None,
+        ).await;
+        
+        if let Ok(exec_result) = result {
+            assert!(exec_result.success);
+            if let Some(output) = exec_result.output {
+                assert!(output.contains("Hello, Sandbox!"));
+            }
+        }
+    }
+    
+    #[test]
+    fn test_sandbox_config_default() {
+        let config = SandboxConfig::default();
+        
+        assert!(matches!(config.default_level, SandboxLevel::Standard));
+        assert!(config.resource_limits.max_memory_bytes.is_some());
+        assert!(!config.network_restrictions.allow_network);
+        assert!(config.filesystem_restrictions.allow_filesystem);
+    }
+}

@@ -1,0 +1,343 @@
+# Prometheus Configuration for Web3 Ecosystem
+# Comprehensive monitoring for all 6 components
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'web3-ecosystem'
+    region: 'us-west-2'
+
+rule_files:
+  - "alert_rules.yml"
+  - "performance_rules.yml"
+  - "security_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # TrustChain Certificate Authority
+  - job_name: 'trustchain-ca'
+    static_configs:
+      - targets: 
+        - 'trustchain-1:8443'
+        - 'trustchain-2:8443'
+        - 'trustchain-3:8443'
+    scrape_interval: 5s
+    metrics_path: /metrics
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: trustchain
+      - source_labels: [__address__]
+        target_label: service
+        replacement: ca
+
+  # TrustChain Certificate Transparency
+  - job_name: 'trustchain-ct'
+    static_configs:
+      - targets:
+        - 'trustchain-1:6962'
+        - 'trustchain-2:6962'
+        - 'trustchain-3:6962'
+    scrape_interval: 10s
+    metrics_path: /ct/v1/metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: trustchain
+      - source_labels: [__address__]
+        target_label: service
+        replacement: ct
+
+  # STOQ Transport Protocol
+  - job_name: 'stoq-transport'
+    static_configs:
+      - targets:
+        - 'stoq-1:8454'
+        - 'stoq-2:8454'
+        - 'stoq-3:8454'
+    scrape_interval: 1s                # High frequency for performance monitoring
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: stoq
+      - source_labels: [__address__]
+        target_label: service
+        replacement: transport
+
+  # HyperMesh Asset Management
+  - job_name: 'hypermesh-assets'
+    static_configs:
+      - targets:
+        - 'hypermesh-1:8445'
+        - 'hypermesh-2:8445'
+        - 'hypermesh-3:8445'
+    scrape_interval: 2s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: hypermesh
+      - source_labels: [__address__]
+        target_label: service
+        replacement: assets
+
+  # Catalog Asset SDK
+  - job_name: 'catalog-sdk'
+    static_configs:
+      - targets:
+        - 'catalog-1:8446'
+        - 'catalog-2:8446'
+        - 'catalog-3:8446'
+    scrape_interval: 1s                # High frequency for performance validation
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: catalog
+      - source_labels: [__address__]
+        target_label: service
+        replacement: sdk
+
+  # Caesar Economic Layer
+  - job_name: 'caesar-economy'
+    static_configs:
+      - targets:
+        - 'caesar-1:8447'
+        - 'caesar-2:8447'
+        - 'caesar-3:8447'
+    scrape_interval: 5s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: caesar
+      - source_labels: [__address__]
+        target_label: service
+        replacement: economy
+
+  # NGauge Engagement Platform
+  - job_name: 'ngauge-engagement'
+    static_configs:
+      - targets:
+        - 'ngauge-1:8448'
+        - 'ngauge-2:8448'
+    scrape_interval: 10s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: ngauge
+      - source_labels: [__address__]
+        target_label: service
+        replacement: engagement
+
+  # Infrastructure monitoring
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+        - 'trustchain-1:9100'
+        - 'trustchain-2:9100'
+        - 'trustchain-3:9100'
+        - 'stoq-1:9100'
+        - 'stoq-2:9100'
+        - 'stoq-3:9100'
+        - 'hypermesh-1:9100'
+        - 'hypermesh-2:9100'
+        - 'hypermesh-3:9100'
+        - 'catalog-1:9100'
+        - 'catalog-2:9100'
+        - 'catalog-3:9100'
+        - 'caesar-1:9100'
+        - 'caesar-2:9100'
+        - 'caesar-3:9100'
+        - 'ngauge-1:9100'
+        - 'ngauge-2:9100'
+    scrape_interval: 15s
+
+  # Container monitoring
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+        - 'trustchain-1:8080'
+        - 'trustchain-2:8080'
+        - 'trustchain-3:8080'
+        - 'stoq-1:8080'
+        - 'stoq-2:8080'
+        - 'stoq-3:8080'
+        - 'hypermesh-1:8080'
+        - 'hypermesh-2:8080'
+        - 'hypermesh-3:8080'
+        - 'catalog-1:8080'
+        - 'catalog-2:8080'
+        - 'catalog-3:8080'
+        - 'caesar-1:8080'
+        - 'caesar-2:8080'
+        - 'caesar-3:8080'
+        - 'ngauge-1:8080'
+        - 'ngauge-2:8080'
+    scrape_interval: 10s
+
+  # AWS CloudWatch metrics
+  - job_name: 'cloudwatch'
+    ec2_sd_configs:
+      - region: us-west-2
+        port: 9100
+        filters:
+          - name: tag:Project
+            values: 
+              - Web3-Ecosystem
+    relabel_configs:
+      - source_labels: [__meta_ec2_tag_Component]
+        target_label: component
+      - source_labels: [__meta_ec2_tag_Environment]
+        target_label: environment
+      - source_labels: [__meta_ec2_instance_id]
+        target_label: instance_id
+      - source_labels: [__meta_ec2_availability_zone]
+        target_label: availability_zone
+
+  # Load balancer metrics
+  - job_name: 'aws-load-balancer'
+    static_configs:
+      - targets: ['cloudwatch-exporter:9106']
+    scrape_interval: 60s
+    metrics_path: /metrics
+
+  # Database metrics
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+        - 'postgres-exporter:9187'
+    scrape_interval: 15s
+
+  # Performance testing metrics
+  - job_name: 'performance-tests'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+    scrape_interval: 5s
+
+# Custom metric configurations
+metric_relabel_configs:
+  # TrustChain specific metrics
+  - source_labels: [__name__]
+    regex: 'trustchain_certificate_.*'
+    target_label: metric_type
+    replacement: certificate_management
+  
+  - source_labels: [__name__]
+    regex: 'trustchain_ct_.*'
+    target_label: metric_type
+    replacement: certificate_transparency
+  
+  # STOQ performance metrics
+  - source_labels: [__name__]
+    regex: 'stoq_throughput_.*'
+    target_label: metric_type
+    replacement: network_performance
+  
+  - source_labels: [__name__]
+    regex: 'stoq_connection_.*'
+    target_label: metric_type
+    replacement: connection_management
+  
+  # HyperMesh asset metrics
+  - source_labels: [__name__]
+    regex: 'hypermesh_asset_.*'
+    target_label: metric_type
+    replacement: asset_management
+  
+  - source_labels: [__name__]
+    regex: 'hypermesh_consensus_.*'
+    target_label: metric_type
+    replacement: consensus_validation
+  
+  # Catalog performance metrics
+  - source_labels: [__name__]
+    regex: 'catalog_operation_.*'
+    target_label: metric_type
+    replacement: catalog_performance
+  
+  - source_labels: [__name__]
+    regex: 'catalog_julia_.*'
+    target_label: metric_type
+    replacement: julia_vm_execution
+  
+  # Caesar economic metrics
+  - source_labels: [__name__]
+    regex: 'caesar_transaction_.*'
+    target_label: metric_type
+    replacement: economic_transactions
+  
+  - source_labels: [__name__]
+    regex: 'caesar_demurrage_.*'
+    target_label: metric_type
+    replacement: demurrage_calculation
+
+# Recording rules for performance aggregation
+recording_rules:
+  - record: web3:component_availability
+    expr: up{job=~"trustchain-.*|stoq-.*|hypermesh-.*|catalog-.*|caesar-.*|ngauge-.*"}
+    labels:
+      aggregation: component_health
+
+  - record: web3:response_time_p95
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, component))
+    labels:
+      aggregation: performance_percentile
+
+  - record: web3:response_time_p99
+    expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, component))
+    labels:
+      aggregation: performance_percentile
+
+  - record: web3:error_rate
+    expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (component) / sum(rate(http_requests_total[5m])) by (component)
+    labels:
+      aggregation: error_metrics
+
+  - record: web3:throughput_ops_per_second
+    expr: sum(rate(http_requests_total[5m])) by (component)
+    labels:
+      aggregation: throughput_metrics
+
+  # Component-specific performance recordings
+  - record: trustchain:certificate_issuance_rate
+    expr: rate(trustchain_certificates_issued_total[5m])
+    labels:
+      component: trustchain
+      metric_type: certificate_performance
+
+  - record: stoq:throughput_gbps
+    expr: rate(stoq_bytes_transferred_total[5m]) * 8 / 1000000000
+    labels:
+      component: stoq
+      metric_type: network_performance
+
+  - record: hypermesh:asset_operations_per_second
+    expr: rate(hypermesh_asset_operations_total[5m])
+    labels:
+      component: hypermesh
+      metric_type: asset_performance
+
+  - record: catalog:operation_duration_ms
+    expr: histogram_quantile(0.95, rate(catalog_operation_duration_seconds_bucket[5m])) * 1000
+    labels:
+      component: catalog
+      metric_type: operation_performance
+
+  - record: caesar:transaction_rate
+    expr: rate(caesar_transactions_total[5m])
+    labels:
+      component: caesar
+      metric_type: economic_performance

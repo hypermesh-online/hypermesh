@@ -1,0 +1,150 @@
+[package]
+name = "trustchain"
+version = "0.1.0"
+edition = "2021"
+authors = ["Web3 Ecosystem Team"]
+description = "TrustChain - Certificate Authority with Certificate Transparency and DNS resolution"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/web3-ecosystem/trustchain"
+keywords = ["ca", "certificate", "transparency", "dns", "consensus"]
+
+[dependencies]
+# Core async runtime
+tokio = { version = "1.38", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# STOQ transport integration (replaces direct QUIC)
+stoq = { path = "../stoq", features = ["high-performance"] }
+bytes = "1.6"
+
+# ARCHITECTURAL ENFORCEMENT: Direct QUIC removed - all transport via STOQ
+# quinn = "0.10"      # REMOVED: Violates architecture - use STOQ
+# rustls = { ... }    # REMOVED: Managed by STOQ transport
+# rcgen = "0.11"      # REMOVED: Certificate generation via STOQ/TrustChain integration
+
+# Certificate and cryptography
+x509-parser = "0.15"
+der-parser = "9.0"
+ring = "0.17"
+ed25519-dalek = "2.0"  # Being phased out for FALCON-1024
+rsa = "0.9"           # Being phased out for FALCON-1024
+pem = "3.0"
+der = "0.7"
+rustls = "0.21"
+rcgen = "0.11"
+
+# Post-quantum cryptography (FALCON-1024 implementation)
+pqcrypto-falcon = "0.3"
+pqcrypto-kyber = "0.8"  # For hybrid encryption
+pqcrypto-traits = "0.3"
+falcon-rust = "0.1"     # Alternative FALCON implementation
+aes-gcm = "0.10"        # For hybrid Kyber + AES encryption
+serde_arrays = "0.1"   # For serializing fixed-size arrays
+
+# HTTP client for HyperMesh consensus integration
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Web and API
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.4", features = ["cors", "trace"] }
+hyper = "1.0"
+
+# DNS
+trust-dns-client = "0.23"
+trust-dns-server = "0.23"
+trust-dns-proto = "0.23"
+hickory-client = "0.24"
+hickory-proto = "0.24"
+
+# Data structures and serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+bincode = "1.3"
+
+# Consensus and blockchain (NKrypt integration)
+sha2 = "0.10"
+blake3 = "1.5"
+merkletree = "0.23"
+
+# Storage and data management
+dashmap = "6.0"
+arc-swap = "1.7"
+parking_lot = "0.12"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+
+# Error handling and logging
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time and UUID
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Configuration
+config = "0.14"
+clap = { version = "4.5", features = ["derive"] }
+
+# IPv6 networking
+socket2 = "0.5"
+
+# Certificate Transparency specific
+# ct-logs = "0.9"
+# sct = "0.7"
+
+# Additional required dependencies
+hex = "0.4"
+base64 = "0.22"
+rand = "0.8"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+tempfile = "3.8"
+tokio-test = "0.4"
+
+[features]
+default = ["ca", "ct", "dns", "consensus"]
+
+# Core features
+ca = []           # Certificate Authority
+ct = []           # Certificate Transparency
+dns = []          # DNS resolution
+consensus = []    # NKrypt consensus integration
+
+# Testing and development
+localhost-testing = []
+production-ready = ["consensus"]
+
+[lib]
+name = "trustchain"
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "trustchain-server"
+path = "src/bin/trustchain-server.rs"
+
+[[bin]]
+name = "trustchain-simple"
+path = "src/bin/simple-server.rs"
+
+[[bin]]
+name = "trustchain-standalone"
+path = "src/bin/standalone-server.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+panic = "unwind"

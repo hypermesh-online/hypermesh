@@ -1,0 +1,234 @@
+# TrustChain Production Configuration for trust.hypermesh.online
+# High-performance certificate authority with STOQ and HyperMesh integration
+
+[server]
+# IPv6-only production deployment
+bind_address = "::"
+port = 8443
+workers = 4
+enable_http2 = true
+enable_http3 = true
+
+[ca]
+# Certificate Authority Configuration
+ca_id = "trustchain-ca-production"
+mode = "ProductionHSM"
+cert_validity_hours = 24
+rotation_interval_hours = 24
+target_issuance_time_ms = 35
+enable_ct_logging = true
+
+# HSM Configuration for production root CA
+[ca.hsm]
+cluster_id = "cluster-1abc23defgh456"
+endpoint = "https://cloudhsm.us-east-1.amazonaws.com"
+region = "us-east-1"
+key_spec = "RSA_4096"
+key_usage = "SignVerify"
+origin = "HSM"
+
+# Consensus requirements for certificate operations
+[ca.consensus]
+require_proof_of_space = true
+require_proof_of_stake = true
+require_proof_of_work = true
+require_proof_of_time = true
+min_confirmations = 6
+consensus_timeout_ms = 30000
+
+[ct]
+# Certificate Transparency Configuration
+log_id = "trustchain-ct-production"
+max_log_size = 1000000
+enable_realtime_fingerprinting = true
+merkle_update_interval_ms = 1000
+
+# Performance targets for CT operations
+[ct.performance]
+append_time_ms = 1000
+proof_generation_ms = 100
+verification_time_ms = 50
+max_entries_per_second = 1000
+
+# S3 storage for CT logs
+[ct.storage]
+bucket_name = "trustchain-ct-logs-prod"
+region = "us-east-1"
+prefix = "logs/production/"
+encryption_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+[dns]
+# DNS-over-QUIC Configuration
+server_id = "trustchain-dns-production"
+bind_address = "::"
+quic_port = 853
+enable_cert_validation = true
+target_resolution_time_ms = 100
+cache_ttl_seconds = 300
+max_cache_entries = 10000
+
+# IPv6-only upstream DNS servers
+upstream_servers = [
+    "2001:4860:4860::8888",  # Google DNS
+    "2001:4860:4860::8844",  # Google DNS
+    "2606:4700:4700::1111",  # Cloudflare DNS
+    "2606:4700:4700::1001",  # Cloudflare DNS
+]
+
+# TrustChain domain mappings
+truschain_domains = [
+    "hypermesh",
+    "caesar", 
+    "trust",
+    "assets"
+]
+
+[trust]
+# HyperMesh Trust Integration
+min_trust_score = 0.7
+byzantine_sensitivity = 0.8
+trust_cache_ttl_seconds = 3600
+max_proxy_hops = 3
+monitoring_interval_seconds = 60
+
+# Alert thresholds for Byzantine detection
+[trust.alerts]
+byzantine_confidence = 0.8
+trust_score_degradation = 0.3
+performance_degradation = 0.5
+availability_threshold = 0.95
+
+[stoq]
+# STOQ Transport Integration
+bind_address = "::"
+port = 8444
+max_connections = 10000
+connection_timeout_ms = 3000
+enable_migration = true
+enable_0rtt = true
+max_idle_timeout_ms = 30000
+cert_rotation_interval_hours = 24
+max_concurrent_streams = 100
+send_buffer_size = 1048576
+receive_buffer_size = 1048576
+
+[api]
+# API Server Configuration
+bind_address = "::"
+port = 8446
+enable_cors = true
+max_request_size = 1048576
+rate_limit_requests_per_minute = 1000
+enable_metrics = true
+metrics_port = 9090
+
+[logging]
+# Logging configuration
+level = "info"
+format = "json"
+output = "stdout"
+enable_tracing = true
+
+# Log to files in production
+[logging.file]
+enabled = true
+path = "/var/log/trustchain/trustchain.log"
+max_size = "100MB"
+max_files = 10
+compress = true
+
+[monitoring]
+# Performance monitoring
+enable_prometheus = true
+prometheus_port = 9090
+enable_jaeger = true
+jaeger_endpoint = "http://localhost:14268/api/traces"
+
+# Health check configuration
+[monitoring.health]
+endpoint = "/health"
+interval_seconds = 30
+timeout_ms = 5000
+
+[security]
+# Security configuration
+tls_version = "1.3"
+cipher_suites = [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_CHACHA20_POLY1305_SHA256",
+    "TLS_AES_128_GCM_SHA256"
+]
+enable_hsts = true
+hsts_max_age = 31536000
+enable_certificate_pinning = true
+
+# IPv6-only enforcement
+[network]
+ipv6_only = true
+allow_ipv4_mapped = false
+bind_to_ipv6_any = true
+enable_ipv6_dual_stack = false
+
+# Production deployment settings
+[deployment]
+environment = "production"
+service_name = "trustchain-ca"
+namespace = "trustchain"
+replicas = 3
+
+# Resource limits
+[resources]
+cpu_limit = "2000m"
+memory_limit = "4Gi"
+cpu_request = "1000m"
+memory_request = "2Gi"
+
+# Production domain configuration
+[domains]
+primary_domain = "trust.hypermesh.online"
+alt_domains = [
+    "ca.hypermesh.online",
+    "ct.hypermesh.online",
+    "dns.hypermesh.online"
+]
+
+# Service endpoints
+[endpoints]
+ca_service = "https://[::]:8443/ca"
+ct_service = "https://[::]:8443/ct"
+dns_service = "quic://[::]:853"
+api_service = "https://[::]:8446/api"
+metrics_service = "http://[::]:9090/metrics"
+health_service = "http://[::]:8446/health"
+
+# Certificate configuration
+[certificates]
+root_ca_validity_days = 3650  # 10 years
+intermediate_ca_validity_days = 1095  # 3 years
+server_cert_validity_hours = 24  # 24 hours
+automated_renewal = true
+renewal_threshold_hours = 6  # Renew when 6 hours left
+
+# Backup and disaster recovery
+[backup]
+enable_continuous_backup = true
+backup_interval_hours = 6
+retention_days = 90
+s3_bucket = "trustchain-backups-prod"
+encryption_enabled = true
+
+# Performance tuning
+[performance]
+worker_threads = 8
+blocking_threads = 8
+max_blocking_threads = 16
+thread_stack_size = "2MB"
+enable_work_stealing = true
+
+# Connection pooling
+[pools]
+max_connections = 1000
+min_idle = 10
+max_idle = 100
+connection_timeout_ms = 5000
+idle_timeout_ms = 300000

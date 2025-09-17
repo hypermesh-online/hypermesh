@@ -1,0 +1,16 @@
+[package]
+name = "simple-trustchain-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.38", features = ["full"] }
+axum = { version = "0.7", features = ["ws"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[[bin]]
+name = "simple-server"
+path = "simple-trustchain-server.rs"

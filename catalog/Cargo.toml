@@ -1,0 +1,119 @@
+[package]
+name = "catalog"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "Catalog - Universal Asset SDK with JuliaVM compiler and delegation system"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-org/catalog"
+keywords = ["assets", "vm", "julia", "scripting", "sandboxing"]
+
+[dependencies]
+# Core async runtime
+tokio = { version = "1.38", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Scripting languages
+mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
+julia = { version = "0.2", optional = true }  # Julia integration
+wasmtime = { version = "13.0", optional = true }  # WASM VM
+rhai = { version = "1.17", optional = true }  # Embedded scripting
+
+# Security and sandboxing
+nix = "0.27"
+seccomp = { version = "0.1", optional = true }
+landlock = { version = "0.2", optional = true }
+
+# Asset management
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+
+# Cryptography and hashing
+sha2 = "0.10"
+blake3 = "1.5"
+ring = "0.17"
+ed25519-dalek = "2.0"
+
+# Data structures
+dashmap = "6.0"
+arc-swap = "1.7"
+parking_lot = "0.12"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and metrics
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# File system and compression
+tar = "0.4"
+flate2 = "1.0"
+tempfile = "3.8"
+
+# Time and uuid
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "v5", "serde"] }
+
+# Configuration
+config = "0.14"
+clap = { version = "4.5", features = ["derive"] }
+
+# Template engine
+handlebars = "5.1"
+regex = "1.10"
+
+# HTTP client for registry
+reqwest = { version = "0.12", features = ["json"] }
+
+# Base64 encoding
+base64 = "0.22"
+
+# Path expansion
+shellexpand = "3.1"
+
+# Globbing
+glob = "0.3"
+
+# Hex encoding
+hex = "0.4"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+tempfile = "3.8"
+
+[features]
+default = ["security-sandbox", "all-scripting"]
+
+# VM engines
+julia-vm = ["julia"]
+wasm-vm = ["wasmtime"]
+
+# Scripting languages
+lua-scripting = []
+rhai-scripting = ["rhai"]
+all-scripting = ["lua-scripting", "rhai-scripting"]
+
+# Security features
+security-sandbox = ["seccomp", "landlock"]
+full-isolation = ["security-sandbox"]
+
+# Performance features
+high-performance = []
+
+[lib]
+name = "catalog"
+path = "src/lib.rs"
+
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+

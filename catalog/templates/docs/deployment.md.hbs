@@ -1,0 +1,35 @@
+# Deployment Guide - {{asset.name}}
+
+## Requirements
+
+- **CPU**: {{deployment.requirements.cpu}}
+- **Memory**: {{deployment.requirements.memory}}
+- **Execution Timeout**: {{deployment.requirements.timeout}}
+{{#if deployment.requirements.gpu}}- **GPU**: Required{{/if}}
+- **Minimum Consensus Nodes**: {{deployment.requirements.consensus}}
+
+## Security Configuration
+
+- **Sandbox Level**: {{deployment.security.sandbox_level}}
+- **Network Access**: {{#if deployment.security.network_access}}Enabled{{else}}Disabled{{/if}}
+- **File Access**: {{deployment.security.file_access}}
+
+## Deployment Steps
+
+{{#each deployment.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+## Monitoring
+
+### Metrics to Monitor
+
+{{#each deployment.monitoring.metrics}}
+- {{this}}
+{{/each}}
+
+### Alert Conditions
+
+{{#each deployment.monitoring.alerts}}
+- {{this}}
+{{/each}}
