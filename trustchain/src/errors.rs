@@ -182,6 +182,34 @@ pub enum TrustChainError {
     /// Crypto error
     #[error("Cryptographic error: {reason}")]
     CryptoError { reason: String },
+
+    /// HSM operation failed
+    #[error("HSM operation failed: {operation} - {reason}")]
+    HSMOperationFailed { operation: String, reason: String },
+
+    /// HSM security violation
+    #[error("HSM security violation: {reason}")]
+    HSMSecurityViolation { reason: String },
+
+    /// Security policy violation
+    #[error("Security policy violation: {reason}")]
+    SecurityPolicyViolation { reason: String },
+
+    /// Security violation
+    #[error("Security violation: {reason}")]
+    SecurityViolation { reason: String },
+
+    /// Storage configuration error
+    #[error("Storage configuration error: {reason}")]
+    StorageConfigError { reason: String },
+
+    /// Storage connection error
+    #[error("Storage connection error: {reason}")]
+    StorageConnectionError { reason: String },
+
+    /// Storage operation failed
+    #[error("Storage operation failed: {operation} - {reason}")]
+    StorageOperationFailed { operation: String, reason: String },
 }
 
 /// Certificate Authority specific errors

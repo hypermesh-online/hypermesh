@@ -6840,7 +6840,7 @@
       "type": "COMPILATION_FAILURE",
       "severity": "CRITICAL",
       "description": "Code does not compile - production deployment impossible",
-      "evidence": "    Checking tokio v1.47.1\n    Checking proptest v1.7.0\n    Checking criterion v0.5.1\n    Checking tokio-util v0.7.16\n    Checking tokio-stream v0.1.17\n    Checking hyper v1.7.0\n    Checking tokio-rustls v0.24.1\n    Checking tokio-native-tls v0.3.1\n    Checking trust-dns-proto v0.23.2\n    Checking tokio-tungstenite v0.24.0\n    Checking quinn v0.11.9\n    Checking drain v0.1.2\n    Checking hickory-proto v0.24.4\n    Checking tower v0.5.2\n    Checking hyper-util v0.1.16\n    Checking axum v0.7.9\n    "
+      "evidence": "warning: unused imports: `CertificateDer` and `PrivateKeyDer`\n --> /home/persist/repos/projects/web3/stoq/src/transport/mod.rs:5:25\n  |\n5 | use rustls::pki_types::{CertificateDer, PrivateKeyDer};\n  |                         ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^\n  |\n  = note: `#[warn(unused_imports)]` on by default\n\nwarning: unused import: `error`\n  --> /home/persist/repos/projects/web3/stoq/src/transport/mod.rs:14:34\n   |\n14 | use tracing::{info, debug, warn, error};\n   |                                "
     }
   ]
 }
