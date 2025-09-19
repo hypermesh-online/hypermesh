@@ -38,7 +38,7 @@ RUN mkdir -p /app/logs /app/config /app/certificates && \
     chown -R hypermesh:hypermesh /app
 
 # Copy binary from builder stage
-COPY --from=builder /app/target/release/internet2-server /usr/local/bin/
+COPY --from=builder /app/target/release/web3-server /usr/local/bin/
 
 # Copy configuration files
 COPY --chown=hypermesh:hypermesh config/ /app/config/
@@ -63,4 +63,4 @@ ENV RUST_LOG=info
 ENV CONFIG_FILE=/app/config/production.toml
 
 # Start the server
-CMD ["internet2-server", "--config", "${CONFIG_FILE}", "production", "--federated"]
+CMD ["web3-server", "--config", "${CONFIG_FILE}", "production", "--federated"]
