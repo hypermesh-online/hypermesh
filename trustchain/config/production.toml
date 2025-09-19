@@ -18,15 +18,6 @@ rotation_interval_hours = 24
 target_issuance_time_ms = 35
 enable_ct_logging = true
 
-# HSM Configuration for production root CA
-[ca.hsm]
-cluster_id = "cluster-1abc23defgh456"
-endpoint = "https://cloudhsm.us-east-1.amazonaws.com"
-region = "us-east-1"
-key_spec = "RSA_4096"
-key_usage = "SignVerify"
-origin = "HSM"
-
 # Consensus requirements for certificate operations
 [ca.consensus]
 require_proof_of_space = true

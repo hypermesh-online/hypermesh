@@ -1,0 +1,118 @@
+# Internet 2.0 Protocol Stack Configuration (Development)
+
+[global]
+bind_address = "::"
+port = 443
+server_id = "internet2-dev-001"
+max_connections = 1000
+ipv6_only = true
+log_level = "info"
+metrics_interval = { secs = 60, nanos = 0 }
+
+[stoq.performance]
+target_throughput_gbps = 1.0  # Reduced for development
+enable_zero_copy = false
+enable_hardware_acceleration = false
+connection_pool_size = 100
+memory_pool_size = 256
+frame_batch_size = 16
+enable_cpu_affinity = false
+enable_large_send_offload = false
+
+[stoq.quic]
+max_concurrent_streams = 100
+send_buffer_size = 1048576  # 1MB
+receive_buffer_size = 1048576  # 1MB
+connection_timeout = { secs = 5, nanos = 0 }
+idle_timeout = { secs = 60, nanos = 0 }
+enable_0rtt = false
+enable_migration = false
+congestion_control = "cubic"
+max_datagram_size = 1472
+
+[stoq.certificates]
+validate_at_connection = false  # Disabled for development
+validation_timeout = { secs = 5, nanos = 0 }
+enable_caching = false
+cache_size = 100
+cache_ttl = { secs = 300, nanos = 0 }
+
+[stoq.dns]
+use_embedded_resolver = false  # Use system DNS for development
+query_timeout = { secs = 5, nanos = 0 }
+enable_caching = false
+cache_size = 100
+cache_ttl = { secs = 60, nanos = 0 }
+
+[hypermesh.consensus]
+mandatory_four_proof = false  # Optional for development
+validation_timeout = { secs = 1, nanos = 0 }
+min_stake_requirement = 1
+pow_difficulty = 1
+enable_byzantine_detection = false
+max_consensus_participants = 10
+
+[hypermesh.assets]
+max_assets_per_node = 100
+allocation_timeout = { secs = 10, nanos = 0 }
+enable_pooling = false
+pool_size = 10
+cleanup_interval = { secs = 60, nanos = 0 }
+default_resource_capacity = 100.0
+require_consensus_for_allocation = false
+
+[hypermesh.vm]
+enable_vm_execution = false  # Disabled for development
+max_vms_per_node = 1
+execution_timeout = { secs = 60, nanos = 0 }
+memory_limit_mb = 512
+cpu_limit_cores = 1
+enable_snapshots = false
+
+[hypermesh.proxy]
+enable_nat_addressing = false  # Disabled for development
+connection_timeout = { secs = 10, nanos = 0 }
+max_proxy_connections = 10
+enable_trust_validation = false
+enable_performance_monitoring = false
+
+[trustchain.ca]
+ca_mode = "external"  # Use external CA for development
+certificate_validity_days = 30
+rotation_interval = { secs = 3600, nanos = 0 }  # 1 hour
+enable_auto_rotation = false
+max_chain_depth = 3
+
+[trustchain.dns]
+dns_mode = "external"  # Use external DNS for development
+dns_port = 53
+query_timeout = { secs = 5, nanos = 0 }
+enable_caching = false
+cache_ttl = { secs = 60, nanos = 0 }
+max_cache_size = 100
+
+[trustchain.ct]
+enable_ct_logging = false  # Disabled for development
+submission_timeout = { secs = 10, nanos = 0 }
+enable_verification = false
+max_log_entries = 1000
+
+[trustchain.pqc]
+enable_pqc = false  # Disabled for development
+enable_falcon = false
+enable_kyber = false
+enable_hybrid = false
+security_level = 64
+
+[integration]
+enable_cross_layer_optimization = false  # Disabled for development
+validation_timeout = { secs = 10, nanos = 0 }
+coordination_interval = { secs = 30, nanos = 0 }
+enable_layer_monitoring = false
+
+[deployment]
+mode = "development"
+production_security = false
+consensus_mandatory = false
+legacy_compatibility = true
+federated_bootstrap = false

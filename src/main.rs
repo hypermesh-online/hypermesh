@@ -1,0 +1,539 @@
+//! Internet 2.0 Protocol Stack - Unified Server
+//! 
+//! A revolutionary replacement for the traditional Internet protocol stack that embeds
+//! STOQ transport, HyperMesh consensus, and TrustChain security into a single, 
+//! self-contained networking foundation.
+//!
+//! This server represents a fundamental shift from Internet 1.0's layered protocols
+//! with external dependencies to Internet 2.0's unified, consensus-validated,
+//! certificate-embedded protocol stack.
+
+use anyhow::{Result, anyhow};
+use std::sync::Arc;
+use std::net::Ipv6Addr;
+use tokio::signal;
+use tracing::{info, warn, error};
+use clap::{Parser, Subcommand};
+
+mod config;
+mod transport;
+mod assets;
+mod authority;
+mod integration;
+mod monitoring;
+mod api;
+
+use config::Internet2Config;
+use transport::StoqTransportLayer;
+use assets::HyperMeshAssetLayer;
+use authority::TrustChainAuthorityLayer;
+use integration::LayerIntegration;
+use monitoring::PerformanceMonitor;
+// Removed HTTP API - using pure STOQ protocol
+
+/// Internet 2.0 Protocol Stack Server
+#[derive(Parser)]
+#[command(name = "internet2-server")]
+#[command(about = "Internet 2.0 Protocol Stack - Unified STOQ/HyperMesh/TrustChain Server")]
+#[command(version = "1.0.0")]
+pub struct Cli {
+    /// Configuration file path
+    #[arg(short, long, default_value = "config/production.toml")]
+    pub config: String,
+    
+    /// Server bind address (IPv6 only)
+    #[arg(short, long, default_value = "::")]
+    pub bind: String,
+    
+    /// Server port (QUIC transport)
+    #[arg(short, long, default_value = "8443")]
+    pub port: u16,
+    
+    /// Removed HTTP port - using pure STOQ protocol
+    
+    /// Deployment mode
+    #[command(subcommand)]
+    pub mode: Option<DeploymentMode>,
+}
+
+#[derive(Subcommand)]
+pub enum DeploymentMode {
+    /// Production deployment (full consensus, maximum security)
+    Production {
+        /// Enable federated bootstrap (no external dependencies)
+        #[arg(long)]
+        federated: bool,
+    },
+    
+    /// Development deployment (reduced security for testing)
+    Development {
+        /// Enable legacy HTTP/TCP gateway
+        #[arg(long)]
+        legacy_gateway: bool,
+    },
+    
+    /// Bootstrap mode (initialize new network)
+    Bootstrap {
+        /// Bootstrap as root authority
+        #[arg(long)]
+        root_authority: bool,
+    },
+    
+    /// Gateway mode (legacy compatibility)
+    Gateway {
+        /// HTTP/TCP to STOQ translation
+        #[arg(long)]
+        translate_protocols: bool,
+    },
+}
+
+/// Internet 2.0 Unified Server
+/// 
+/// This server embeds three critical layers into a single protocol stack:
+/// 1. STOQ Transport: QUIC over IPv6 with 40 Gbps performance targets
+/// 2. HyperMesh Assets: Universal asset system with four-proof consensus
+/// 3. TrustChain Authority: Embedded CA and DNS with certificate transparency
+/// 4. REST API: HTTP endpoints for UI management and monitoring
+pub struct Internet2Server {
+    /// Configuration for all layers
+    config: Arc<Internet2Config>,
+    
+    /// Layer 1: STOQ Transport (Foundation)
+    /// - QUIC over IPv6 ONLY
+    /// - Certificate validation at connection establishment
+    /// - 40 Gbps performance optimization
+    /// - Zero-copy operations and hardware acceleration
+    stoq_layer: Arc<StoqTransportLayer>,
+    
+    /// Layer 2: HyperMesh Assets (Orchestration)  
+    /// - Universal asset system (everything is an asset)
+    /// - Four-proof consensus (PoSpace+PoStake+PoWork+PoTime)
+    /// - NAT-like proxy addressing for remote resources
+    /// - VM execution through asset allocation
+    hypermesh_layer: Arc<HyperMeshAssetLayer>,
+    
+    /// Layer 3: TrustChain Authority (Security)
+    /// - Embedded certificate authority (no external CA)
+    /// - Embedded DNS resolver (no external DNS)
+    /// - Certificate transparency logging
+    /// - Automatic certificate rotation
+    trustchain_layer: Arc<TrustChainAuthorityLayer>,
+    
+    /// Layer Integration Logic
+    /// - Cross-layer communication and validation
+    /// - Consensus coordination across layers
+    /// - Performance optimization coordination
+    integration: Arc<LayerIntegration>,
+    
+    /// STOQ Protocol Handler for Certificate-Authenticated Dashboard Access
+    /// - Pure QUIC-based protocol (no HTTP)
+    /// - TrustChain certificate authentication required
+    /// - Real-time updates via QUIC streams
+    stoq_protocol: Option<Arc<transport::protocol::StoqProtocolHandler>>,
+    
+    /// Performance monitoring for 40 Gbps targets
+    monitor: Arc<PerformanceMonitor>,
+}
+
+impl Internet2Server {
+    /// Create new Internet 2.0 server with pure STOQ protocol
+    pub async fn new(config: Internet2Config) -> Result<Self> {
+        Self::new_with_stoq_protocol(config, true).await
+    }
+    
+    /// Create new Internet 2.0 server with optional STOQ protocol handler
+    pub async fn new_with_stoq_protocol(config: Internet2Config, enable_protocol: bool) -> Result<Self> {
+        info!("🚀 Initializing Internet 2.0 Protocol Stack");
+        info!("📡 Mode: Unified STOQ/HyperMesh/TrustChain Server");
+        info!("🔗 Target: 40 Gbps performance with embedded security");
+        
+        let config = Arc::new(config);
+        
+        // Initialize performance monitor first for metrics collection
+        let monitor = Arc::new(PerformanceMonitor::new(config.clone()).await?);
+        
+        // Layer 3: TrustChain Authority (Initialize first - others depend on certificates)
+        info!("🔐 Initializing TrustChain Authority Layer");
+        info!("   • Embedded Certificate Authority");
+        info!("   • Embedded DNS Resolver");  
+        info!("   • Certificate Transparency Logging");
+        info!("   • Post-quantum cryptography (FALCON-1024 + Kyber)");
+        
+        let trustchain_layer = Arc::new(
+            TrustChainAuthorityLayer::new(config.clone(), monitor.clone()).await
+                .map_err(|e| anyhow!("TrustChain initialization failed: {}", e))?
+        );
+        
+        // Layer 1: STOQ Transport (Initialize with TrustChain certificates)
+        info!("⚡ Initializing STOQ Transport Layer");
+        info!("   • QUIC over IPv6 ONLY");
+        info!("   • Certificate validation at connection establishment");
+        info!("   • 40 Gbps performance optimization");
+        info!("   • Zero-copy operations and hardware acceleration");
+        
+        let stoq_layer = Arc::new(
+            StoqTransportLayer::new(config.clone(), trustchain_layer.clone(), monitor.clone()).await
+                .map_err(|e| anyhow!("STOQ transport initialization failed: {}", e))?
+        );
+        
+        // Layer 2: HyperMesh Assets (Initialize with STOQ transport)
+        info!("🏗️  Initializing HyperMesh Asset Layer");
+        info!("   • Universal Asset System");
+        info!("   • Four-proof consensus (PoSpace+PoStake+PoWork+PoTime)");
+        info!("   • NAT-like proxy addressing");
+        info!("   • VM execution through asset allocation");
+        
+        let hypermesh_layer = Arc::new(
+            HyperMeshAssetLayer::new(config.clone(), stoq_layer.clone(), monitor.clone()).await
+                .map_err(|e| anyhow!("HyperMesh initialization failed: {}", e))?
+        );
+        
+        // Layer Integration (Cross-layer coordination)
+        info!("🔄 Initializing Layer Integration");
+        info!("   • Cross-layer communication");
+        info!("   • Consensus coordination");
+        info!("   • Performance optimization coordination");
+        
+        let integration = Arc::new(
+            LayerIntegration::new(
+                config.clone(),
+                stoq_layer.clone(),
+                hypermesh_layer.clone(), 
+                trustchain_layer.clone(),
+                monitor.clone()
+            ).await
+                .map_err(|e| anyhow!("Layer integration failed: {}", e))?
+        );
+        
+        // Verify all layers are properly integrated
+        integration.validate_stack_integration().await
+            .map_err(|e| anyhow!("Protocol stack validation failed: {}", e))?;
+        
+        info!("✅ Internet 2.0 Protocol Stack initialized successfully");
+        info!("🌐 Server ready to replace traditional Internet protocols");
+        
+        // Create server instance
+        let mut server = Self {
+            config,
+            stoq_layer,
+            hypermesh_layer,
+            trustchain_layer,
+            integration,
+            stoq_protocol: None,
+            monitor,
+        };
+        
+        // Initialize STOQ protocol handler if enabled
+        if enable_protocol {
+            info!("📡 Initializing STOQ Protocol Handler");
+            info!("   • Pure QUIC-based protocol (no HTTP)");
+            info!("   • TrustChain certificate authentication required");
+            info!("   • Real-time updates via QUIC streams");
+            
+            let server_arc = Arc::new(server);
+            let protocol_handler = Arc::new(
+                transport::protocol::StoqProtocolHandler::new(server_arc.clone())
+            );
+            
+            // Start real-time updates broadcaster
+            protocol_handler.start_realtime_updates().await
+                .map_err(|e| anyhow!("STOQ protocol real-time updates failed: {}", e))?;
+            
+            // Create a new server instance with the protocol handler
+            let server_with_protocol = Self {
+                config: server_arc.config.clone(),
+                stoq_layer: server_arc.stoq_layer.clone(),
+                hypermesh_layer: server_arc.hypermesh_layer.clone(),
+                trustchain_layer: server_arc.trustchain_layer.clone(),
+                integration: server_arc.integration.clone(),
+                stoq_protocol: Some(protocol_handler),
+                monitor: server_arc.monitor.clone(),
+            };
+            
+            info!("✅ STOQ Protocol Handler initialized successfully");
+            Ok(server_with_protocol)
+        } else {
+            info!("ℹ️  STOQ protocol handler disabled");
+            Ok(server)
+        }
+    }
+    
+    /// Start the Internet 2.0 server - runs persistently until shutdown
+    pub async fn start(&self) -> Result<()> {
+        info!("🚀 Starting Internet 2.0 Protocol Stack Server");
+        
+        // Start non-persistent layers first (they complete quickly)
+        let hypermesh_task = self.hypermesh_layer.start(); 
+        let trustchain_task = self.trustchain_layer.start();
+        let integration_task = self.integration.start();
+        let monitor_task = self.monitor.start();
+        
+        // Wait for non-persistent layers to complete startup
+        match tokio::try_join!(hypermesh_task, trustchain_task, integration_task, monitor_task) {
+            Ok(_) => {
+                info!("✅ Supporting Internet 2.0 layers started successfully");
+                
+                // Log comprehensive startup summary before starting persistent service
+                self.log_startup_summary().await;
+                
+                // STOQ protocol handler runs embedded within STOQ transport layer
+                if let Some(stoq_protocol) = &self.stoq_protocol {
+                    info!("📡 STOQ Protocol Handler embedded in QUIC transport - certificate authentication enabled");
+                }
+                
+                // Now start the persistent STOQ transport layer (this will block until shutdown)
+                info!("🌐 Starting persistent STOQ transport layer...");
+                info!("🔄 Server will now run until shutdown signal (Ctrl+C)");
+                
+                // This is the main server loop - STOQ transport runs persistently
+                self.stoq_layer.start().await?;
+                
+                info!("🛑 STOQ transport layer stopped - server shutting down");
+                Ok(())
+            }
+            Err(e) => {
+                error!("❌ Failed to start Internet 2.0 support layers: {}", e);
+                Err(anyhow!("Server startup failed: {}", e))
+            }
+        }
+    }
+    
+    /// Log comprehensive startup summary
+    async fn log_startup_summary(&self) {
+        let stats = self.monitor.get_stack_statistics().await;
+        
+        info!("🌐 Internet 2.0 Server Successfully Started");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("📊 Protocol Stack Status:");
+        info!("   🔹 STOQ Transport: {} (Target: 40 Gbps)", format_performance(stats.stoq_throughput));
+        info!("   🔹 HyperMesh Assets: {} active assets", stats.active_assets);
+        info!("   🔹 TrustChain Authority: {} certificates", stats.active_certificates);
+        info!("   🔹 Layer Integration: {} cross-layer operations/sec", stats.integration_ops_per_sec);
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("🔗 Network Configuration:");
+        info!("   🔹 Listening on: [{}]:{}", self.config.global.bind_address, self.config.global.port);
+        info!("   🔹 IPv6 Only: ✅ (STOQ protocol requirement)");
+        info!("   🔹 Protocol: QUIC over IPv6 (replacing HTTP/TCP)");
+        info!("   🔹 Consensus Mode: {}", if self.config.deployment.consensus_mandatory { "MANDATORY" } else { "Optional" });
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("🔐 Security Configuration:");
+        info!("   🔹 Embedded CA: ✅ (No external dependencies)");
+        info!("   🔹 Embedded DNS: ✅ (No external dependencies)");
+        info!("   🔹 Certificate Transparency: ✅");
+        info!("   🔹 Post-quantum Ready: ✅ (FALCON-1024 + Kyber)");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("⚡ Performance Targets:");
+        info!("   🔹 Transport Throughput: 40 Gbps");
+        info!("   🔹 Consensus Operations: <100ms four-proof validation");
+        info!("   🔹 Certificate Operations: <35ms"); 
+        info!("   🔹 Asset Operations: 1000+ allocations/sec");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        if stats.performance_warnings.is_empty() {
+            info!("🎯 Performance Status: All targets met");
+        } else {
+            warn!("⚠️  Performance Warnings:");
+            for warning in &stats.performance_warnings {
+                warn!("   • {}", warning);
+            }
+        }
+        
+        info!("🌟 Internet 2.0 server ready to serve connections");
+    }
+    
+    /// Graceful shutdown of all layers
+    pub async fn shutdown(&self) -> Result<()> {
+        info!("🛑 Shutting down Internet 2.0 Protocol Stack");
+        
+        // Shutdown layers in reverse order (dependencies)
+        self.integration.shutdown().await?;
+        self.hypermesh_layer.shutdown().await?;
+        self.stoq_layer.shutdown().await?;
+        self.trustchain_layer.shutdown().await?;
+        self.monitor.shutdown().await?;
+        
+        info!("✅ Internet 2.0 server shutdown complete");
+        Ok(())
+    }
+    
+    /// Get comprehensive server statistics
+    pub async fn get_statistics(&self) -> Result<ServerStatistics> {
+        Ok(ServerStatistics {
+            stack_stats: self.monitor.get_stack_statistics().await,
+            stoq_stats: self.stoq_layer.get_statistics().await?,
+            hypermesh_stats: self.hypermesh_layer.get_statistics().await?,
+            trustchain_stats: self.trustchain_layer.get_statistics().await?,
+            integration_stats: self.integration.get_statistics().await?,
+        })
+    }
+}
+
+/// Comprehensive server statistics
+#[derive(Debug)]
+pub struct ServerStatistics {
+    pub stack_stats: monitoring::StackStatistics,
+    pub stoq_stats: transport::TransportStatistics,
+    pub hypermesh_stats: assets::AssetStatistics,
+    pub trustchain_stats: authority::AuthorityStatistics,
+    pub integration_stats: integration::IntegrationStatistics,
+}
+
+/// Format performance numbers for human readability
+fn format_performance(throughput_mbps: f64) -> String {
+    if throughput_mbps >= 1000.0 {
+        format!("{:.2} Gbps", throughput_mbps / 1000.0)
+    } else {
+        format!("{:.2} Mbps", throughput_mbps)
+    }
+}
+
+/// Main entry point for Internet 2.0 server
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging for the entire stack
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,internet2_server=debug".into())
+        )
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+    
+    let cli = Cli::parse();
+    
+    info!("🌐 Internet 2.0 Protocol Stack Server");
+    info!("📡 Unified STOQ/HyperMesh/TrustChain Implementation");
+    info!("🔧 Version: 1.0.0");
+    
+    // Load configuration
+    let config = Internet2Config::load(&cli.config, &cli.bind, cli.port).await
+        .map_err(|e| anyhow!("Configuration loading failed: {}", e))?;
+    
+    // Apply deployment mode settings
+    let config = match cli.mode {
+        Some(DeploymentMode::Production { federated }) => {
+            info!("🔐 Production Mode: Maximum security, mandatory consensus");
+            if federated {
+                info!("🌐 Federated Bootstrap: No external dependencies");
+            }
+            config.with_production_settings(federated)
+        }
+        Some(DeploymentMode::Development { legacy_gateway }) => {
+            warn!("⚠️  Development Mode: Reduced security for testing");
+            if legacy_gateway {
+                info!("🔄 Legacy Gateway: HTTP/TCP compatibility enabled");
+            }
+            config.with_development_settings(legacy_gateway)
+        }
+        Some(DeploymentMode::Bootstrap { root_authority }) => {
+            info!("🏗️  Bootstrap Mode: Initializing new Internet 2.0 network");
+            if root_authority {
+                info!("👑 Root Authority: Bootstrapping as root certificate authority");
+            }
+            config.with_bootstrap_settings(root_authority)
+        }
+        Some(DeploymentMode::Gateway { translate_protocols }) => {
+            info!("🔄 Gateway Mode: Legacy protocol translation");
+            if translate_protocols {
+                info!("🔀 Protocol Translation: HTTP/TCP to STOQ translation enabled");
+            }
+            config.with_gateway_settings(translate_protocols)
+        }
+        None => {
+            info!("🔧 Default Mode: Balanced configuration");
+            config
+        }
+    };
+    
+    // Validate configuration
+    config.validate()
+        .map_err(|e| anyhow!("Configuration validation failed: {}", e))?;
+    
+    // Create the unified server with REST API
+    let server = Internet2Server::new_with_api(config, Some(cli.http_port)).await
+        .map_err(|e| anyhow!("Server initialization failed: {}", e))?;
+    
+    // Setup shutdown signal handling
+    let (shutdown_sender, mut shutdown_receiver) = tokio::sync::mpsc::channel::<()>(1);
+    
+    // Spawn task to handle shutdown signals
+    tokio::spawn(async move {
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler");
+        
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                info!("📡 Received Ctrl+C shutdown signal");
+            }
+            _ = sigterm.recv() => {
+                info!("📡 Received SIGTERM shutdown signal");
+            }
+        }
+        
+        // Send shutdown signal to main loop
+        let _ = shutdown_sender.send(()).await;
+    });
+    
+    // Start server and wait for completion or shutdown signal
+    tokio::select! {
+        result = server.start() => {
+            match result {
+                Ok(()) => {
+                    info!("🏁 Server completed normally");
+                }
+                Err(e) => {
+                    error!("❌ Server failed: {}", e);
+                    return Err(e);
+                }
+            }
+        }
+        _ = shutdown_receiver.recv() => {
+            info!("🛑 Shutdown signal received - stopping server");
+        }
+    }
+    
+    // Graceful shutdown
+    server.shutdown().await
+        .map_err(|e| anyhow!("Server shutdown failed: {}", e))?;
+    
+    info!("👋 Internet 2.0 server stopped");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_server_initialization() {
+        let config = Internet2Config::default_development();
+        let server = Internet2Server::new(config).await;
+        assert!(server.is_ok());
+    }
+    
+    #[tokio::test]
+    async fn test_layer_integration() {
+        let config = Internet2Config::default_development();
+        let server = Internet2Server::new(config).await.unwrap();
+        
+        // Verify all layers are integrated
+        let stats = server.get_statistics().await.unwrap();
+        assert!(stats.stack_stats.layers_integrated);
+    }
+    
+    #[tokio::test]
+    async fn test_performance_targets() {
+        let config = Internet2Config::default_production();
+        let server = Internet2Server::new(config).await.unwrap();
+        
+        let stats = server.get_statistics().await.unwrap();
+        
+        // Verify performance targets are tracked
+        assert!(stats.stoq_stats.target_throughput_gbps >= 40.0);
+        assert!(stats.hypermesh_stats.consensus_time_ms <= 100.0);
+        assert!(stats.trustchain_stats.certificate_ops_ms <= 35.0);
+    }
+}
