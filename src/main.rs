@@ -21,7 +21,6 @@ mod assets;
 mod authority;
 mod integration;
 mod monitoring;
-mod api;
 
 use config::Internet2Config;
 use transport::StoqTransportLayer;
@@ -29,7 +28,6 @@ use assets::HyperMeshAssetLayer;
 use authority::TrustChainAuthorityLayer;
 use integration::LayerIntegration;
 use monitoring::PerformanceMonitor;
-// Removed HTTP API - using pure STOQ protocol
 
 /// Internet 2.0 Protocol Stack Server
 #[derive(Parser)]
@@ -49,7 +47,6 @@ pub struct Cli {
     #[arg(short, long, default_value = "8443")]
     pub port: u16,
     
-    /// Removed HTTP port - using pure STOQ protocol
     
     /// Deployment mode
     #[command(subcommand)]
@@ -93,7 +90,6 @@ pub enum DeploymentMode {
 /// 1. STOQ Transport: QUIC over IPv6 with 40 Gbps performance targets
 /// 2. HyperMesh Assets: Universal asset system with four-proof consensus
 /// 3. TrustChain Authority: Embedded CA and DNS with certificate transparency
-/// 4. REST API: HTTP endpoints for UI management and monitoring
 pub struct Internet2Server {
     /// Configuration for all layers
     config: Arc<Internet2Config>,
@@ -125,11 +121,6 @@ pub struct Internet2Server {
     /// - Performance optimization coordination
     integration: Arc<LayerIntegration>,
     
-    /// STOQ Protocol Handler for Certificate-Authenticated Dashboard Access
-    /// - Pure QUIC-based protocol (no HTTP)
-    /// - TrustChain certificate authentication required
-    /// - Real-time updates via QUIC streams
-    stoq_protocol: Option<Arc<transport::protocol::StoqProtocolHandler>>,
     
     /// Performance monitoring for 40 Gbps targets
     monitor: Arc<PerformanceMonitor>,
@@ -138,11 +129,6 @@ pub struct Internet2Server {
 impl Internet2Server {
     /// Create new Internet 2.0 server with pure STOQ protocol
     pub async fn new(config: Internet2Config) -> Result<Self> {
-        Self::new_with_stoq_protocol(config, true).await
-    }
-    
-    /// Create new Internet 2.0 server with optional STOQ protocol handler
-    pub async fn new_with_stoq_protocol(config: Internet2Config, enable_protocol: bool) -> Result<Self> {
         info!("🚀 Initializing Internet 2.0 Protocol Stack");
         info!("📡 Mode: Unified STOQ/HyperMesh/TrustChain Server");
         info!("🔗 Target: 40 Gbps performance with embedded security");
@@ -212,50 +198,18 @@ impl Internet2Server {
         info!("✅ Internet 2.0 Protocol Stack initialized successfully");
         info!("🌐 Server ready to replace traditional Internet protocols");
         
-        // Create server instance
-        let mut server = Self {
+        // Create server instance  
+        let server = Self {
             config,
             stoq_layer,
             hypermesh_layer,
             trustchain_layer,
             integration,
-            stoq_protocol: None,
             monitor,
         };
         
-        // Initialize STOQ protocol handler if enabled
-        if enable_protocol {
-            info!("📡 Initializing STOQ Protocol Handler");
-            info!("   • Pure QUIC-based protocol (no HTTP)");
-            info!("   • TrustChain certificate authentication required");
-            info!("   • Real-time updates via QUIC streams");
-            
-            let server_arc = Arc::new(server);
-            let protocol_handler = Arc::new(
-                transport::protocol::StoqProtocolHandler::new(server_arc.clone())
-            );
-            
-            // Start real-time updates broadcaster
-            protocol_handler.start_realtime_updates().await
-                .map_err(|e| anyhow!("STOQ protocol real-time updates failed: {}", e))?;
-            
-            // Create a new server instance with the protocol handler
-            let server_with_protocol = Self {
-                config: server_arc.config.clone(),
-                stoq_layer: server_arc.stoq_layer.clone(),
-                hypermesh_layer: server_arc.hypermesh_layer.clone(),
-                trustchain_layer: server_arc.trustchain_layer.clone(),
-                integration: server_arc.integration.clone(),
-                stoq_protocol: Some(protocol_handler),
-                monitor: server_arc.monitor.clone(),
-            };
-            
-            info!("✅ STOQ Protocol Handler initialized successfully");
-            Ok(server_with_protocol)
-        } else {
-            info!("ℹ️  STOQ protocol handler disabled");
-            Ok(server)
-        }
+        info!("✅ Internet 2.0 Protocol Stack initialized successfully");
+        Ok(server)
     }
     
     /// Start the Internet 2.0 server - runs persistently until shutdown
@@ -276,10 +230,6 @@ impl Internet2Server {
                 // Log comprehensive startup summary before starting persistent service
                 self.log_startup_summary().await;
                 
-                // STOQ protocol handler runs embedded within STOQ transport layer
-                if let Some(stoq_protocol) = &self.stoq_protocol {
-                    info!("📡 STOQ Protocol Handler embedded in QUIC transport - certificate authentication enabled");
-                }
                 
                 // Now start the persistent STOQ transport layer (this will block until shutdown)
                 info!("🌐 Starting persistent STOQ transport layer...");
@@ -452,8 +402,8 @@ async fn main() -> Result<()> {
     config.validate()
         .map_err(|e| anyhow!("Configuration validation failed: {}", e))?;
     
-    // Create the unified server with REST API
-    let server = Internet2Server::new_with_api(config, Some(cli.http_port)).await
+    // Create the unified server with pure STOQ protocol
+    let server = Internet2Server::new(config).await
         .map_err(|e| anyhow!("Server initialization failed: {}", e))?;
     
     // Setup shutdown signal handling

@@ -21,13 +21,11 @@ pub mod quic;
 pub mod certificates;
 pub mod dns;
 pub mod performance;
-pub mod protocol;
 
 use quic::{QuicConnection, QuicEndpoint};
 use certificates::CertificateValidator;
 use dns::EmbeddedDnsResolver;
 use performance::{PerformanceOptimizer, TransportMetrics};
-use protocol::StoqProtocolHandler;
 
 /// STOQ Transport Layer - Foundation protocol for Internet 2.0
 /// 

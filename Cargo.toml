@@ -58,12 +58,6 @@ toml = "0.8"
 config = "0.14"
 clap = { version = "4.5", features = ["derive", "env"] }
 
-# Web interface for monitoring and management
-axum = { version = "0.7", features = ["ws", "json"] }
-tower = "0.4"
-tower-http = { version = "0.4", features = ["cors", "trace", "fs"] }
-hyper = { version = "1.0", features = ["full"] }
-tokio-tungstenite = "0.24"
 
 # Error handling and logging
 anyhow = "1.0"
