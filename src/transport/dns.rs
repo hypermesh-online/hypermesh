@@ -116,11 +116,12 @@ impl EmbeddedDnsResolver {
         let server_addr = config.global.bind_address;
         let mut mappings = HashMap::new();
         
-        // Core Internet 2.0 infrastructure domains
-        mappings.insert("internet2.network".to_string(), vec![server_addr]);
-        mappings.insert("stoq.internet2.network".to_string(), vec![server_addr]);
-        mappings.insert("assets.internet2.network".to_string(), vec![server_addr]);
-        mappings.insert("trust.internet2.network".to_string(), vec![server_addr]);
+        // Core HyperMesh infrastructure domains
+        mappings.insert("hypermesh.online".to_string(), vec![server_addr]);
+        mappings.insert("stoq.hypermesh.online".to_string(), vec![server_addr]);
+        mappings.insert("catalog.hypermesh.online".to_string(), vec![server_addr]);
+        mappings.insert("trust.hypermesh.online".to_string(), vec![server_addr]);
+        mappings.insert("caesar.hypermesh.online".to_string(), vec![server_addr]);
         
         // Local development domains
         mappings.insert("localhost".to_string(), vec![Ipv6Addr::LOCALHOST]);
@@ -374,10 +375,11 @@ impl EmbeddedDnsResolver {
     /// Preload DNS mappings for common domains
     pub async fn preload_common_domains(&self) -> Result<()> {
         let common_domains = vec![
-            "internet2.network",
-            "stoq.internet2.network", 
-            "assets.internet2.network",
-            "trust.internet2.network",
+            "hypermesh.online",
+            "stoq.hypermesh.online",
+            "catalog.hypermesh.online",
+            "trust.hypermesh.online",
+            "caesar.hypermesh.online",
         ];
         
         for domain in common_domains {

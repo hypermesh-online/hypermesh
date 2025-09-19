@@ -1,0 +1,67 @@
+# Docker Compose for Local DNS Testing
+# Alternative to hosts file modification for containerized testing
+
+version: '3.8'
+
+services:
+  # Dnsmasq for local DNS resolution
+  local-dns:
+    image: jpillora/dnsmasq
+    restart: unless-stopped
+    ports:
+      - "53:53/udp"
+      - "5380:8080"  # Web UI
+    volumes:
+      - ./dnsmasq.conf:/etc/dnsmasq.conf
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - HTTP_USER=admin
+      - HTTP_PASS=hypermesh
+    networks:
+      hypermesh-net:
+        ipv4_address: 172.20.0.10
+
+  # Web3 Internet 2.0 Server
+  internet2-server:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.internet2
+    restart: unless-stopped
+    ports:
+      - "8443:443"
+    volumes:
+      - ../../config:/app/config
+      - ../../certificates:/app/certificates
+      - ../../logs:/app/logs
+    environment:
+      - RUST_LOG=debug
+      - CONFIG_FILE=/app/config/development-local.toml
+    depends_on:
+      - local-dns
+    networks:
+      hypermesh-net:
+        ipv4_address: 172.20.0.20
+
+  # Development proxy for HTTPS termination
+  https-proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ../../certificates:/etc/nginx/certs
+    depends_on:
+      - internet2-server
+    networks:
+      hypermesh-net:
+        ipv4_address: 172.20.0.30
+
+networks:
+  hypermesh-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

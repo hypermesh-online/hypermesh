@@ -31,6 +31,9 @@ use certificates::CertificateManager;
 use metrics::TransportMetrics;
 use hardware_acceleration::{HardwareAccelerator, HardwareAccelConfig, HardwareAccelStats};
 
+// Forward declaration for protocol handler integration
+use crate::protocol::StoqProtocolHandler;
+
 /// High-performance STOQ Transport configuration optimized for 40 Gbps
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportConfig {
@@ -363,13 +366,14 @@ pub struct StoqTransport {
     endpoint: Arc<quinn::Endpoint>,
     connections: Arc<DashMap<String, Arc<Connection>>>,
     connection_pool: Arc<DashMap<String, Vec<Arc<Connection>>>>,
-    cert_manager: Arc<CertificateManager>,
+    pub cert_manager: Arc<CertificateManager>,
     metrics: Arc<TransportMetrics>,
     cached_client_config: Arc<RwLock<Option<quinn::ClientConfig>>>,
     memory_pool: Arc<MemoryPool>,
     connection_multiplexer: Arc<DashMap<String, VecDeque<Arc<Connection>>>>,
     performance_stats: Arc<RwLock<PerformanceStats>>,
     hardware_accelerator: Option<Arc<HardwareAccelerator>>,
+    protocol_handler: Option<Arc<StoqProtocolHandler>>,
 }
 
 /// Performance statistics for 40 Gbps monitoring
@@ -534,6 +538,7 @@ impl StoqTransport {
             connection_multiplexer: Arc::new(DashMap::new()),
             performance_stats: Arc::new(RwLock::new(PerformanceStats::default())),
             hardware_accelerator,
+            protocol_handler: None, // Initialize as None, can be set later
         })
     }
     
@@ -587,6 +592,16 @@ impl StoqTransport {
         }
     }
     
+    /// Set protocol handler for message processing
+    pub fn set_protocol_handler(&mut self, handler: Arc<StoqProtocolHandler>) {
+        self.protocol_handler = Some(handler);
+    }
+
+    /// Get protocol handler if available
+    pub fn protocol_handler(&self) -> Option<Arc<StoqProtocolHandler>> {
+        self.protocol_handler.clone()
+    }
+
     /// Accept incoming connections
     pub async fn accept(&self) -> Result<Arc<Connection>> {
         let incoming = self.endpoint.accept().await.ok_or_else(|| anyhow!("No incoming connection"))?;
@@ -611,6 +626,19 @@ impl StoqTransport {
         
         self.connections.insert(connection.id(), connection.clone());
         self.metrics.record_connection_established();
+        
+        // If protocol handler is available, start handling protocol messages
+        if let Some(protocol_handler) = &self.protocol_handler {
+            let handler = protocol_handler.clone();
+            let conn_clone = connection.clone();
+            let transport_clone = Arc::new(self.clone());
+            
+            tokio::spawn(async move {
+                if let Err(e) = handler.handle_connection(conn_clone, transport_clone).await {
+                    warn!("Protocol handler error: {}", e);
+                }
+            });
+        }
         
         info!("Accepted connection from {}", remote_addr);
         Ok(connection)
@@ -868,6 +896,25 @@ impl crate::Transport for StoqTransport {
     
     async fn shutdown(&self) {
         self.shutdown().await
+    }
+}
+
+impl Clone for StoqTransport {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            endpoint: self.endpoint.clone(),
+            connections: self.connections.clone(),
+            connection_pool: self.connection_pool.clone(),
+            cert_manager: self.cert_manager.clone(),
+            metrics: self.metrics.clone(),
+            cached_client_config: self.cached_client_config.clone(),
+            memory_pool: self.memory_pool.clone(),
+            connection_multiplexer: self.connection_multiplexer.clone(),
+            performance_stats: self.performance_stats.clone(),
+            hardware_accelerator: self.hardware_accelerator.clone(),
+            protocol_handler: self.protocol_handler.clone(),
+        }
     }
 }
 

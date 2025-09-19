@@ -22,6 +22,9 @@ pub struct QuicEndpoint {
     /// QUIC endpoint configuration
     config: StoqConfig,
     
+    /// Global configuration
+    global_config: crate::config::GlobalConfig,
+    
     /// Quinn QUIC endpoint
     quinn_endpoint: Arc<RwLock<Option<quinn::Endpoint>>>,
     
@@ -60,7 +63,8 @@ struct EndpointState {
 impl QuicEndpoint {
     /// Create new QUIC endpoint
     pub async fn new(
-        config: &StoqConfig, 
+        config: &StoqConfig,
+        global_config: &crate::config::GlobalConfig,
         trustchain: Arc<TrustChainAuthorityLayer>
     ) -> Result<Self> {
         info!("🚀 Initializing QUIC endpoint for STOQ transport");
@@ -75,6 +79,7 @@ impl QuicEndpoint {
         
         Ok(Self {
             config: config.clone(),
+            global_config: global_config.clone(),
             quinn_endpoint: Arc::new(RwLock::new(None)),
             trustchain,
             state: Arc::new(RwLock::new(state)),
@@ -96,15 +101,15 @@ impl QuicEndpoint {
         
         // Create socket with IPv6-only binding - bind to global config port
         let bind_addr = SocketAddr::from((
-            Ipv6Addr::UNSPECIFIED, // Bind to all IPv6 addresses
-            443 // STOQ standard port (HTTPS replacement)
+            self.global_config.bind_address, // Use configured bind address
+            self.global_config.port // Use configured port (e.g., 8443)
         ));
         
         let socket = std::net::UdpSocket::bind(bind_addr)?;
         
-        // Set IPv6-only
+        // Set IPv6-only (temporarily disabled for testing)
         let socket = socket2::Socket::from(socket);
-        socket.set_only_v6(true)?;
+        // socket.set_only_v6(true)?;
         
         // Configure socket for high performance
         socket.set_send_buffer_size(self.config.quic.send_buffer_size)?;

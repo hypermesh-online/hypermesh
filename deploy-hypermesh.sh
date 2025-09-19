@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Internet 2.0 Protocol Stack Deployment Script
+# HyperMesh Protocol Stack Deployment Script
 #
-# This script deploys the unified Internet 2.0 server that replaces
+# This script deploys the unified HyperMesh server that replaces
 # traditional Internet protocols with an integrated STOQ/HyperMesh/TrustChain stack.
 
 set -euo pipefail
@@ -17,10 +17,10 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-BINARY_NAME="internet2-server"
+BINARY_NAME="hypermesh-server"
 CONFIG_FILE="config/production.toml"
 LOG_DIR="logs"
-PID_FILE="internet2-server.pid"
+PID_FILE="hypermesh-server.pid"
 
 # Print colored output
 print_status() {
@@ -40,14 +40,14 @@ print_error() {
 }
 
 print_header() {
-    echo -e "${PURPLE}[INTERNET2]${NC} $1"
+    echo -e "${PURPLE}[HYPERMESH]${NC} $1"
 }
 
 # Display banner
 show_banner() {
     echo
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                    Internet 2.0 Deployment                  ║${NC}"
+    echo -e "${CYAN}║                    HyperMesh Deployment                     ║${NC}"
     echo -e "${CYAN}║              Unified Protocol Stack Server                   ║${NC}"
     echo -e "${CYAN}║                                                              ║${NC}"
     echo -e "${CYAN}║  🌐 STOQ Transport:    40 Gbps QUIC over IPv6              ║${NC}"

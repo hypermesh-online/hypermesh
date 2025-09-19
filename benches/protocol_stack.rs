@@ -1,17 +1,17 @@
 //! Protocol Stack Benchmarks
 //! 
-//! Comprehensive benchmarks for the unified Internet 2.0 server performance
+//! Comprehensive benchmarks for the unified HyperMesh server performance
 //! Tests STOQ transport, HyperMesh assets, and TrustChain authority layers
 
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
 use tokio::runtime::Runtime;
 use std::time::Duration;
 
-// Import our unified Internet 2.0 server components
-use internet2_server::config::Internet2Config;
-use internet2_server::transport::StoqTransportLayer;
-use internet2_server::assets::HyperMeshAssetLayer;
-use internet2_server::authority::TrustChainAuthorityLayer;
+// Import our unified HyperMesh server components
+use hypermesh_server::config::HyperMeshServerConfig;
+use hypermesh_server::transport::StoqTransportLayer;
+use hypermesh_server::assets::HyperMeshAssetLayer;
+use hypermesh_server::authority::TrustChainAuthorityLayer;
 
 /// Benchmark STOQ Transport Layer performance
 fn bench_stoq_transport(c: &mut Criterion) {

@@ -3,7 +3,7 @@
 [global]
 bind_address = "::"
 port = 443
-server_id = "internet2-dev-001"
+server_id = "hypermesh-dev-001"
 max_connections = 1000
 ipv6_only = true
 log_level = "info"

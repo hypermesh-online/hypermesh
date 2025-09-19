@@ -1,11 +1,11 @@
 [package]
-name = "internet2-server"
+name = "hypermesh-server"
 version = "1.0.0"
 edition = "2021"
 authors = ["HyperMesh Team"]
-description = "Internet 2.0 Protocol Stack - Unified STOQ/HyperMesh/TrustChain Server"
+description = "HyperMesh Protocol Stack - Unified STOQ/HyperMesh/TrustChain Server"
 license = "MIT OR Apache-2.0"
-keywords = ["internet2", "protocol", "stoq", "hypermesh", "trustchain", "consensus"]
+keywords = ["hypermesh", "protocol", "stoq", "trustchain", "consensus"]
 
 [dependencies]
 # Core async runtime
@@ -19,6 +19,7 @@ quinn = "0.11"
 rustls = { version = "0.23", features = ["ring"] }
 socket2 = "0.5"
 bytes = { version = "1.6", features = ["serde"] }
+stoq = { path = "stoq" }  # Local STOQ protocol implementation
 
 # High-performance data structures for 40 Gbps optimization
 dashmap = "6.0"
@@ -46,9 +47,13 @@ hickory-proto = "0.24"
 
 # HyperMesh Assets (embedded) - Consensus and asset management
 sha2 = "0.10"
+sha1 = "0.10"
+sha3 = "0.10"
+hmac = "0.12"
 blake3 = "1.5"
 merkletree = "0.23"
 uuid = { version = "1.6", features = ["v4", "serde"] }
+num_cpus = "1.16"
 
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
@@ -67,12 +72,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Time and data handling
 chrono = { version = "0.4", features = ["serde"] }
+time = "0.3"
 hex = "0.4"
 base64 = "0.22"
 rand = "0.8"
-num_cpus = "1.16"
 rsa = "0.9"
-sha1 = "0.10"
 
 # Performance monitoring
 prometheus = "0.13"
@@ -84,10 +88,10 @@ tempfile = "3.10"
 tokio-test = "0.4"
 
 [features]
-default = ["internet2-full", "high-performance"]
+default = ["hypermesh-full", "high-performance"]
 
-# Complete Internet 2.0 stack
-internet2-full = ["stoq-transport", "hypermesh-assets", "trustchain-authority"]
+# Complete HyperMesh stack
+hypermesh-full = ["stoq-transport", "hypermesh-assets", "trustchain-authority"]
 
 # Individual layers (for testing/development)
 stoq-transport = []
@@ -100,13 +104,13 @@ hardware-acceleration = []
 zero-copy = []
 
 # Deployment modes
-production = ["internet2-full", "high-performance", "consensus-mandatory"]
-development = ["internet2-full", "legacy-compatibility"]
+production = ["hypermesh-full", "high-performance", "consensus-mandatory"]
+development = ["hypermesh-full", "legacy-compatibility"]
 consensus-mandatory = []
 legacy-compatibility = []
 
 [[bin]]
-name = "internet2-server"
+name = "hypermesh-server"
 path = "src/main.rs"
 
 

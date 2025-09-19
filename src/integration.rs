@@ -64,7 +64,7 @@ pub struct IntegrationState {
 }
 
 /// Integration statistics for monitoring
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IntegrationStatistics {
     /// Layer readiness
     pub layers_ready: u8, // 0-3 layers ready
@@ -258,11 +258,11 @@ impl LayerIntegration {
     async fn test_certificate_validation_integration(&self) -> Result<()> {
         // Create a test certificate through TrustChain
         let test_cert_request = crate::authority::ca::CertificateRequest {
-            subject: "CN=integration-test.internet2.network".to_string(),
+            subject: "CN=integration-test.hypermesh.online".to_string(),
             validity_days: 1, // Short validity for test
             key_size: 2048,
             usage: vec!["digitalSignature".to_string()],
-            san_entries: vec!["integration-test.internet2.network".to_string()],
+            san_entries: vec!["integration-test.hypermesh.online".to_string()],
             is_ca: false,
             path_length: None,
         };
@@ -289,7 +289,7 @@ impl LayerIntegration {
     /// Test DNS resolution integration (STOQ → TrustChain)
     async fn test_dns_resolution_integration(&self) -> Result<()> {
         // Test resolving a known domain through embedded DNS
-        match self.trustchain_layer.resolve_domain("internet2.network").await {
+        match self.trustchain_layer.resolve_domain("hypermesh.online").await {
             Ok(addresses) => {
                 if addresses.is_empty() {
                     return Err(anyhow!("DNS resolution returned empty results"));

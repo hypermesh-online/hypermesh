@@ -1,4 +1,4 @@
-//! Configuration for Internet 2.0 Protocol Stack
+//! Configuration for HyperMesh Protocol Stack
 //! 
 //! Unified configuration system that coordinates all three layers:
 //! - STOQ Transport configuration (QUIC, performance, networking)
@@ -11,9 +11,9 @@ use std::net::Ipv6Addr;
 use std::path::Path;
 use std::time::Duration;
 
-/// Master configuration for Internet 2.0 protocol stack
+/// Master configuration for HyperMesh protocol stack
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Internet2Config {
+pub struct HyperMeshServerConfig {
     /// Global server configuration
     pub global: GlobalConfig,
     
@@ -441,7 +441,7 @@ pub enum DeploymentMode {
     Gateway,
 }
 
-impl Internet2Config {
+impl HyperMeshServerConfig {
     /// Load configuration from file with CLI overrides
     pub async fn load(config_path: &str, bind_address: &str, port: u16) -> Result<Self> {
         let mut config = if Path::new(config_path).exists() {
@@ -466,7 +466,7 @@ impl Internet2Config {
             global: GlobalConfig {
                 bind_address: Ipv6Addr::UNSPECIFIED,
                 port: 443,
-                server_id: "internet2-server-001".to_string(),
+                server_id: "hypermesh-server-001".to_string(),
                 max_connections: 100000,
                 ipv6_only: true,
                 log_level: "info".to_string(),
@@ -671,7 +671,7 @@ impl Internet2Config {
     pub fn validate(&self) -> Result<()> {
         // Validate IPv6-only requirement
         if !self.global.ipv6_only {
-            return Err(anyhow!("IPv4 is not supported - Internet 2.0 is IPv6-only"));
+            return Err(anyhow!("IPv4 is not supported - HyperMesh is IPv6-only"));
         }
         
         // Validate performance targets
@@ -703,7 +703,7 @@ impl Internet2Config {
     }
 }
 
-impl Default for Internet2Config {
+impl Default for HyperMeshServerConfig {
     fn default() -> Self {
         Self::default_production()
     }

@@ -1,0 +1,42 @@
+[package]
+name = "stoq-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "STOQ Protocol WebAssembly Client for Internet 2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Use minimal dependencies for WASM - no heavy crypto
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console",
+    "WebSocket",
+    "MessageEvent",
+    "ErrorEvent",
+    "CloseEvent",
+    "EventTarget",
+    "Window",
+    "Performance",
+    "Blob",
+    "BlobPropertyBag",
+    "Response",
+    "ResponseInit",
+    "Headers",
+] }
+console_error_panic_hook = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.4"
+tokio = { version = "1.38", features = ["macros", "time"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.8", features = ["v4", "js"] }
+sha2 = "0.10"
+hex = "0.4"
+tracing = "0.1"
+tracing-wasm = "0.2"
+anyhow = "1.0"

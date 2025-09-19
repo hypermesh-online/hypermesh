@@ -34,6 +34,7 @@ use performance::{PerformanceOptimizer, TransportMetrics};
 /// - DNS resolution through TrustChain
 /// - 40 Gbps performance optimization
 /// - Zero-copy operations and hardware acceleration
+#[derive(Clone)]
 pub struct StoqTransportLayer {
     /// Configuration
     config: Arc<Internet2Config>,
@@ -58,6 +59,9 @@ pub struct StoqTransportLayer {
     
     /// Performance monitor
     monitor: Arc<PerformanceMonitor>,
+    
+    /// STOQ Protocol Handler for message processing
+    protocol_handler: Option<Arc<stoq::protocol::StoqProtocolHandler>>,
 }
 
 /// STOQ Connection - Validated, Certificate-Embedded QUIC Connection
@@ -158,7 +162,7 @@ impl StoqTransportLayer {
         
         // Initialize QUIC endpoint with IPv6-only networking
         let quic_endpoint = Arc::new(
-            QuicEndpoint::new(&config.stoq, trustchain.clone()).await
+            QuicEndpoint::new(&config.stoq, &config.global, trustchain.clone()).await
                 .map_err(|e| anyhow!("QUIC endpoint initialization failed: {}", e))?
         );
         
@@ -198,6 +202,7 @@ impl StoqTransportLayer {
             connections: Arc::new(DashMap::new()),
             metrics,
             monitor,
+            protocol_handler: None, // Will be set by server
         })
     }
     
@@ -541,6 +546,17 @@ impl StoqTransportLayer {
         
         info!("✅ STOQ Transport Layer shutdown complete");
         Ok(())
+    }
+    
+    /// Set protocol handler for message processing
+    pub fn set_protocol_handler(&mut self, handler: Arc<stoq::protocol::StoqProtocolHandler>) {
+        info!("🔌 Integrating STOQ protocol handler with transport layer");
+        self.protocol_handler = Some(handler);
+    }
+    
+    /// Get reference to protocol handler
+    pub fn get_protocol_handler(&self) -> Option<Arc<stoq::protocol::StoqProtocolHandler>> {
+        self.protocol_handler.clone()
     }
 }
 

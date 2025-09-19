@@ -136,7 +136,7 @@ impl StubDnsResolver {
     pub fn new() -> Self {
         let mut mappings = HashMap::new();
         mappings.insert("localhost".to_string(), Ipv6Addr::LOCALHOST);
-        mappings.insert("internet2.network".to_string(), Ipv6Addr::LOCALHOST);
+        mappings.insert("hypermesh.online".to_string(), Ipv6Addr::LOCALHOST);
         
         Self {
             static_mappings: Arc::new(RwLock::new(mappings)),

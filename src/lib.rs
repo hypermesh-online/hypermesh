@@ -1,11 +1,11 @@
-//! Internet 2.0 Protocol Stack Library
+//! HyperMesh Protocol Stack Library
 //! 
 //! A revolutionary replacement for the traditional Internet protocol stack that embeds
 //! STOQ transport, HyperMesh consensus, and TrustChain security into a single,
 //! self-contained networking foundation.
 //!
-//! This library represents a fundamental shift from Internet 1.0's layered protocols
-//! with external dependencies to Internet 2.0's unified, consensus-validated,
+//! This library represents a fundamental shift from traditional Internet's layered protocols
+//! with external dependencies to HyperMesh's unified, consensus-validated,
 //! certificate-embedded protocol stack.
 
 pub mod config;
@@ -16,26 +16,26 @@ pub mod integration;
 pub mod monitoring;
 
 // Re-export main types for easy access
-pub use config::Internet2Config;
+pub use config::HyperMeshServerConfig;
 pub use transport::StoqTransportLayer;
 pub use assets::HyperMeshAssetLayer;
 pub use authority::TrustChainAuthorityLayer;
 pub use integration::LayerIntegration;
 pub use monitoring::PerformanceMonitor;
 
-/// Internet 2.0 Server (re-export from main)
-// Note: The actual Internet2Server struct is defined in main.rs
+/// HyperMesh Server (re-export from main)
+// Note: The actual HyperMeshServer struct is defined in main.rs
 // We re-export key types for library usage
 
-/// Unified result type for the Internet 2.0 stack
+/// Unified result type for the HyperMesh stack
 pub type Result<T> = anyhow::Result<T>;
 
-/// Internet 2.0 Protocol Stack Features
+/// HyperMesh Protocol Stack Features
 /// 
-/// This enum represents the core features that distinguish Internet 2.0
-/// from traditional Internet 1.0 protocols.
+/// This enum represents the core features that distinguish HyperMesh
+/// from traditional Internet protocols.
 #[derive(Debug, Clone)]
-pub enum Internet2Feature {
+pub enum HyperMeshFeature {
     /// STOQ Transport: QUIC over IPv6 foundation
     /// - 40 Gbps performance targets
     /// - Certificate validation at connection establishment
@@ -65,12 +65,12 @@ pub enum Internet2Feature {
     LayerIntegration,
 }
 
-/// Internet 2.0 Protocol Stack Capabilities
+/// HyperMesh Protocol Stack Capabilities
 /// 
-/// This struct describes the complete capabilities of the Internet 2.0
+/// This struct describes the complete capabilities of the HyperMesh
 /// protocol stack compared to traditional Internet protocols.
 #[derive(Debug, Clone)]
-pub struct Internet2Capabilities {
+pub struct HyperMeshCapabilities {
     /// Transport capabilities
     pub transport: TransportCapabilities,
     
@@ -153,7 +153,7 @@ pub struct IntegrationCapabilities {
     pub federated_bootstrap: bool,
 }
 
-impl Default for Internet2Capabilities {
+impl Default for HyperMeshCapabilities {
     fn default() -> Self {
         Self {
             transport: TransportCapabilities {
@@ -203,12 +203,12 @@ impl Default for Internet2Capabilities {
     }
 }
 
-/// Get Internet 2.0 protocol stack capabilities
-pub fn get_internet2_capabilities() -> Internet2Capabilities {
-    Internet2Capabilities::default()
+/// Get HyperMesh protocol stack capabilities
+pub fn get_hypermesh_capabilities() -> HyperMeshCapabilities {
+    HyperMeshCapabilities::default()
 }
 
-/// Compare Internet 2.0 vs Internet 1.0 capabilities
+/// Compare HyperMesh vs traditional Internet capabilities
 pub fn compare_protocol_stacks() -> ProtocolStackComparison {
     ProtocolStackComparison {
         internet1_stack: Internet1Stack {
@@ -231,7 +231,7 @@ pub fn compare_protocol_stacks() -> ProtocolStackComparison {
                 "Vulnerable to quantum attacks".to_string(),
             ],
         },
-        internet2_advantages: vec![
+        hypermesh_advantages: vec![
             "40 Gbps STOQ transport (vs HTTP/TCP limitations)".to_string(),
             "Zero external dependencies (embedded CA + DNS)".to_string(),
             "Four-proof consensus validation for all operations".to_string(),
@@ -250,7 +250,7 @@ pub fn compare_protocol_stacks() -> ProtocolStackComparison {
 #[derive(Debug, Clone)]
 pub struct ProtocolStackComparison {
     pub internet1_stack: Internet1Stack,
-    pub internet2_advantages: Vec<String>,
+    pub hypermesh_advantages: Vec<String>,
 }
 
 /// Internet 1.0 protocol stack description
@@ -263,23 +263,23 @@ pub struct Internet1Stack {
 }
 
 /// Library version and metadata
-pub const INTERNET2_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const INTERNET2_NAME: &str = env!("CARGO_PKG_NAME");
-pub const INTERNET2_DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
+pub const HYPERMESH_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const HYPERMESH_NAME: &str = env!("CARGO_PKG_NAME");
+pub const HYPERMESH_DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Library information
 pub fn library_info() -> LibraryInfo {
     LibraryInfo {
-        name: INTERNET2_NAME.to_string(),
-        version: INTERNET2_VERSION.to_string(),
-        description: INTERNET2_DESCRIPTION.to_string(),
+        name: HYPERMESH_NAME.to_string(),
+        version: HYPERMESH_VERSION.to_string(),
+        description: HYPERMESH_DESCRIPTION.to_string(),
         features: vec![
-            Internet2Feature::StoqTransport,
-            Internet2Feature::HyperMeshAssets,
-            Internet2Feature::TrustChainAuthority,
-            Internet2Feature::LayerIntegration,
+            HyperMeshFeature::StoqTransport,
+            HyperMeshFeature::HyperMeshAssets,
+            HyperMeshFeature::TrustChainAuthority,
+            HyperMeshFeature::LayerIntegration,
         ],
-        capabilities: get_internet2_capabilities(),
+        capabilities: get_hypermesh_capabilities(),
     }
 }
 
@@ -289,8 +289,8 @@ pub struct LibraryInfo {
     pub name: String,
     pub version: String,
     pub description: String,
-    pub features: Vec<Internet2Feature>,
-    pub capabilities: Internet2Capabilities,
+    pub features: Vec<HyperMeshFeature>,
+    pub capabilities: HyperMeshCapabilities,
 }
 
 #[cfg(test)]
@@ -300,14 +300,14 @@ mod tests {
     #[test]
     fn test_library_info() {
         let info = library_info();
-        assert_eq!(info.name, "internet2-server");
+        assert_eq!(info.name, "hypermesh-server");
         assert!(!info.version.is_empty());
         assert_eq!(info.features.len(), 4);
     }
 
     #[test]
     fn test_capabilities() {
-        let capabilities = get_internet2_capabilities();
+        let capabilities = get_hypermesh_capabilities();
         
         // Verify transport capabilities
         assert_eq!(capabilities.transport.max_throughput_gbps, 40.0);
@@ -338,22 +338,22 @@ mod tests {
         assert!(comparison.internet1_stack.performance_limitations.len() > 0);
         assert!(comparison.internet1_stack.security_issues.len() > 0);
         
-        // Verify Internet 2.0 advantages
-        assert!(comparison.internet2_advantages.len() >= 10);
-        assert!(comparison.internet2_advantages.iter().any(|a| a.contains("40 Gbps")));
-        assert!(comparison.internet2_advantages.iter().any(|a| a.contains("zero external dependencies")));
-        assert!(comparison.internet2_advantages.iter().any(|a| a.contains("four-proof consensus")));
+        // Verify HyperMesh advantages
+        assert!(comparison.hypermesh_advantages.len() >= 10);
+        assert!(comparison.hypermesh_advantages.iter().any(|a| a.contains("40 Gbps")));
+        assert!(comparison.hypermesh_advantages.iter().any(|a| a.contains("zero external dependencies")));
+        assert!(comparison.hypermesh_advantages.iter().any(|a| a.contains("four-proof consensus")));
     }
 
     #[test]
-    fn test_internet2_features() {
+    fn test_hypermesh_features() {
         use std::mem::discriminant;
         
         let features = vec![
-            Internet2Feature::StoqTransport,
-            Internet2Feature::HyperMeshAssets,
-            Internet2Feature::TrustChainAuthority,
-            Internet2Feature::LayerIntegration,
+            HyperMeshFeature::StoqTransport,
+            HyperMeshFeature::HyperMeshAssets,
+            HyperMeshFeature::TrustChainAuthority,
+            HyperMeshFeature::LayerIntegration,
         ];
         
         // Verify all features are unique

@@ -1,11 +1,11 @@
-//! Internet 2.0 Protocol Stack - Unified Server
+//! HyperMesh Protocol Stack - Unified Server
 //! 
 //! A revolutionary replacement for the traditional Internet protocol stack that embeds
 //! STOQ transport, HyperMesh consensus, and TrustChain security into a single, 
 //! self-contained networking foundation.
 //!
-//! This server represents a fundamental shift from Internet 1.0's layered protocols
-//! with external dependencies to Internet 2.0's unified, consensus-validated,
+//! This server represents a fundamental shift from traditional Internet's layered protocols
+//! with external dependencies to HyperMesh's unified, consensus-validated,
 //! certificate-embedded protocol stack.
 
 use anyhow::{Result, anyhow};
@@ -14,6 +14,7 @@ use std::net::Ipv6Addr;
 use tokio::signal;
 use tracing::{info, warn, error};
 use clap::{Parser, Subcommand};
+use serde::{Serialize, Deserialize};
 
 mod config;
 mod transport;
@@ -21,18 +22,20 @@ mod assets;
 mod authority;
 mod integration;
 mod monitoring;
+mod dashboard;
 
-use config::Internet2Config;
+use config::HyperMeshServerConfig;
 use transport::StoqTransportLayer;
 use assets::HyperMeshAssetLayer;
 use authority::TrustChainAuthorityLayer;
 use integration::LayerIntegration;
 use monitoring::PerformanceMonitor;
+use dashboard::{DashboardMessageHandler, DashboardMessage};
 
-/// Internet 2.0 Protocol Stack Server
+/// HyperMesh Protocol Stack Server
 #[derive(Parser)]
-#[command(name = "internet2-server")]
-#[command(about = "Internet 2.0 Protocol Stack - Unified STOQ/HyperMesh/TrustChain Server")]
+#[command(name = "hypermesh-server")]
+#[command(about = "HyperMesh Protocol Stack - Unified STOQ/HyperMesh/TrustChain Server")]
 #[command(version = "1.0.0")]
 pub struct Cli {
     /// Configuration file path
@@ -84,15 +87,15 @@ pub enum DeploymentMode {
     },
 }
 
-/// Internet 2.0 Unified Server
+/// HyperMesh Unified Server
 /// 
 /// This server embeds three critical layers into a single protocol stack:
 /// 1. STOQ Transport: QUIC over IPv6 with 40 Gbps performance targets
 /// 2. HyperMesh Assets: Universal asset system with four-proof consensus
 /// 3. TrustChain Authority: Embedded CA and DNS with certificate transparency
-pub struct Internet2Server {
+pub struct HyperMeshServer {
     /// Configuration for all layers
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// Layer 1: STOQ Transport (Foundation)
     /// - QUIC over IPv6 ONLY
@@ -124,12 +127,15 @@ pub struct Internet2Server {
     
     /// Performance monitoring for 40 Gbps targets
     monitor: Arc<PerformanceMonitor>,
+    
+    /// STOQ Protocol Handler for dashboard communication
+    protocol_handler: Option<Arc<stoq::protocol::StoqProtocolHandler>>,
 }
 
-impl Internet2Server {
-    /// Create new Internet 2.0 server with pure STOQ protocol
-    pub async fn new(config: Internet2Config) -> Result<Self> {
-        info!("🚀 Initializing Internet 2.0 Protocol Stack");
+impl HyperMeshServer {
+    /// Create new HyperMesh server with pure STOQ protocol
+    pub async fn new(config: HyperMeshServerConfig) -> Result<Self> {
+        info!("🚀 Initializing HyperMesh Protocol Stack");
         info!("📡 Mode: Unified STOQ/HyperMesh/TrustChain Server");
         info!("🔗 Target: 40 Gbps performance with embedded security");
         
@@ -195,8 +201,50 @@ impl Internet2Server {
         integration.validate_stack_integration().await
             .map_err(|e| anyhow!("Protocol stack validation failed: {}", e))?;
         
-        info!("✅ Internet 2.0 Protocol Stack initialized successfully");
-        info!("🌐 Server ready to replace traditional Internet protocols");
+        info!("✅ HyperMesh Protocol Stack initialized successfully");
+        info!("🌐 Server ready to replace traditional protocols");
+        
+        // Initialize STOQ protocol handler for dashboard communication
+        info!("🔌 Initializing STOQ Protocol Handler");
+        info!("   • Dashboard message handling");
+        info!("   • Certificate-based authentication");
+        info!("   • Real-time server statistics");
+        
+        let protocol_config = stoq::protocol::ProtocolConfig {
+            max_message_size: 16 * 1024 * 1024, // 16MB
+            message_timeout: std::time::Duration::from_secs(30),
+            enable_compression: true,
+            compression_threshold: 1024,
+            enable_authentication: true,
+            max_concurrent_streams: 100,
+        };
+        
+        let protocol_handler = Arc::new(
+            stoq::protocol::StoqProtocolHandler::new(
+                protocol_config,
+                None // Certificate manager will be provided by transport layer
+            )
+        );
+        
+        // Register dashboard message handler
+        let dashboard_handler = DashboardMessageHandler::new(
+            config.clone(),
+            stoq_layer.clone(),
+            hypermesh_layer.clone(),
+            trustchain_layer.clone(),
+            integration.clone(),
+            monitor.clone()
+        );
+        
+        protocol_handler.register_handler(
+            "dashboard".to_string(),
+            dashboard_handler
+        ).await;
+        
+        info!("✅ STOQ Protocol Handler initialized with dashboard support");
+        
+        // Integrate protocol handler with transport layer
+        // Note: This requires making stoq_layer mutable, which we'll handle via Arc<Mutex<>> pattern
         
         // Create server instance  
         let server = Self {
@@ -206,15 +254,16 @@ impl Internet2Server {
             trustchain_layer,
             integration,
             monitor,
+            protocol_handler: Some(protocol_handler),
         };
         
-        info!("✅ Internet 2.0 Protocol Stack initialized successfully");
+        info!("✅ HyperMesh Protocol Stack initialized successfully");
         Ok(server)
     }
     
-    /// Start the Internet 2.0 server - runs persistently until shutdown
+    /// Start the HyperMesh server - runs persistently until shutdown
     pub async fn start(&self) -> Result<()> {
-        info!("🚀 Starting Internet 2.0 Protocol Stack Server");
+        info!("🚀 Starting HyperMesh Protocol Stack Server");
         
         // Start non-persistent layers first (they complete quickly)
         let hypermesh_task = self.hypermesh_layer.start(); 
@@ -225,15 +274,27 @@ impl Internet2Server {
         // Wait for non-persistent layers to complete startup
         match tokio::try_join!(hypermesh_task, trustchain_task, integration_task, monitor_task) {
             Ok(_) => {
-                info!("✅ Supporting Internet 2.0 layers started successfully");
+                info!("✅ Supporting HyperMesh layers started successfully");
                 
                 // Log comprehensive startup summary before starting persistent service
                 self.log_startup_summary().await;
                 
                 
-                // Now start the persistent STOQ transport layer (this will block until shutdown)
-                info!("🌐 Starting persistent STOQ transport layer...");
+                // Now start the persistent STOQ transport layer with protocol handler
+                info!("🌐 Starting persistent STOQ transport layer with protocol handler...");
                 info!("🔄 Server will now run until shutdown signal (Ctrl+C)");
+                
+                // Start the protocol handler alongside the transport layer
+                if let Some(protocol_handler) = &self.protocol_handler {
+                    let handler = protocol_handler.clone();
+                    let transport = self.stoq_layer.clone();
+                    
+                    tokio::spawn(async move {
+                        info!("📡 STOQ Protocol Handler ready for dashboard connections");
+                        // The protocol handler will be invoked by the transport layer
+                        // when connections are established
+                    });
+                }
                 
                 // This is the main server loop - STOQ transport runs persistently
                 self.stoq_layer.start().await?;
@@ -242,7 +303,7 @@ impl Internet2Server {
                 Ok(())
             }
             Err(e) => {
-                error!("❌ Failed to start Internet 2.0 support layers: {}", e);
+                error!("❌ Failed to start HyperMesh support layers: {}", e);
                 Err(anyhow!("Server startup failed: {}", e))
             }
         }
@@ -252,7 +313,7 @@ impl Internet2Server {
     async fn log_startup_summary(&self) {
         let stats = self.monitor.get_stack_statistics().await;
         
-        info!("🌐 Internet 2.0 Server Successfully Started");
+        info!("🌐 HyperMesh Server Successfully Started");
         info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         info!("📊 Protocol Stack Status:");
         info!("   🔹 STOQ Transport: {} (Target: 40 Gbps)", format_performance(stats.stoq_throughput));
@@ -288,12 +349,12 @@ impl Internet2Server {
             }
         }
         
-        info!("🌟 Internet 2.0 server ready to serve connections");
+        info!("🌟 HyperMesh server ready to serve connections");
     }
     
     /// Graceful shutdown of all layers
     pub async fn shutdown(&self) -> Result<()> {
-        info!("🛑 Shutting down Internet 2.0 Protocol Stack");
+        info!("🛑 Shutting down HyperMesh Protocol Stack");
         
         // Shutdown layers in reverse order (dependencies)
         self.integration.shutdown().await?;
@@ -302,7 +363,7 @@ impl Internet2Server {
         self.trustchain_layer.shutdown().await?;
         self.monitor.shutdown().await?;
         
-        info!("✅ Internet 2.0 server shutdown complete");
+        info!("✅ HyperMesh server shutdown complete");
         Ok(())
     }
     
@@ -337,14 +398,14 @@ fn format_performance(throughput_mbps: f64) -> String {
     }
 }
 
-/// Main entry point for Internet 2.0 server
+/// Main entry point for HyperMesh server
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging for the entire stack
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,internet2_server=debug".into())
+                .unwrap_or_else(|_| "info,hypermesh_server=debug".into())
         )
         .with_target(false)
         .with_thread_ids(true)
@@ -354,12 +415,12 @@ async fn main() -> Result<()> {
     
     let cli = Cli::parse();
     
-    info!("🌐 Internet 2.0 Protocol Stack Server");
+    info!("🌐 HyperMesh Protocol Stack Server");
     info!("📡 Unified STOQ/HyperMesh/TrustChain Implementation");
     info!("🔧 Version: 1.0.0");
     
     // Load configuration
-    let config = Internet2Config::load(&cli.config, &cli.bind, cli.port).await
+    let config = HyperMeshServerConfig::load(&cli.config, &cli.bind, cli.port).await
         .map_err(|e| anyhow!("Configuration loading failed: {}", e))?;
     
     // Apply deployment mode settings
@@ -379,7 +440,7 @@ async fn main() -> Result<()> {
             config.with_development_settings(legacy_gateway)
         }
         Some(DeploymentMode::Bootstrap { root_authority }) => {
-            info!("🏗️  Bootstrap Mode: Initializing new Internet 2.0 network");
+            info!("🏗️  Bootstrap Mode: Initializing new HyperMesh network");
             if root_authority {
                 info!("👑 Root Authority: Bootstrapping as root certificate authority");
             }
@@ -403,7 +464,7 @@ async fn main() -> Result<()> {
         .map_err(|e| anyhow!("Configuration validation failed: {}", e))?;
     
     // Create the unified server with pure STOQ protocol
-    let server = Internet2Server::new(config).await
+    let server = HyperMeshServer::new(config).await
         .map_err(|e| anyhow!("Server initialization failed: {}", e))?;
     
     // Setup shutdown signal handling

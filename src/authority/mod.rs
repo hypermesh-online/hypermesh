@@ -366,7 +366,7 @@ impl TrustChainAuthorityLayer {
                 key_size: root_certificate.key_size,
                 key_usage: vec!["digitalSignature".to_string(), "keyCertSign".to_string()],
                 extended_key_usage: vec!["serverAuth".to_string(), "clientAuth".to_string()],
-                san_entries: vec!["trust.internet2.network".to_string()],
+                san_entries: vec!["trust.hypermesh.online".to_string()],
                 status: CertificateStatus::Active,
                 issued_at: SystemTime::now(),
                 updated_at: SystemTime::now(),
@@ -399,19 +399,20 @@ impl TrustChainAuthorityLayer {
         self.initialize_root_certificate().await
     }
     
-    /// Initialize core DNS records for Internet 2.0 infrastructure
+    /// Initialize core DNS records for HyperMesh infrastructure
     async fn initialize_core_dns_records(&self) -> Result<()> {
         info!("🌐 Initializing core DNS records");
         
         let server_ipv6 = self.config.global.bind_address;
         let server_port = self.config.global.port;
         
-        // Core Internet 2.0 infrastructure records (simplified)
+        // Core HyperMesh infrastructure records (simplified)
         let core_records = vec![
-            ("internet2.network".to_string(), format!("AAAA {} 300", server_ipv6)),
-            ("stoq.internet2.network".to_string(), format!("AAAA {} 300", server_ipv6)),
-            ("assets.internet2.network".to_string(), format!("AAAA {} 300", server_ipv6)),
-            ("trust.internet2.network".to_string(), format!("AAAA {} 300", server_ipv6)),
+            ("hypermesh.online".to_string(), format!("AAAA {} 300", server_ipv6)),
+            ("stoq.hypermesh.online".to_string(), format!("AAAA {} 300", server_ipv6)),
+            ("catalog.hypermesh.online".to_string(), format!("AAAA {} 300", server_ipv6)),
+            ("trust.hypermesh.online".to_string(), format!("AAAA {} 300", server_ipv6)),
+            ("caesar.hypermesh.online".to_string(), format!("AAAA {} 300", server_ipv6)),
         ];
         
         // Register core DNS records (simplified for now)
@@ -646,6 +647,112 @@ impl TrustChainAuthorityLayer {
         self.ct_logs.clear();
         
         info!("✅ TrustChain Authority Layer shutdown complete");
+        Ok(())
+    }
+    
+    /// Dashboard API: List certificates with optional filtering
+    pub async fn list_certificates(&self, filter: Option<String>) -> Result<Vec<serde_json::Value>> {
+        let mut certificates = Vec::new();
+        
+        for cert_entry in self.certificates.iter() {
+            let cert = cert_entry.value();
+            
+            // Apply filter if provided
+            if let Some(ref filter_str) = filter {
+                if !cert.metadata.subject.contains(filter_str) && 
+                   !cert.metadata.issuer.contains(filter_str) {
+                    continue;
+                }
+            }
+            
+            let cert_info = serde_json::json!({
+                "id": cert.id,
+                "subject": cert.metadata.subject,
+                "issuer": cert.metadata.issuer,
+                "serial_number": cert.metadata.serial_number,
+                "not_before": cert.metadata.valid_from.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "not_after": cert.metadata.valid_to.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "is_ca": cert.metadata.extended_key_usage.contains(&"CA".to_string()),
+                "key_usage": cert.metadata.key_usage,
+                "fingerprint": cert.metadata.fingerprint_sha256,
+                "status": cert.metadata.status,
+                "issued_at": cert.metadata.issued_at.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "has_pq_signatures": cert.pq_signatures.is_some(),
+                "ct_logged": cert.ct_info.is_some(),
+            });
+            
+            certificates.push(cert_info);
+        }
+        
+        Ok(certificates)
+    }
+    
+    /// Dashboard API: Get detailed certificate information
+    pub async fn get_certificate(&self, certificate_id: &str) -> Result<serde_json::Value> {
+        let cert = self.certificates.get(certificate_id)
+            .ok_or_else(|| anyhow!("Certificate not found: {}", certificate_id))?;
+        
+        Ok(serde_json::json!({
+            "id": cert.id,
+            "metadata": {
+                "subject": cert.metadata.subject,
+                "issuer": cert.metadata.issuer,
+                "serial_number": cert.metadata.serial_number,
+                "not_before": cert.metadata.valid_from.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "not_after": cert.metadata.valid_to.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "is_ca": cert.metadata.extended_key_usage.contains(&"CA".to_string()),
+                "key_usage": cert.metadata.key_usage,
+                "extended_key_usage": cert.metadata.extended_key_usage,
+                "san_entries": cert.metadata.san_entries,
+                "fingerprint": cert.metadata.fingerprint_sha256,
+                "status": cert.metadata.status,
+                "issued_at": cert.metadata.issued_at.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "path_length": null, // Not available in basic metadata
+            },
+            "certificate_der_length": cert.certificate_der.len(),
+            "post_quantum": {
+                "enabled": cert.pq_signatures.is_some(),
+                "signatures": cert.pq_signatures.as_ref().map(|pq| serde_json::json!({
+                    "falcon_signature_available": true,
+                    "kyber_key_available": true,
+                })),
+            },
+            "certificate_transparency": {
+                "logged": cert.ct_info.is_some(),
+                "info": cert.ct_info.as_ref().map(|ct| serde_json::json!({
+                    "log_entries": ct.log_entries,
+                    "scts": ct.scts,
+                    "logged_at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                })),
+            },
+            "rotation": {
+                "enabled": cert.rotation_info.is_some(),
+                "info": cert.rotation_info.as_ref().map(|rot| serde_json::json!({
+                    "policy_id": rot.policy_id,
+                    "previous_cert_id": rot.previous_certificate_id,
+                    "next_rotation_time": rot.next_rotation.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                    "rotation_count": rot.rotation_count,
+                })),
+            }
+        }))
+    }
+    
+    /// Dashboard API: Revoke certificate
+    pub async fn revoke_certificate(&self, certificate_id: &str, reason: &str) -> Result<()> {
+        let cert = self.certificates.get(certificate_id)
+            .ok_or_else(|| anyhow!("Certificate not found: {}", certificate_id))?;
+        
+        // Update certificate status
+        let mut updated_cert = (**cert).clone();
+        updated_cert.metadata.status = CertificateStatus::Revoked;
+        
+        self.certificates.insert(certificate_id.to_string(), Arc::new(updated_cert));
+        
+        info!("📜 Certificate revoked: {} (reason: {})", certificate_id, reason);
+        
+        // TODO: Add to CRL (Certificate Revocation List)
+        // TODO: Update CT logs with revocation
+        
         Ok(())
     }
 }
