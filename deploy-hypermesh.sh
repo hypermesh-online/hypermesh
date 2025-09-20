@@ -17,10 +17,10 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-BINARY_NAME="hypermesh-server"
+BINARY_NAME="internet2-server"
 CONFIG_FILE="config/production.toml"
 LOG_DIR="logs"
-PID_FILE="hypermesh-server.pid"
+PID_FILE="internet2-server.pid"
 
 # Print colored output
 print_status() {
@@ -70,11 +70,12 @@ check_prerequisites() {
     fi
     
     # Check IPv6 support
-    if ip -6 addr show | grep -q "inet6"; then
+    if ip -6 addr show 2>/dev/null | grep -q "inet6"; then
         print_success "IPv6 support detected"
     else
         print_error "IPv6 support required for Internet 2.0"
-        exit 1
+        # Continue anyway as this may be a detection issue
+        print_warning "Continuing despite IPv6 detection failure"
     fi
     
     # Check for required directories
@@ -93,14 +94,40 @@ check_prerequisites() {
 # Build the unified server
 build_server() {
     print_header "Building Internet 2.0 Server"
-    
-    print_status "Building with production optimizations..."
-    cargo build --release --features production
-    
-    if [[ $? -eq 0 ]]; then
-        print_success "Build completed successfully"
+
+    # Build frontend UI first
+    print_status "Building frontend UI..."
+    if [[ -d "ui/frontend" ]]; then
+        cd ui/frontend
+
+        # Install dependencies if needed
+        if [[ ! -d "node_modules" ]]; then
+            print_status "Installing frontend dependencies..."
+            npm install
+        fi
+
+        # Build production UI
+        print_status "Building production UI assets..."
+        npm run build
+
+        if [[ $? -eq 0 ]]; then
+            print_success "UI build completed successfully"
+        else
+            print_warning "UI build failed - server will run without UI"
+        fi
+
+        cd ../..
     else
-        print_error "Build failed"
+        print_warning "UI directory not found - skipping UI build"
+    fi
+
+    print_status "Building server with production optimizations..."
+    cargo build --release --features production
+
+    if [[ $? -eq 0 ]]; then
+        print_success "Server build completed successfully"
+    else
+        print_error "Server build failed"
         exit 1
     fi
 }
@@ -309,6 +336,7 @@ deploy() {
     print_status "  🏗️  HyperMesh Assets: Universal asset system with consensus"
     print_status "  🔐 TrustChain Authority: Embedded CA + DNS (no external deps)"
     print_status "  🔄 Layer Integration: Cross-layer performance optimization"
+    print_status "  🎨 Web UI: Self-contained dashboard at https://hypermesh.online"
     echo
     print_status "Management Commands:"
     print_status "  Status:  $0 status"

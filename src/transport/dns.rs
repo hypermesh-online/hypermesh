@@ -12,13 +12,13 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 use dashmap::DashMap;
 
-use crate::config::Internet2Config;
+use crate::config::HyperMeshServerConfig;
 use crate::authority::TrustChainAuthorityLayer;
 
 /// Embedded DNS resolver for STOQ transport
 pub struct EmbeddedDnsResolver {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// TrustChain integration for DNS resolution
     trustchain: Arc<TrustChainAuthorityLayer>,
@@ -93,7 +93,7 @@ struct DnsStats {
 impl EmbeddedDnsResolver {
     /// Create new embedded DNS resolver
     pub async fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         trustchain: Arc<TrustChainAuthorityLayer>
     ) -> Result<Self> {
         info!("🌐 Initializing Embedded DNS Resolver for STOQ transport");
@@ -112,7 +112,7 @@ impl EmbeddedDnsResolver {
     }
     
     /// Create static DNS mappings for Internet 2.0 infrastructure
-    fn create_static_mappings(config: &Internet2Config) -> HashMap<String, Vec<Ipv6Addr>> {
+    fn create_static_mappings(config: &HyperMeshServerConfig) -> HashMap<String, Vec<Ipv6Addr>> {
         let server_addr = config.global.bind_address;
         let mut mappings = HashMap::new();
         
@@ -409,7 +409,7 @@ impl Clone for EmbeddedDnsResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Internet2Config;
+    use crate::config::HyperMeshServerConfig;
     
     #[tokio::test]
     async fn test_static_dns_mappings() {

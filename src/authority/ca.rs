@@ -1062,6 +1062,84 @@ fn encode_san(san_entries: &[String]) -> Result<Vec<u8>> {
     Ok(encode_sequence(&sans))
 }
 
+impl EmbeddedCertificateAuthority {
+    /// Get server certificate for TLS
+    pub async fn get_server_certificate(&self) -> Result<Vec<u8>> {
+        debug!("📜 Retrieving server certificate");
+
+        // Check if we have a root certificate
+        let root_cert_guard = self.root_certificate.read().await;
+        if let Some(root_cert) = root_cert_guard.as_ref() {
+            // For now, return the root certificate as the server certificate
+            // In production, we would issue a proper server certificate
+            Ok(root_cert.certificate_der.clone())
+        } else {
+            // Generate a self-signed certificate for development
+            self.generate_self_signed_certificate().await
+        }
+    }
+
+    /// Get server private key for TLS
+    pub async fn get_server_private_key(&self) -> Result<Vec<u8>> {
+        debug!("🔑 Retrieving server private key");
+
+        // Check if we have a root private key
+        let root_key_guard = self.root_private_key.read().await;
+        if let Some(root_key) = root_key_guard.as_ref() {
+            // Encode the private key to DER format
+            let key_der = root_key.to_pkcs8_der()
+                .map_err(|e| anyhow!("Failed to encode private key: {}", e))?;
+            Ok(key_der.as_bytes().to_vec())
+        } else {
+            // Generate a new key pair for development
+            self.generate_server_key_pair().await
+        }
+    }
+
+    /// Generate a self-signed certificate for development
+    async fn generate_self_signed_certificate(&self) -> Result<Vec<u8>> {
+        use rcgen::{CertificateParams, DistinguishedName};
+
+        debug!("🔐 Generating self-signed certificate for development");
+
+        let mut params = CertificateParams::default();
+        params.distinguished_name = DistinguishedName::new();
+        params.distinguished_name.push(
+            rcgen::DnType::CommonName,
+            "HyperMesh Development Server",
+        );
+        params.subject_alt_names = vec![
+            rcgen::SanType::DnsName(rcgen::Ia5String::try_from("localhost").unwrap()),
+            rcgen::SanType::IpAddress(std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)),
+        ];
+
+        let cert = params.self_signed(&rcgen::KeyPair::generate()?)
+            .map_err(|e| anyhow!("Failed to generate certificate: {}", e))?;
+
+        let cert_der = cert.der().to_vec();
+
+        info!("✅ Self-signed certificate generated for development");
+
+        Ok(cert_der)
+    }
+
+    /// Generate server key pair for development
+    async fn generate_server_key_pair(&self) -> Result<Vec<u8>> {
+        debug!("🔑 Generating server key pair for development");
+
+        let mut rng = OsRng;
+        let private_key = RsaPrivateKey::new(&mut rng, 2048)
+            .map_err(|e| anyhow!("Failed to generate RSA key: {}", e))?;
+
+        let key_der = private_key.to_pkcs8_der()
+            .map_err(|e| anyhow!("Failed to encode private key: {}", e))?;
+
+        info!("✅ Server key pair generated for development");
+
+        Ok(key_der.as_bytes().to_vec())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

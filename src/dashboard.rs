@@ -13,12 +13,13 @@ use serde::{Serialize, Deserialize};
 use tracing::{info, debug, warn, error};
 use async_trait::async_trait;
 
-use crate::config::Internet2Config;
+use crate::config::HyperMeshServerConfig;
 use crate::transport::StoqTransportLayer;
 use crate::assets::HyperMeshAssetLayer;
 use crate::authority::TrustChainAuthorityLayer;
 use crate::integration::LayerIntegration;
 use crate::monitoring::PerformanceMonitor;
+// use crate::hardware::HardwareDetectionService; // TODO: Fix sysinfo API
 
 /// Dashboard message types for STOQ protocol communication
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +42,9 @@ pub enum DashboardMessage {
     
     /// Integration status requests
     IntegrationStatus,
+
+    /// Hardware detection requests
+    HardwareDetection(HardwareDetectionRequest),
 }
 
 /// Asset management request types
@@ -132,6 +136,23 @@ pub enum PerformanceMonitoringRequest {
     },
 }
 
+/// Hardware detection request types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "operation")]
+pub enum HardwareDetectionRequest {
+    /// Get hardware capabilities
+    GetHardwareCapabilities,
+
+    /// Get current resource allocation
+    GetResourceAllocation,
+
+    /// Get sharing capabilities
+    GetSharingCapabilities,
+
+    /// Refresh hardware detection
+    RefreshHardware,
+}
+
 /// Dashboard response types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardResponse {
@@ -143,23 +164,25 @@ pub struct DashboardResponse {
 
 /// Dashboard message handler implementing the STOQ MessageHandler trait
 pub struct DashboardMessageHandler {
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     stoq_layer: Arc<StoqTransportLayer>,
     hypermesh_layer: Arc<HyperMeshAssetLayer>,
     trustchain_layer: Arc<TrustChainAuthorityLayer>,
     integration: Arc<LayerIntegration>,
     monitor: Arc<PerformanceMonitor>,
+    hardware_service: Arc<()>, // TODO: Fix hardware service
 }
 
 impl DashboardMessageHandler {
     /// Create new dashboard message handler
     pub fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         stoq_layer: Arc<StoqTransportLayer>,
         hypermesh_layer: Arc<HyperMeshAssetLayer>,
         trustchain_layer: Arc<TrustChainAuthorityLayer>,
         integration: Arc<LayerIntegration>,
         monitor: Arc<PerformanceMonitor>,
+        hardware_service: Arc<()>, // TODO: Fix hardware service
     ) -> Self {
         Self {
             config,
@@ -168,6 +191,7 @@ impl DashboardMessageHandler {
             trustchain_layer,
             integration,
             monitor,
+            hardware_service,
         }
     }
 
@@ -450,9 +474,9 @@ impl DashboardMessageHandler {
     /// Handle integration status request
     async fn handle_integration_status(&self) -> Result<serde_json::Value> {
         info!("🔄 Handling integration status request");
-        
+
         let integration_stats = self.integration.get_statistics().await?;
-        
+
         Ok(serde_json::json!({
             "integration_status": {
                 "layers_ready": integration_stats.layers_ready,
@@ -475,6 +499,54 @@ impl DashboardMessageHandler {
                 "trustchain_authority": integration_stats.layers_ready >= 3,
             }
         }))
+    }
+
+    /// Handle hardware detection requests
+    async fn handle_hardware_detection(&self, request: HardwareDetectionRequest) -> Result<serde_json::Value> {
+        info!("🔍 Handling hardware detection request: {:?}", std::mem::discriminant(&request));
+
+        match request {
+            HardwareDetectionRequest::GetHardwareCapabilities => {
+                debug!("Getting hardware capabilities");
+
+                // TODO: Fix hardware service
+                // let capabilities = self.hardware_service.get_hardware_capabilities().await?;
+                // Ok(serde_json::to_value(capabilities)?)
+                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+            }
+
+            HardwareDetectionRequest::GetResourceAllocation => {
+                debug!("Getting resource allocation status");
+
+                // TODO: Fix hardware service
+                // let allocation = self.hardware_service.get_resource_allocation().await?;
+                // Ok(serde_json::to_value(allocation)?)
+                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+            }
+
+            HardwareDetectionRequest::GetSharingCapabilities => {
+                debug!("Getting sharing capabilities");
+
+                // TODO: Fix hardware service
+                // let sharing = self.hardware_service.get_sharing_capabilities().await?;
+                // Ok(serde_json::to_value(sharing)?)
+                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+            }
+
+            HardwareDetectionRequest::RefreshHardware => {
+                debug!("Refreshing hardware detection");
+
+                self.hardware_service.refresh().await?;
+
+                Ok(serde_json::json!({
+                    "refreshed": true,
+                    "timestamp": std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
+                }))
+            }
+        }
     }
 }
 
@@ -531,6 +603,10 @@ impl stoq::protocol::MessageHandler<DashboardMessage> for DashboardMessageHandle
             
             DashboardMessage::IntegrationStatus => {
                 self.handle_integration_status().await
+            }
+
+            DashboardMessage::HardwareDetection(request) => {
+                self.handle_hardware_detection(request).await
             }
         };
         

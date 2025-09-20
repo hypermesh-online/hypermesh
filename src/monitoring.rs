@@ -11,7 +11,7 @@ use tracing::{info, debug, warn};
 use serde::{Serialize, Deserialize};
 use dashmap::DashMap;
 
-use crate::config::Internet2Config;
+use crate::config::HyperMeshServerConfig;
 
 /// Performance Monitor for Internet 2.0 Protocol Stack
 /// 
@@ -22,7 +22,7 @@ use crate::config::Internet2Config;
 /// - Integration: Cross-layer coordination efficiency
 pub struct PerformanceMonitor {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// Layer-specific metrics
     stoq_metrics: Arc<RwLock<StoqMetrics>>,
@@ -239,7 +239,7 @@ pub struct LayerHealth {
 
 impl PerformanceMonitor {
     /// Create new performance monitor
-    pub async fn new(config: Arc<Internet2Config>) -> Result<Self> {
+    pub async fn new(config: Arc<HyperMeshServerConfig>) -> Result<Self> {
         info!("📊 Initializing Performance Monitor");
         info!("   Targets: 40 Gbps STOQ, <100ms consensus, <35ms certificates");
         

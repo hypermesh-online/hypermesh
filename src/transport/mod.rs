@@ -13,7 +13,7 @@ use tracing::{info, debug, warn, error};
 use dashmap::DashMap;
 use parking_lot::Mutex;
 
-use crate::config::{Internet2Config, StoqConfig};
+use crate::config::{HyperMeshServerConfig, StoqConfig};
 use crate::authority::TrustChainAuthorityLayer;
 use crate::monitoring::PerformanceMonitor;
 
@@ -21,11 +21,18 @@ pub mod quic;
 pub mod certificates;
 pub mod dns;
 pub mod performance;
+pub mod http_gateway;
+pub mod http3_bridge;
+pub mod caesar_handler;
+pub mod hardware_handler;
+pub mod trustchain_handler;
 
 use quic::{QuicConnection, QuicEndpoint};
 use certificates::CertificateValidator;
 use dns::EmbeddedDnsResolver;
 use performance::{PerformanceOptimizer, TransportMetrics};
+use http_gateway::HttpGateway;
+use http3_bridge::Http3Bridge;
 
 /// STOQ Transport Layer - Foundation protocol for Internet 2.0
 /// 
@@ -37,7 +44,7 @@ use performance::{PerformanceOptimizer, TransportMetrics};
 #[derive(Clone)]
 pub struct StoqTransportLayer {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// QUIC endpoint for all connections
     quic_endpoint: Arc<QuicEndpoint>,
@@ -62,6 +69,12 @@ pub struct StoqTransportLayer {
     
     /// STOQ Protocol Handler for message processing
     protocol_handler: Option<Arc<stoq::protocol::StoqProtocolHandler>>,
+
+    /// HTTP Gateway for serving static files and HTTP compatibility
+    http_gateway: Option<Arc<tokio::sync::RwLock<HttpGateway>>>,
+
+    /// HTTP/3 Bridge for browser compatibility
+    http3_bridge: Option<Arc<tokio::sync::RwLock<Http3Bridge>>>,
 }
 
 /// STOQ Connection - Validated, Certificate-Embedded QUIC Connection
@@ -152,9 +165,10 @@ pub struct TransportStatistics {
 impl StoqTransportLayer {
     /// Create new STOQ transport layer with embedded security
     pub async fn new(
-        config: Arc<Internet2Config>, 
+        config: Arc<HyperMeshServerConfig>,
         trustchain: Arc<TrustChainAuthorityLayer>,
-        monitor: Arc<PerformanceMonitor>
+        monitor: Arc<PerformanceMonitor>,
+        static_server: Option<Arc<crate::static_server::StaticFileServer>>
     ) -> Result<Self> {
         info!("🚀 Initializing STOQ Transport Layer (Internet 2.0 Foundation)");
         info!("   Target: {} Gbps throughput", config.stoq.performance.target_throughput_gbps);
@@ -193,6 +207,17 @@ impl StoqTransportLayer {
         info!("   • Embedded DNS resolution: Ready"); 
         info!("   • Performance optimization: Ready (targeting {} Gbps)", config.stoq.performance.target_throughput_gbps);
         
+        // Create HTTP gateway if static server is provided
+        let http_gateway = if let Some(static_server) = static_server {
+            info!("   • HTTP Gateway for static files: Enabled");
+            Some(Arc::new(tokio::sync::RwLock::new(HttpGateway::new(static_server))))
+        } else {
+            None
+        };
+
+        // HTTP/3 bridge will be initialized separately after the transport layer is created
+        let http3_bridge = None;
+
         Ok(Self {
             config,
             quic_endpoint,
@@ -203,6 +228,8 @@ impl StoqTransportLayer {
             metrics,
             monitor,
             protocol_handler: None, // Will be set by server
+            http_gateway,
+            http3_bridge,
         })
     }
     
@@ -503,6 +530,127 @@ impl StoqTransportLayer {
         Ok(data)
     }
     
+    /// Set hardware detection handler for API endpoints
+    pub async fn set_hardware_handler(&self, hardware_service: Arc<crate::hardware::HardwareDetectionService>) -> Result<()> {
+        use hardware_handler::HardwareRouteHandler;
+
+        if let Some(gateway) = &self.http_gateway {
+            let mut gateway = gateway.write().await;
+
+            // Create handlers for each endpoint
+            gateway.add_route_handler(
+                "/api/v1/system/hardware".to_string(),
+                Box::new(HardwareRouteHandler::new(hardware_service.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/system/network".to_string(),
+                Box::new(HardwareRouteHandler::new(hardware_service.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/system/allocation".to_string(),
+                Box::new(HardwareRouteHandler::new(hardware_service.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/system/capabilities".to_string(),
+                Box::new(HardwareRouteHandler::new(hardware_service.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/system/refresh".to_string(),
+                Box::new(HardwareRouteHandler::new(hardware_service.clone()))
+            );
+
+            info!("✅ Hardware detection API endpoints registered with STOQ transport");
+        }
+
+        Ok(())
+    }
+
+    /// Set TrustChain authority handler for API endpoints
+    pub async fn set_trustchain_handler(&self, trustchain: Arc<TrustChainAuthorityLayer>) -> Result<()> {
+        use trustchain_handler::TrustChainRouteHandler;
+
+        if let Some(gateway) = &self.http_gateway {
+            let mut gateway = gateway.write().await;
+
+            // Create handlers for each endpoint
+            gateway.add_route_handler(
+                "/api/v1/trustchain/certificates".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/certificates/expiring".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/certificates/revoked".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/certificates/root".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/policies/rotation".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/health".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/trustchain/stats".to_string(),
+                Box::new(TrustChainRouteHandler::new(trustchain.clone()))
+            );
+
+            info!("✅ TrustChain authority API endpoints registered with STOQ transport");
+        }
+
+        Ok(())
+    }
+
+    /// Set Caesar economic handler for API endpoints
+    pub async fn set_caesar_handler(&self, caesar: Arc<caesar::CaesarEconomicSystem>) -> Result<()> {
+        use caesar_handler::CaesarRouteHandler;
+
+        if let Some(gateway) = &self.http_gateway {
+            let mut gateway = gateway.write().await;
+
+            // Create handlers for each endpoint
+            gateway.add_route_handler(
+                "/api/v1/caesar/wallet".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/rewards".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/staking".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/transactions".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/exchange/rates".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/analytics/overview".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+            gateway.add_route_handler(
+                "/api/v1/caesar/analytics/earnings".to_string(),
+                Box::new(CaesarRouteHandler::new(caesar.clone()))
+            );
+
+            info!("✅ Caesar economic API endpoints registered with STOQ transport");
+        }
+
+        Ok(())
+    }
+
     /// Get transport statistics
     pub async fn get_statistics(&self) -> Result<TransportStatistics> {
         let metrics = self.metrics.get_current_metrics().await;
@@ -558,12 +706,55 @@ impl StoqTransportLayer {
     pub fn get_protocol_handler(&self) -> Option<Arc<stoq::protocol::StoqProtocolHandler>> {
         self.protocol_handler.clone()
     }
+
+    /// Initialize HTTP/3 bridge for browser compatibility
+    pub async fn initialize_http3_bridge(&mut self, trustchain: Arc<TrustChainAuthorityLayer>) -> Result<()> {
+        info!("🌉 Initializing HTTP/3 bridge for browser compatibility");
+
+        // Get HTTP gateway - required for HTTP/3 bridge
+        let http_gateway = self.http_gateway.as_ref()
+            .ok_or_else(|| anyhow!("HTTP gateway not initialized - required for HTTP/3 bridge"))?
+            .clone();
+
+        // Create HTTP/3 bridge
+        let mut bridge = Http3Bridge::new(
+            self.config.clone(),
+            Arc::new(self.clone()),  // Clone the transport layer
+            trustchain,  // Pass the actual TrustChain
+            http_gateway,
+            self.monitor.clone(),
+        ).await?;
+
+        // Initialize the bridge
+        bridge.initialize().await?;
+
+        // Store the bridge
+        self.http3_bridge = Some(Arc::new(tokio::sync::RwLock::new(bridge)));
+
+        info!("✅ HTTP/3 bridge initialized - browsers can now connect");
+        info!("   Access via: https://[::1]:{}/", self.config.global.port);
+        info!("   Protocol: HTTP/3 over QUIC with STOQ backend");
+
+        Ok(())
+    }
+
+    /// Start HTTP/3 bridge
+    pub async fn start_http3_bridge(&self) -> Result<()> {
+        if let Some(bridge) = &self.http3_bridge {
+            let bridge = bridge.read().await;
+            bridge.start().await?;
+            info!("✅ HTTP/3 bridge started - accepting browser connections");
+        } else {
+            return Err(anyhow!("HTTP/3 bridge not initialized"));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Internet2Config;
+    use crate::config::HyperMeshServerConfig;
     
     #[tokio::test]
     async fn test_stoq_transport_creation() {

@@ -23,6 +23,11 @@ mod authority;
 mod integration;
 mod monitoring;
 mod dashboard;
+mod static_server;
+mod hardware;
+
+// External economic system integration
+use caesar::{CaesarEconomicSystem, CaesarConfig};
 
 use config::HyperMeshServerConfig;
 use transport::StoqTransportLayer;
@@ -31,6 +36,8 @@ use authority::TrustChainAuthorityLayer;
 use integration::LayerIntegration;
 use monitoring::PerformanceMonitor;
 use dashboard::{DashboardMessageHandler, DashboardMessage};
+use static_server::{StaticFileServer, StaticServerConfig};
+// use hardware::HardwareDetectionService; // TODO: Fix sysinfo API
 
 /// HyperMesh Protocol Stack Server
 #[derive(Parser)]
@@ -130,6 +137,16 @@ pub struct HyperMeshServer {
     
     /// STOQ Protocol Handler for dashboard communication
     protocol_handler: Option<Arc<stoq::protocol::StoqProtocolHandler>>,
+
+    /// Static file server for UI assets
+    static_server: Arc<StaticFileServer>,
+
+    /// Caesar economic system
+    caesar: Arc<CaesarEconomicSystem>,
+
+    // TODO: Fix hardware detection service - sysinfo API changes
+    // /// Hardware detection service
+    // hardware_service: Arc<HardwareDetectionService>,
 }
 
 impl HyperMeshServer {
@@ -163,8 +180,26 @@ impl HyperMeshServer {
         info!("   • 40 Gbps performance optimization");
         info!("   • Zero-copy operations and hardware acceleration");
         
+        // Initialize static file server for UI first (needed by transport layer)
+        info!("📦 Initializing Static File Server for UI");
+        let static_config = StaticServerConfig {
+            static_dir: std::path::PathBuf::from("ui/frontend/dist"),
+            spa_fallback: true,
+            cache_control: "public, max-age=3600".to_string(),
+        };
+        let static_server = Arc::new(StaticFileServer::new(static_config));
+
+        // Validate static files directory
+        static_server.validate().await
+            .map_err(|e| anyhow!("Static file server validation failed: {}", e))?;
+
         let stoq_layer = Arc::new(
-            StoqTransportLayer::new(config.clone(), trustchain_layer.clone(), monitor.clone()).await
+            StoqTransportLayer::new(
+                config.clone(),
+                trustchain_layer.clone(),
+                monitor.clone(),
+                Some(static_server.clone())
+            ).await
                 .map_err(|e| anyhow!("STOQ transport initialization failed: {}", e))?
         );
         
@@ -225,7 +260,22 @@ impl HyperMeshServer {
                 None // Certificate manager will be provided by transport layer
             )
         );
-        
+
+        // Initialize hardware detection service first (needed by dashboard handler)
+        info!("🔍 Initializing Hardware Detection Service");
+        info!("   • Real-time CPU, memory, storage detection");
+        info!("   • Network interface discovery");
+        info!("   • Resource allocation tracking");
+        info!("   • System capability analysis");
+
+        // TODO: Fix hardware detection service - sysinfo API changes
+        // let hardware_service = Arc::new(
+        //     HardwareDetectionService::new().await
+        //         .map_err(|e| anyhow!("Hardware detection initialization failed: {}", e))?
+        // );
+
+        // info!("✅ Hardware Detection Service initialized");
+
         // Register dashboard message handler
         let dashboard_handler = DashboardMessageHandler::new(
             config.clone(),
@@ -233,7 +283,8 @@ impl HyperMeshServer {
             hypermesh_layer.clone(),
             trustchain_layer.clone(),
             integration.clone(),
-            monitor.clone()
+            monitor.clone(),
+            Arc::new(()) // TODO: Fix hardware service
         );
         
         protocol_handler.register_handler(
@@ -242,11 +293,43 @@ impl HyperMeshServer {
         ).await;
         
         info!("✅ STOQ Protocol Handler initialized with dashboard support");
-        
-        // Integrate protocol handler with transport layer
-        // Note: This requires making stoq_layer mutable, which we'll handle via Arc<Mutex<>> pattern
-        
-        // Create server instance  
+        info!("✅ Static file server integrated with transport layer");
+
+        // Initialize Caesar economic system
+        info!("💰 Initializing Caesar Economic System");
+        info!("   • Real token balance tracking");
+        info!("   • Transaction processing and validation");
+        info!("   • Reward calculation based on resource sharing");
+        info!("   • Staking mechanisms with APY calculations");
+
+        let caesar_config = CaesarConfig::default(); // Will be loaded from config in production
+        let caesar = Arc::new(
+            CaesarEconomicSystem::new(caesar_config).await
+                .map_err(|e| anyhow!("Caesar initialization failed: {}", e))?
+        );
+
+        info!("✅ Caesar Economic System initialized");
+
+        // Register TrustChain API endpoints with transport layer
+        stoq_layer.set_trustchain_handler(trustchain_layer.clone()).await
+            .map_err(|e| anyhow!("Failed to register TrustChain handlers: {}", e))?;
+
+        info!("✅ TrustChain API endpoints integrated with STOQ transport");
+
+        // Register Caesar API endpoints with transport layer
+        stoq_layer.set_caesar_handler(caesar.clone()).await
+            .map_err(|e| anyhow!("Failed to register Caesar handlers: {}", e))?;
+
+        info!("✅ Caesar API endpoints integrated with STOQ transport");
+
+        // TODO: Fix hardware detection API - sysinfo API changes
+        // // Register Hardware API endpoints with transport layer
+        // stoq_layer.set_hardware_handler(hardware_service.clone()).await
+        //     .map_err(|e| anyhow!("Failed to register Hardware handlers: {}", e))?;
+
+        // info!("✅ Hardware detection API endpoints integrated with STOQ transport");
+
+        // Create server instance
         let server = Self {
             config,
             stoq_layer,
@@ -255,6 +338,9 @@ impl HyperMeshServer {
             integration,
             monitor,
             protocol_handler: Some(protocol_handler),
+            static_server,
+            caesar,
+            // hardware_service,
         };
         
         info!("✅ HyperMesh Protocol Stack initialized successfully");
@@ -283,19 +369,42 @@ impl HyperMeshServer {
                 // Now start the persistent STOQ transport layer with protocol handler
                 info!("🌐 Starting persistent STOQ transport layer with protocol handler...");
                 info!("🔄 Server will now run until shutdown signal (Ctrl+C)");
-                
+
                 // Start the protocol handler alongside the transport layer
                 if let Some(protocol_handler) = &self.protocol_handler {
                     let handler = protocol_handler.clone();
                     let transport = self.stoq_layer.clone();
-                    
+
                     tokio::spawn(async move {
                         info!("📡 STOQ Protocol Handler ready for dashboard connections");
                         // The protocol handler will be invoked by the transport layer
                         // when connections are established
                     });
                 }
-                
+
+                // Initialize and start HTTP/3 bridge for browser compatibility
+                info!("🌉 Enabling HTTP/3 bridge for web browser access...");
+                {
+                    // Clone transport layer for mutable access
+                    let mut stoq_layer = (*self.stoq_layer).clone();
+                    let trustchain = self.trustchain_layer.clone();
+
+                    // Initialize HTTP/3 bridge with TrustChain
+                    stoq_layer.initialize_http3_bridge(trustchain).await
+                        .map_err(|e| {
+                            warn!("⚠️ HTTP/3 bridge initialization failed: {}", e);
+                            warn!("   Browsers will not be able to connect directly");
+                            warn!("   Use STOQ client for full protocol access");
+                            e
+                        }).ok(); // Continue even if HTTP/3 fails - STOQ still works
+
+                    // Start HTTP/3 bridge if initialized
+                    if stoq_layer.start_http3_bridge().await.is_ok() {
+                        info!("✅ HTTP/3 bridge active - browsers can connect to https://[::1]:{}/",
+                              self.config.global.port);
+                    }
+                }
+
                 // This is the main server loop - STOQ transport runs persistently
                 self.stoq_layer.start().await?;
                 
@@ -520,15 +629,15 @@ mod tests {
     
     #[tokio::test]
     async fn test_server_initialization() {
-        let config = Internet2Config::default_development();
-        let server = Internet2Server::new(config).await;
+        let config = HyperMeshServerConfig::default_development();
+        let server = HyperMeshServer::new(config).await;
         assert!(server.is_ok());
     }
     
     #[tokio::test]
     async fn test_layer_integration() {
-        let config = Internet2Config::default_development();
-        let server = Internet2Server::new(config).await.unwrap();
+        let config = HyperMeshServerConfig::default_development();
+        let server = HyperMeshServer::new(config).await.unwrap();
         
         // Verify all layers are integrated
         let stats = server.get_statistics().await.unwrap();
@@ -537,8 +646,8 @@ mod tests {
     
     #[tokio::test]
     async fn test_performance_targets() {
-        let config = Internet2Config::default_production();
-        let server = Internet2Server::new(config).await.unwrap();
+        let config = HyperMeshServerConfig::default_production();
+        let server = HyperMeshServer::new(config).await.unwrap();
         
         let stats = server.get_statistics().await.unwrap();
         

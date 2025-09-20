@@ -15,7 +15,7 @@ use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-use crate::config::{Internet2Config, HyperMeshConfig};
+use crate::config::{HyperMeshServerConfig, HyperMeshConfig};
 use crate::transport::StoqTransportLayer;
 use crate::monitoring::PerformanceMonitor;
 
@@ -41,7 +41,7 @@ use adapters::{AssetAdapter, CpuAdapter, GpuAdapter, MemoryAdapter, StorageAdapt
 /// - Four-proof consensus for all operations
 pub struct HyperMeshAssetLayer {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// STOQ transport layer for all communications
     stoq_transport: Arc<StoqTransportLayer>,
@@ -241,7 +241,7 @@ pub struct AssetStatistics {
 impl HyperMeshAssetLayer {
     /// Create new HyperMesh asset layer
     pub async fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         stoq_transport: Arc<StoqTransportLayer>,
         monitor: Arc<PerformanceMonitor>
     ) -> Result<Self> {

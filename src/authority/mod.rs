@@ -15,7 +15,7 @@ use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-use crate::config::{Internet2Config, TrustChainConfig};
+use crate::config::{HyperMeshServerConfig, TrustChainConfig};
 use crate::monitoring::PerformanceMonitor;
 
 pub mod ca;
@@ -41,7 +41,7 @@ use rotation::CertificateRotationManager;
 /// - Automatic certificate rotation
 pub struct TrustChainAuthorityLayer {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// Embedded Certificate Authority
     certificate_authority: Arc<EmbeddedCertificateAuthority>,
@@ -185,7 +185,7 @@ pub enum CertificateStatus {
 }
 
 /// Authority statistics for monitoring
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct AuthorityStatistics {
     /// Certificate operations
     pub certificates_issued: u64,
@@ -216,7 +216,7 @@ pub struct AuthorityStatistics {
 impl TrustChainAuthorityLayer {
     /// Create new TrustChain authority layer
     pub async fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         monitor: Arc<PerformanceMonitor>
     ) -> Result<Self> {
         info!("🔐 Initializing TrustChain Authority Layer");
@@ -389,11 +389,16 @@ impl TrustChainAuthorityLayer {
         Ok(())
     }
     
+    /// Get reference to the certificate authority
+    pub async fn get_ca(&self) -> &EmbeddedCertificateAuthority {
+        &self.certificate_authority
+    }
+
     /// Check if root certificate exists
     pub async fn has_root_certificate(&self) -> Result<bool> {
         self.certificate_authority.has_root_certificate().await
     }
-    
+
     /// Bootstrap root certificate (public interface)
     pub async fn bootstrap_root_certificate(&self) -> Result<()> {
         self.initialize_root_certificate().await
@@ -591,6 +596,33 @@ impl TrustChainAuthorityLayer {
         let cert_arc = Arc::new(certificate);
         self.certificates.insert(cert_arc.id.clone(), cert_arc.clone());
         Ok(cert_arc)
+    }
+
+    /// Get server TLS configuration for HTTP/3
+    pub async fn get_server_tls_config(&self) -> Result<Arc<rustls::ServerConfig>> {
+        debug!("🔐 Creating server TLS configuration for HTTP/3");
+
+        // Get the server certificate and private key from the CA
+        let server_cert = self.certificate_authority.get_server_certificate().await
+            .map_err(|e| anyhow!("Failed to get server certificate: {}", e))?;
+
+        let server_key = self.certificate_authority.get_server_private_key().await
+            .map_err(|e| anyhow!("Failed to get server private key: {}", e))?;
+
+        // Parse certificate and key
+        let cert_chain = vec![rustls::pki_types::CertificateDer::from(server_cert)];
+        let key_der = rustls::pki_types::PrivateKeyDer::try_from(server_key)
+            .map_err(|e| anyhow!("Failed to parse private key: {:?}", e))?;
+
+        // Create TLS configuration
+        let config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(cert_chain, key_der.into())
+            .map_err(|e| anyhow!("Failed to create TLS config: {}", e))?;
+
+        debug!("✅ Server TLS configuration created for HTTP/3");
+
+        Ok(Arc::new(config))
     }
     
     /// Get authority statistics

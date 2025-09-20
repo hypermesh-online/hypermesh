@@ -14,6 +14,9 @@ pub mod assets;
 pub mod authority;
 pub mod integration;
 pub mod monitoring;
+pub mod static_server;
+pub mod dashboard;
+pub mod hardware;
 
 // Re-export main types for easy access
 pub use config::HyperMeshServerConfig;

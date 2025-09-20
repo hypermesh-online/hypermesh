@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 use serde::{Serialize, Deserialize};
 
-use crate::config::Internet2Config;
+use crate::config::HyperMeshServerConfig;
 use crate::transport::StoqTransportLayer;
 use crate::assets::HyperMeshAssetLayer;
 use crate::authority::TrustChainAuthorityLayer;
@@ -28,7 +28,7 @@ use crate::monitoring::PerformanceMonitor;
 /// - Performance: Cross-layer optimization for 40 Gbps targets
 pub struct LayerIntegration {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// Layer references for cross-layer coordination
     stoq_layer: Arc<StoqTransportLayer>,
@@ -142,7 +142,7 @@ pub struct PerformanceOptimizationRequest {
 impl LayerIntegration {
     /// Create new layer integration coordinator
     pub async fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         stoq_layer: Arc<StoqTransportLayer>,
         hypermesh_layer: Arc<HyperMeshAssetLayer>,
         trustchain_layer: Arc<TrustChainAuthorityLayer>,

@@ -11,14 +11,14 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 use dashmap::DashMap;
 
-use crate::config::Internet2Config;
+use crate::config::HyperMeshServerConfig;
 use crate::authority::TrustChainAuthorityLayer;
 use crate::transport::quic::QuicConnection;
 
 /// Certificate validator integrated with STOQ transport
 pub struct CertificateValidator {
     /// Configuration
-    config: Arc<Internet2Config>,
+    config: Arc<HyperMeshServerConfig>,
     
     /// TrustChain integration for certificate validation
     trustchain: Arc<TrustChainAuthorityLayer>,
@@ -86,7 +86,7 @@ struct ValidationStats {
 impl CertificateValidator {
     /// Create new certificate validator
     pub async fn new(
-        config: Arc<Internet2Config>,
+        config: Arc<HyperMeshServerConfig>,
         trustchain: Arc<TrustChainAuthorityLayer>
     ) -> Result<Self> {
         info!("🔐 Initializing Certificate Validator for STOQ transport");
@@ -369,7 +369,7 @@ impl CertificateValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Internet2Config;
+    use crate::config::HyperMeshServerConfig;
     
     #[tokio::test]
     async fn test_certificate_validation() {
