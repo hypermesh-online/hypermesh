@@ -14,65 +14,10 @@ use tokio::time::Duration;
 use stoq::{
     StoqServer, StoqServerConfig, StoqClient, StoqClientConfig,
     Endpoint, MessageHandler, StoqMessage, ConnectionInfo,
-    ProtocolConfig, TransportConfig
+    ProtocolConfig, TransportConfig,
+    // Import handlers from server module to avoid code duplication
+    EchoMessageHandler, JsonMessageHandler
 };
-
-/// Custom echo message handler that demonstrates protocol integration
-struct IntegratedEchoHandler;
-
-#[async_trait::async_trait]
-impl MessageHandler<String> for IntegratedEchoHandler {
-    async fn handle_message(
-        &self, 
-        message: StoqMessage<String>, 
-        connection_info: &ConnectionInfo
-    ) -> Result<Option<Bytes>> {
-        info!(
-            "Received message from {}: '{}'", 
-            connection_info.remote_address, 
-            message.payload
-        );
-        
-        // Create echo response
-        let response = format!("Echo: {}", message.payload);
-        let response_bytes = bincode::serialize(&response)?;
-        
-        info!("Sending echo response: '{}'", response);
-        Ok(Some(Bytes::from(response_bytes)))
-    }
-}
-
-/// JSON message handler for structured data
-struct JsonHandler;
-
-#[async_trait::async_trait]
-impl MessageHandler<serde_json::Value> for JsonHandler {
-    async fn handle_message(
-        &self,
-        message: StoqMessage<serde_json::Value>,
-        connection_info: &ConnectionInfo
-    ) -> Result<Option<Bytes>> {
-        info!(
-            "Received JSON from {}: {}", 
-            connection_info.remote_address, 
-            message.payload
-        );
-        
-        // Process JSON and create response
-        let response = serde_json::json!({
-            "status": "processed",
-            "received": message.payload,
-            "timestamp": std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            "connection_id": connection_info.connection_id
-        });
-        
-        let response_bytes = bincode::serialize(&response)?;
-        Ok(Some(Bytes::from(response_bytes)))
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -113,9 +58,9 @@ async fn main() -> Result<()> {
     // Create and configure server
     let server = StoqServer::new(server_config).await?;
     
-    // Register message handlers
-    server.register_handler("echo".to_string(), IntegratedEchoHandler).await;
-    server.register_handler("json".to_string(), JsonHandler).await;
+    // Register message handlers from server module (avoiding duplication)
+    server.register_handler("echo".to_string(), EchoMessageHandler).await;
+    server.register_handler("json".to_string(), JsonMessageHandler).await;
     
     // Start server in background
     let server_clone = server.clone();

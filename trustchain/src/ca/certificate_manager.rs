@@ -1,21 +1,20 @@
 //! Certificate Manager
-//! 
-//! Core certificate management functionality for TrustChain CA.
+//!
+//! Re-exports the STOQ certificate manager for TrustChain integration.
+//! This avoids code duplication and ensures consistent certificate handling.
 
 use serde::{Serialize, Deserialize};
 
-/// Certificate manager (placeholder)
-#[derive(Clone, Debug)]
-pub struct CertificateManager;
+// Re-export the STOQ CertificateManager as the authoritative implementation
+pub use stoq::transport::certificates::{
+    CertificateManager,
+    CertificateConfig,
+    CertificateMode,
+    StoqNodeCertificate,
+    TrustChainClient,
+};
 
-impl CertificateManager {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for CertificateManager {
-    fn default() -> Self {
-        Self::new()
-    }
+// For backward compatibility, provide a simple factory function
+pub async fn create_certificate_manager(config: CertificateConfig) -> anyhow::Result<CertificateManager> {
+    CertificateManager::new(config).await
 }
