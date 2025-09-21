@@ -19,7 +19,7 @@ use crate::assets::HyperMeshAssetLayer;
 use crate::authority::TrustChainAuthorityLayer;
 use crate::integration::LayerIntegration;
 use crate::monitoring::PerformanceMonitor;
-// use crate::hardware::HardwareDetectionService; // TODO: Fix sysinfo API
+use crate::hardware::HardwareDetectionService;
 
 /// Dashboard message types for STOQ protocol communication
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -170,7 +170,7 @@ pub struct DashboardMessageHandler {
     trustchain_layer: Arc<TrustChainAuthorityLayer>,
     integration: Arc<LayerIntegration>,
     monitor: Arc<PerformanceMonitor>,
-    hardware_service: Arc<()>, // TODO: Fix hardware service
+    hardware_service: Arc<HardwareDetectionService>,
 }
 
 impl DashboardMessageHandler {
@@ -182,7 +182,7 @@ impl DashboardMessageHandler {
         trustchain_layer: Arc<TrustChainAuthorityLayer>,
         integration: Arc<LayerIntegration>,
         monitor: Arc<PerformanceMonitor>,
-        hardware_service: Arc<()>, // TODO: Fix hardware service
+        hardware_service: Arc<HardwareDetectionService>,
     ) -> Self {
         Self {
             config,
@@ -509,34 +509,50 @@ impl DashboardMessageHandler {
             HardwareDetectionRequest::GetHardwareCapabilities => {
                 debug!("Getting hardware capabilities");
 
-                // TODO: Fix hardware service
-                // let capabilities = self.hardware_service.get_hardware_capabilities().await?;
-                // Ok(serde_json::to_value(capabilities)?)
-                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+                let capabilities = self.hardware_service.get_hardware_capabilities().await?;
+                Ok(serde_json::to_value(capabilities)?)
             }
 
             HardwareDetectionRequest::GetResourceAllocation => {
                 debug!("Getting resource allocation status");
 
-                // TODO: Fix hardware service
-                // let allocation = self.hardware_service.get_resource_allocation().await?;
-                // Ok(serde_json::to_value(allocation)?)
-                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+                // For now, return a simplified allocation status since we don't have get_resource_allocation method
+                let capabilities = self.hardware_service.get_hardware_capabilities().await?;
+                let allocation = serde_json::json!({
+                    "cpu_allocation": {"used_percent": capabilities.cpu.usage_percent, "available_cores": capabilities.cpu.core_count},
+                    "memory_allocation": {"used_bytes": capabilities.memory.used_bytes, "total_bytes": capabilities.memory.total_bytes},
+                    "storage_allocation": capabilities.storage,
+                    "network_allocation": capabilities.network
+                });
+                Ok(allocation)
             }
 
             HardwareDetectionRequest::GetSharingCapabilities => {
                 debug!("Getting sharing capabilities");
 
-                // TODO: Fix hardware service
-                // let sharing = self.hardware_service.get_sharing_capabilities().await?;
-                // Ok(serde_json::to_value(sharing)?)
-                Ok(serde_json::json!({"error": "Hardware service temporarily disabled"}))
+                // For now, return simplified sharing capabilities
+                let capabilities = self.hardware_service.get_hardware_capabilities().await?;
+                let sharing = serde_json::json!({
+                    "sharing_enabled": true,
+                    "available_resources": {
+                        "cpu_cores": capabilities.cpu.core_count,
+                        "memory_gb": capabilities.memory.total_bytes / (1024 * 1024 * 1024),
+                        "storage": capabilities.storage,
+                        "network": capabilities.network
+                    },
+                    "privacy_settings": {
+                        "privacy_level": "public",
+                        "sharing_mode": "full"
+                    }
+                });
+                Ok(sharing)
             }
 
             HardwareDetectionRequest::RefreshHardware => {
                 debug!("Refreshing hardware detection");
 
-                self.hardware_service.refresh().await?;
+                // Force refresh by getting fresh capabilities
+                let _capabilities = self.hardware_service.get_hardware_capabilities().await?;
 
                 Ok(serde_json::json!({
                     "refreshed": true,

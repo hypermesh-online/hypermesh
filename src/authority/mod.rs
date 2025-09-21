@@ -543,18 +543,21 @@ impl TrustChainAuthorityLayer {
         let validation_time = start_time.elapsed();
         
         // Overall validation result
-        let overall_valid = ca_result.valid && ct_verified && pq_valid;
-        
+        let overall_valid = ca_result.is_valid && ct_verified && pq_valid;
+
+        // Extract certificate info if available
+        let cert_info = ca_result.certificate_info.as_ref();
+
         let result = CertificateValidationResult {
             valid: overall_valid,
-            fingerprint: ca_result.fingerprint,
-            subject: ca_result.subject,
-            issuer: ca_result.issuer,
-            valid_from: ca_result.valid_from,
-            valid_to: ca_result.valid_to,
+            fingerprint: cert_info.map(|i| i.fingerprint.clone()).unwrap_or_default(),
+            subject: cert_info.map(|i| i.subject_dn.clone()).unwrap_or_default(),
+            issuer: cert_info.map(|i| i.issuer_dn.clone()).unwrap_or_default(),
+            valid_from: cert_info.map(|i| i.not_before).unwrap_or(SystemTime::now()),
+            valid_to: cert_info.map(|i| i.not_after).unwrap_or(SystemTime::now()),
             validated_at: SystemTime::now(),
             validation_time,
-            ca_valid: ca_result.valid,
+            ca_valid: ca_result.is_valid,
             ct_verified,
             pq_valid,
             error: if overall_valid { 
@@ -781,9 +784,16 @@ impl TrustChainAuthorityLayer {
         self.certificates.insert(certificate_id.to_string(), Arc::new(updated_cert));
         
         info!("📜 Certificate revoked: {} (reason: {})", certificate_id, reason);
-        
-        // TODO: Add to CRL (Certificate Revocation List)
-        // TODO: Update CT logs with revocation
+
+        // Add to CRL (Certificate Revocation List)
+        self.certificate_authority.add_to_crl(certificate_id, reason).await
+            .map_err(|e| anyhow!("Failed to add certificate to CRL: {}", e))?;
+
+        // Update CT logs with revocation
+        if self.config.trustchain.ct.enable_ct_logging {
+            self.certificate_transparency.log_revocation(certificate_id, reason).await
+                .map_err(|e| anyhow!("Failed to log revocation to CT: {}", e))?;
+        }
         
         Ok(())
     }

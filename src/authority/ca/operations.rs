@@ -133,7 +133,7 @@ impl DefaultCertificateOperations {
     }
 
     /// Create key usage extension
-    pub fn create_key_usage(usage: &KeyUsage) -> Vec<u8> {
+    pub fn create_key_usage(usage: &super::types::KeyUsage) -> Vec<u8> {
         let mut flags = 0u16;
 
         if usage.digital_signature {
@@ -162,7 +162,7 @@ impl DefaultCertificateOperations {
     }
 
     /// Create extended key usage extension
-    pub fn create_extended_key_usage(usage: &ExtendedKeyUsage) -> Vec<u8> {
+    pub fn create_extended_key_usage(usage: &super::types::ExtendedKeyUsage) -> Vec<u8> {
         let mut oids = Vec::new();
 
         if usage.server_auth {

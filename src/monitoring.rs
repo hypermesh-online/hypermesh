@@ -814,8 +814,51 @@ impl PerformanceMonitor {
                 info!("Updated certificate operations threshold to {} ms", threshold_value);
             }
         }
-        
+
         Ok(())
+    }
+
+    /// Record HTTP request metrics
+    pub async fn record_http_request(
+        &self,
+        method: &str,
+        path: &str,
+        duration: Duration,
+        status: u16,
+    ) {
+        debug!(
+            "Recording HTTP request: {} {} - {}ms - status {}",
+            method,
+            path,
+            duration.as_millis(),
+            status
+        );
+
+        // Record in STOQ metrics as HTTP/3 requests go through STOQ
+        let mut stoq_metrics = self.stoq_metrics.write().await;
+        stoq_metrics.total_requests += 1;
+
+        if status >= 200 && status < 300 {
+            stoq_metrics.successful_requests += 1;
+        } else if status >= 400 {
+            stoq_metrics.failed_requests += 1;
+        }
+
+        // Update latency tracking
+        let latency_ms = duration.as_millis() as f64;
+        stoq_metrics.total_latency_ms += latency_ms;
+        stoq_metrics.avg_latency_ms = stoq_metrics.total_latency_ms / stoq_metrics.total_requests as f64;
+
+        // Update peak latency if this is higher
+        if latency_ms > stoq_metrics.peak_latency_ms {
+            stoq_metrics.peak_latency_ms = latency_ms;
+        }
+
+        // Add to latency samples for rolling average (keep last 100 samples)
+        stoq_metrics.latency_samples.push((Instant::now(), latency_ms));
+        if stoq_metrics.latency_samples.len() > 100 {
+            stoq_metrics.latency_samples.remove(0);
+        }
     }
 }
 

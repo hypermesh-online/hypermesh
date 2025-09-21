@@ -37,7 +37,7 @@ use integration::LayerIntegration;
 use monitoring::PerformanceMonitor;
 use dashboard::{DashboardMessageHandler, DashboardMessage};
 use static_server::{StaticFileServer, StaticServerConfig};
-// use hardware::HardwareDetectionService; // TODO: Fix sysinfo API
+use hardware::HardwareDetectionService;
 
 /// HyperMesh Protocol Stack Server
 #[derive(Parser)]
@@ -144,9 +144,8 @@ pub struct HyperMeshServer {
     /// Caesar economic system
     caesar: Arc<CaesarEconomicSystem>,
 
-    // TODO: Fix hardware detection service - sysinfo API changes
-    // /// Hardware detection service
-    // hardware_service: Arc<HardwareDetectionService>,
+    /// Hardware detection service
+    hardware_service: Arc<HardwareDetectionService>,
 }
 
 impl HyperMeshServer {
@@ -268,11 +267,10 @@ impl HyperMeshServer {
         info!("   • Resource allocation tracking");
         info!("   • System capability analysis");
 
-        // TODO: Fix hardware detection service - sysinfo API changes
-        // let hardware_service = Arc::new(
-        //     HardwareDetectionService::new().await
-        //         .map_err(|e| anyhow!("Hardware detection initialization failed: {}", e))?
-        // );
+        let hardware_service = Arc::new(
+            HardwareDetectionService::new().await
+                .map_err(|e| anyhow!("Hardware detection initialization failed: {}", e))?
+        );
 
         // info!("✅ Hardware Detection Service initialized");
 
@@ -284,7 +282,7 @@ impl HyperMeshServer {
             trustchain_layer.clone(),
             integration.clone(),
             monitor.clone(),
-            Arc::new(()) // TODO: Fix hardware service
+            hardware_service.clone()
         );
         
         protocol_handler.register_handler(
@@ -322,10 +320,9 @@ impl HyperMeshServer {
 
         info!("✅ Caesar API endpoints integrated with STOQ transport");
 
-        // TODO: Fix hardware detection API - sysinfo API changes
-        // // Register Hardware API endpoints with transport layer
-        // stoq_layer.set_hardware_handler(hardware_service.clone()).await
-        //     .map_err(|e| anyhow!("Failed to register Hardware handlers: {}", e))?;
+        // Register Hardware API endpoints with transport layer
+        stoq_layer.set_hardware_handler(hardware_service.clone()).await
+            .map_err(|e| anyhow!("Failed to register Hardware handlers: {}", e))?;
 
         // info!("✅ Hardware detection API endpoints integrated with STOQ transport");
 
@@ -340,7 +337,7 @@ impl HyperMeshServer {
             protocol_handler: Some(protocol_handler),
             static_server,
             caesar,
-            // hardware_service,
+            hardware_service,
         };
         
         info!("✅ HyperMesh Protocol Stack initialized successfully");

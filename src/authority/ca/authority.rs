@@ -320,6 +320,34 @@ impl EmbeddedCertificateAuthority {
             .ok_or_else(|| anyhow!("Root CA not initialized"))
     }
 
+    /// Add certificate to CRL (Certificate Revocation List)
+    pub async fn add_to_crl(&self, certificate_id: &str, reason: &str) -> Result<()> {
+        debug!("Adding certificate {} to CRL with reason: {}", certificate_id, reason);
+
+        let revocation_reason = match reason {
+            "key_compromise" => RevocationReason::KeyCompromise,
+            "ca_compromise" => RevocationReason::CaCompromise,
+            "affiliation_changed" => RevocationReason::AffiliationChanged,
+            "superseded" => RevocationReason::Superseded,
+            "cessation_of_operation" => RevocationReason::CessationOfOperation,
+            "certificate_hold" => RevocationReason::CertificateHold,
+            "privilege_withdrawn" => RevocationReason::PrivilegeWithdrawn,
+            "aa_compromise" => RevocationReason::AaCompromise,
+            _ => RevocationReason::Unspecified,
+        };
+
+        let entry = RevocationEntry {
+            serial_number: certificate_id.to_string(),
+            revoked_at: SystemTime::now(),
+            reason: revocation_reason,
+        };
+
+        self.revocation_list.write().await.insert(certificate_id.to_string(), entry);
+
+        info!("Certificate {} added to CRL", certificate_id);
+        Ok(())
+    }
+
     /// Cleanup expired certificates
     pub async fn cleanup_expired(&self) -> Result<usize> {
         let mut certificates = self.issued_certificates.write().await;

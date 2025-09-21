@@ -199,39 +199,67 @@ impl CertificateRotationManager {
     }
     
     /// Get rotation info (mutable) for certificate
-    pub async fn get_rotation_info_mut(&self, _certificate_id: &str) -> Option<CertificateRotationInfo> {
-        // TODO: Implement async mutable access to Arc<RwLock<HashMap>>
-        None
+    pub async fn get_rotation_info_mut(&self, certificate_id: &str) -> Option<CertificateRotationInfo> {
+        let rotation_info_guard = self.rotation_info.read().await;
+        rotation_info_guard.get(certificate_id).cloned()
     }
     
     /// Start rotation for certificate
-    pub async fn start_rotation(&self, _certificate_id: &str) -> Result<()> {
-        // TODO: Implement async rotation start
-        info!("🔄 Rotation start requested (stubbed)");
+    pub async fn start_rotation(&self, certificate_id: &str) -> Result<()> {
+        let mut rotation_info_guard = self.rotation_info.write().await;
+        if let Some(rotation_info) = rotation_info_guard.get_mut(certificate_id) {
+            rotation_info.start_rotation();
+            info!("🔄 Started rotation for certificate: {}", certificate_id);
+        } else {
+            warn!("⚠️ Certificate not found for rotation: {}", certificate_id);
+        }
         Ok(())
     }
     
     /// Complete rotation for certificate
-    pub async fn complete_rotation(&self, _old_certificate_id: &str, _new_certificate_id: String) -> Result<()> {
-        // TODO: Implement async rotation completion with Arc<RwLock<HashMap>>
-        info!("✅ Rotation completion requested (stubbed)");
+    pub async fn complete_rotation(&self, old_certificate_id: &str, new_certificate_id: String) -> Result<()> {
+        let mut rotation_info_guard = self.rotation_info.write().await;
+        if let Some(rotation_info) = rotation_info_guard.get_mut(old_certificate_id) {
+            rotation_info.complete_rotation(new_certificate_id.clone(), &self.config);
+            info!("✅ Completed rotation for certificate: {} -> {}", old_certificate_id, new_certificate_id);
+        } else {
+            warn!("⚠️ Certificate not found for rotation completion: {}", old_certificate_id);
+        }
         Ok(())
     }
     
     /// Fail rotation for certificate
-    pub async fn fail_rotation(&self, _certificate_id: &str, _error: &str) -> Result<()> {
-        // TODO: Implement async rotation failure with Arc<RwLock<HashMap>>
-        info!("❌ Rotation failure reported (stubbed)");
+    pub async fn fail_rotation(&self, certificate_id: &str, error: &str) -> Result<()> {
+        let mut rotation_info_guard = self.rotation_info.write().await;
+        if let Some(rotation_info) = rotation_info_guard.get_mut(certificate_id) {
+            rotation_info.fail_rotation(error);
+            warn!("❌ Failed rotation for certificate: {} - {}", certificate_id, error);
+        } else {
+            warn!("⚠️ Certificate not found for rotation failure: {}", certificate_id);
+        }
         Ok(())
     }
     
     /// Get rotation statistics
     pub async fn get_statistics(&self) -> RotationStatistics {
-        // TODO: Implement proper async statistics with Arc<RwLock<HashMap>>
+        let rotation_info_guard = self.rotation_info.read().await;
+        let mut status_counts = std::collections::HashMap::new();
+        let mut needs_rotation = 0;
+
+        for (_, rotation_info) in rotation_info_guard.iter() {
+            // Count status
+            *status_counts.entry(rotation_info.status.clone()).or_insert(0) += 1;
+
+            // Check if needs rotation
+            if rotation_info.needs_rotation(&self.config) {
+                needs_rotation += 1;
+            }
+        }
+
         RotationStatistics {
-            total_certificates: 0,
-            status_counts: std::collections::HashMap::new(),
-            needs_rotation: 0,
+            total_certificates: rotation_info_guard.len(),
+            status_counts,
+            needs_rotation,
             auto_rotation_enabled: self.config.auto_rotate,
         }
     }

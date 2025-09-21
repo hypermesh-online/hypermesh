@@ -371,10 +371,10 @@ impl HardwareDetectionService {
     /// Detect CPU information
     async fn detect_cpu_info(&self, system: &System) -> Result<CpuInfo> {
         let physical_cores = system.physical_core_count().unwrap_or(1) as u32;
-        let processors = system.processors();
-        let logical_cores = processors.len() as u32;
+        let cpus = system.cpus();
+        let logical_cores = cpus.len() as u32;
 
-        let first_cpu = processors.first();
+        let first_cpu = cpus.first();
         let model_name = first_cpu
             .map(|p| p.brand().to_string())
             .unwrap_or_else(|| "Unknown CPU".to_string());
@@ -387,7 +387,7 @@ impl HardwareDetectionService {
             .map(|p| p.vendor_id().to_string())
             .unwrap_or_else(|| "Unknown".to_string());
 
-        let usage_percent = system.global_processor_info().cpu_usage();
+        let usage_percent = system.global_cpu_info().cpu_usage();
 
         // Detect architecture
         let architecture = if cfg!(target_arch = "x86_64") {
@@ -412,13 +412,13 @@ impl HardwareDetectionService {
 
     /// Detect memory information
     async fn detect_memory_info(&self, system: &System) -> Result<MemoryInfo> {
-        let total_bytes = system.total_memory() * 1024; // Convert from KB to bytes
-        let used_bytes = system.used_memory() * 1024;
-        let available_bytes = system.available_memory() * 1024;
+        let total_bytes = system.total_memory(); // Already in bytes in v0.30
+        let used_bytes = system.used_memory();
+        let available_bytes = system.available_memory();
         let usage_percent = (used_bytes as f32 / total_bytes as f32) * 100.0;
 
-        let swap_total_bytes = system.total_swap() * 1024;
-        let swap_used_bytes = system.used_swap() * 1024;
+        let swap_total_bytes = system.total_swap();
+        let swap_used_bytes = system.used_swap();
 
         Ok(MemoryInfo {
             total_bytes,

@@ -81,7 +81,7 @@ impl AssetAdapter for CpuAdapter {
                 proxy_address: None,
                 created_at: std::time::SystemTime::now(),
                 updated_at: std::time::SystemTime::now(),
-                consensus_proofs: Vec::new(),
+                consensus_proofs: HashMap::new(),
             };
             
             assets.push(asset);
@@ -161,7 +161,7 @@ impl AssetAdapter for GpuAdapter {
             proxy_address: None,
             created_at: std::time::SystemTime::now(),
             updated_at: std::time::SystemTime::now(),
-            consensus_proofs: Vec::new(),
+            consensus_proofs: HashMap::new(),
         };
         
         Ok(vec![asset])
@@ -232,7 +232,7 @@ impl AssetAdapter for MemoryAdapter {
             proxy_address: None,
             created_at: std::time::SystemTime::now(),
             updated_at: std::time::SystemTime::now(),
-            consensus_proofs: Vec::new(),
+            consensus_proofs: HashMap::new(),
         };
         
         Ok(vec![asset])
@@ -303,7 +303,7 @@ impl AssetAdapter for StorageAdapter {
             proxy_address: None,
             created_at: std::time::SystemTime::now(),
             updated_at: std::time::SystemTime::now(),
-            consensus_proofs: Vec::new(),
+            consensus_proofs: HashMap::new(),
         };
         
         Ok(vec![asset])

@@ -287,22 +287,29 @@ impl Http3Bridge {
         // Handle requests
         loop {
             match h3_connection.accept().await {
-                Ok(Some(_request_stream)) => {
-                    // TODO: Properly implement H3 request handling
-                    // This is a simplified placeholder for now
-                    debug!("HTTP/3 request received - placeholder handler");
+                Ok(Some((request, response_stream))) => {
+                    debug!("HTTP/3 request received");
 
-                    // For now, just log and continue
-                    // Full implementation would:
-                    // 1. Resolve the request stream
-                    // 2. Process the HTTP request
-                    // 3. Send response back via H3
+                    // Handle the request using the existing handler
+                    let http_gateway = http_gateway.clone();
+                    let ws_connections = websocket_connections.clone();
+                    let bridge_state = state.clone();
+                    let perf_monitor = monitor.clone();
+                    let connection_id = format!("h3-{}", uuid::Uuid::new_v4());
 
-                    // Update connection activity
-                    if let Some(mut conn) = connections.get_mut(&connection_id) {
-                        conn.last_activity = Instant::now();
-                        conn.request_count += 1;
-                    }
+                    tokio::spawn(async move {
+                        if let Err(e) = Self::handle_http3_request(
+                            request,
+                            response_stream,
+                            http_gateway,
+                            ws_connections,
+                            connection_id,
+                            bridge_state,
+                            perf_monitor,
+                        ).await {
+                            warn!("Failed to handle H3 request: {}", e);
+                        }
+                    });
                 }
                 Ok(None) => {
                     debug!("HTTP/3 connection closed: {}", connection_id);
@@ -321,7 +328,7 @@ impl Http3Bridge {
         Ok(())
     }
 
-    /// Handle HTTP/3 request (TODO: Implement properly with h3 stream handling)
+    /// Handle HTTP/3 request with proper h3 stream handling
     #[allow(dead_code)]
     async fn handle_http3_request(
         request: Request<()>,
@@ -357,6 +364,7 @@ impl Http3Bridge {
 
         // Translate back to HTTP/3 response
         let response_body = internal_response.body.clone();
+        let response_status = internal_response.status;
         let http3_response = Self::translate_to_http3_response(internal_response)?;
 
         // Send response
@@ -372,8 +380,13 @@ impl Http3Bridge {
         stream.finish().await
             .context("Failed to finish HTTP/3 response")?;
 
-        // Record metrics (using generic operation recording)
-        // TODO: Add specific HTTP request recording method to PerformanceMonitor
+        // Record HTTP/3 request metrics
+        monitor.record_http_request(
+            request.method().as_str(),
+            request.uri().path(),
+            start.elapsed(),
+            response_status
+        ).await;
 
         // Update state
         {
@@ -485,11 +498,61 @@ impl Http3Bridge {
 
         info!("✅ WebSocket connection established: {}", ws_id);
 
-        // TODO: Implement WebSocket protocol handling
-        // This would involve:
-        // - Reading WebSocket frames from the stream
-        // - Processing messages through the application
-        // - Sending responses back to the client
+        // WebSocket protocol handling
+        let ws_connections_clone = websocket_connections.clone();
+        let ws_id_clone = ws_id.clone();
+
+        let ws_handler = tokio::spawn(async move {
+            // Get the connection from the map to access its receiver
+            if let Some(ws_conn) = ws_connections_clone.get(&ws_id_clone) {
+                let mut rx_guard = ws_conn.rx.lock().await;
+                let tx = ws_conn.tx.clone();
+
+                // WebSocket message loop
+                loop {
+                    tokio::select! {
+                        // Handle incoming messages from receiver
+                        msg = rx_guard.recv() => {
+                            match msg {
+                                Some(data) => {
+                                    // Echo the message back (for now)
+                                    // In production, this would process the message through the application
+                                    debug!("Received WebSocket message: {} bytes", data.len());
+
+                                    // Echo back for demonstration
+                                    let echo_msg = format!("Echo: {}", String::from_utf8_lossy(&data));
+                                    if let Err(e) = tx.send(Bytes::from(echo_msg)).await {
+                                        warn!("Failed to send WebSocket response: {}", e);
+                                        break;
+                                    }
+                                }
+                                None => {
+                                    debug!("WebSocket receiver closed");
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Handle periodic ping/pong
+                        _ = tokio::time::sleep(Duration::from_secs(30)) => {
+                            let ping_msg = Bytes::from("ping");
+                            if let Err(e) = tx.send(ping_msg).await {
+                                warn!("Failed to send WebSocket ping: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            debug!("WebSocket handler for {} ended", ws_id_clone);
+
+            // Clean up connection
+            ws_connections_clone.remove(&ws_id_clone);
+        });
+
+        // Store the handler task (detached)
+        tokio::spawn(ws_handler);
 
         Ok(())
     }
