@@ -20,6 +20,10 @@ Complete documentation for the Web3 decentralized compute and storage ecosystem.
 - **[Deployment Guide](./DEPLOYMENT.md)** - Production deployment instructions
 - **[Development Setup](./DEVELOPMENT.md)** - Local development environment
 
+### Technical Documentation
+- **[Implementation Summary](./implementation/IMPLEMENTATION_SUMMARY.md)** - Consolidated technical details
+- **[Archive](./archive/)** - Historical documentation and legacy files
+
 ## System Status
 
 | Component | Status | Performance | Notes |
