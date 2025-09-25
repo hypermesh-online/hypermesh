@@ -1,24 +1,16 @@
 //! STOQ Protocol - Pure QUIC over IPv6 Transport
-//! 
+//!
 //! This crate provides a high-performance, pure transport protocol
 //! built on QUIC over IPv6. STOQ focuses exclusively on transport layer responsibilities:
 //! packet delivery, connection management, flow control, and congestion control.
-//! 
+//!
 //! STOQ is designed as a pure transport protocol without application-layer features.
 
 #![warn(missing_docs)]
-// Allow unsafe code for adaptive network tiers performance optimizations (memory pools, zero-copy)
-#![allow(unsafe_code)]
 
 pub mod transport;
 pub mod config;
-pub mod protocol;
-pub mod server;
-pub mod client;
-
-// WebAssembly client module - only compiled for WASM target
-#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub mod wasm_client;
+pub mod extensions;
 
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
@@ -30,19 +22,16 @@ use anyhow::Result;
 use bytes::Bytes;
 use serde::{Serialize, Deserialize};
 
-// Re-export transport types, protocol types, server types, and client types
+// Re-export pure transport types and protocol extensions
 pub use transport::{StoqTransport, Connection, Endpoint, Stream};
+pub use transport::falcon::{
+    FalconEngine, FalconTransport, FalconVariant, FalconPublicKey,
+    FalconPrivateKey, FalconSignature
+};
 pub use config::StoqConfig;
-pub use protocol::{StoqProtocolHandler, StoqMessage, MessageHandler, ProtocolConfig, ConnectionInfo};
-pub use server::{StoqServer, StoqServerConfig, EchoMessageHandler, JsonMessageHandler};
-pub use client::{StoqClient, StoqClientConfig};
-
-// Re-export WASM types when compiled for WebAssembly
-#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub use wasm_client::{
-    WasmStoqClient, WasmConnectionConfig, WasmStoqMessage, WasmCertificate, 
-    WasmConnectionStatus, create_connection_config, create_stoq_message,
-    get_version, log_message
+pub use extensions::{
+    StoqProtocolExtension, DefaultStoqExtensions, PacketToken, PacketShard,
+    HopInfo, SeedInfo, SeedNode, SeedPriority, StoqPacket
 };
 
 /// STOQ Protocol version

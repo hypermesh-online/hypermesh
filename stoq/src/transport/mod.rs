@@ -22,19 +22,13 @@ use crossbeam::queue::SegQueue;
 pub mod certificates;
 pub mod streams;
 pub mod metrics;
-pub mod hardware_acceleration;
-
-// Re-export hardware acceleration for easier access
-pub use hardware_acceleration::{detect_hardware_capabilities, HardwareCapabilities};
+pub mod falcon;
 
 use certificates::CertificateManager;
 use metrics::TransportMetrics;
-use hardware_acceleration::{HardwareAccelerator, HardwareAccelConfig, HardwareAccelStats};
+use falcon::{FalconTransport, FalconVariant};
 
-// Forward declaration for protocol handler integration
-use crate::protocol::StoqProtocolHandler;
-
-/// High-performance STOQ Transport configuration optimized for adaptive network tiers
+/// STOQ Transport configuration for QUIC over IPv6
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportConfig {
     /// Bind address (IPv6 only)
@@ -53,17 +47,17 @@ pub struct TransportConfig {
     pub max_idle_timeout: Duration,
     /// Certificate rotation interval
     pub cert_rotation_interval: Duration,
-    /// Maximum concurrent streams per connection (adaptive network tiers optimization)
+    /// Maximum concurrent streams per connection
     pub max_concurrent_streams: u32,
-    /// Send buffer size (adaptive network tiers optimization)
+    /// Send buffer size
     pub send_buffer_size: usize,
-    /// Receive buffer size (adaptive network tiers optimization)
+    /// Receive buffer size
     pub receive_buffer_size: usize,
     /// Connection pool size for multiplexing
     pub connection_pool_size: usize,
     /// Enable zero-copy operations
     pub enable_zero_copy: bool,
-    /// Maximum datagram size (adaptive network tiers optimization)
+    /// Maximum datagram size
     pub max_datagram_size: usize,
     /// Congestion control algorithm
     pub congestion_control: CongestionControl,
@@ -77,8 +71,10 @@ pub struct TransportConfig {
     pub enable_cpu_affinity: bool,
     /// Enable large send offload optimization
     pub enable_large_send_offload: bool,
-    /// Hardware acceleration configuration
-    pub hardware_accel: HardwareAccelConfig,
+    /// Enable FALCON quantum-resistant cryptography
+    pub enable_falcon_crypto: bool,
+    /// FALCON variant to use
+    pub falcon_variant: FalconVariant,
 }
 
 /// Congestion control algorithms
@@ -94,7 +90,7 @@ pub enum CongestionControl {
 
 impl Default for CongestionControl {
     fn default() -> Self {
-        Self::Bbr2 // BBR v2 for adaptive network tiers performance
+        Self::Bbr2 // BBR v2 for high performance
     }
 }
 
@@ -109,19 +105,20 @@ impl Default for TransportConfig {
             enable_0rtt: true,
             max_idle_timeout: Duration::from_secs(120), // Increased for connection reuse
             cert_rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
-            max_concurrent_streams: 1000, // 10x increase for adaptive network tiers
-            send_buffer_size: 16 * 1024 * 1024, // 16MB for adaptive network tiers
-            receive_buffer_size: 16 * 1024 * 1024, // 16MB for adaptive network tiers
+            max_concurrent_streams: 1000, // High concurrency support
+            send_buffer_size: 16 * 1024 * 1024, // 16MB send buffer
+            receive_buffer_size: 16 * 1024 * 1024, // 16MB receive buffer
             connection_pool_size: 100, // Connection multiplexing
             enable_zero_copy: true, // Zero-copy optimization
             max_datagram_size: 65507, // Maximum UDP datagram
             congestion_control: CongestionControl::default(),
-            enable_memory_pool: true, // Memory pool for adaptive network tiers
+            enable_memory_pool: true, // Memory pool optimization
             memory_pool_size: 1024, // 1024 buffers per pool
             frame_batch_size: 64, // Batch 64 frames per syscall
             enable_cpu_affinity: true, // CPU affinity optimization
             enable_large_send_offload: true, // LSO for large transfers
-            hardware_accel: HardwareAccelConfig::default(), // Hardware acceleration
+            enable_falcon_crypto: true, // Quantum-resistant FALCON cryptography
+            falcon_variant: FalconVariant::Falcon1024, // Maximum security level
         }
     }
 }
@@ -159,7 +156,7 @@ impl Endpoint {
     }
 }
 
-/// High-performance memory buffer pool for zero-copy operations
+/// Memory buffer pool for efficient buffer reuse
 pub struct MemoryPool {
     buffers: SegQueue<NonNull<u8>>,
     buffer_size: usize,
@@ -168,7 +165,7 @@ pub struct MemoryPool {
 }
 
 impl MemoryPool {
-    /// Create a new memory pool optimized for adaptive network tiers performance
+    /// Create a new memory pool for efficient buffer management
     pub fn new(buffer_size: usize, max_buffers: usize) -> Self {
         Self {
             buffers: SegQueue::new(),
@@ -360,7 +357,7 @@ impl Stream {
     }
 }
 
-/// High-performance STOQ transport optimized for adaptive network tiers
+/// STOQ transport implementation using QUIC over IPv6
 pub struct StoqTransport {
     config: TransportConfig,
     endpoint: Arc<quinn::Endpoint>,
@@ -372,11 +369,11 @@ pub struct StoqTransport {
     memory_pool: Arc<MemoryPool>,
     connection_multiplexer: Arc<DashMap<String, VecDeque<Arc<Connection>>>>,
     performance_stats: Arc<RwLock<PerformanceStats>>,
-    hardware_accelerator: Option<Arc<HardwareAccelerator>>,
-    protocol_handler: Option<Arc<StoqProtocolHandler>>,
+    /// FALCON quantum-resistant cryptography (optional)
+    falcon_transport: Option<Arc<RwLock<FalconTransport>>>,
 }
 
-/// Performance statistics for adaptive network tiers monitoring
+/// Performance statistics for transport monitoring
 #[derive(Debug, Default)]
 pub struct PerformanceStats {
     pub total_bytes_sent: AtomicU64,
@@ -390,10 +387,10 @@ pub struct PerformanceStats {
 }
 
 impl StoqTransport {
-    /// Create a new high-performance STOQ transport optimized for adaptive network tiers
+    /// Create a new STOQ transport using QUIC over IPv6
     pub async fn new(config: TransportConfig) -> Result<Self> {
-        info!("Initializing high-performance STOQ transport on [{}]:{}", config.bind_address, config.port);
-        info!("Performance optimizations: zero_copy={}, pool_size={}, max_streams={}", 
+        info!("Initializing STOQ transport on [{}]:{}", config.bind_address, config.port);
+        info!("Transport config: zero_copy={}, pool_size={}, max_streams={}",
               config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams);
         
         // Initialize certificate manager with IPv6-only production configuration
@@ -415,7 +412,7 @@ impl StoqTransport {
         server_transport_config.max_concurrent_uni_streams(config.max_concurrent_streams.into());
         server_transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
         
-        // adaptive network tiers optimizations
+        // QUIC performance optimizations
         server_transport_config.send_window(config.send_buffer_size as u64);
         server_transport_config.receive_window(VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX));
         server_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
@@ -431,11 +428,11 @@ impl StoqTransport {
         client_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
         client_transport_config.datagram_send_buffer_size(config.max_datagram_size);
         
-        // Advanced congestion control for adaptive network tiers
+        // Advanced congestion control for high performance
         match config.congestion_control {
             CongestionControl::Bbr2 => {
                 // BBR v2 would be configured here when available in Quinn
-                debug!("Using BBR-optimized settings for adaptive network tiers performance");
+                debug!("Using BBR-optimized settings for high performance");
             }
             CongestionControl::Cubic => {
                 debug!("Using CUBIC congestion control");
@@ -478,7 +475,7 @@ impl StoqTransport {
                 warn!("Could not set IPv6-only socket option (continuing anyway): {}", e);
             }
             
-            // High-performance socket optimizations
+            // Socket optimizations
             if let Err(e) = socket2_sock.set_send_buffer_size(config.send_buffer_size) {
                 warn!("Could not set send buffer size: {}", e);
             }
@@ -500,7 +497,7 @@ impl StoqTransport {
         
         endpoint.set_default_client_config(client_config.clone());
         
-        // Initialize metrics and adaptive network tiers optimizations
+        // Initialize metrics and transport optimizations
         let metrics = Arc::new(TransportMetrics::new());
         
         // Initialize memory pool for zero-copy operations
@@ -509,20 +506,18 @@ impl StoqTransport {
             config.memory_pool_size,
         ));
         
-        // Initialize hardware accelerator for adaptive network tiers performance
-        let hardware_accelerator = if config.enable_cpu_affinity || config.enable_large_send_offload {
-            match HardwareAccelerator::new(config.hardware_accel.clone()) {
-                Ok(accel) => {
-                    info!("Hardware acceleration enabled - theoretical max: {:.1} Gbps", 
-                          accel.max_theoretical_throughput_gbps());
-                    Some(Arc::new(accel))
-                }
-                Err(e) => {
-                    warn!("Hardware acceleration failed to initialize: {}", e);
-                    None
-                }
+        // Initialize FALCON quantum-resistant cryptography if enabled
+        let falcon_transport = if config.enable_falcon_crypto {
+            let mut falcon = FalconTransport::new(config.falcon_variant);
+            if let Err(e) = falcon.generate_local_keypair() {
+                warn!("Failed to generate FALCON keypair: {}", e);
+                None
+            } else {
+                info!("FALCON quantum-resistant cryptography enabled with {:?}", config.falcon_variant);
+                Some(Arc::new(RwLock::new(falcon)))
             }
         } else {
+            info!("FALCON cryptography disabled");
             None
         };
         
@@ -537,12 +532,11 @@ impl StoqTransport {
             memory_pool,
             connection_multiplexer: Arc::new(DashMap::new()),
             performance_stats: Arc::new(RwLock::new(PerformanceStats::default())),
-            hardware_accelerator,
-            protocol_handler: None, // Initialize as None, can be set later
+            falcon_transport,
         })
     }
     
-    /// Connect to a remote endpoint with connection pooling for adaptive network tiers performance
+    /// Connect to a remote endpoint with connection pooling for performance
     pub async fn connect(&self, endpoint: &Endpoint) -> Result<Arc<Connection>> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         
@@ -578,7 +572,7 @@ impl StoqTransport {
         Ok(connection)
     }
     
-    /// Return connection to pool for reuse (adaptive network tiers optimization)
+    /// Return connection to pool for reuse (optimization)
     pub fn return_to_pool(&self, connection: Arc<Connection>) {
         if !connection.is_active() {
             return; // Don't pool inactive connections
@@ -592,14 +586,29 @@ impl StoqTransport {
         }
     }
     
-    /// Set protocol handler for message processing
-    pub fn set_protocol_handler(&mut self, handler: Arc<StoqProtocolHandler>) {
-        self.protocol_handler = Some(handler);
+    /// Get FALCON transport for quantum-resistant operations
+    pub fn falcon_transport(&self) -> Option<Arc<RwLock<FalconTransport>>> {
+        self.falcon_transport.clone()
     }
 
-    /// Get protocol handler if available
-    pub fn protocol_handler(&self) -> Option<Arc<StoqProtocolHandler>> {
-        self.protocol_handler.clone()
+    /// Sign data using FALCON quantum-resistant cryptography
+    pub fn falcon_sign(&self, data: &[u8]) -> Result<Option<falcon::FalconSignature>> {
+        if let Some(falcon) = &self.falcon_transport {
+            let falcon_guard = falcon.read();
+            Ok(Some(falcon_guard.sign_handshake_data(data)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Verify FALCON signature
+    pub fn falcon_verify(&self, key_id: &str, signature: &falcon::FalconSignature, data: &[u8]) -> Result<bool> {
+        if let Some(falcon) = &self.falcon_transport {
+            let falcon_guard = falcon.read();
+            falcon_guard.verify_handshake_signature(key_id, signature, data)
+        } else {
+            Err(anyhow!("FALCON transport not enabled"))
+        }
     }
 
     /// Accept incoming connections
@@ -626,43 +635,14 @@ impl StoqTransport {
         
         self.connections.insert(connection.id(), connection.clone());
         self.metrics.record_connection_established();
-        
-        // If protocol handler is available, start handling protocol messages
-        if let Some(protocol_handler) = &self.protocol_handler {
-            let handler = protocol_handler.clone();
-            let conn_clone = connection.clone();
-            let transport_clone = Arc::new(self.clone());
-            
-            tokio::spawn(async move {
-                if let Err(e) = handler.handle_connection(conn_clone, transport_clone).await {
-                    warn!("Protocol handler error: {}", e);
-                }
-            });
-        }
-        
+
         info!("Accepted connection from {}", remote_addr);
         Ok(connection)
     }
     
-    /// Send data with advanced adaptive network tiers optimizations including hardware acceleration
+    /// Send data with transport layer optimizations
     pub async fn send(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let start_time = std::time::Instant::now();
-        
-        // Try hardware acceleration first for maximum performance
-        if let Some(hw_accel) = &self.hardware_accelerator {
-            if hw_accel.is_accelerated() && data.len() >= 1024 { // Use HW accel for larger data
-                match hw_accel.accelerated_send(data).await {
-                    Ok(_) => {
-                        info!("Hardware accelerated send: {} bytes at {:.1} Gbps", 
-                              data.len(), hw_accel.get_stats().avg_throughput_gbps);
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        warn!("Hardware acceleration failed, falling back to software: {}", e);
-                    }
-                }
-            }
-        }
         
         if self.config.enable_zero_copy {
             // Try memory pool buffer first for maximum performance
@@ -717,7 +697,7 @@ impl StoqTransport {
         Ok(())
     }
     
-    /// Send large data with frame batching for adaptive network tiers performance
+    /// Send large data with frame batching for performance
     async fn send_large_data_batched(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let chunk_size = self.config.max_datagram_size;
         let mut chunks = data.chunks(chunk_size);
@@ -758,7 +738,7 @@ impl StoqTransport {
         Ok(())
     }
     
-    /// Receive data with zero-copy optimization for adaptive network tiers performance
+    /// Receive data with zero-copy optimization for performance
     pub async fn receive(&self, conn: &Connection) -> Result<Bytes> {
         if self.config.enable_zero_copy {
             // Try datagram receive first for maximum performance
@@ -772,15 +752,15 @@ impl StoqTransport {
         stream.receive().await
     }
     
-    /// Get enhanced transport statistics with adaptive network tiers metrics
+    /// Get transport statistics with performance metrics
     pub fn stats(&self) -> crate::TransportStats {
         let base_stats = self.metrics.get_stats(self.connections.len());
         
-        // Add adaptive network tiers performance metrics
+        // Add performance metrics
         let perf_stats = self.performance_stats.read();
         let (pool_available, pool_allocated) = self.memory_pool.stats();
         
-        info!("adaptive network tiers, Zero-copy ops: {}, Pool hits/misses: {}/{}, Frame batches: {}",
+        info!("Performance: {:.1} Gbps peak, Zero-copy ops: {}, Pool hits/misses: {}/{}, Frame batches: {}",
               perf_stats.peak_throughput_gbps.load(Ordering::Relaxed) as f64 / 1000.0,
               perf_stats.zero_copy_operations.load(Ordering::Relaxed),
               perf_stats.memory_pool_hits.load(Ordering::Relaxed),
@@ -799,7 +779,7 @@ impl StoqTransport {
     
     /// Close all connections and connection pools
     pub async fn shutdown(&self) {
-        info!("Shutting down high-performance STOQ transport");
+        info!("Shutting down STOQ transport");
         
         // Close all active connections
         for conn in self.connections.iter() {
@@ -816,7 +796,7 @@ impl StoqTransport {
         info!("STOQ transport shutdown complete");
     }
     
-    /// Get comprehensive connection pool statistics for adaptive network tiers monitoring
+    /// Get connection pool statistics for monitoring
     pub fn pool_stats(&self) -> Vec<(String, usize)> {
         self.connection_pool
             .iter()
@@ -824,24 +804,18 @@ impl StoqTransport {
             .collect()
     }
     
-    /// Get adaptive network tiers performance statistics
+    /// Get transport performance statistics
     pub fn performance_stats(&self) -> (f64, u64, u64, u64) {
         let stats = self.performance_stats.read();
         let peak_gbps = stats.peak_throughput_gbps.load(Ordering::Relaxed) as f64 / 1000.0;
         let zero_copy_ops = stats.zero_copy_operations.load(Ordering::Relaxed);
         let pool_hits = stats.memory_pool_hits.load(Ordering::Relaxed);
         let frame_batches = stats.frame_batches_sent.load(Ordering::Relaxed);
-        
-        if let Some(hw_accel) = &self.hardware_accelerator {
-            let hw_stats = hw_accel.get_stats();
-            info!("Hardware acceleration stats: {:.1} Gbps avg, {} bypass ops, {} LSO ops",
-                  hw_stats.avg_throughput_gbps, hw_stats.kernel_bypass_ops, hw_stats.lso_operations);
-        }
-        
+
         (peak_gbps, zero_copy_ops, pool_hits, frame_batches)
     }
     
-    /// Enable connection multiplexing for specific endpoint (adaptive network tiers optimization)
+    /// Enable connection multiplexing for specific endpoint (optimization)
     pub async fn enable_multiplexing(&self, endpoint: &Endpoint, connection_count: usize) -> Result<()> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         let mut connections = VecDeque::with_capacity(connection_count);
@@ -855,13 +829,13 @@ impl StoqTransport {
         }
         
         self.connection_multiplexer.insert(pool_key, connections);
-        info!("Enabled {}x connection multiplexing for [{}]:{} (adaptive network tiers optimization)", 
+        info!("Enabled {}x connection multiplexing for [{}]:{} (optimization)",
               connection_count, endpoint.address, endpoint.port);
         
         Ok(())
     }
     
-    /// Send data using connection multiplexing for maximum adaptive network tiers throughput
+    /// Send data using connection multiplexing for maximum throughput
     pub async fn send_multiplexed(&self, endpoint: &Endpoint, data: &[u8]) -> Result<()> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         
@@ -912,8 +886,7 @@ impl Clone for StoqTransport {
             memory_pool: self.memory_pool.clone(),
             connection_multiplexer: self.connection_multiplexer.clone(),
             performance_stats: self.performance_stats.clone(),
-            hardware_accelerator: self.hardware_accelerator.clone(),
-            protocol_handler: self.protocol_handler.clone(),
+            falcon_transport: self.falcon_transport.clone(),
         }
     }
 }
