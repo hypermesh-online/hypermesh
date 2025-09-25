@@ -1,13 +1,15 @@
-//! Catalog - Universal Asset SDK - SECURITY REMEDIATION IN PROGRESS
+//! Catalog - HyperMesh Asset Package Manager
 //!
-//! WARNING: This library contains critical security vulnerabilities and is NOT production ready.
+//! Pure asset package manager for the HyperMesh ecosystem.
+//! Runs on HyperMesh infrastructure via catalog.hypermesh.online trustchain network.
 //!
-//! SECURITY STATUS:
-//! - Julia VM: DISABLED - Previous shell execution implementation posed RCE risk
-//! - Security Sandbox: NOT IMPLEMENTED - Environment variables provide no actual security
-//! - Remote Execution: NOT IMPLEMENTED - No network layer exists
+//! ARCHITECTURE:
+//! - Asset package management and distribution
+//! - HyperMesh native resource utilization
+//! - TrustChain certificate-based security
+//! - No local execution - delegates to HyperMesh nodes
 //!
-//! This is a LIBRARY ONLY with interface definitions. No executable components exist.
+//! NETWORK ADDRESS: catalog.hypermesh.online (via TrustChain DNS)
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
@@ -19,9 +21,8 @@ pub mod registry;
 pub mod validation;
 pub mod documentation;
 pub mod versioning;
-pub mod julia_vm;
 pub mod scripting;
-pub mod security;
+pub mod hypermesh_integration;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
@@ -38,14 +39,13 @@ pub use registry::{AssetRegistry, RegistryConfig, AssetDiscovery};
 pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
 pub use documentation::DocumentationGenerator;
 pub use versioning::{VersionManager, SemanticVersion, DependencyResolver};
-pub use julia_vm::{JuliaVMManager, JuliaCompiler, JuliaRuntime};
-pub use scripting::{LuaEngine, ScriptingEngine, ScriptResult};
-pub use security::{SecuritySandbox, SandboxLevel, ExecutionContext};
+pub use scripting::{ScriptingEngine, ScriptResult};
+pub use hypermesh_integration::{HyperMeshClient, HyperMeshAssetAdapter};
 
 /// Catalog version
 pub const CATALOG_VERSION: &str = "0.1.0";
 
-/// Main Catalog instance that orchestrates all components
+/// Main Catalog instance - HyperMesh Asset Package Manager
 pub struct Catalog {
     consensus_config: Arc<ConsensusContext>,
     asset_registry: Arc<registry::AssetRegistry>,
@@ -53,9 +53,10 @@ pub struct Catalog {
     asset_validator: Arc<validation::AssetValidator>,
     documentation_generator: Arc<documentation::DocumentationGenerator>,
     version_manager: Arc<versioning::VersionManager>,
+    hypermesh_client: Arc<tokio::sync::Mutex<hypermesh_integration::HyperMeshClient>>,
 }
 
-/// Catalog configuration
+/// Catalog configuration for HyperMesh integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogConfig {
     /// Consensus configuration
@@ -68,6 +69,10 @@ pub struct CatalogConfig {
     pub validation: validation::ValidationConfig,
     /// Documentation configuration
     pub documentation: documentation::DocumentationConfig,
+    /// HyperMesh network address
+    pub hypermesh_address: Option<String>,
+    /// TrustChain certificate path
+    pub trustchain_cert_path: Option<String>,
 }
 
 impl Default for CatalogConfig {
@@ -78,22 +83,36 @@ impl Default for CatalogConfig {
             template: template::TemplateConfig::default(),
             validation: validation::ValidationConfig::default(),
             documentation: documentation::DocumentationConfig::default(),
+            hypermesh_address: Some("catalog.hypermesh.online".to_string()),
+            trustchain_cert_path: None,
         }
     }
 }
 
 impl Catalog {
-    /// Create a new Catalog instance
+    /// Create a new Catalog instance with HyperMesh integration
     pub async fn new(config: CatalogConfig) -> Result<Self> {
         let consensus_config = Arc::new(config.consensus);
-        
+
         // Initialize components
         let asset_registry = Arc::new(registry::AssetRegistry::new(config.registry).await?);
         let template_generator = Arc::new(template::CatalogTemplateGenerator::new(config.template)?);
         let asset_validator = Arc::new(validation::AssetValidator::new(config.validation));
         let documentation_generator = Arc::new(documentation::DocumentationGenerator::new(config.documentation)?);
         let version_manager = Arc::new(versioning::VersionManager::new());
-        
+
+        // Initialize HyperMesh client
+        let hypermesh_address = config.hypermesh_address
+            .unwrap_or_else(|| "catalog.hypermesh.online".to_string());
+        let mut hypermesh_client = hypermesh_integration::HyperMeshClient::new(hypermesh_address);
+
+        if let Some(cert_path) = config.trustchain_cert_path {
+            hypermesh_client.set_trustchain_certificate(cert_path);
+        }
+
+        // Connect to HyperMesh network
+        hypermesh_client.connect().await?;
+
         Ok(Self {
             consensus_config,
             asset_registry,
@@ -101,6 +120,7 @@ impl Catalog {
             asset_validator,
             documentation_generator,
             version_manager,
+            hypermesh_client: Arc::new(tokio::sync::Mutex::new(hypermesh_client)),
         })
     }
     
@@ -180,6 +200,43 @@ impl Catalog {
     pub async fn generate_documentation(&self, package: &AssetPackage) -> Result<documentation::GeneratedDocumentation> {
         self.documentation_generator.generate(package).await
     }
+
+    /// Execute asset on HyperMesh infrastructure
+    pub async fn execute_asset_on_hypermesh(
+        &self,
+        asset_id: &AssetId,
+        package: &AssetPackage,
+    ) -> Result<hypermesh_integration::CatalogExecutionContext> {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+
+        // Map asset requirements to HyperMesh resources
+        let asset_adapter = hypermesh_integration::HyperMeshAssetAdapter::new();
+        let resource_requirements = asset_adapter.map_asset_to_resources(package);
+
+        // Execute on HyperMesh
+        hypermesh_client.execute_asset(asset_id, resource_requirements).await
+    }
+
+    /// Query execution status on HyperMesh
+    pub async fn query_hypermesh_execution(
+        &self,
+        execution_id: &str,
+    ) -> Result<hypermesh_integration::CatalogExecutionContext> {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+        hypermesh_client.query_execution(execution_id).await
+    }
+
+    /// Terminate execution on HyperMesh
+    pub async fn terminate_hypermesh_execution(&self, execution_id: &str) -> Result<()> {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+        hypermesh_client.terminate_execution(execution_id).await
+    }
+
+    /// Get HyperMesh network address
+    pub async fn hypermesh_network_address(&self) -> String {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+        hypermesh_client.network_address().to_string()
+    }
 }
 
 /// Builder for creating Catalog instances
@@ -198,6 +255,18 @@ impl CatalogBuilder {
     /// Set consensus configuration
     pub fn with_consensus(mut self, config: ConsensusContext) -> Self {
         self.config.consensus = config;
+        self
+    }
+
+    /// Set HyperMesh network address
+    pub fn with_hypermesh_address<S: Into<String>>(mut self, address: S) -> Self {
+        self.config.hypermesh_address = Some(address.into());
+        self
+    }
+
+    /// Set TrustChain certificate path
+    pub fn with_trustchain_certificate<P: Into<String>>(mut self, cert_path: P) -> Self {
+        self.config.trustchain_cert_path = Some(cert_path.into());
         self
     }
     
