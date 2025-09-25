@@ -1,7 +1,13 @@
-//! Catalog - Universal Asset SDK with JuliaVM
-//! 
-//! A standalone library for secure asset management, scripting, and remote code execution
-//! with bidirectional ZeroTrust validation and consensus integration.
+//! Catalog - Universal Asset SDK - SECURITY REMEDIATION IN PROGRESS
+//!
+//! WARNING: This library contains critical security vulnerabilities and is NOT production ready.
+//!
+//! SECURITY STATUS:
+//! - Julia VM: DISABLED - Previous shell execution implementation posed RCE risk
+//! - Security Sandbox: NOT IMPLEMENTED - Environment variables provide no actual security
+//! - Remote Execution: NOT IMPLEMENTED - No network layer exists
+//!
+//! This is a LIBRARY ONLY with interface definitions. No executable components exist.
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]

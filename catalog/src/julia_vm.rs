@@ -1,13 +1,14 @@
-//! Julia VM Integration
+//! Julia VM Integration - SECURITY REMEDIATION
 //!
-//! Provides Julia virtual machine integration for compiling and executing
-//! Julia programs within the Catalog ecosystem.
+//! This module has been DISABLED due to critical security vulnerabilities.
+//! Previous implementation used unsafe shell command execution.
+//!
+//! REQUIRED: Implement proper VM with sandboxing before enabling.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use tokio::process::Command;
 
 /// Julia VM manager for compilation and execution
 pub struct JuliaVMManager {
@@ -160,30 +161,16 @@ impl Default for JuliaVMConfig {
 }
 
 impl JuliaVMManager {
-    /// Create a new Julia VM manager
+    /// Create a new Julia VM manager - DISABLED FOR SECURITY
     pub fn new(config: JuliaVMConfig) -> Result<Self> {
-        // Verify Julia installation
-        let output = std::process::Command::new(&config.julia_path)
-            .arg("--version")
-            .output()?;
-        
-        if !output.status.success() {
-            return Err(anyhow::anyhow!("Julia not found at path: {}", config.julia_path));
-        }
-        
-        let version_output = String::from_utf8_lossy(&output.stdout);
-        tracing::info!("Detected Julia version: {}", version_output.trim());
-        
-        // Ensure cache directory exists
-        let cache_dir = shellexpand::tilde(&config.cache_dir).into_owned();
-        std::fs::create_dir_all(&cache_dir)?;
-        
-        Ok(Self {
-            julia_path: config.julia_path.clone(),
-            project_env: config.project_env.clone(),
-            cache_dir,
-            config,
-        })
+        // SECURITY: Previous implementation used unsafe shell execution
+        // This would execute arbitrary code via tokio::process::Command
+
+        Err(anyhow::anyhow!(
+            "Julia VM disabled due to security vulnerabilities. \
+             Shell command execution poses RCE risk. \
+             Implement proper sandboxed VM or use WASM runtime."
+        ))
     }
     
     /// Get Julia compiler
@@ -221,221 +208,74 @@ impl JuliaVMManager {
 }
 
 impl JuliaCompiler {
-    /// Compile Julia source code
-    pub async fn compile<P: AsRef<Path>>(&self, source_path: P) -> Result<CompilationResult> {
-        let start_time = std::time::Instant::now();
-        let source_path = source_path.as_ref();
-        
-        let mut command = Command::new(&self.vm_manager.julia_path);
-        
-        // Add Julia arguments
-        for arg in &self.vm_manager.config.julia_args {
-            command.arg(arg);
-        }
-        
-        // Set project environment if specified
-        if let Some(project_env) = &self.vm_manager.project_env {
-            command.env("JULIA_PROJECT", project_env);
-        }
-        
-        // Set number of threads if specified
-        if let Some(num_threads) = self.vm_manager.config.num_threads {
-            command.env("JULIA_NUM_THREADS", num_threads.to_string());
-        }
-        
-        // Compile the source
-        command.arg("--compile=yes")
-               .arg("--optimize=2")
-               .arg(source_path);
-        
-        let output = command.output().await?;
-        let compilation_time = start_time.elapsed().as_millis() as u64;
-        
-        let success = output.status.success();
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-        
-        // Parse compilation output for errors and warnings
-        if !success {
-            errors.push(CompilationError {
-                message: stderr.clone(),
-                file: Some(source_path.to_string_lossy().to_string()),
-                line: None,
-                column: None,
-                code: None,
-            });
-        }
-        
-        Ok(CompilationResult {
-            success,
-            output_path: if success { Some(source_path.to_string_lossy().to_string()) } else { None },
-            compilation_time_ms: compilation_time,
-            errors,
-            warnings,
-            artifacts: vec![],
-        })
+    /// Compile Julia source code - DISABLED FOR SECURITY
+    pub async fn compile<P: AsRef<Path>>(&self, _source_path: P) -> Result<CompilationResult> {
+        // SECURITY: Previous implementation executed arbitrary shell commands
+        // This creates a remote code execution vulnerability
+
+        Err(anyhow::anyhow!(
+            "Julia compilation disabled due to security vulnerabilities. \
+             Previous implementation used tokio::process::Command with arbitrary code execution. \
+             Implement proper sandboxed compilation or use WASM runtime."
+        ))
     }
     
-    /// Compile Julia code to system image
-    pub async fn compile_to_sysimage<P: AsRef<Path>>(&self, source_path: P, output_path: P) -> Result<CompilationResult> {
-        let start_time = std::time::Instant::now();
-        
-        let mut command = Command::new(&self.vm_manager.julia_path);
-        
-        // PackageCompiler.jl command to create system image
-        command.arg("-e")
-               .arg(format!(
-                   "using PackageCompiler; create_sysimage([\"{}\"], sysimage_path=\"{}\")",
-                   source_path.as_ref().to_string_lossy(),
-                   output_path.as_ref().to_string_lossy()
-               ));
-        
-        let output = command.output().await?;
-        let compilation_time = start_time.elapsed().as_millis() as u64;
-        
-        let success = output.status.success();
-        
-        Ok(CompilationResult {
-            success,
-            output_path: if success { Some(output_path.as_ref().to_string_lossy().to_string()) } else { None },
-            compilation_time_ms: compilation_time,
-            errors: if success { vec![] } else { 
-                vec![CompilationError {
-                    message: String::from_utf8_lossy(&output.stderr).to_string(),
-                    file: None,
-                    line: None,
-                    column: None,
-                    code: None,
-                }]
-            },
-            warnings: vec![],
-            artifacts: if success {
-                vec![CompilationArtifact {
-                    artifact_type: ArtifactType::SystemImage,
-                    path: output_path.as_ref().to_string_lossy().to_string(),
-                    size: std::fs::metadata(output_path.as_ref()).map(|m| m.len()).unwrap_or(0),
-                    description: "Julia system image".to_string(),
-                }]
-            } else {
-                vec![]
-            },
-        })
+    /// Compile Julia code to system image - DISABLED FOR SECURITY
+    pub async fn compile_to_sysimage<P: AsRef<Path>>(&self, _source_path: P, _output_path: P) -> Result<CompilationResult> {
+        // SECURITY: Previous implementation used string interpolation into shell commands
+        // This creates a code injection vulnerability via format!() macro
+
+        Err(anyhow::anyhow!(
+            "System image compilation disabled due to security vulnerabilities. \
+             Previous implementation used unsafe string interpolation into shell commands. \
+             Implement proper sandboxed compilation pipeline."
+        ))
     }
 }
 
 impl JuliaRuntime {
-    /// Execute Julia source code
-    pub async fn execute<P: AsRef<Path>>(&self, source_path: P) -> Result<ExecutionResult> {
-        self.execute_with_args(source_path, &[]).await
+    /// Execute Julia source code - DISABLED FOR SECURITY
+    pub async fn execute<P: AsRef<Path>>(&self, _source_path: P) -> Result<ExecutionResult> {
+        // SECURITY: Previous implementation executed arbitrary code via shell
+        Err(anyhow::anyhow!(
+            "Julia execution disabled due to critical security vulnerability. \
+             Previous implementation allowed arbitrary code execution via shell commands."
+        ))
+    }
+
+    /// Execute Julia source code with arguments - DISABLED FOR SECURITY
+    pub async fn execute_with_args<P: AsRef<Path>>(&self, _source_path: P, _args: &[String]) -> Result<ExecutionResult> {
+        // SECURITY: Previous implementation executed arbitrary code via shell
+        Err(anyhow::anyhow!(
+            "Julia execution disabled due to critical security vulnerability. \
+             Previous implementation allowed arbitrary code execution via shell commands."
+        ))
+    }
+
+    /// Execute Julia code string - DISABLED FOR SECURITY
+    pub async fn execute_code(&self, _code: &str) -> Result<ExecutionResult> {
+        // SECURITY: This was the most dangerous function - direct code injection
+        // Previous implementation: command.arg("-e").arg(code);
+        // This allowed arbitrary code execution with full system privileges
+
+        Err(anyhow::anyhow!(
+            "Direct code execution disabled due to CRITICAL security vulnerability. \
+             Previous implementation allowed arbitrary code injection via -e flag. \
+             This poses immediate remote code execution risk."
+        ))
     }
     
-    /// Execute Julia source code with arguments
-    pub async fn execute_with_args<P: AsRef<Path>>(&self, source_path: P, args: &[String]) -> Result<ExecutionResult> {
-        let start_time = std::time::Instant::now();
-        
-        let mut command = Command::new(&self.vm_manager.julia_path);
-        
-        // Add Julia arguments
-        for arg in &self.vm_manager.config.julia_args {
-            command.arg(arg);
-        }
-        
-        // Set project environment if specified
-        if let Some(project_env) = &self.vm_manager.project_env {
-            command.env("JULIA_PROJECT", project_env);
-        }
-        
-        // Set number of threads if specified
-        if let Some(num_threads) = self.vm_manager.config.num_threads {
-            command.env("JULIA_NUM_THREADS", num_threads.to_string());
-        }
-        
-        // Add source file and arguments
-        command.arg(source_path.as_ref());
-        for arg in args {
-            command.arg(arg);
-        }
-        
-        let output = command.output().await?;
-        let execution_time = start_time.elapsed().as_millis() as u64;
-        
-        let success = output.status.success();
-        let exit_code = output.status.code().unwrap_or(-1);
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
-        Ok(ExecutionResult {
-            success,
-            exit_code,
-            stdout,
-            stderr,
-            execution_time_ms: execution_time,
-            peak_memory_bytes: None, // TODO: Implement memory monitoring
-            return_value: None, // TODO: Parse return value from stdout
-        })
-    }
-    
-    /// Execute Julia code string
-    pub async fn execute_code(&self, code: &str) -> Result<ExecutionResult> {
-        let start_time = std::time::Instant::now();
-        
-        let mut command = Command::new(&self.vm_manager.julia_path);
-        
-        // Add Julia arguments
-        for arg in &self.vm_manager.config.julia_args {
-            command.arg(arg);
-        }
-        
-        // Set project environment if specified
-        if let Some(project_env) = &self.vm_manager.project_env {
-            command.env("JULIA_PROJECT", project_env);
-        }
-        
-        // Execute code directly
-        command.arg("-e").arg(code);
-        
-        let output = command.output().await?;
-        let execution_time = start_time.elapsed().as_millis() as u64;
-        
-        let success = output.status.success();
-        let exit_code = output.status.code().unwrap_or(-1);
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
-        Ok(ExecutionResult {
-            success,
-            exit_code,
-            stdout,
-            stderr,
-            execution_time_ms: execution_time,
-            peak_memory_bytes: None,
-            return_value: None,
-        })
-    }
-    
-    /// Execute Julia code with timeout
+    /// Execute Julia code with timeout - DISABLED FOR SECURITY
     pub async fn execute_with_timeout<P: AsRef<Path>>(
         &self,
-        source_path: P,
-        timeout_secs: u64,
+        _source_path: P,
+        _timeout_secs: u64,
     ) -> Result<ExecutionResult> {
-        let execution_future = self.execute(source_path);
-        
-        match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), execution_future).await {
-            Ok(result) => result,
-            Err(_) => Ok(ExecutionResult {
-                success: false,
-                exit_code: -1,
-                stdout: String::new(),
-                stderr: "Execution timed out".to_string(),
-                execution_time_ms: timeout_secs * 1000,
-                peak_memory_bytes: None,
-                return_value: None,
-            }),
-        }
+        // SECURITY: Previous implementation still used unsafe execute() method
+        Err(anyhow::anyhow!(
+            "Timed execution disabled due to security vulnerability. \
+             Previous implementation relied on unsafe execute() method."
+        ))
     }
 }
 

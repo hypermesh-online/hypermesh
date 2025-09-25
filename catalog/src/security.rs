@@ -1,6 +1,10 @@
-//! Security and Sandboxing System
+//! Security and Sandboxing System - SECURITY REMEDIATION
 //!
-//! Provides security sandbox implementation for safe execution of asset packages.
+//! WARNING: This module contains only data structures and stubs.
+//! NO ACTUAL SECURITY ENFORCEMENT IS IMPLEMENTED.
+//!
+//! CRITICAL: All "security" features are configuration-only with no enforcement.
+//! Do not use in production without implementing actual sandboxing mechanisms.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -447,102 +451,78 @@ impl SecuritySandbox {
         })
     }
     
-    /// Apply sandbox restrictions to command
+    /// Apply sandbox restrictions to command - SECURITY WARNING: NOT IMPLEMENTED
     fn apply_sandbox_restrictions(
         &self,
-        cmd: &mut tokio::process::Command,
-        level: &SandboxLevel,
+        _cmd: &mut tokio::process::Command,
+        _level: &SandboxLevel,
     ) -> Result<()> {
-        match level {
-            SandboxLevel::Minimal => {
-                // Minimal restrictions - mainly for development
-                self.apply_basic_limits(cmd)?;
-            }
-            SandboxLevel::Standard => {
-                // Standard production restrictions
-                self.apply_basic_limits(cmd)?;
-                self.apply_network_restrictions(cmd)?;
-                self.apply_filesystem_restrictions(cmd)?;
-            }
-            SandboxLevel::Strict => {
-                // Strict security restrictions
-                self.apply_basic_limits(cmd)?;
-                self.apply_network_restrictions(cmd)?;
-                self.apply_filesystem_restrictions(cmd)?;
-                self.apply_syscall_restrictions(cmd)?;
-            }
-            SandboxLevel::Paranoid => {
-                // Maximum security restrictions
-                self.apply_basic_limits(cmd)?;
-                self.apply_network_restrictions(cmd)?;
-                self.apply_filesystem_restrictions(cmd)?;
-                self.apply_syscall_restrictions(cmd)?;
-                self.apply_isolation(cmd)?;
-            }
-        }
-        
-        Ok(())
+        // SECURITY WARNING: This function does not implement any actual restrictions
+        // Previous implementation only set environment variables, no actual enforcement
+        // Commands execute with full system privileges regardless of "sandbox level"
+
+        tracing::warn!(
+            "SECURITY RISK: apply_sandbox_restrictions called but no actual sandboxing implemented. \
+             All commands execute with full system privileges. \
+             Implement Linux namespaces, cgroups, seccomp, landlock, or containerization."
+        );
+
+        // Return error to prevent false sense of security
+        Err(anyhow::anyhow!(
+            "Sandbox restrictions not implemented. \
+             Would provide false security if enabled. \
+             Implement actual sandboxing before use."
+        ))
     }
     
-    /// Apply basic resource limits
-    fn apply_basic_limits(&self, cmd: &mut tokio::process::Command) -> Result<()> {
-        // Set environment variables for resource limits
-        if let Some(max_memory) = self.config.resource_limits.max_memory_bytes {
-            cmd.env("CATALOG_MAX_MEMORY", max_memory.to_string());
-        }
-        
-        if let Some(max_cpu_time) = self.config.resource_limits.max_cpu_time {
-            cmd.env("CATALOG_MAX_CPU_TIME", max_cpu_time.to_string());
-        }
-        
-        Ok(())
+    /// Apply basic resource limits - SECURITY WARNING: NOT IMPLEMENTED
+    fn apply_basic_limits(&self, _cmd: &mut tokio::process::Command) -> Result<()> {
+        // SECURITY WARNING: Setting environment variables does not enforce limits
+        // Process can ignore these environment variables entirely
+        // Requires cgroups, systemd, or containerization for actual enforcement
+
+        tracing::warn!("SECURITY RISK: Resource limits not enforced, only environment variables set");
+        Err(anyhow::anyhow!("Resource limits not implemented - environment variables provide no actual security"))
     }
-    
-    /// Apply network restrictions
-    fn apply_network_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
-        if !self.config.network_restrictions.allow_network {
-            cmd.env("CATALOG_DISABLE_NETWORK", "1");
-        }
-        
-        Ok(())
+
+    /// Apply network restrictions - SECURITY WARNING: NOT IMPLEMENTED
+    fn apply_network_restrictions(&self, _cmd: &mut tokio::process::Command) -> Result<()> {
+        // SECURITY WARNING: Environment variables cannot restrict network access
+        // Process can make arbitrary network connections regardless of env vars
+        // Requires iptables, netfilter, network namespaces, or containerization
+
+        tracing::warn!("SECURITY RISK: Network restrictions not enforced, only environment variables set");
+        Err(anyhow::anyhow!("Network restrictions not implemented - environment variables provide no network security"))
     }
-    
-    /// Apply filesystem restrictions
-    fn apply_filesystem_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
-        if !self.config.filesystem_restrictions.allow_filesystem {
-            cmd.env("CATALOG_DISABLE_FILESYSTEM", "1");
-        }
-        
-        // Set temp directory
-        if let Some(temp_dir) = &self.config.filesystem_restrictions.temp_directory {
-            cmd.env("TMPDIR", temp_dir);
-            cmd.env("TEMP", temp_dir);
-            cmd.env("TMP", temp_dir);
-        }
-        
-        Ok(())
+
+    /// Apply filesystem restrictions - SECURITY WARNING: NOT IMPLEMENTED
+    fn apply_filesystem_restrictions(&self, _cmd: &mut tokio::process::Command) -> Result<()> {
+        // SECURITY WARNING: Environment variables cannot restrict filesystem access
+        // Process can access any file with user permissions regardless of env vars
+        // Requires chroot, bind mounts, landlock, or containerization
+
+        tracing::warn!("SECURITY RISK: Filesystem restrictions not enforced, only environment variables set");
+        Err(anyhow::anyhow!("Filesystem restrictions not implemented - environment variables provide no filesystem security"))
     }
-    
-    /// Apply system call restrictions
-    fn apply_syscall_restrictions(&self, cmd: &mut tokio::process::Command) -> Result<()> {
-        if self.config.syscall_restrictions.enable_filtering {
-            cmd.env("CATALOG_SYSCALL_FILTER", "1");
-        }
-        
-        Ok(())
+
+    /// Apply system call restrictions - SECURITY WARNING: NOT IMPLEMENTED
+    fn apply_syscall_restrictions(&self, _cmd: &mut tokio::process::Command) -> Result<()> {
+        // SECURITY WARNING: Environment variables cannot restrict system calls
+        // Process can make any system call with user permissions
+        // Requires seccomp-bpf, ptrace, or containerization
+
+        tracing::warn!("SECURITY RISK: Syscall restrictions not enforced, only environment variables set");
+        Err(anyhow::anyhow!("Syscall restrictions not implemented - environment variables provide no syscall security"))
     }
-    
-    /// Apply isolation settings
-    fn apply_isolation(&self, cmd: &mut tokio::process::Command) -> Result<()> {
-        if self.config.isolation.use_namespaces {
-            cmd.env("CATALOG_USE_NAMESPACES", "1");
-        }
-        
-        if self.config.isolation.isolate_network {
-            cmd.env("CATALOG_ISOLATE_NETWORK", "1");
-        }
-        
-        Ok(())
+
+    /// Apply isolation settings - SECURITY WARNING: NOT IMPLEMENTED
+    fn apply_isolation(&self, _cmd: &mut tokio::process::Command) -> Result<()> {
+        // SECURITY WARNING: Environment variables cannot provide process isolation
+        // Process runs in same namespace with full access to system resources
+        // Requires Linux namespaces, containers, or virtual machines
+
+        tracing::warn!("SECURITY RISK: Process isolation not implemented, only environment variables set");
+        Err(anyhow::anyhow!("Process isolation not implemented - environment variables provide no isolation"))
     }
     
     /// Execute command with monitoring
