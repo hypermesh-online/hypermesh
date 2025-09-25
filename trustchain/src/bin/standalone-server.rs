@@ -202,7 +202,7 @@ async fn system_status(State(state): State<AppState>) -> Json<serde_json::Value>
                 "target_throughput": "adaptive network tiers"
             },
             "services": {
-                "certificate_authority": "Production-ready CA with HSM integration",
+                "certificate_authority": "Production-ready CA with software-based cryptography",
                 "certificate_transparency": "Real-time CT logging",
                 "dns_resolver": "DNS-over-STOQ with certificate validation",
                 "trust_validation": "HyperMesh integration for Byzantine fault tolerance"

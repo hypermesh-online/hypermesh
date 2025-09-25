@@ -195,6 +195,17 @@ impl PartialEq for StakeProof {
     }
 }
 
+impl Default for StakeProof {
+    fn default() -> Self {
+        Self {
+            stake_holder: "test".to_string(),
+            stake_holder_id: "test-001".to_string(),
+            stake_amount: 1000,
+            stake_timestamp: SystemTime::now(),
+        }
+    }
+}
+
 /// TimeProof - WHEN it occurred (temporal ordering)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TimeProof {
@@ -323,6 +334,12 @@ impl PartialEq for TimeProof {
     }
 }
 
+impl Default for TimeProof {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(0))
+    }
+}
+
 /// SpaceProof - WHERE it's stored (storage commitment)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpaceProof {
@@ -416,6 +433,16 @@ impl PartialEq for SpaceProof {
     }
 }
 
+impl Default for SpaceProof {
+    fn default() -> Self {
+        Self::new(
+            "test-node".to_string(),
+            "/tmp/test".to_string(),
+            1024 * 1024 * 1024, // 1GB
+        )
+    }
+}
+
 /// WorkProof - WHAT computational work (resource proof)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorkProof {
@@ -437,7 +464,7 @@ pub struct WorkProof {
     pub proof_timestamp: SystemTime,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WorkloadType {
     /// Certificate generation/validation
     Certificate,
@@ -553,6 +580,19 @@ impl PartialEq for WorkProof {
         self.workload_id == other.workload_id &&
         self.pid == other.pid &&
         self.computational_power == other.computational_power
+    }
+}
+
+impl Default for WorkProof {
+    fn default() -> Self {
+        Self::new(
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            1234, // pid
+            1000, // computational_power
+            WorkloadType::Certificate,
+            WorkState::Pending,
+        )
     }
 }
 

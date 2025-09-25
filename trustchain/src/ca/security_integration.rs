@@ -246,7 +246,8 @@ impl SecurityIntegratedCA {
             info!("MANDATORY consensus validation for operation: {}", operation_id);
             
             // Use the CA's internal consensus validator
-            let result = self.ca.consensus.validate_consensus(&request.consensus_proof).await?;
+            let mut consensus_guard = self.ca.consensus.lock().await;
+            let result = consensus_guard.validate_consensus(&request.consensus_proof).await?;
             
             operation.consensus_validation = Some(result.clone());
             
@@ -307,17 +308,20 @@ impl SecurityIntegratedCA {
     /// Validate certificate with security monitoring
     pub async fn validate_certificate_secure(&self, certificate_der: &[u8]) -> TrustChainResult<CertificateValidationResult> {
         let operation_id = uuid::Uuid::new_v4().to_string();
-        
+
         info!("Starting secure certificate validation (operation: {})", operation_id);
-        
-        // For certificate validation, we need to extract any consensus proof from the certificate
-        // In production, this would parse the certificate extensions for consensus proof data
-        let mock_consensus_proof = crate::consensus::ConsensusProof::default_for_testing();
+
+        // Generate real consensus proof from network state for validation
+        let node_id = format!("validator_{}", operation_id);
+        let consensus_proof = crate::consensus::ConsensusProof::generate_from_network(&node_id).await
+            .map_err(|e| TrustChainError::ConsensusValidationFailed {
+                reason: format!("Failed to generate consensus proof for validation: {}", e)
+            })?;
         
         // Perform security validation
         let security_result = self.security_monitor.validate_certificate_operation(
             "validate_certificate",
-            &mock_consensus_proof,
+            &consensus_proof,
             &format!("cert_validate_{}", operation_id),
         ).await?;
         

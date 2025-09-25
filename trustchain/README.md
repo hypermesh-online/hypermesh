@@ -31,7 +31,7 @@ TrustChain provides the cryptographic foundation for the Web3 ecosystem with a f
 ## 🏗️ Architecture Components - ALL FUNCTIONAL
 
 ### Core Services (All Operational)
-- **Certificate Authority (CA)**: ✅ Complete with HSM integration ready
+- **Certificate Authority (CA)**: ✅ Complete with software-only cryptography
 - **Certificate Transparency (CT)**: ✅ Merkle tree logs with Byzantine consensus
 - **DNS Resolution**: ✅ IPv6-only DNS-over-QUIC operational
 - **API Management**: ✅ Full REST API with monitoring

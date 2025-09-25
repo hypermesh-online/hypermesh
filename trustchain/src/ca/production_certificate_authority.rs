@@ -21,13 +21,12 @@ use uuid::Uuid;
 use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements, ConsensusResult, FourProofValidator};
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
-use super::{CloudHSMClient, HSMConfig, KeySpec, KeyUsage, KeyOrigin, CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
-use super::production_hsm_client::ProductionCloudHSMClient;
+use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
+// AWS CloudHSM dependencies REMOVED - software-only operation
 
 /// Production TrustChain Certificate Authority - NO SECURITY BYPASSES
 pub struct ProductionTrustChainCA {
-    /// Real HSM client for secure key operations
-    hsm_client: Option<Arc<ProductionCloudHSMClient>>,
+    // AWS CloudHSM dependencies REMOVED - software-only operation
     /// Production four-proof consensus validator
     consensus: Arc<Mutex<FourProofValidator>>,
     /// Certificate transparency log
@@ -53,7 +52,7 @@ pub struct ProductionCAConfiguration {
     pub validity_period: Duration,
     pub key_rotation_interval: Duration,
     pub consensus_requirements: ConsensusRequirements,
-    pub hsm: Option<HSMConfig>,
+    // AWS CloudHSM dependencies REMOVED - hsm config removed
     pub ct_log_url: Option<String>,
     pub performance_targets: PerformanceTargets,
     pub security_policy: SecurityPolicy,
@@ -87,7 +86,7 @@ pub struct ProductionCAMetrics {
     pub consensus_validations_passed: std::sync::atomic::AtomicU64,
     pub consensus_validations_failed: std::sync::atomic::AtomicU64,
     pub security_violations_detected: std::sync::atomic::AtomicU64,
-    pub hsm_operations: std::sync::atomic::AtomicU64,
+    // AWS CloudHSM dependencies REMOVED - hsm_operations removed
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
     pub performance_violations: std::sync::atomic::AtomicU64,

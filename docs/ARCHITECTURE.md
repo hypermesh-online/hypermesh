@@ -21,10 +21,10 @@ The Web3 ecosystem is a complete reimplementation of cloud infrastructure built 
 - **Consensus**: Multi-signature certificate issuance
 
 ### Layer 2: Transport (STOQ)
-- **Purpose**: Secure, efficient data transport
-- **Components**: QUIC implementation, CDN features, routing
-- **Protocol**: STOQ over IPv6
-- **Performance**: Target adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput
+- **Purpose**: Quantum-resistant secure transport
+- **Components**: FALCON-1024 crypto, QUIC over IPv6, protocol extensions
+- **Protocol**: Pure STOQ transport with adaptive performance
+- **Features**: Zero-copy operations, memory pooling, frame batching
 
 ### Layer 3: Compute (HyperMesh)
 - **Purpose**: Distributed resource management

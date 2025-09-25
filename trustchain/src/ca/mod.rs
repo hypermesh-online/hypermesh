@@ -33,7 +33,7 @@ pub mod security_integration; // Security integration module
 pub use certificate_manager::*;
 pub use certificate_store::CertificateStore as CertStore;
 pub use policy::*;
-// HSM client removed - violates software-only requirement
+// AWS CloudHSM dependencies REMOVED - software-only operation
 pub use stoq_ca_client::*;
 // Re-export from certificate_authority with qualified imports
 pub use certificate_authority::{TrustChainCA as TrustChainCAImpl, *};
@@ -53,8 +53,8 @@ pub struct TrustChainCA {
     consensus_context: Arc<ConsensusContext>,
     /// HyperMesh consensus client for validation
     hypermesh_client: Arc<HyperMeshConsensusClient>,
-    /// Four-proof consensus validator
-    pub consensus: Arc<crate::consensus::FourProofValidator>,
+    /// Four-proof consensus validator (wrapped in Mutex for mutability)
+    pub consensus: Arc<tokio::sync::Mutex<crate::consensus::FourProofValidator>>,
     /// CA configuration
     config: Arc<CAConfig>,
 }
@@ -84,38 +84,13 @@ pub struct CAConfig {
 pub enum CAMode {
     /// Localhost testing with self-signed root
     LocalhostTesting,
-    /// Production with HSM-protected root
+    /// Production with software-protected root
+    /// AWS CloudHSM dependencies REMOVED - software-only operation
     Production,
 }
 
-/// HSM Configuration for production deployments
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HSMConfig {
-    pub cluster_id: String,
-    pub endpoint: String,
-    pub key_spec: KeySpec,
-    pub region: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KeySpec {
-    pub key_usage: KeyUsage,
-    pub key_spec: String, // "RSA_4096", "ECC_NIST_P384", etc.
-    pub origin: KeyOrigin,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum KeyUsage {
-    SignVerify,
-    EncryptDecrypt,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum KeyOrigin {
-    AWS_CLOUDHSM,
-    AWS_KMS,
-    External,
-}
+// AWS CloudHSM dependencies REMOVED - software-only operation
+// HSM Configuration structures removed for software-only implementation
 
 impl Default for CAConfig {
     fn default() -> Self {
@@ -216,7 +191,8 @@ pub enum CertificateStatus {
 #[derive(Default)]
 pub struct CAMetrics {
     pub certificates_issued: std::sync::atomic::AtomicU64,
-    pub hsm_operations: std::sync::atomic::AtomicU64,
+    // AWS CloudHSM dependencies REMOVED - software-only operation
+    // hsm_operations metric removed
     pub consensus_validations: std::sync::atomic::AtomicU64,
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
@@ -229,9 +205,7 @@ impl Clone for CAMetrics {
             certificates_issued: std::sync::atomic::AtomicU64::new(
                 self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed)
             ),
-            hsm_operations: std::sync::atomic::AtomicU64::new(
-                self.hsm_operations.load(std::sync::atomic::Ordering::Relaxed)
-            ),
+            // AWS CloudHSM dependencies REMOVED - hsm_operations removed
             consensus_validations: std::sync::atomic::AtomicU64::new(
                 self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed)
             ),
@@ -252,7 +226,7 @@ impl std::fmt::Debug for CAMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CAMetrics")
             .field("certificates_issued", &self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed))
-            .field("hsm_operations", &self.hsm_operations.load(std::sync::atomic::Ordering::Relaxed))
+            // AWS CloudHSM dependencies REMOVED - hsm_operations field removed
             .field("consensus_validations", &self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed))
             .field("ct_log_entries", &self.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed))
             .field("average_issuance_time_ms", &self.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed))
@@ -267,9 +241,9 @@ impl serde::Serialize for CAMetrics {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("CAMetrics", 6)?;
+        let mut state = serializer.serialize_struct("CAMetrics", 5)?; // AWS CloudHSM dependencies REMOVED - reduced field count
         state.serialize_field("certificates_issued", &self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed))?;
-        state.serialize_field("hsm_operations", &self.hsm_operations.load(std::sync::atomic::Ordering::Relaxed))?;
+        // AWS CloudHSM dependencies REMOVED - hsm_operations serialization removed
         state.serialize_field("consensus_validations", &self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed))?;
         state.serialize_field("ct_log_entries", &self.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed))?;
         state.serialize_field("average_issuance_time_ms", &self.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed))?;
@@ -286,7 +260,7 @@ impl<'de> serde::Deserialize<'de> for CAMetrics {
         #[derive(serde::Deserialize)]
         struct CAMetricsData {
             certificates_issued: u64,
-            hsm_operations: u64,
+            // AWS CloudHSM dependencies REMOVED - hsm_operations field removed
             consensus_validations: u64,
             ct_log_entries: u64,
             average_issuance_time_ms: u64,
@@ -296,7 +270,7 @@ impl<'de> serde::Deserialize<'de> for CAMetrics {
         let data = CAMetricsData::deserialize(deserializer)?;
         Ok(Self {
             certificates_issued: std::sync::atomic::AtomicU64::new(data.certificates_issued),
-            hsm_operations: std::sync::atomic::AtomicU64::new(data.hsm_operations),
+            // AWS CloudHSM dependencies REMOVED - software-only operation
             consensus_validations: std::sync::atomic::AtomicU64::new(data.consensus_validations),
             ct_log_entries: std::sync::atomic::AtomicU64::new(data.ct_log_entries),
             average_issuance_time_ms: std::sync::atomic::AtomicU64::new(data.average_issuance_time_ms),
@@ -317,8 +291,9 @@ impl TrustChainCA {
                 Self::create_self_signed_root(&config.ca_id)?
             }
             CAMode::Production => {
-                info!("Loading production root CA (HSM-protected)");
-                // In production, this would load from HSM
+                info!("Loading production root CA (software-protected)");
+                // AWS CloudHSM dependencies REMOVED - software-only operation
+                // Using software-based key generation for production
                 Self::create_self_signed_root(&config.ca_id)?
             }
         };
@@ -341,7 +316,7 @@ impl TrustChainCA {
         );
 
         // Initialize four-proof consensus validator
-        let consensus = Arc::new(crate::consensus::FourProofValidator::new());
+        let consensus = Arc::new(tokio::sync::Mutex::new(crate::consensus::FourProofValidator::new()));
 
         let ca = Self {
             root_ca: Arc::new(RwLock::new(root_ca)),
@@ -465,6 +440,11 @@ impl TrustChainCA {
     pub async fn get_ca_certificate(&self) -> Result<Vec<u8>> {
         let root_ca = self.root_ca.read().await;
         Ok(root_ca.serialize_der()?)
+    }
+
+    /// Get root certificate (alias for API compatibility)
+    pub async fn get_root_certificate(&self) -> Result<Vec<u8>> {
+        self.get_ca_certificate().await
     }
 
     /// Internal: Create self-signed root CA

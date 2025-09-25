@@ -16,7 +16,7 @@ use sha2::{Sha256, Digest};
 
 use crate::config::CTConfig;
 use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
-use crate::errors::{CTError, Result as TrustChainResult};
+use crate::errors::{CTError, TrustChainError, Result as TrustChainResult};
 
 pub mod merkle_log;
 pub mod sct_manager;
@@ -199,7 +199,10 @@ impl CertificateTransparency {
             timestamp,
             common_name,
             issuer_ca_id,
-            consensus_proof: ConsensusProof::default_for_testing(), // TODO: Use actual proof
+            consensus_proof: ConsensusProof::generate_from_network(&self.log_id).await
+                .map_err(|e| TrustChainError::ConsensusValidationFailed {
+                    reason: format!("Failed to generate consensus proof: {}", e)
+                })?, // TODO: Use actual proof
             entry_id,
             leaf_hash: [0u8; 32], // Will be set by merkle log
         };

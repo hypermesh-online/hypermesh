@@ -48,6 +48,38 @@ use ring::rand::{SystemRandom, SecureRandom};
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use crate::ca::IssuedCertificate;
 
+/// Inclusion proof data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InclusionProofData {
+    pub log_id: String,
+    pub sequence_number: u64,
+    pub proof_hashes: Vec<String>,
+    pub tree_size: u64,
+    pub root_hash: Vec<u8>,
+    pub timestamp: SystemTime,
+}
+
+/// Consistency proof data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsistencyProofData {
+    pub proof_hashes: Vec<Vec<u8>>,
+    pub old_root_hash: Vec<u8>,
+    pub new_root_hash: Vec<u8>,
+}
+
+/// CT log statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CTStatistics {
+    pub log_id: String,
+    pub total_entries: u64,
+    pub shard_count: u64,
+    pub tree_size: u64,
+    pub root_hash: Vec<u8>,
+    pub last_update: SystemTime,
+    pub entries_per_second: f64,
+    pub storage_size_bytes: u64,
+}
+
 /// Certificate Transparency Log with Merkle tree verification
 pub struct CertificateTransparencyLog {
     /// Merkle tree for certificate entries (placeholder until Algorithm trait is fixed)
@@ -528,6 +560,113 @@ impl CertificateTransparencyLog {
                 self.metrics.current_tree_size.load(std::sync::atomic::Ordering::Relaxed)
             ),
         }
+    }
+
+    /// Get CT entry by fingerprint
+    pub async fn get_entry(&self, fingerprint: &str) -> TrustChainResult<Option<CTEntry>> {
+        // Check cache first
+        if let Some(entry) = self.entries_cache.iter().find(|e| hex::encode(e.certificate_fingerprint) == fingerprint) {
+            return Ok(Some(entry.clone()));
+        }
+
+        // Check S3 storage
+        let fingerprint_bytes: [u8; 32] = hex::decode(fingerprint)
+            .map_err(|_| TrustChainError::InvalidFingerprint)?
+            .try_into()
+            .map_err(|_| TrustChainError::InvalidFingerprint)?;
+
+        self.storage.find_entry_by_hash(&fingerprint_bytes).await
+    }
+
+    /// Get inclusion proof for a certificate
+    pub async fn get_inclusion_proof(&self, fingerprint: &str) -> TrustChainResult<InclusionProofData> {
+        // Get the entry first
+        let entry = self.get_entry(fingerprint).await?
+            .ok_or_else(|| TrustChainError::NotFound)?;
+
+        // Generate inclusion proof (simplified for now)
+        let proof_hashes = vec![
+            hex::encode(self.calculate_leaf_hash(&entry.certificate_der)?),
+            hex::encode(self.calculate_log_id()),
+        ];
+
+        Ok(InclusionProofData {
+            log_id: hex::encode(self.calculate_log_id()),
+            sequence_number: entry.sequence_number,
+            proof_hashes,
+            tree_size: self.get_log_size().await?,
+            root_hash: self.calculate_root_hash().await?,
+            timestamp: entry.timestamp,
+        })
+    }
+
+    /// Get consistency proof between two tree sizes
+    pub async fn get_consistency_proof(&self, old_size: u64, new_size: u64) -> TrustChainResult<ConsistencyProofData> {
+        if new_size <= old_size {
+            return Err(TrustChainError::InvalidRequest {
+                reason: "New size must be greater than old size".to_string()
+            });
+        }
+
+        // Generate consistency proof (simplified for now)
+        let proof_hashes = vec![
+            vec![0u8; 32], // Placeholder proof hash 1
+            vec![0u8; 32], // Placeholder proof hash 2
+        ];
+
+        Ok(ConsistencyProofData {
+            proof_hashes,
+            old_root_hash: vec![0u8; 32], // Placeholder old root
+            new_root_hash: self.calculate_root_hash().await?,
+        })
+    }
+
+    /// Get CT log entries in a range
+    pub async fn get_entries(&self, start: u64, end: u64) -> TrustChainResult<Vec<CTEntry>> {
+        if end <= start {
+            return Err(TrustChainError::InvalidRequest {
+                reason: "End must be greater than start".to_string()
+            });
+        }
+
+        // Get from cache (simplified - in production would paginate from storage)
+        let mut entries = Vec::new();
+        for entry in self.entries_cache.iter() {
+            if entry.sequence_number >= start && entry.sequence_number < end {
+                entries.push(entry.clone());
+            }
+            if entries.len() >= 100 { // Limit to 100 entries
+                break;
+            }
+        }
+
+        entries.sort_by_key(|e| e.sequence_number);
+        Ok(entries)
+    }
+
+    /// Get CT log statistics
+    pub async fn get_statistics(&self) -> TrustChainResult<CTStatistics> {
+        let metrics = self.get_metrics().await;
+
+        Ok(CTStatistics {
+            log_id: hex::encode(self.calculate_log_id()),
+            total_entries: metrics.entries_added.load(std::sync::atomic::Ordering::Relaxed),
+            shard_count: 1, // Single shard for now
+            tree_size: self.get_log_size().await?,
+            root_hash: self.calculate_root_hash().await?,
+            last_update: SystemTime::now(),
+            entries_per_second: 0.0, // Would calculate from metrics
+            storage_size_bytes: 0, // Would get from storage
+        })
+    }
+
+    /// Calculate current root hash (simplified)
+    async fn calculate_root_hash(&self) -> TrustChainResult<Vec<u8>> {
+        // Simplified root hash calculation
+        let mut hasher = Sha256::new();
+        hasher.update(self.calculate_log_id());
+        hasher.update(&self.get_log_size().await?.to_be_bytes());
+        Ok(hasher.finalize().to_vec())
     }
 }
 

@@ -1,6 +1,7 @@
 //! Production TrustChain Certificate Authority Implementation
 //!
-//! HSM-backed certificate authority with four-proof consensus validation,
+//! AWS CloudHSM dependencies REMOVED - software-only operation
+//! Software-based certificate authority with four-proof consensus validation,
 //! STOQ protocol integration, and <35ms certificate operations.
 
 use std::sync::Arc;
@@ -23,10 +24,15 @@ use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
 
+// AWS CloudHSM dependencies REMOVED - software-only operation
+// All HSM-related types and clients have been removed.
+// Using software-based cryptography (Ed25519/RSA) for all operations.
+
 /// Production TrustChain Certificate Authority (Software-Only)
 pub struct TrustChainCA {
-    /// Four-proof consensus validator
-    consensus: Arc<FourProofValidator>,
+    // AWS CloudHSM dependencies REMOVED - software-only operation
+    /// Four-proof consensus validator (wrapped in Mutex for mutability)
+    consensus: Arc<Mutex<FourProofValidator>>,
     /// Certificate transparency log
     ct_log: Arc<CertificateTransparencyLog>,
     /// Certificate store for issued certificates
@@ -48,7 +54,7 @@ pub struct CACertificate {
     pub serial_number: String,
     pub issued_at: SystemTime,
     pub expires_at: SystemTime,
-    pub key_handle: Option<String>, // HSM key handle
+    // AWS CloudHSM dependencies REMOVED - key_handle removed
 }
 
 /// CA configuration
@@ -58,7 +64,7 @@ pub struct CAConfiguration {
     pub validity_period: Duration,
     pub key_rotation_interval: Duration,
     pub consensus_requirements: ConsensusRequirements,
-    pub hsm: Option<HSMConfig>,
+    // AWS CloudHSM dependencies REMOVED - hsm config removed
     pub ct_log_url: Option<String>,
     pub performance_targets: PerformanceTargets,
 }
@@ -75,7 +81,7 @@ pub struct PerformanceTargets {
 #[derive(Default)]
 pub struct CAMetrics {
     pub certificates_issued: std::sync::atomic::AtomicU64,
-    pub hsm_operations: std::sync::atomic::AtomicU64,
+    // AWS CloudHSM dependencies REMOVED - hsm_operations removed
     pub consensus_validations: std::sync::atomic::AtomicU64,
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
@@ -109,7 +115,7 @@ impl Default for CAConfiguration {
             validity_period: Duration::from_secs(86400), // 24 hours
             key_rotation_interval: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
             consensus_requirements: ConsensusRequirements::production(),
-            hsm: None,
+            // AWS CloudHSM dependencies REMOVED - hsm removed
             ct_log_url: None,
             performance_targets: PerformanceTargets {
                 max_issuance_time_ms: 35, // <35ms target
@@ -121,21 +127,16 @@ impl Default for CAConfiguration {
 }
 
 impl TrustChainCA {
-    /// Create new production CA with HSM integration
+    /// Create new production CA with software-only implementation
+    // AWS CloudHSM dependencies REMOVED - software-only operation
     pub async fn new(config: CAConfiguration) -> TrustChainResult<Self> {
         info!("Initializing production TrustChain CA: {}", config.ca_id);
 
-        // Initialize HSM client if configured
-        let hsm_client = if let Some(hsm_config) = &config.hsm {
-            info!("Initializing HSM client for production CA");
-            Some(Arc::new(CloudHSMClient::new(hsm_config.clone()).await?))
-        } else {
-            info!("HSM not configured, using software-based keys");
-            None
-        };
+        // AWS CloudHSM dependencies REMOVED - software-only operation
+        info!("Using software-based keys (Ed25519/RSA) for production CA");
 
         // Initialize four-proof consensus validator
-        let consensus = Arc::new(FourProofValidator::new());
+        let consensus = Arc::new(Mutex::new(FourProofValidator::new()));
 
         // Initialize certificate transparency log
         let ct_log = Arc::new(CertificateTransparencyLog::new().await?);
@@ -146,18 +147,15 @@ impl TrustChainCA {
         // Initialize rotation manager
         let rotation = Arc::new(CertificateRotationManager::new().await?);
 
-        // Load or generate root CA
-        let root_ca = if let Some(ref hsm) = hsm_client {
-            Arc::new(RwLock::new(Self::load_production_root(hsm).await?))
-        } else {
-            Arc::new(RwLock::new(Self::generate_self_signed_root(&config.ca_id).await?))
-        };
+        // AWS CloudHSM dependencies REMOVED - software-only operation
+        // Generate root CA using software keys
+        let root_ca = Arc::new(RwLock::new(Self::generate_self_signed_root(&config.ca_id).await?));
 
         // Initialize metrics
         let metrics = Arc::new(CAMetrics::default());
 
         let ca = Self {
-            hsm_client,
+            // AWS CloudHSM dependencies REMOVED - hsm_client removed
             consensus,
             ct_log,
             certificate_store,
@@ -185,12 +183,9 @@ impl TrustChainCA {
             });
         }
 
-        // Generate certificate using HSM if available
-        let issued_cert = if let Some(ref hsm) = self.hsm_client {
-            self.generate_certificate_hsm(request, hsm).await?
-        } else {
-            self.generate_certificate_local(request).await?
-        };
+        // AWS CloudHSM dependencies REMOVED - software-only operation
+        // Generate certificate using software-based signing
+        let issued_cert = self.generate_certificate_local(request).await?;
 
         // Add to Certificate Transparency log
         let ct_entry = self.ct_log.add_certificate(&issued_cert).await?;
@@ -217,62 +212,7 @@ impl TrustChainCA {
         Ok(issued_cert)
     }
 
-    /// Load production root CA from HSM
-    async fn load_production_root(hsm_client: &CloudHSMClient) -> TrustChainResult<CACertificate> {
-        info!("Loading production root CA from HSM");
-        
-        // Validate HSM cluster health
-        hsm_client.validate_cluster_health().await?;
-
-        // In production, this would load the actual root CA certificate from HSM
-        // For now, we generate a production-grade root CA using HSM
-        let root_ca_data = b"production root ca certificate";
-        let signature = hsm_client.sign_certificate(root_ca_data).await?;
-
-        // Create production root CA certificate
-        let ca_cert = CACertificate {
-            certificate_der: Self::create_production_root_certificate(hsm_client).await?,
-            serial_number: "PROD-ROOT-CA-001".to_string(),
-            issued_at: SystemTime::now(),
-            expires_at: SystemTime::now() + Duration::from_secs(365 * 24 * 60 * 60), // 1 year
-            key_handle: Some("root-ca".to_string()),
-        };
-
-        info!("Production root CA loaded from HSM: {}", ca_cert.serial_number);
-        Ok(ca_cert)
-    }
-
-    /// Create production root certificate with HSM
-    async fn create_production_root_certificate(hsm_client: &CloudHSMClient) -> TrustChainResult<Vec<u8>> {
-        // Generate root CA certificate parameters
-        let mut params = CertificateParams::new(vec!["TrustChain Root CA".to_string()]);
-        params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-        params.key_usages = vec![
-            rcgen::KeyUsagePurpose::KeyCertSign,
-            rcgen::KeyUsagePurpose::CrlSign,
-        ];
-
-        // Set validity period
-        let now = SystemTime::now();
-        params.not_before = now.into();
-        params.not_after = (now + Duration::from_secs(365 * 24 * 60 * 60)).into(); // 1 year
-
-        // Generate certificate with HSM-backed key
-        let cert = RcgenCertificate::from_params(params)
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
-            })?;
-
-        let cert_der = cert.serialize_der()
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
-            })?;
-
-        // Sign with HSM
-        let _signature = hsm_client.sign_certificate(&cert_der).await?;
-
-        Ok(cert_der)
-    }
+    // AWS CloudHSM dependencies REMOVED - load_production_root and create_production_root_certificate functions removed
 
     /// Generate self-signed root CA for testing
     async fn generate_self_signed_root(ca_id: &str) -> TrustChainResult<CACertificate> {
@@ -296,69 +236,13 @@ impl TrustChainCA {
             serial_number: format!("SELF-SIGNED-{}", Uuid::new_v4()),
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(365 * 24 * 60 * 60),
-            key_handle: None,
+            // AWS CloudHSM dependencies REMOVED - key_handle removed
         };
 
         Ok(ca_cert)
     }
 
-    /// Generate certificate using HSM
-    async fn generate_certificate_hsm(
-        &self, 
-        request: CertificateRequest, 
-        hsm: &CloudHSMClient
-    ) -> TrustChainResult<IssuedCertificate> {
-        info!("Generating certificate using HSM for: {}", request.common_name);
-        
-        // Increment HSM operations counter
-        self.metrics.hsm_operations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-        // Create certificate parameters
-        let mut params = CertificateParams::new(vec![request.common_name.clone()]);
-        
-        // Set validity period
-        let now = SystemTime::now();
-        params.not_before = now.into();
-        params.not_after = (now + self.config.validity_period).into();
-
-        // Generate certificate
-        let cert = RcgenCertificate::from_params(params)
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
-            })?;
-
-        let cert_der = cert.serialize_der()
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
-            })?;
-
-        // Sign with HSM
-        let signature = hsm.sign_certificate(&cert_der).await?;
-
-        // Calculate fingerprint
-        let fingerprint = self.calculate_certificate_fingerprint(&cert_der);
-
-        let issued_cert = IssuedCertificate {
-            serial_number: hex::encode(&fingerprint[..16]),
-            certificate_der: cert_der,
-            fingerprint,
-            common_name: request.common_name,
-            issued_at: now,
-            expires_at: now + self.config.validity_period,
-            issuer_ca_id: self.config.ca_id.clone(),
-            consensus_proof: ConsensusProof::default_for_testing(),
-            status: CertificateStatus::Valid,
-            metadata: CertificateMetadata {
-                key_algorithm: Some("Ed25519".to_string()),
-                signature_algorithm: Some("Ed25519".to_string()),
-                extensions: vec!["basicConstraints".to_string(), "keyUsage".to_string()],
-                tags: HashMap::new(),
-            },
-        };
-
-        info!("Certificate generated using HSM: {}", issued_cert.serial_number);
-        Ok(issued_cert)
-    }
+    // AWS CloudHSM dependencies REMOVED - generate_certificate_hsm function removed
 
     /// Generate certificate using local signing
     async fn generate_certificate_local(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
@@ -393,7 +277,10 @@ impl TrustChainCA {
             issued_at: now,
             expires_at: now + self.config.validity_period,
             issuer_ca_id: self.config.ca_id.clone(),
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id).await
+                .map_err(|e| TrustChainError::ConsensusValidationFailed {
+                    reason: format!("Failed to generate consensus proof: {}", e)
+                })?,
             status: CertificateStatus::Valid,
             metadata: CertificateMetadata::default(),
         };
@@ -406,7 +293,8 @@ impl TrustChainCA {
         info!("Validating certificate request for: {}", request.common_name);
 
         // Validate consensus proof using four-proof validator
-        let consensus_result = self.consensus.validate_consensus(&request.consensus_proof).await?;
+        let mut consensus_guard = self.consensus.lock().await;
+        let consensus_result = consensus_guard.validate_consensus(&request.consensus_proof).await?;
         
         // Update metrics
         self.metrics.consensus_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -432,9 +320,9 @@ impl TrustChainCA {
     pub async fn execute_scheduled_rotations(&self) -> TrustChainResult<()> {
         info!("Executing scheduled certificate rotations");
         
+        // AWS CloudHSM dependencies REMOVED - software-only operation
         let rotation_result = self.rotation.execute_scheduled_rotations(
-            &self.certificate_store,
-            self.hsm_client.as_ref().map(|v| &**v)
+            &self.certificate_store
         ).await?;
 
         info!("Scheduled rotations completed: {:?}", rotation_result);
@@ -447,9 +335,7 @@ impl TrustChainCA {
             certificates_issued: std::sync::atomic::AtomicU64::new(
                 self.metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed)
             ),
-            hsm_operations: std::sync::atomic::AtomicU64::new(
-                self.metrics.hsm_operations.load(std::sync::atomic::Ordering::Relaxed)
-            ),
+            // AWS CloudHSM dependencies REMOVED - hsm_operations removed
             consensus_validations: std::sync::atomic::AtomicU64::new(
                 self.metrics.consensus_validations.load(std::sync::atomic::Ordering::Relaxed)
             ),
@@ -463,6 +349,12 @@ impl TrustChainCA {
                 self.metrics.performance_violations.load(std::sync::atomic::Ordering::Relaxed)
             ),
         }
+    }
+
+    /// Get root CA certificate
+    pub async fn get_root_certificate(&self) -> TrustChainResult<CACertificate> {
+        let root_ca = self.root_ca.read().await;
+        Ok(root_ca.clone())
     }
 }
 
@@ -506,8 +398,7 @@ impl CertificateRotationManager {
 
     pub async fn execute_scheduled_rotations(
         &self,
-        _certificate_store: &CertificateStore,
-        _hsm_client: Option<&CloudHSMClient>
+        _certificate_store: &CertificateStore
     ) -> TrustChainResult<RotationResult> {
         let mut in_progress = self.rotation_in_progress.lock().await;
         if *in_progress {
@@ -553,25 +444,7 @@ mod tests {
         assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 0);
     }
 
-    #[tokio::test]
-    async fn test_hsm_integration() {
-        let hsm_config = HSMConfig {
-            cluster_id: "cluster-test-123".to_string(),
-            endpoint: "https://test-hsm.amazonaws.com".to_string(),
-            region: "us-east-1".to_string(),
-            key_spec: KeySpec {
-                key_usage: KeyUsage::SignVerify,
-                key_spec: "Ed25519".to_string(),
-                origin: KeyOrigin::AWS_CLOUDHSM,
-            },
-        };
-
-        let mut config = CAConfiguration::default();
-        config.hsm = Some(hsm_config);
-
-        let ca = TrustChainCA::new(config).await.unwrap();
-        assert!(ca.hsm_client.is_some());
-    }
+    // AWS CloudHSM dependencies REMOVED - test_hsm_integration test removed
 
     #[tokio::test]
     async fn test_certificate_issuance_with_consensus() {
@@ -583,7 +456,10 @@ mod tests {
             san_entries: vec!["test.production.com".to_string()],
             node_id: "prod_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id).await
+                .map_err(|e| TrustChainError::ConsensusValidationFailed {
+                    reason: format!("Failed to generate consensus proof: {}", e)
+                })?,
             timestamp: SystemTime::now(),
         };
 

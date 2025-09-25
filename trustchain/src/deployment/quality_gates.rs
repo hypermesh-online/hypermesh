@@ -70,7 +70,7 @@ impl std::fmt::Display for SecuritySeverity {
 /// TrustChain Quality Gate Validator
 pub struct QualityGateValidator {
     pub source_path: String,
-    pub gates: Vec<QualityGate>,
+    pub gates: Vec<Box<dyn QualityGate>>,
 }
 
 /// Quality gate definition

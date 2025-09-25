@@ -113,12 +113,17 @@ async fn main() -> Result<()> {
     // 6. Issue Post-Quantum Certificate
     info!("\n📚 Step 6: Issuing Post-Quantum Certificate");
     
+    // Generate real consensus proof for production example
+    let node_id = "example_node_001";
+    let consensus_proof = ConsensusProof::generate_from_network(node_id).await
+        .map_err(|e| anyhow!("Failed to generate consensus proof: {}", e))?;
+
     let cert_request = CertificateRequest {
         common_name: "example.hypermesh.online".to_string(),
         san_entries: vec!["example.hypermesh.online".to_string()],
-        node_id: "example_node_001".to_string(),
+        node_id: node_id.to_string(),
         ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::default_for_testing(),
+        consensus_proof,
         timestamp: std::time::SystemTime::now(),
     };
     

@@ -3,15 +3,14 @@
 //! Validates deployment readiness and security compliance.
 //! Prevents deployment of systems with security theater.
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command, value_parser};
 use std::path::PathBuf;
 use tracing::{info, error};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
-    tracing_subscriber::init();
+    tracing_subscriber::fmt::init();
 
     let matches = Command::new("TrustChain Deployment Validator")
         .version(env!("CARGO_PKG_VERSION"))
@@ -25,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .value_name("PATH")
                 .required(false)
                 .default_value(".")
+                .value_parser(value_parser!(PathBuf))
         )
         .arg(
             Arg::new("output-format")
@@ -32,20 +32,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short('f')
                 .help("Output format")
                 .value_name("FORMAT")
-                .possible_values(["human", "json"])
+                .value_parser(["human", "json"])
                 .default_value("human")
         )
         .arg(
             Arg::new("strict")
                 .long("strict")
                 .help("Use strict validation (fail on warnings)")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
         )
         .get_matches();
 
-    let source_path = PathBuf::from(matches.value_of("source-path").unwrap());
-    let _output_format = matches.value_of("output-format").unwrap();
-    let _strict_mode = matches.is_present("strict");
+    let source_path = matches.get_one::<PathBuf>("source-path").unwrap();
+    let _output_format = matches.get_one::<String>("output-format").unwrap();
+    let _strict_mode = matches.get_flag("strict");
 
     if !source_path.exists() {
         error!("Source path does not exist: {}", source_path.display());

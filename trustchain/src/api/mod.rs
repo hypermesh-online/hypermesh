@@ -97,6 +97,12 @@ pub struct AppState {
     pub stats: Arc<RwLock<ApiStats>>,
     pub rate_limiter: Arc<RateLimiter>,
     pub start_time: SystemTime,
+    /// Certificate Authority instance
+    pub ca: Arc<crate::ca::TrustChainCA>,
+    /// Certificate Transparency Log
+    pub ct_log: Arc<crate::ct::CertificateTransparencyLog>,
+    /// Certificate store
+    pub certificate_store: Arc<crate::ca::CertificateStore>,
 }
 
 impl ApiServer {
@@ -107,12 +113,21 @@ impl ApiServer {
         // Initialize rate limiter
         let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_per_minute).await?);
 
+        // Initialize CA components
+        let ca_config = crate::ca::CAConfig::default();
+        let ca = Arc::new(crate::ca::TrustChainCA::new(ca_config).await?);
+        let ct_log = Arc::new(crate::ct::CertificateTransparencyLog::new().await?);
+        let certificate_store = Arc::new(crate::ca::CertificateStore::new().await?);
+
         // Create shared state
         let state = AppState {
             config: Arc::new(config.clone()),
             stats: Arc::new(RwLock::new(ApiStats::default())),
             rate_limiter: Arc::clone(&rate_limiter),
             start_time: SystemTime::now(),
+            ca: ca.clone(),
+            ct_log: ct_log.clone(),
+            certificate_store: certificate_store.clone(),
         };
 
         // Build application with routes and middleware

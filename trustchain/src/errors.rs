@@ -150,6 +150,18 @@ pub enum TrustChainError {
     #[error("Certificate generation failed: {reason}")]
     CertificateGenerationFailed { reason: String },
 
+    /// Invalid fingerprint
+    #[error("Invalid certificate fingerprint")]
+    InvalidFingerprint,
+
+    /// Resource not found
+    #[error("Resource not found")]
+    NotFound,
+
+    /// Invalid request
+    #[error("Invalid request: {reason}")]
+    InvalidRequest { reason: String },
+
     /// Key not found (software-only key management)
     #[error("Key not found: {key_id}")]
     KeyNotFound { key_id: String },
@@ -309,6 +321,18 @@ pub enum DnsError {
 
     #[error("Domain not found: {domain}")]
     DomainNotFound { domain: String },
+
+    #[error("Invalid fingerprint: {reason}")]
+    InvalidFingerprint { reason: String },
+
+    #[error("Invalid request: {reason}")]
+    InvalidRequest { reason: String },
+
+    #[error("Resource not found: {resource}")]
+    NotFound { resource: String },
+
+    #[error("Timestamp error: {reason}")]
+    TimestampError { reason: String },
 }
 
 /// API server specific errors

@@ -162,25 +162,25 @@ impl AuthoritativeDnsServer {
         let mut cache = dns_cache.write().await;
 
         // Add AAAA record for trust.hypermesh.online
-        let trust_record = Record::new()
-            .set_name(Name::from_ascii("trust.hypermesh.online")?)
-            .set_record_type(RecordType::AAAA)
-            .set_ttl(config.primary_zone.default_ttl)
-            .set_data(Some(RData::AAAA(config.primary_zone.primary_address)));
+        let mut trust_record = Record::new();
+        trust_record.set_name(Name::from_ascii("trust.hypermesh.online").map_err(|e| anyhow!(e))?);
+        trust_record.set_record_type(RecordType::AAAA);
+        trust_record.set_ttl(config.primary_zone.default_ttl);
+        trust_record.set_data(Some(RData::AAAA(config.primary_zone.primary_address.into())));
         cache.insert("trust.hypermesh.online.AAAA".to_string(), trust_record);
 
         // Add SOA record for trust.hypermesh.online
-        let soa_record = Record::new()
-            .set_name(Name::from_ascii("trust.hypermesh.online")?)
-            .set_record_type(RecordType::SOA)
-            .set_ttl(config.primary_zone.default_ttl);
+        let mut soa_record = Record::new();
+        soa_record.set_name(Name::from_ascii("trust.hypermesh.online").map_err(|e| anyhow!(e))?);
+        soa_record.set_record_type(RecordType::SOA);
+        soa_record.set_ttl(config.primary_zone.default_ttl);
         cache.insert("trust.hypermesh.online.SOA".to_string(), soa_record);
 
         // Add NS record for trust.hypermesh.online
-        let ns_record = Record::new()
-            .set_name(Name::from_ascii("trust.hypermesh.online")?)
-            .set_record_type(RecordType::NS)
-            .set_ttl(config.primary_zone.default_ttl);
+        let mut ns_record = Record::new();
+        ns_record.set_name(Name::from_ascii("trust.hypermesh.online").map_err(|e| anyhow!(e))?);
+        ns_record.set_record_type(RecordType::NS);
+        ns_record.set_ttl(config.primary_zone.default_ttl);
         cache.insert("trust.hypermesh.online.NS".to_string(), ns_record);
 
         drop(cache);
@@ -351,9 +351,19 @@ impl AuthoritativeDnsServer {
         let mut response = Vec::new();
 
         // Basic error response header
+        // Convert ResponseCode to its numeric value
+        let error_code_value = match error_code {
+            ResponseCode::NoError => 0,
+            ResponseCode::FormErr => 1,
+            ResponseCode::ServFail => 2,
+            ResponseCode::NXDomain => 3,
+            ResponseCode::NotImp => 4,
+            ResponseCode::Refused => 5,
+            _ => 2, // Default to ServFail for unknown codes
+        };
         response.extend_from_slice(&[
             0x00, 0x01, // ID = 1
-            0x81, error_code as u8, // Flags with error code
+            0x81, error_code_value, // Flags with error code
             0x00, 0x00, // Questions = 0
             0x00, 0x00, // Answers = 0
             0x00, 0x00, // Authority RRs = 0
@@ -377,11 +387,11 @@ impl AuthoritativeDnsServer {
         let mut cache = self.dns_cache.write().await;
         let cache_key = format!("{}.AAAA", network.domain);
 
-        let record = Record::new()
-            .set_name(Name::from_ascii(&network.domain)?)
-            .set_record_type(RecordType::AAAA)
-            .set_ttl(self.config.primary_zone.default_ttl)
-            .set_data(Some(RData::AAAA(network.primary_address)));
+        let mut record = Record::new();
+        record.set_name(Name::from_ascii(&network.domain).map_err(|e| anyhow!(e))?);
+        record.set_record_type(RecordType::AAAA);
+        record.set_ttl(self.config.primary_zone.default_ttl);
+        record.set_data(Some(RData::AAAA(network.primary_address.into())));
 
         cache.insert(cache_key, record);
 
@@ -399,11 +409,11 @@ impl AuthoritativeDnsServer {
         // Update DNS cache with new zone data
         let mut cache = self.dns_cache.write().await;
 
-        let trust_record = Record::new()
-            .set_name(Name::from_ascii(&new_zone.zone_name)?)
-            .set_record_type(RecordType::AAAA)
-            .set_ttl(new_zone.default_ttl)
-            .set_data(Some(RData::AAAA(new_zone.primary_address)));
+        let mut trust_record = Record::new();
+        trust_record.set_name(Name::from_ascii(&new_zone.zone_name).map_err(|e| anyhow!(e))?);
+        trust_record.set_record_type(RecordType::AAAA);
+        trust_record.set_ttl(new_zone.default_ttl);
+        trust_record.set_data(Some(RData::AAAA(new_zone.primary_address.into())));
 
         cache.insert(format!("{}.AAAA", new_zone.zone_name), trust_record);
 
