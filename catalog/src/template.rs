@@ -842,28 +842,23 @@ return {{script_name}}
                 tokio::fs::write(file_path, rendered_content).await?;
             }
             
-            PostGenerationAction::ExecuteCommand { command, working_dir, env } => {
-                let mut cmd = tokio::process::Command::new("sh");
-                cmd.arg("-c").arg(command);
-                
-                if let Some(wd) = working_dir {
-                    cmd.current_dir(wd);
-                } else {
-                    cmd.current_dir(&context.output_dir);
-                }
-                
-                for (key, value) in env {
-                    cmd.env(key, value);
-                }
-                
-                let output = cmd.output().await?;
-                
-                if !output.status.success() {
-                    return Err(anyhow::anyhow!(
-                        "Post-generation command failed: {}",
-                        String::from_utf8_lossy(&output.stderr)
-                    ));
-                }
+            PostGenerationAction::ExecuteCommand { command: _, working_dir: _, env: _ } => {
+                // CRITICAL SECURITY: Disabled shell command execution
+                // Previous implementation used tokio::process::Command::new("sh") with arbitrary commands
+                // This created a command injection vulnerability
+
+                tracing::error!(
+                    "SECURITY VIOLATION: Template attempted to execute shell command. \
+                     All execution must use HyperMesh infrastructure via catalog.hypermesh.online"
+                );
+
+                return Err(anyhow::anyhow!(
+                    "Template shell execution disabled for security. \
+                     Use HyperMesh asset execution instead of post-generation commands."
+                ));
+
+                // Previous vulnerable code was fully removed above
+                // No shell command execution allowed in HyperMesh architecture
             }
             
             _ => {

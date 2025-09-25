@@ -390,64 +390,64 @@ impl SecuritySandbox {
         Ok(context_id)
     }
     
-    /// Execute code in sandbox
+    /// Execute code in sandbox - SECURITY WARNING: DISABLED
     pub async fn execute_in_sandbox(
         &mut self,
         context_id: &str,
-        command: &str,
-        args: &[String],
-        working_dir: Option<&std::path::Path>,
+        _command: &str,
+        _args: &[String],
+        _working_dir: Option<&std::path::Path>,
     ) -> Result<SandboxExecutionResult> {
-        let start_time = std::time::Instant::now();
-        
-        // Get sandbox level for restrictions
-        let sandbox_level = {
-            let context = self.active_contexts.get_mut(context_id)
-                .ok_or_else(|| anyhow::anyhow!("Context not found: {}", context_id))?;
-            context.status = ExecutionStatus::Running;
-            context.sandbox_level.clone()
-        };
-        
-        // Prepare sandboxed execution
-        let mut cmd = tokio::process::Command::new(command);
-        cmd.args(args);
-        
-        if let Some(work_dir) = working_dir {
-            cmd.current_dir(work_dir);
-        }
-        
-        // Apply sandbox restrictions based on level
-        self.apply_sandbox_restrictions(&mut cmd, &sandbox_level)?;
-        
-        // Execute with monitoring
-        let execution_result = {
-            // Clone the context to avoid borrowing issues
-            let context = self.active_contexts.get(context_id).unwrap().clone();
-            let mut temp_context = context;
-            self.execute_with_monitoring(cmd, &mut temp_context).await?
-        };
-        
-        let execution_time = start_time.elapsed().as_millis() as u64;
-        
-        // Update context status and get result data
-        let (resource_usage, violations) = {
-            let context = self.active_contexts.get_mut(context_id).unwrap();
-            context.status = if execution_result.success {
-                ExecutionStatus::Completed
-            } else {
-                ExecutionStatus::Failed
+        // CRITICAL SECURITY: Previous implementation used tokio::process::Command
+        // This created shell command injection vulnerabilities
+        // All execution must be delegated to HyperMesh infrastructure
+
+        tracing::error!(
+            "SECURITY VIOLATION: Attempted local code execution in sandbox context: {}. \
+             All execution must use HyperMesh infrastructure via catalog.hypermesh.online",
+            context_id
+        );
+
+        // Mark context as failed due to security policy
+        if let Some(context) = self.active_contexts.get_mut(context_id) {
+            context.status = ExecutionStatus::Failed;
+
+            let violation = crate::security::SecurityViolation {
+                violation_type: crate::security::ViolationType::BlockedSyscallAttempted,
+                description: "Local execution attempted - violates HyperMesh architecture".to_string(),
+                timestamp: chrono::Utc::now(),
+                severity: crate::security::ViolationSeverity::Critical,
+                action_taken: crate::security::ViolationAction::Blocked,
+                context: std::collections::HashMap::new(),
             };
-            (context.resource_usage.clone(), context.violations.clone())
-        };
-        
+            context.violations.push(violation.clone());
+        }
+
+        // Return security violation result
         Ok(SandboxExecutionResult {
-            success: execution_result.success,
-            exit_code: execution_result.exit_code,
-            execution_time_ms: execution_time,
-            resource_usage,
-            violations,
-            output: execution_result.output,
-            error: execution_result.error,
+            success: false,
+            exit_code: Some(-1),
+            execution_time_ms: 0,
+            resource_usage: crate::security::ResourceUsage {
+                cpu_time_secs: 0.0,
+                memory_bytes: 0,
+                peak_memory_bytes: 0,
+                file_descriptors: 0,
+                network_bytes_sent: 0,
+                network_bytes_received: 0,
+                files_created: 0,
+                syscalls_made: 0,
+            },
+            violations: vec![crate::security::SecurityViolation {
+                violation_type: crate::security::ViolationType::BlockedSyscallAttempted,
+                description: "Local execution blocked - use HyperMesh infrastructure".to_string(),
+                timestamp: chrono::Utc::now(),
+                severity: crate::security::ViolationSeverity::Critical,
+                action_taken: crate::security::ViolationAction::Blocked,
+                context: std::collections::HashMap::new(),
+            }],
+            output: None,
+            error: Some("Local execution disabled. Use catalog.execute_asset_on_hypermesh() instead.".to_string()),
         })
     }
     
@@ -525,42 +525,24 @@ impl SecuritySandbox {
         Err(anyhow::anyhow!("Process isolation not implemented - environment variables provide no isolation"))
     }
     
-    /// Execute command with monitoring
+    /// Execute command with monitoring - SECURITY: DISABLED
     async fn execute_with_monitoring(
         &mut self,
-        mut cmd: tokio::process::Command,
-        context: &mut ExecutionContext,
+        _cmd: tokio::process::Command,
+        _context: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-        
-        let mut child = cmd.spawn()?;
-        context.process_id = child.id();
-        
-        // Monitor resource usage in background
-        let context_id = context.id.clone();
-        let monitor_handle = tokio::spawn(async move {
-            // TODO: Implement actual resource monitoring
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        });
-        
-        // Wait for process completion
-        let output = child.wait_with_output().await?;
-        
-        // Cancel monitoring
-        monitor_handle.abort();
-        
-        let success = output.status.success();
-        let exit_code = output.status.code();
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
-        Ok(ExecutionResult {
-            success,
-            exit_code,
-            output: if stdout.is_empty() { None } else { Some(stdout) },
-            error: if stderr.is_empty() { None } else { Some(stderr) },
-        })
+        // CRITICAL SECURITY: Previous implementation spawned processes via tokio::process::Command
+        // This violates the HyperMesh architecture and creates security vulnerabilities
+
+        tracing::error!(
+            "SECURITY VIOLATION: execute_with_monitoring called - no local execution allowed. \
+             All execution must be delegated to HyperMesh infrastructure."
+        );
+
+        Err(anyhow::anyhow!(
+            "Local process execution disabled for security. \
+             Use HyperMesh infrastructure via catalog.execute_asset_on_hypermesh() instead."
+        ))
     }
     
     /// Get execution context
