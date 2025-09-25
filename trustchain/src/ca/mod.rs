@@ -27,14 +27,13 @@ pub mod certificate_manager;
 pub mod certificate_store;
 pub mod policy;
 pub mod certificate_authority;
-pub mod hsm_client;
 pub mod stoq_ca_client;
-pub mod security_integration; // NEW: Security integration module
+pub mod security_integration; // Security integration module
 
 pub use certificate_manager::*;
 pub use certificate_store::CertificateStore as CertStore;
 pub use policy::*;
-pub use hsm_client::*;
+// HSM client removed - violates software-only requirement
 pub use stoq_ca_client::*;
 // Re-export from certificate_authority with qualified imports
 pub use certificate_authority::{TrustChainCA as TrustChainCAImpl, *};

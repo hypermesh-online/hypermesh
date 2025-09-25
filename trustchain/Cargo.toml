@@ -45,13 +45,8 @@ serde_arrays = "0.1"   # For serializing fixed-size arrays
 # HTTP client for HyperMesh consensus integration
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
-# AWS CloudHSM integration for production security
-aws-config = "1.0"
-aws-sdk-cloudhsm = "1.0"
-aws-sdk-cloudhsmv2 = "1.0"
-aws-sdk-kms = "1.0"
-aws-sdk-s3 = "1.0"
-aws-types = "1.0"
+# AWS CloudHSM dependencies REMOVED - violates software-only requirement
+# These dependencies created operational security risks and cloud vendor lock-in
 
 # Compression for storage efficiency
 flate2 = "1.0"
@@ -96,6 +91,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Time and UUID
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
+num_cpus = "1.16"
 
 # Configuration
 config = "0.14"

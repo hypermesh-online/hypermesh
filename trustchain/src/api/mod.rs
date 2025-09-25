@@ -96,6 +96,7 @@ pub struct AppState {
     pub config: Arc<ApiConfig>,
     pub stats: Arc<RwLock<ApiStats>>,
     pub rate_limiter: Arc<RateLimiter>,
+    pub start_time: SystemTime,
 }
 
 impl ApiServer {
@@ -111,6 +112,7 @@ impl ApiServer {
             config: Arc::new(config.clone()),
             stats: Arc::new(RwLock::new(ApiStats::default())),
             rate_limiter: Arc::clone(&rate_limiter),
+            start_time: SystemTime::now(),
         };
 
         // Build application with routes and middleware
@@ -503,6 +505,7 @@ mod tests {
             config: Arc::new(config),
             stats: Arc::new(RwLock::new(ApiStats::default())),
             rate_limiter,
+            start_time: SystemTime::now(),
         };
         
         assert_eq!(state.config.server_id, "test-api");

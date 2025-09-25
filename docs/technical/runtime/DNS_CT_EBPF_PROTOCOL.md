@@ -1,30 +1,30 @@
-# DNS/CT eBPF Protocol Specification
+# TrustChain DNS/CT Protocol Specification
 
 ## Overview
 
-The DNS/CT (Domain Name System with Certificate Transparency) eBPF protocol represents a breakthrough in distributed name resolution and certificate validation, achieving sub-millisecond DNS resolution with integrated Byzantine fault tolerance and real-time threat detection.
+TrustChain provides DNS resolution with Certificate Transparency integration through traditional DNS protocols and certificate validation. The system focuses on production-ready certificate authority operations with reliable DNS resolution and trust chain validation.
 
 ## Protocol Architecture
 
 ### Core Components
 
-#### 1. DNS/CT eBPF Engine
-- **Location**: Kernel-space eBPF programs
-- **Function**: High-performance packet processing and DNS resolution
-- **Performance**: Sub-millisecond DNS resolution, adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing
-- **Security**: Hardware-assisted validation with certificate transparency integration
+#### 1. DNS Resolution Service
+- **Implementation**: Traditional DNS server with modern security features
+- **Function**: Standard DNS resolution with trust validation
+- **Performance**: Standard DNS response times with reliable operation
+- **Integration**: STOQ transport for secure communication
 
-#### 2. Byzantine Fault-Tolerant Consensus
-- **Implementation**: Distributed consensus for DNS record validation
-- **Fault Tolerance**: Handles up to (n-1)/3 Byzantine node failures
-- **Consistency**: Strong consistency guarantees across the mesh network
-- **Latency**: <10ms consensus completion for critical DNS operations
+#### 2. Certificate Authority Operations
+- **Implementation**: X.509 certificate generation and management
+- **Features**: Certificate issuance, renewal, and revocation
+- **Security**: Ed25519 and RSA signature algorithms
+- **Integration**: Certificate transparency log submission
 
 #### 3. Certificate Transparency Integration
-- **Real-time Validation**: Live certificate status checking against CT logs
-- **Revocation Checking**: Instantaneous certificate revocation detection
-- **Trust Chain Validation**: Complete certificate chain verification
-- **Performance**: <5ms certificate validation including CT log queries
+- **Implementation**: CT log submission and monitoring
+- **Validation**: Certificate transparency verification
+- **Trust Chain**: Standard X.509 trust chain validation
+- **Performance**: Reliable certificate validation with CT integration
 
 ## Technical Specifications
 

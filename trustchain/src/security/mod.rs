@@ -24,8 +24,8 @@ pub use alerts::*;
 
 /// Security monitoring system with consensus integration
 pub struct SecurityMonitor {
-    /// Four-proof consensus validator
-    consensus_validator: Arc<FourProofValidator>,
+    /// Four-proof consensus validator (needs mutability for state tracking)
+    consensus_validator: Arc<tokio::sync::Mutex<FourProofValidator>>,
     /// Byzantine fault detector
     byzantine_detector: Arc<ByzantineDetector>,
     /// Security alert manager
@@ -284,8 +284,8 @@ impl SecurityMonitor {
     pub async fn new(config: SecurityConfig) -> TrustChainResult<Self> {
         info!("Initializing Security Monitor with consensus integration");
 
-        // Initialize consensus validator
-        let consensus_validator = Arc::new(FourProofValidator::new());
+        // Initialize consensus validator with Mutex for thread-safe mutability
+        let consensus_validator = Arc::new(tokio::sync::Mutex::new(FourProofValidator::new()));
 
         // Initialize Byzantine detector
         let byzantine_detector = Arc::new(ByzantineDetector::new(config.byzantine_threshold).await?);
@@ -333,7 +333,8 @@ impl SecurityMonitor {
             self.metrics.consensus_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.metrics.certificate_consensus_required.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             
-            let result = self.consensus_validator.validate_consensus(consensus_proof).await?;
+            let mut validator = self.consensus_validator.lock().await;
+            let result = validator.validate_consensus(consensus_proof).await?;
             
             if !result.is_valid() {
                 error!("CONSENSUS VALIDATION FAILED for {}: {:?}", operation, result);

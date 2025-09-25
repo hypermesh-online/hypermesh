@@ -1,8 +1,8 @@
-# HyperMesh Architecture Overview with DNS/CT Integration
+# Web3 Ecosystem Architecture Overview
 
 ## Executive Summary
 
-HyperMesh represents a revolutionary approach to distributed computing infrastructure, combining DNS/CT eBPF breakthrough technology, STOQ statistical framework, and Byzantine fault tolerance to create a next-generation container orchestration platform. This architecture achieves sub-millisecond DNS resolution, adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing, and Byzantine-resilient consensus while maintaining enterprise-grade security and scalability.
+The Web3 Ecosystem provides a distributed compute and storage platform built on production-ready components: HyperMesh for asset management, STOQ for transport, TrustChain for certificates, and Caesar for economics. The architecture focuses on practical Byzantine fault tolerance, quantum-resistant security, and scalable production deployment.
 
 ## System Architecture
 

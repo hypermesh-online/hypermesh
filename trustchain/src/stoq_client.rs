@@ -19,9 +19,9 @@ use crate::errors::{TrustChainError, Result as TrustChainResult};
 
 // Import STOQ transport
 use stoq::{
-    StoqTransport, Endpoint, Connection
+    StoqTransport, Endpoint, Connection, FalconVariant
 };
-use stoq::config::TransportConfig;
+use stoq::transport::TransportConfig;
 
 /// TrustChain STOQ client for all network operations
 pub struct TrustChainStoqClient {
@@ -280,8 +280,10 @@ impl TrustChainStoqClient {
             frame_batch_size: 32,
             enable_cpu_affinity: false, // Client mode
             enable_large_send_offload: false, // Client mode
-            hardware_accel: stoq::transport::hardware_acceleration::HardwareAccelConfig::default(),
+            // hardware_accel removed - not available in STOQ transport
             cert_rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
+            enable_falcon_crypto: true, // Post-quantum cryptography
+            falcon_variant: stoq::FalconVariant::Falcon1024, // NIST PQC standard
         };
 
         // Initialize STOQ transport

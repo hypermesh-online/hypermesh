@@ -13,7 +13,19 @@ use tracing::{info, debug, error};
 use base64::{engine::general_purpose, Engine as _};
 
 use crate::errors::{ErrorResponse, Result as TrustChainResult};
+use crate::consensus::ConsensusProof;
 use super::*;
+
+/// SECURITY FUNCTION: Detect default_for_testing() bypasses
+fn is_default_testing_proof(proof: &ConsensusProof) -> bool {
+    // Detect the signature patterns of default_for_testing() proofs
+    proof.stake_proof.stake_holder == "localhost_test" ||
+    proof.stake_proof.stake_holder_id == "test_node_001" ||
+    proof.space_proof.node_id == "localhost_node" ||
+    proof.work_proof.owner_id == "localhost_test" ||
+    proof.work_proof.workload_id == "test_work_001" ||
+    proof.stake_proof.stake_amount == 1000  // Default testing amount
+}
 
 /// Health check endpoint
 pub async fn health_check() -> Result<JsonResponse<HealthResponse>, StatusCode> {
@@ -69,79 +81,64 @@ pub async fn get_stats(
 
 // Certificate Authority Handlers
 
-/// Issue new certificate
+/// Issue new certificate - SECURITY FIX: No longer returns mock certificates
 pub async fn issue_certificate(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(request): Json<CertificateIssueRequest>
 ) -> Result<JsonResponse<CertificateResponse>, StatusCode> {
-    info!("Certificate issuance requested for: {}", request.common_name);
-    
-    // TODO: Integrate with actual CA service
-    // For now, return a mock response
-    
-    // Convert request to CA format
-    use crate::ca::CertificateRequest;
-    let ca_request = CertificateRequest {
-        common_name: request.common_name.clone(),
-        san_entries: request.san_entries,
-        node_id: request.node_id,
-        ipv6_addresses: request.ipv6_addresses,
-        consensus_proof: request.consensus_proof,
-        timestamp: SystemTime::now(),
-    };
-    
-    // Mock issued certificate
-    use crate::ca::{IssuedCertificate, CertificateStatus, CertificateMetadata};
-    let issued_cert = IssuedCertificate {
-        serial_number: "mock_serial_123".to_string(),
-        certificate_der: format!("mock_certificate_for_{}", ca_request.common_name).into_bytes(),
-        fingerprint: [0u8; 32], // Mock fingerprint
-        common_name: ca_request.common_name,
-        issued_at: SystemTime::now(),
-        expires_at: SystemTime::now() + std::time::Duration::from_secs(86400), // 24 hours
-        issuer_ca_id: "mock_ca".to_string(),
-        consensus_proof: ca_request.consensus_proof,
-        status: CertificateStatus::Valid,
-        metadata: CertificateMetadata::default(),
-    };
-    
-    // Mock SCT
-    use crate::ct::SignedCertificateTimestamp;
-    let sct = SignedCertificateTimestamp {
-        version: 1,
-        log_id: [0u8; 32], // Mock log ID
-        timestamp: SystemTime::now(),
-        signature: vec![0u8; 64], // Mock signature
-        extensions: vec![],
-    };
-    
-    let response = CertificateResponse {
-        certificate: issued_cert,
-        sct: Some(sct),
-    };
-    
-    info!("Certificate issued successfully (mock)");
-    Ok(Json(response))
+    error!("SECURITY: Certificate issuance attempted for: {} - MOCK RESPONSES REMOVED", request.common_name);
+
+    // SECURITY FIX: Reject default_for_testing() proofs
+    if is_default_testing_proof(&request.consensus_proof) {
+        error!("SECURITY VIOLATION: default_for_testing() proof detected - REJECTING");
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Use the consensus proof directly (not optional)
+    let consensus_proof = &request.consensus_proof;
+
+    // Generate real consensus proof instead of accepting bypass
+    let node_id = &request.node_id;
+    match crate::consensus::ConsensusProof::generate_from_network(node_id).await {
+        Ok(real_proof) => {
+            info!("Real consensus proof generated for certificate issuance: {}", request.common_name);
+
+            // SECURITY IMPROVEMENT: Return error until real CA integration is complete
+            error!("PRODUCTION ERROR: Real CA implementation required - mock responses REMOVED for security");
+
+            let error_response = json!({
+                "error": "NotImplemented",
+                "message": "Production CA implementation required",
+                "details": "Mock certificate responses removed for security - implement real CA integration",
+                "status": "security_upgrade_required"
+            });
+
+            Err(StatusCode::NOT_IMPLEMENTED)
+        }
+        Err(e) => {
+            error!("SECURITY: Consensus proof generation failed: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
-/// Get certificate by serial number
+/// Get certificate by serial number - SECURITY FIX: No mock certificates
 pub async fn get_certificate(
     State(_state): State<AppState>,
     Path(serial): Path<String>
 ) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
-    info!("Certificate retrieval requested for serial: {}", serial);
-    
-    // TODO: Integrate with actual CA service
-    let response = json!({
+    error!("SECURITY: Certificate retrieval attempted for serial: {} - MOCK RESPONSES REMOVED", serial);
+
+    // SECURITY FIX: Remove mock certificate responses
+    let error_response = json!({
+        "error": "NotImplemented",
+        "message": "Production certificate lookup required",
+        "details": "Mock certificate responses removed for security - implement real certificate store integration",
         "serial_number": serial,
-        "status": "valid",
-        "common_name": "mock.example.com",
-        "issued_at": SystemTime::now(),
-        "expires_at": SystemTime::now(),
-        "message": "Mock certificate data - integrate with CA service"
+        "status": "security_upgrade_required"
     });
-    
-    Ok(Json(response))
+
+    Err(StatusCode::NOT_IMPLEMENTED)
 }
 
 /// Revoke certificate

@@ -31,6 +31,8 @@ pub mod dns_over_stoq;
 pub mod stoq_transport;
 // DEPRECATED: Legacy modules to be removed after full STOQ migration
 pub mod dns_over_quic;
+pub mod authoritative_server;
+pub mod production_zones;
 
 pub use cache::*;
 pub use resolver::*;
@@ -39,6 +41,8 @@ pub use dns_over_stoq::*;
 pub use stoq_transport::*;
 // DEPRECATED: Legacy exports to be removed after full STOQ migration
 pub use dns_over_quic::*;
+pub use authoritative_server::*;
+pub use production_zones::*;
 
 /// TrustChain DNS resolver with STOQ transport (architectural compliance)
 #[derive(Clone)]
@@ -344,74 +348,42 @@ impl DnsResolver {
         Ok(response)
     }
 
-    /// Resolve TrustChain-specific domain
+    /// Resolve TrustChain-specific domain using production addresses
     pub async fn resolve_trustchain_domain(&self, query: &DnsQuery) -> TrustChainResult<DnsResponse> {
         debug!("Resolving TrustChain domain: {}", query.name);
 
+        // Use production domain resolver instead of localhost stubs
+        let production_resolver = ProductionDomainResolver::new();
         let mut answers = Vec::new();
 
-        match query.name.as_str() {
-            "hypermesh" => {
-                // Resolve to HyperMesh global dashboard
-                if query.record_type == RecordType::AAAA {
-                    // For localhost testing, return localhost
-                    // In production, this would return the actual HyperMesh IPv6 address
-                    answers.push(DnsRecord {
-                        name: query.name.clone(),
-                        record_type: RecordType::AAAA,
-                        class: DNSClass::IN,
-                        ttl: 300,
-                        data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
-                    });
-                }
-            }
-            "caesar" => {
-                // Resolve to Caesar wallet/exchange
-                if query.record_type == RecordType::AAAA {
-                    answers.push(DnsRecord {
-                        name: query.name.clone(),
-                        record_type: RecordType::AAAA,
-                        class: DNSClass::IN,
-                        ttl: 300,
-                        data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
-                    });
-                }
-            }
-            "trust" => {
-                // Resolve to TrustChain management
-                if query.record_type == RecordType::AAAA {
-                    answers.push(DnsRecord {
-                        name: query.name.clone(),
-                        record_type: RecordType::AAAA,
-                        class: DNSClass::IN,
-                        ttl: 300,
-                        data: DnsRecordData::AAAA(self.config.bind_address),
-                    });
-                }
-            }
-            "assets" => {
-                // Resolve to HyperMesh asset management
-                if query.record_type == RecordType::AAAA {
-                    answers.push(DnsRecord {
-                        name: query.name.clone(),
-                        record_type: RecordType::AAAA,
-                        class: DNSClass::IN,
-                        ttl: 300,
-                        data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
-                    });
-                }
-            }
-            _ => {
-                // Unknown TrustChain domain
-                return Ok(DnsResponse {
-                    id: query.id,
-                    response_code: ResponseCode::NXDomain,
-                    answers: vec![],
-                    authorities: vec![],
-                    additionals: vec![],
-                    timestamp: SystemTime::now(),
-                    ttl: 0,
+        if query.record_type == RecordType::AAAA {
+            if let Some(ipv6_addr) = production_resolver.resolve_domain(&query.name) {
+                info!("✅ Resolved {} to production address: [{}]", query.name, ipv6_addr);
+                answers.push(DnsRecord {
+                    name: query.name.clone(),
+                    record_type: RecordType::AAAA,
+                    class: DNSClass::IN,
+                    ttl: 300, // 5 minutes TTL
+                    data: DnsRecordData::AAAA(ipv6_addr),
                 });
+            } else {
+                // Fall back to localhost only for development/testing
+                if self.config.bind_address == Ipv6Addr::LOCALHOST {
+                    warn!("⚠️ Domain {} not found in production resolver, using localhost (development mode)", query.name);
+                    answers.push(DnsRecord {
+                        name: query.name.clone(),
+                        record_type: RecordType::AAAA,
+                        class: DNSClass::IN,
+                        ttl: 60, // Short TTL for development
+                        data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
+                    });
+                } else {
+                    // Production mode - domain not found
+                    warn!("❌ Domain {} not found in production DNS zones", query.name);
+                    return Err(DnsError::DomainNotFound {
+                        domain: query.name.clone(),
+                    }.into());
+                }
             }
         }
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides comprehensive documentation for integrating with HyperMesh's DNS/CT eBPF system, STOQ statistical framework, and Byzantine fault tolerance capabilities. Developers can leverage these breakthrough technologies to build high-performance, secure, and intelligent network applications.
+This guide provides comprehensive documentation for integrating with the Web3 Ecosystem components: STOQ transport, TrustChain certificates, HyperMesh assets, and Caesar economics. Developers can build applications using these production-ready components for distributed computing and secure communication.
 
 ## Quick Start
 
@@ -12,11 +12,10 @@ This guide provides comprehensive documentation for integrating with HyperMesh's
 ```bash
 # System requirements
 sudo apt update && sudo apt install -y \
-    linux-headers-$(uname -r) \
-    libbpf-dev \
     libssl-dev \
     pkg-config \
-    build-essential
+    build-essential \
+    curl
 
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

@@ -21,12 +21,10 @@ use uuid::Uuid;
 use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements, ConsensusResult, FourProofValidator};
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
-use super::{CloudHSMClient, HSMConfig, KeySpec, KeyUsage, KeyOrigin, CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
+use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
 
-/// Production TrustChain Certificate Authority with HSM integration
+/// Production TrustChain Certificate Authority (Software-Only)
 pub struct TrustChainCA {
-    /// HSM client for secure key operations
-    hsm_client: Option<Arc<CloudHSMClient>>,
     /// Four-proof consensus validator
     consensus: Arc<FourProofValidator>,
     /// Certificate transparency log

@@ -16,6 +16,7 @@ pub mod errors;
 pub mod stoq_client;
 pub mod security; // NEW: Security monitoring and Byzantine detection
 pub mod crypto;   // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
+pub mod deployment; // NEW: Quality gates and deployment validation
 
 // Re-export main types
 pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};

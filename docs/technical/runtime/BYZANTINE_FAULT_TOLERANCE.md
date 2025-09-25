@@ -2,7 +2,7 @@
 
 ## Overview
 
-HyperMesh implements a sophisticated Byzantine Fault Tolerance (BFT) system that ensures reliable operation even when up to (n-1)/3 nodes exhibit arbitrary (Byzantine) failures. The implementation combines classical BFT algorithms with modern eBPF-based monitoring and STOQ statistical analysis for enhanced fault detection and recovery.
+The Web3 Ecosystem implements Byzantine Fault Tolerance (BFT) to ensure reliable operation when up to (n-1)/3 nodes exhibit arbitrary (Byzantine) failures. The implementation uses proven consensus algorithms with practical fault detection and recovery mechanisms integrated with STOQ transport for secure communication.
 
 ## Theoretical Foundation
 

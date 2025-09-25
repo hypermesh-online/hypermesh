@@ -186,7 +186,7 @@ impl ByzantineDetector {
         let malicious_info = MaliciousNodeInfo {
             node_id: node_id.to_string(),
             detected_at: SystemTime::now(),
-            violation_type: violation,
+            violation_type: violation.clone(),
             evidence: vec![format!("Automated detection: {:?}", violation)],
             confidence_score: 0.95,
         };

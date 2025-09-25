@@ -150,13 +150,13 @@ pub enum TrustChainError {
     #[error("Certificate generation failed: {reason}")]
     CertificateGenerationFailed { reason: String },
 
-    /// HSM key not found
-    #[error("HSM key not found: {key_id}")]
-    HSMKeyNotFound { key_id: String },
+    /// Key not found (software-only key management)
+    #[error("Key not found: {key_id}")]
+    KeyNotFound { key_id: String },
 
-    /// HSM connection error
-    #[error("HSM connection error: {reason}")]
-    HSMConnectionError { reason: String },
+    /// Key operation error
+    #[error("Key operation error: {reason}")]
+    KeyOperationError { reason: String },
 
 
     /// Duplicate certificate
@@ -175,21 +175,21 @@ pub enum TrustChainError {
     #[error("Serialization failed: {reason}")]
     SerializationFailed { reason: String },
 
-    /// HSM configuration error
-    #[error("HSM configuration error: {reason}")]
-    HSMConfigError { reason: String },
+    /// Key configuration error
+    #[error("Key configuration error: {reason}")]
+    KeyConfigError { reason: String },
 
     /// Crypto error
     #[error("Cryptographic error: {reason}")]
     CryptoError { reason: String },
 
-    /// HSM operation failed
-    #[error("HSM operation failed: {operation} - {reason}")]
-    HSMOperationFailed { operation: String, reason: String },
+    /// Key operation failed
+    #[error("Key operation failed: {operation} - {reason}")]
+    KeyOperationFailed { operation: String, reason: String },
 
-    /// HSM security violation
-    #[error("HSM security violation: {reason}")]
-    HSMSecurityViolation { reason: String },
+    /// Software key security violation
+    #[error("Software key security violation: {reason}")]
+    SoftwareKeySecurityViolation { reason: String },
 
     /// Security policy violation
     #[error("Security policy violation: {reason}")]
@@ -306,6 +306,9 @@ pub enum DnsError {
 
     #[error("TrustChain domain resolution failed: {domain}")]
     TrustChainDomainResolution { domain: String },
+
+    #[error("Domain not found: {domain}")]
+    DomainNotFound { domain: String },
 }
 
 /// API server specific errors

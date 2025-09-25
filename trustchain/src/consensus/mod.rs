@@ -50,7 +50,32 @@ impl ConsensusProof {
         }
     }
 
-    /// Create a default consensus proof for testing
+    /// Generate real consensus proof from network state
+    /// This replaces the security bypass default_for_testing() method
+    pub async fn generate_from_network(node_id: &str) -> Result<Self> {
+        // Generate real stake proof with cryptographic signatures
+        let stake_proof = StakeProof::generate_from_network(node_id).await?;
+
+        // Generate time proof with network synchronization
+        let time_proof = TimeProof::generate_with_ntp_sync().await?;
+
+        // Generate space proof with actual storage commitment
+        let space_proof = SpaceProof::generate_from_system(node_id).await?;
+
+        // Generate work proof with computational challenge
+        let work_proof = WorkProof::generate_from_computation(node_id).await?;
+
+        Ok(Self {
+            stake_proof,
+            time_proof,
+            space_proof,
+            work_proof,
+        })
+    }
+
+    /// DEPRECATED - SECURITY BYPASS - DO NOT USE IN PRODUCTION
+    /// This method creates invalid proofs and bypasses security validation
+    /// TODO: Replace all calls to this method with generate_from_network()
     pub fn default_for_testing() -> Self {
         Self {
             stake_proof: StakeProof::default(),
