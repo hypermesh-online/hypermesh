@@ -3,10 +3,10 @@ name = "catalog"
 version = "0.1.0"
 edition = "2021"
 authors = ["HyperMesh Team"]
-description = "Catalog - Universal Asset SDK with JuliaVM compiler and delegation system"
+description = "Catalog - HyperMesh Asset Package Manager for catalog.hypermesh.online"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/your-org/catalog"
-keywords = ["assets", "vm", "julia", "scripting", "sandboxing"]
+repository = "https://github.com/hypermesh-online/catalog"
+keywords = ["assets", "hypermesh", "package-manager", "trustchain", "distributed"]
 
 [dependencies]
 # Core async runtime
@@ -14,16 +14,12 @@ tokio = { version = "1.38", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"
 
-# Scripting languages
+# Scripting languages (library support only - no local execution)
 mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
-julia = { version = "0.2", optional = true }  # Julia integration
-wasmtime = { version = "13.0", optional = true }  # WASM VM
-rhai = { version = "1.17", optional = true }  # Embedded scripting
 
-# Security and sandboxing
-nix = "0.27"
-seccomp = { version = "0.1", optional = true }
-landlock = { version = "0.2", optional = true }
+# No security/sandboxing needed - execution delegated to HyperMesh
+# Previous julia/wasmtime/seccomp/landlock dependencies removed
+# All execution happens on HyperMesh infrastructure
 
 # Asset management
 serde = { version = "1.0", features = ["derive"] }
@@ -50,7 +46,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# File system and compression
+# File system and compression (for asset packages)
 tar = "0.4"
 flate2 = "1.0"
 tempfile = "3.8"
@@ -61,26 +57,23 @@ uuid = { version = "1.6", features = ["v4", "v5", "serde"] }
 
 # Configuration
 config = "0.14"
-clap = { version = "4.5", features = ["derive"] }
 
-# Template engine
+# Template engine (for asset package templates)
 handlebars = "5.1"
 regex = "1.10"
 
-# HTTP client for registry
+# HTTP client for HyperMesh communication
 reqwest = { version = "0.12", features = ["json"] }
 
-# Base64 encoding
+# Encoding utilities
 base64 = "0.22"
+hex = "0.4"
 
-# Path expansion
+# Path expansion (for asset package paths)
 shellexpand = "3.1"
 
-# Globbing
+# Globbing (for asset discovery)
 glob = "0.3"
-
-# Hex encoding
-hex = "0.4"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -88,23 +81,20 @@ proptest = "1.4"
 tempfile = "3.8"
 
 [features]
-default = ["security-sandbox", "all-scripting"]
+default = ["hypermesh-integration"]
 
-# VM engines
-julia-vm = ["julia"]
-wasm-vm = ["wasmtime"]
+# HyperMesh integration features
+hypermesh-integration = []
 
-# Scripting languages
+# Scripting support (template/config only - no execution)
 lua-scripting = []
-rhai-scripting = ["rhai"]
-all-scripting = ["lua-scripting", "rhai-scripting"]
 
-# Security features
-security-sandbox = ["seccomp", "landlock"]
-full-isolation = ["security-sandbox"]
+# TrustChain certificate support
+trustchain-support = []
 
-# Performance features
-high-performance = []
+# Asset package management features
+asset-templates = []
+asset-validation = []
 
 [lib]
 name = "catalog"

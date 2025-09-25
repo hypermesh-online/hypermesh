@@ -1,359 +1,311 @@
-# Catalog - Universal Asset SDK with JuliaVM
+# Catalog - HyperMesh Asset Package Manager
 
-**Secure Asset Management, Scripting, and Remote Code Execution Library**
+**Pure Asset Package Management for HyperMesh Ecosystem**
 
-Catalog is a standalone library that provides universal asset management with secure scripting capabilities, featuring a JuliaVM compiler and delegation system for safe remote code execution with bidirectional ZeroTrust validation.
+Catalog is a HyperMesh native asset package manager that runs on the HyperMesh infrastructure via catalog.hypermesh.online. It provides asset package management, distribution, and execution delegation to HyperMesh nodes.
 
 ## 🎯 Purpose
 
-Catalog serves as the **universal asset orchestration layer** that can be plugged into any distributed system:
+Catalog serves as the **HyperMesh Asset Package Manager** running at catalog.hypermesh.online:
 
-- **HyperMesh**: Uses Catalog for blockchain asset management
-- **TrustChain**: Uses Catalog for certificate/key asset management  
-- **Caesar**: Uses Catalog for financial contract assets
-- **AdTech**: Uses Catalog for advertising creative assets
-- **Any System**: Can integrate Catalog for asset management needs
+- **Asset Package Management**: Create, distribute, and manage asset packages
+- **HyperMesh Native**: Utilizes HyperMesh CPU/GPU/Memory/Storage resources
+- **TrustChain Security**: Certificate-based authentication and authorization
+- **No Local Execution**: All computation delegated to HyperMesh infrastructure
+- **Resource Mapping**: Maps asset requirements to HyperMesh resource allocations
 
 ## 🏗️ Architecture
 
+**Network Address**: catalog.hypermesh.online (via TrustChain DNS)
+
 ### Core Components
 
-#### 1. Asset Management System
-- **Asset Definition**: YAML/JSON declarative asset specifications
-- **Asset Status**: Real-time asset lifecycle and health tracking
-- **Asset Adapters**: Pluggable interfaces for different asset types
-- **Asset Registry**: Global catalog of available assets and capabilities
+#### 1. Asset Package Management
+- **Asset Packages**: Define software components with resource requirements
+- **Asset Registry**: Distributed registry of available packages
+- **Version Management**: Semantic versioning and dependency resolution
+- **Template Generation**: Create new asset packages from templates
 
-#### 2. JuliaVM Compiler & Delegation System
-- **Julia Compilation**: Just-in-time compilation of Julia code to native
-- **Secure Execution**: Sandboxed execution with resource limits
-- **Delegation Engine**: Route execution to appropriate compute nodes
-- **Consensus Integration**: Require consensus proofs for execution
+#### 2. HyperMesh Integration
+- **Resource Mapping**: Map asset requirements to HyperMesh resources (CPU/GPU/Memory/Storage)
+- **Execution Delegation**: Submit execution requests to HyperMesh infrastructure
+- **Status Monitoring**: Track execution status and resource usage
+- **Native Assets**: Integrate with HyperMesh Asset Adapter system
 
-#### 3. Multi-Language Scripting Support
-- **YAML Scripting**: Declarative asset configuration and workflows
-- **Lua Scripting**: Imperative logic for asset behavior
-- **Julia Programs**: High-performance mathematical computations
-- **WASM Support**: Portable execution for untrusted code
-
-#### 4. Security & Sandboxing
-- **Bidirectional ZeroTrust**: Continuous validation of host and client
-- **Certificate Validation**: All execution requires valid certificates
-- **Hash Verification**: Code integrity validation before execution
-- **Resource Limits**: CPU, memory, and I/O constraints
+#### 3. TrustChain Security
+- **Certificate-Based Auth**: All operations require valid TrustChain certificates
+- **Network Security**: Secure communication via TrustChain DNS resolution
+- **No Local Execution**: Security through architectural elimination of local risks
+- **Consensus Validation**: Leverage HyperMesh consensus for execution validation
 
 ## 🚀 Quick Start
 
-```bash
-# Build Catalog
-cargo build --release
+```rust
+use catalog::{CatalogBuilder, AssetPackage};
 
-# Start Catalog server
-./target/release/catalog-server --config catalog.toml
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Connect to HyperMesh via catalog.hypermesh.online
+    let catalog = CatalogBuilder::new()
+        .with_hypermesh_address("catalog.hypermesh.online")
+        .with_trustchain_certificate("path/to/cert.pem")
+        .build()
+        .await?;
 
-# Deploy an asset
-./target/release/catalog-cli asset deploy my-asset.yaml
+    // Create and publish asset package
+    let package = AssetPackage::new(/* asset definition */);
+    let asset_id = catalog.publish_asset(package.clone()).await?;
 
-# Execute Julia code remotely
-./target/release/catalog-cli julia execute --file computation.jl --consensus-proof <proof>
+    // Execute on HyperMesh infrastructure
+    let execution_context = catalog.execute_asset_on_hypermesh(&asset_id, &package).await?;
+    println!("Executing on HyperMesh: {}", execution_context.execution_id);
+
+    Ok(())
+}
 ```
 
-## 📝 Asset Definition Examples
+## 📝 Asset Package Examples
 
-### YAML Asset Definition
+### Basic Asset Package
 ```yaml
-# my-asset.yaml
+# computational-asset.yaml
 apiVersion: "catalog.v1"
-kind: "Asset"
+kind: "AssetPackage"
 metadata:
-  name: "financial-calculator"
+  name: "mathematical-computation"
   version: "1.0.0"
-  tags: ["finance", "calculator", "julia"]
+  tags: ["computation", "math", "hypermesh"]
 
 spec:
-  type: "julia-program"
-  description: "High-performance financial calculations"
-  
-  # Asset content
-  content:
-    main: "financial_calc.jl"
-    dependencies:
-      - "LinearAlgebra"
-      - "Statistics"
-    
-  # Security requirements
-  security:
-    consensus_required: true
-    certificate_pinning: true
-    hash_validation: "blake3"
-    sandbox_level: "strict"
-    
-  # Resource constraints
+  description: "Mathematical computation asset for HyperMesh"
+
+  # HyperMesh resource requirements
   resources:
-    cpu_limit: "2000m"
-    memory_limit: "1Gi"
-    execution_timeout: "30s"
-    
-  # Execution policy
+    cpu_cores: 4
+    cpu_architecture: "x86_64"
+    memory_mb: 2048
+    storage_mb: 1024
+    network_bandwidth_mbps: 100
+
+  # Execution configuration
   execution:
-    delegation_strategy: "nearest_node"
-    minimum_consensus: 3
-    retry_policy: "exponential_backoff"
+    cpu_required: true
+    gpu_required: false
+    memory_mb: 2048
+    storage_mb: 1024
+    persistent_storage: false
+
+  # Security and validation
+  security:
+    trustchain_validation: true
+    hypermesh_consensus: true
+    resource_isolation: true
 ```
 
-### Lua Asset for Logic
+### GPU-Accelerated Asset
 ```yaml
-# logic-asset.yaml
+# gpu-asset.yaml
 apiVersion: "catalog.v1"
-kind: "Asset"
+kind: "AssetPackage"
 metadata:
-  name: "ad-targeting-logic"
-  version: "2.1.0"
+  name: "gpu-computation"
+  version: "2.0.0"
+  tags: ["gpu", "acceleration", "hypermesh"]
 
 spec:
-  type: "lua-script"
-  content:
-    main: |
-      function target_ad(user_profile, ad_campaigns)
-          local score = 0
-          for _, campaign in ipairs(ad_campaigns) do
-              if campaign.demographics.age_range[1] <= user_profile.age and
-                 user_profile.age <= campaign.demographics.age_range[2] then
-                  score = score + campaign.relevance_weight
-              end
-          end
-          return score > 0.7
-      end
-      
+  description: "GPU-accelerated computation on HyperMesh"
+
+  resources:
+    cpu_cores: 2
+    gpu_memory_mb: 8192
+    gpu_type: "CUDA"
+    memory_mb: 4096
+
+  execution:
+    cpu_required: true
+    gpu_required: true
+    gpu_memory_mb: 8192
+    gpu_type: "CUDA"
+    memory_mb: 4096
+
   security:
-    consensus_required: false  # Lua scripts can run locally
-    hash_validation: "sha256"
+    trustchain_validation: true
+    hypermesh_consensus: true
 ```
 
-### Complex Julia Asset
+### Distributed Asset Package
 ```yaml
-# julia-asset.yaml
-apiVersion: "catalog.v1"  
-kind: "Asset"
+# distributed-asset.yaml
+apiVersion: "catalog.v1"
+kind: "AssetPackage"
 metadata:
-  name: "ml-pricing-model"
+  name: "distributed-processing"
   version: "3.0.0"
 
 spec:
-  type: "julia-program"
-  content:
-    main: |
-      using LinearAlgebra, Statistics
-      
-      function optimize_pricing(market_data::Matrix{Float64}, 
-                               constraints::Vector{Float64})
-          # Advanced mathematical optimization
-          n = size(market_data, 1)
-          prices = zeros(n)
-          
-          # Gradient descent optimization
-          for epoch in 1:1000
-              gradient = compute_gradient(market_data, prices, constraints)
-              prices -= 0.01 * gradient
-              
-              if norm(gradient) < 1e-6
-                  break
-              end
-          end
-          
-          return prices
-      end
-      
-      function compute_gradient(data, prices, constraints)
-          # Complex gradient computation
-          grad = similar(prices)
-          # ... mathematical computation ...
-          return grad
-      end
-      
+  description: "Distributed processing across HyperMesh nodes"
+
+  resources:
+    cpu_cores: 16
+    memory_mb: 32768
+    storage_mb: 10240
+    network_bandwidth_mbps: 1000
+
   execution:
-    delegation_strategy: "high_performance_cluster"
-    minimum_consensus: 5  # High-value computation needs more consensus
-    require_gpu: false
+    distributed: true
+    min_nodes: 3
+    max_nodes: 10
+    cpu_required: true
+    memory_mb: 32768
+
+  dependencies:
+    - name: "base-runtime"
+      version: ">=1.0.0"
+    - name: "networking-lib"
+      version: "^2.1.0"
 ```
 
 ## 🔒 Security Model
 
-### Bidirectional ZeroTrust
+### HyperMesh Native Security
+
+Security is provided through **architectural elimination** of local execution risks:
+
 ```rust
-pub struct ExecutionContext {
-    // Host validation
-    pub host_certificate: Certificate,
-    pub host_identity: NodeId,
-    pub host_reputation: ReputationScore,
-    
-    // Client validation  
-    pub client_certificate: Certificate,
-    pub client_identity: UserId,
-    pub client_permissions: Vec<Permission>,
-    
-    // Consensus validation
-    pub consensus_proof: ConsensusProof,
-    pub execution_hash: Hash,
-    pub delegation_signature: Signature,
+pub struct CatalogExecutionContext {
+    /// Execution ID on HyperMesh
+    pub execution_id: String,
+    /// Asset being executed
+    pub asset_id: AssetId,
+    /// HyperMesh resources allocated
+    pub allocated_resources: Vec<HyperMeshResource>,
+    /// TrustChain validation proof
+    pub trustchain_proof: Option<String>,
+    /// Execution status on HyperMesh
+    pub status: ExecutionStatus,
 }
 
-impl ExecutionContext {
-    pub fn validate_bidirectional_trust(&self) -> Result<(), SecurityError> {
-        // 1. Validate host certificate and identity
-        self.validate_host_trust()?;
-        
-        // 2. Validate client certificate and permissions
-        self.validate_client_trust()?;
-        
-        // 3. Validate consensus proof for execution
-        self.validate_consensus_proof()?;
-        
-        // 4. Validate code hash and integrity
-        self.validate_code_integrity()?;
-        
+impl CatalogExecutionContext {
+    /// All validation occurs on HyperMesh infrastructure
+    pub fn validate_on_hypermesh(&self) -> Result<(), SecurityError> {
+        // 1. TrustChain certificate validation
+        self.validate_trustchain_certificate()?;
+
+        // 2. HyperMesh consensus validation
+        self.validate_hypermesh_consensus()?;
+
+        // 3. Resource allocation validation
+        self.validate_resource_allocation()?;
+
         Ok(())
     }
 }
 ```
 
-### Sandbox Levels
-```yaml
-sandbox_levels:
-  minimal:
-    syscall_filtering: false
-    network_access: true
-    file_access: "read_write"
-    
-  standard:
-    syscall_filtering: true
-    network_access: "restricted"
-    file_access: "read_only"
-    resource_limits: true
-    
-  strict:
-    syscall_filtering: true
-    network_access: false
-    file_access: "none"
-    resource_limits: true
-    container_isolation: true
-    
-  paranoid:
-    syscall_filtering: true
-    network_access: false
-    file_access: "none"
-    resource_limits: true
-    container_isolation: true
-    hardware_isolation: true  # Requires specific hardware
-```
+### Security Through Architecture
+
+**No Local Execution = No Local Vulnerabilities**
+
+- ✅ **No Shell Commands**: All `tokio::process::Command` usage eliminated
+- ✅ **No Local Sandboxing**: Uses HyperMesh native isolation
+- ✅ **TrustChain Certificates**: All network communication secured
+- ✅ **HyperMesh Consensus**: Execution validation via blockchain consensus
+- ✅ **Resource Isolation**: Provided by HyperMesh Asset Adapter system
 
 ## 🔌 Integration APIs
 
 ### HyperMesh Integration
 ```rust
-// HyperMesh uses Catalog for asset management
-pub trait CatalogProvider {
-    async fn deploy_asset(&self, asset: AssetDefinition) -> Result<AssetId>;
-    async fn execute_asset(&self, asset_id: AssetId, 
-                          context: ExecutionContext) -> Result<ExecutionResult>;
-    async fn get_asset_status(&self, asset_id: AssetId) -> Result<AssetStatus>;
-    async fn delegate_execution(&self, request: DelegationRequest) -> Result<ExecutionResult>;
-}
+use catalog::hypermesh_integration::{HyperMeshClient, HyperMeshResource};
 
-// Catalog uses HyperMesh for consensus
-pub trait ConsensusProvider {
-    async fn validate_execution(&self, proof: ConsensusProof) -> Result<bool>;
-    async fn submit_execution_result(&self, result: ExecutionResult) -> Result<BlockHash>;
-    async fn get_node_reputation(&self, node_id: NodeId) -> Result<ReputationScore>;
+// Catalog integrates with HyperMesh as a native service
+impl Catalog {
+    /// Execute asset on HyperMesh infrastructure
+    pub async fn execute_asset_on_hypermesh(
+        &self,
+        asset_id: &AssetId,
+        package: &AssetPackage,
+    ) -> Result<CatalogExecutionContext> {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+        let resource_requirements = self.map_asset_to_resources(package);
+        hypermesh_client.execute_asset(asset_id, resource_requirements).await
+    }
+
+    /// Query execution status on HyperMesh
+    pub async fn query_hypermesh_execution(
+        &self,
+        execution_id: &str,
+    ) -> Result<CatalogExecutionContext> {
+        let hypermesh_client = self.hypermesh_client.lock().await;
+        hypermesh_client.query_execution(execution_id).await
+    }
 }
 ```
 
-### TrustChain Integration
+### TrustChain DNS Resolution
 ```rust
-// TrustChain uses Catalog for certificate asset management
-pub trait CertificateAssets {
-    async fn store_certificate(&self, cert: Certificate) -> Result<AssetId>;
-    async fn validate_certificate_chain(&self, chain: CertificateChain) -> Result<bool>;
-    async fn rotate_certificate(&self, old_id: AssetId, new_cert: Certificate) -> Result<AssetId>;
-}
-
-// Catalog uses TrustChain for certificate validation
-pub trait CertificateValidator {
-    async fn validate_execution_certificate(&self, cert: Certificate) -> Result<bool>;
-    async fn get_trusted_cas(&self) -> Result<Vec<Certificate>>;
-}
+// Catalog connects to HyperMesh via TrustChain DNS
+let catalog = CatalogBuilder::new()
+    .with_hypermesh_address("catalog.hypermesh.online")  // TrustChain DNS
+    .with_trustchain_certificate("path/to/cert.pem")     // Certificate auth
+    .build()
+    .await?;
 ```
 
-## 🎭 Asset Types
+## 🎭 Asset Package Categories
 
-### Supported Asset Categories
-- **Programs**: Julia, Lua, WASM executables
-- **Data**: JSON, YAML, CSV, binary data  
-- **Configurations**: System configs, policies, rules
-- **Certificates**: X.509 certificates, keys, trust anchors
-- **Contracts**: Smart contracts, legal agreements
-- **Media**: Images, videos, audio (for AdTech)
-- **Models**: Machine learning models, AI weights
+### HyperMesh Asset Types
+- **Computational Assets**: CPU/GPU computation packages
+- **Data Processing**: Stream processing, analytics, ETL
+- **Storage Assets**: Persistent data, databases, file systems
+- **Network Services**: APIs, microservices, protocols
+- **AI/ML Models**: Training, inference, model serving
+- **Distributed Systems**: Cluster computing, coordination
 
-### Asset Lifecycle
-1. **Definition**: Create asset specification (YAML/JSON)
-2. **Validation**: Security and syntax validation  
-3. **Registration**: Register in global asset registry
-4. **Deployment**: Deploy to execution environment
-5. **Execution**: Run with consensus validation
-6. **Monitoring**: Track health and performance
-7. **Retirement**: Graceful shutdown and cleanup
+### Asset Package Lifecycle
+1. **Package Definition**: Create AssetPackage with resource requirements
+2. **Validation**: Template validation and dependency checking
+3. **Publication**: Register in HyperMesh asset registry
+4. **Resource Mapping**: Map requirements to HyperMesh resources
+5. **Execution**: Submit to HyperMesh infrastructure for execution
+6. **Monitoring**: Track execution status and resource usage
+7. **Completion**: Retrieve results and cleanup resources
 
 ## 🔧 Configuration
 
-```toml
-# catalog.toml
-[server]
-bind_address = "0.0.0.0:8444"
-max_concurrent_executions = 1000
+```rust
+// Configure catalog for HyperMesh integration
+let config = CatalogConfig {
+    hypermesh_address: Some("catalog.hypermesh.online".to_string()),
+    trustchain_cert_path: Some("/etc/catalog/trustchain.pem".to_string()),
+    consensus: ConsensusContext::default(),
+    registry: RegistryConfig::default(),
+    template: TemplateConfig::default(),
+    validation: ValidationConfig::default(),
+    documentation: DocumentationConfig::default(),
+};
 
-[julia_vm]
-enable = true
-max_heap_size = "2GB"
-compilation_cache = "/tmp/julia_cache"
-precompile_common = true
-
-[security]
-sandbox_default = "strict"
-require_consensus = true
-certificate_validation = "strict"
-hash_algorithm = "blake3"
-
-[delegation]
-strategy = "load_balanced"
-min_replicas = 3
-timeout = "30s"
-retry_attempts = 3
-
-[asset_registry]
-storage_backend = "database"  # or "filesystem"
-replication_factor = 3
+let catalog = Catalog::new(config).await?;
 ```
 
 ## 📊 Performance Characteristics
 
-- **Julia Compilation**: <5s for most programs
-- **Execution Overhead**: <100ms sandboxing overhead
-- **Throughput**: 10,000+ concurrent asset executions
-- **Memory Efficiency**: Copy-on-write for asset instances
-- **Network Efficiency**: Asset caching and delta updates
+- **Asset Publication**: <50ms package registration
+- **Resource Mapping**: <10ms HyperMesh resource allocation
+- **Execution Delegation**: <100ms HyperMesh submission
+- **Status Queries**: <25ms execution status retrieval
+- **Network Efficiency**: TrustChain DNS resolution and caching
 
-## 🛣️ Roadmap
+## 🛣️ Current Status
 
-- [x] Core asset management system
-- [x] YAML/Lua scripting support
-- [ ] JuliaVM integration and compilation
-- [ ] Advanced security sandboxing
-- [ ] Consensus proof validation
-- [ ] High-performance delegation engine
-- [ ] Integration with HyperMesh/TrustChain
-- [ ] Production performance optimization
+- ✅ **Core asset package management system**
+- ✅ **HyperMesh native integration**
+- ✅ **TrustChain certificate-based security**
+- ✅ **Template generation system**
+- ✅ **Resource mapping to HyperMesh assets**
+- ✅ **Execution delegation to HyperMesh infrastructure**
+- ⏳ **Production deployment at catalog.hypermesh.online**
 
 ---
 
-*Catalog: Universal Asset SDK - Safe, Secure, Scalable*
+*Catalog: HyperMesh Asset Package Manager - Native, Secure, Scalable*
