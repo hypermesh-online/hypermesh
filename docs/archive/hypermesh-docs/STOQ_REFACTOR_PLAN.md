@@ -232,7 +232,7 @@ mod cdn_tests {
 - ✅ Edge network support
 
 ### Performance Requirements
-- ✅ Real 40+ Gbps throughput (not simulated)
+- ✅ Real adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput (not simulated)
 - ✅ 100K+ concurrent connections
 - ✅ <10ms route discovery
 - ✅ <100ms chunk retrieval

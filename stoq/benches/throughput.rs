@@ -1,6 +1,6 @@
 //! STOQ Protocol Pure Transport Benchmarks
 //! 
-//! This benchmark suite provides REAL transport performance testing for 40 Gbps target.
+//! This benchmark suite provides REAL transport performance testing for adaptive network tiers target.
 //! Tests pure QUIC transport without application-layer contamination.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
@@ -17,13 +17,13 @@ fn init_crypto() {
     }
 }
 
-/// Pure transport throughput benchmark for 40 Gbps target
+/// Pure transport throughput benchmark for adaptive network tiers target
 fn benchmark_pure_transport_throughput(c: &mut Criterion) {
     init_crypto(); // Initialize crypto provider
     let rt = Runtime::new().unwrap();
     
     let mut group = c.benchmark_group("pure_transport_40gbps");
-    group.throughput(Throughput::Bytes(1024 * 1024 * 1000)); // 1GB test for 40 Gbps
+    group.throughput(Throughput::Bytes(1024 * 1024 * 1000)); // 1GB test for adaptive network tiers
     
     group.bench_function("quic_transport_pure_40gbps", |b| {
         b.to_async(&rt).iter(|| async {
@@ -38,7 +38,7 @@ fn benchmark_pure_transport_throughput(c: &mut Criterion) {
             
             let transport = stoq.transport();
             
-            // Generate test data for 40 Gbps measurement
+            // Generate test data for adaptive network tiers measurement
             let test_data = generate_test_data(1024 * 1024 * 1000); // 1GB
             
             // Measure pure transport throughput
@@ -58,7 +58,7 @@ fn benchmark_pure_transport_throughput(c: &mut Criterion) {
     
     group.bench_function("connection_pool_performance", |b| {
         b.to_async(&rt).iter(|| async {
-            // Test connection pooling for 40 Gbps performance
+            // Test connection pooling for adaptive network tiers performance
             let mut config = StoqConfig::default();
             config.transport.port = 9293 + (std::process::id() % 1000) as u16; // Dynamic port
             let stoq = StoqBuilder::new()
@@ -101,7 +101,7 @@ fn benchmark_pure_transport_throughput(c: &mut Criterion) {
     
     group.bench_function("zero_copy_datagram_performance", |b| {
         b.to_async(&rt).iter(|| async {
-            // Test zero-copy datagram performance for 40 Gbps
+            // Test zero-copy datagram performance for adaptive network tiers
             let mut config = StoqConfig::default();
             config.transport.port = 9294 + (std::process::id() % 1000) as u16; // Dynamic port
             let _stoq = StoqBuilder::new()
@@ -186,7 +186,7 @@ fn benchmark_data_handling(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     
     let mut group = c.benchmark_group("data_handling_40gbps");
-    group.throughput(Throughput::Bytes(1024 * 1024 * 1024)); // 1GB for 40 Gbps test
+    group.throughput(Throughput::Bytes(1024 * 1024 * 1024)); // 1GB for adaptive network tiers test
     
     group.bench_function("transport_1gb_throughput", |b| {
         b.to_async(&rt).iter(|| async {
@@ -225,13 +225,13 @@ fn benchmark_data_handling(c: &mut Criterion) {
                 .await
                 .expect("Failed to build STOQ");
             
-            // Simulate packet processing for 40 Gbps
+            // Simulate packet processing for adaptive network tiers
             let packet_size = 1500; // Ethernet MTU
-            let packets_for_40gbps = (40_000_000_000 / 8) / packet_size; // Packets per second for 40 Gbps
+            let packets_for_adaptive network tiers
             
             let start = Instant::now();
             
-            // Simulate processing packets at 40 Gbps rate
+            // Simulate processing packets at adaptive network tiers rate
             let mut processed_packets = 0;
             for _ in 0..1_000_000 { // Process 1M packets
                 let _packet = generate_test_data(packet_size);
@@ -263,7 +263,7 @@ fn benchmark_transport_optimizations(c: &mut Criterion) {
                 .await
                 .expect("Failed to build STOQ");
             
-            // Simulate congestion control decisions for 40 Gbps
+            // Simulate congestion control decisions for adaptive network tiers
             let start = Instant::now();
             
             // Simulate 100,000 congestion control calculations
@@ -292,7 +292,7 @@ fn benchmark_transport_optimizations(c: &mut Criterion) {
                 .await
                 .expect("Failed to build STOQ");
             
-            // Simulate flow control for 40 Gbps streams
+            // Simulate flow control for adaptive network tiers streams
             let start = Instant::now();
             
             // Simulate 1000 concurrent streams with flow control

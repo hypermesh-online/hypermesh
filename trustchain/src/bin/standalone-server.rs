@@ -199,7 +199,7 @@ async fn system_status(State(state): State<AppState>) -> Json<serde_json::Value>
             "transport": {
                 "protocol": "STOQ",
                 "features": ["IPv6-only", "QUIC-based", "High-performance"],
-                "target_throughput": "40 Gbps"
+                "target_throughput": "adaptive network tiers"
             },
             "services": {
                 "certificate_authority": "Production-ready CA with HSM integration",

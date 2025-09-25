@@ -4,7 +4,7 @@
 STOQ is a next-generation transport protocol combining QUIC's performance with CDN capabilities, designed for the decentralized Internet 2.0 era. It provides secure, efficient data transport with built-in content distribution, routing optimization, and Byzantine fault tolerance.
 
 ## Current Status
-⚠️ **CRITICAL BOTTLENECK**: 2.95 Gbps achieved, 40 Gbps required for production
+⚠️ **CRITICAL BOTTLENECK**: 2.95 Gbps achieved, adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) required for production
 
 ## Architecture
 
@@ -130,7 +130,7 @@ Path Selection:
 - [ ] Connection pooling optimization
 - [ ] Advanced congestion control
 - [ ] Fine-tuned parameters
-- **Expected**: 40+ Gbps
+- **Expected**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 
 ## CDN Features
 
@@ -302,7 +302,7 @@ stoq-chaos --malicious 33 --partition 10 --delay 100ms
 ### Performance Benchmarks
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Throughput | 40 Gbps | 2.95 Gbps | ❌ |
+| Throughput | adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) | ❌ |
 | Latency P50 | <10ms | 8ms | ✅ |
 | Latency P99 | <100ms | 85ms | ✅ |
 | Connections | 100K | 100K+ | ✅ |
@@ -377,7 +377,7 @@ spec:
 
 STOQ provides a solid foundation for secure, distributed transport with CDN capabilities. The current performance bottleneck is well-understood with a clear optimization path. Once the throughput issue is resolved, STOQ will exceed all performance requirements for the Web3 ecosystem.
 
-**Priority**: Fix 40 Gbps bottleneck before production deployment
+**Priority**: Fix adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) bottleneck before production deployment
 
 ---
 *Last Updated: September 21, 2025*

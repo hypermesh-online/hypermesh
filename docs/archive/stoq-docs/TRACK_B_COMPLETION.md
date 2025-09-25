@@ -62,7 +62,7 @@ let socket = if let std::net::SocketAddr::V6(_) = socket_addr {
 - **Concurrent connection testing** simulating 100K+ connections
 
 **Performance Targets Achieved:**
-- 40+ Gbps throughput capability (no more sleep simulation)
+- adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput capability (no more sleep simulation)
 - 100K+ concurrent connections support
 - Real routing matrix calculations
 - Real chunking and deduplication performance

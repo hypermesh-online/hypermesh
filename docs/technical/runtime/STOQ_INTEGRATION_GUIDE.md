@@ -2,7 +2,7 @@
 
 ## Overview
 
-The STOQ (Statistical Temporal Operations & Querying) framework provides advanced statistical analysis and machine learning capabilities for HyperMesh's DNS/CT eBPF system. STOQ enables real-time anomaly detection, predictive analytics, and intelligent network optimization with 40Gbps+ packet processing capability.
+The STOQ (Statistical Temporal Operations & Querying) framework provides advanced statistical analysis and machine learning capabilities for HyperMesh's DNS/CT eBPF system. STOQ enables real-time anomaly detection, predictive analytics, and intelligent network optimization with adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing capability.
 
 ## Architecture Overview
 
@@ -11,7 +11,7 @@ The STOQ (Statistical Temporal Operations & Querying) framework provides advance
 #### 1. STOQ Statistical Engine
 - **Location**: Kernel-space eBPF programs with userspace ML inference
 - **Function**: Real-time statistical analysis and pattern recognition
-- **Performance**: 40Gbps+ sustained throughput, <20μs inference latency
+- **Performance**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ sustained throughput, <20μs inference latency
 - **Capabilities**: Time-series analysis, anomaly detection, predictive modeling
 
 #### 2. Temporal Data Processing Pipeline
@@ -704,4 +704,4 @@ impl<T> OptimizedCircularBuffer<T> {
 
 ---
 
-This STOQ integration guide provides comprehensive documentation for implementing advanced statistical analysis and machine learning capabilities within the HyperMesh DNS/CT eBPF system, enabling 40Gbps+ performance with intelligent network optimization and threat detection.
+This STOQ integration guide provides comprehensive documentation for implementing advanced statistical analysis and machine learning capabilities within the HyperMesh DNS/CT eBPF system, enabling adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ performance with intelligent network optimization and threat detection.

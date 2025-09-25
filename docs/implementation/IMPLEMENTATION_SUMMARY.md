@@ -30,7 +30,7 @@ This document consolidates all implementation details, technical decisions, and 
 - **Transport**: QUIC over IPv6 with automatic certificate management
 - **Routing**: ML-enhanced Dijkstra algorithm for path optimization
 - **CDN Features**: Edge caching, content delivery network capabilities
-- **Current Performance**: 2.95 Gbps (target: 40 Gbps)
+- **Current Performance**: 2.95 Gbps (target: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 
 #### Known Issues
 - Packet processing bottlenecks in QUIC implementation
@@ -156,7 +156,7 @@ Phase 3: Complete federation (no central dependencies)
 | HyperMesh | Asset Ops | 1s | 2ms | 500x |
 | Catalog | VM Execution | 1s | 1.69ms | 592x |
 | Caesar | Transaction | 1s | 450ms | 2.2x |
-| STOQ | Throughput | 40 Gbps | 2.95 Gbps | 0.07x |
+| STOQ | Throughput | adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) | 0.07x |
 
 ### Scalability
 - **Horizontal**: Linear scaling to 1M+ nodes
@@ -167,7 +167,7 @@ Phase 3: Complete federation (no central dependencies)
 ## Critical Gaps and Remediation
 
 ### STOQ Performance (CRITICAL)
-**Issue**: 2.95 Gbps vs 40 Gbps target
+**Issue**: 2.95 Gbps vs adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target
 **Root Cause**: QUIC packet processing bottlenecks
 **Remediation**:
 - Kernel-level eBPF optimizations
@@ -208,7 +208,7 @@ Phase 3: Complete federation (no central dependencies)
 ## Future Enhancements
 
 ### Phase 1 (Q1 2026)
-- STOQ performance optimization to 40 Gbps
+- STOQ performance optimization to adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 - Full production monitoring suite
 - Enterprise SSO integration
 - Compliance reporting (SOC2, HIPAA)

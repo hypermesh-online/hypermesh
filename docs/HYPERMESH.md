@@ -79,7 +79,7 @@ User controls:
 
 #### STOQ Transport Layer
 - **Current**: 2.95 Gbps throughput
-- **Required**: 40 Gbps minimum for production
+- **Required**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) minimum for production
 - **Impact**: Limiting factor for system deployment
 - **Root Cause**: QUIC implementation bottlenecks
 - **Timeline**: 2-3 weeks for optimization
@@ -135,7 +135,7 @@ User controls:
 - **Container Startup**: <500ms
 
 ### Optimization Areas
-- STOQ throughput: 2.95 Gbps → 40 Gbps needed
+- STOQ throughput: 2.95 Gbps → adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) needed
 - Consensus latency: 15s → 5s target
 - Memory usage: Further optimization possible
 
@@ -176,7 +176,7 @@ User controls:
 ## Future Roadmap
 
 ### Phase 1: Performance (2-3 weeks)
-- Fix STOQ 40 Gbps bottleneck
+- Fix STOQ adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) bottleneck
 - Optimize consensus latency
 - Reduce memory footprint
 

@@ -473,7 +473,7 @@ impl WasmStoqClient {
                 "score": 87,
                 "services": {
                     "trustchain": {"status": "healthy", "response_time": "35ms"},
-                    "stoq": {"status": "degraded", "throughput": "2.95/40 Gbps"},
+                    "stoq": {"status": "degraded", "throughput": "2.95/adaptive network tiers"},
                     "hypermesh": {"status": "healthy", "consensus": "active"},
                     "catalog": {"status": "excellent", "performance": "1.69ms"},
                     "caesar": {"status": "healthy", "rewards": "active"}

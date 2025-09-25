@@ -8,7 +8,7 @@ This guide provides step-by-step instructions for deploying TrustChain's product
 
 - **IPv6-Only Networking**: Complete IPv6 infrastructure with no IPv4 support
 - **AWS CloudHSM**: Hardware security modules for certificate authority keys
-- **High Performance**: 40+ Gbps STOQ protocol support with enhanced networking
+- **High Performance**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) STOQ protocol support with enhanced networking
 - **Multi-Service**: CA (8443), CT (6962), DNS (8853), STOQ (8444), HyperMesh (8445), Integration (8446)
 - **Compliance**: 7-year retention, FIPS 140-2 Level 3, automated backup and monitoring
 

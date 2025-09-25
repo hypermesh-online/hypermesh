@@ -1,7 +1,7 @@
-//! Hardware acceleration optimizations for 40 Gbps performance
+//! Hardware acceleration optimizations for adaptive network tiers performance
 //! 
 //! This module implements kernel bypass and hardware offloading optimizations
-//! to push STOQ transport performance from 20.1 Gbps to 40+ Gbps
+//! to push STOQ transport performance from 20.1 Gbps to adaptive network tiers
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -9,7 +9,7 @@ use bytes::{Bytes, BytesMut};
 use anyhow::Result;
 use tracing::{info, debug, warn};
 
-/// Hardware acceleration configuration for 40 Gbps
+/// Hardware acceleration configuration for adaptive network tiers
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HardwareAccelConfig {
     /// Enable kernel bypass (io_uring, DPDK)
@@ -39,7 +39,7 @@ impl Default for HardwareAccelConfig {
     }
 }
 
-/// Hardware acceleration engine for 40 Gbps performance
+/// Hardware acceleration engine for adaptive network tiers performance
 pub struct HardwareAccelerator {
     config: HardwareAccelConfig,
     stats: Arc<HardwareStats>,
@@ -63,9 +63,9 @@ pub struct HardwareStats {
 }
 
 impl HardwareAccelerator {
-    /// Initialize hardware acceleration for 40 Gbps performance
+    /// Initialize hardware acceleration for adaptive network tiers performance
     pub fn new(config: HardwareAccelConfig) -> Result<Self> {
-        info!("Initializing hardware acceleration for 40 Gbps performance");
+        info!("Initializing hardware acceleration for adaptive network tiers performance");
         info!("Kernel bypass: {}, NIC offload: {}, LSO max: {} KB", 
               config.enable_kernel_bypass, config.enable_nic_offload, config.lso_max_size / 1024);
         
@@ -99,7 +99,7 @@ impl HardwareAccelerator {
     
     /// Initialize kernel bypass optimization (io_uring/DPDK)
     fn init_kernel_bypass(&self) -> Result<bool> {
-        debug!("Attempting to initialize kernel bypass for 40 Gbps performance");
+        debug!("Attempting to initialize kernel bypass for adaptive network tiers performance");
         
         // In a real implementation, this would initialize:
         // - io_uring for high-performance async I/O

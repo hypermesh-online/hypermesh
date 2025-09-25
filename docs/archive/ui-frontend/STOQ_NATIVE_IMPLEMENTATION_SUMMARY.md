@@ -205,7 +205,7 @@ function Dashboard() {
 ### Protocol Performance
 - **Connection Establishment**: ~100-500ms (QUIC handshake + TLS)
 - **Message Round-trip**: ~1-5ms (localhost testing)
-- **Throughput**: Targeting 40 Gbps (currently simulated at 2.95 Gbps)
+- **Throughput**: Targeting adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 - **Concurrent Connections**: Supports 1000+ simultaneous connections
 
 ### Browser Compatibility
@@ -260,7 +260,7 @@ function Dashboard() {
 - Replace simulated QUIC with actual QUIC-Rust integration
 - Implement full QUIC handshake and stream management
 - Add connection migration and 0-RTT support
-- Optimize for 40 Gbps target throughput
+- Optimize for adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target throughput
 
 ### Phase 2: Advanced Features
 - **Certificate Management**: Browser-based certificate storage

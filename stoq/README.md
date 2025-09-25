@@ -2,7 +2,7 @@
 
 **Status: ✅ COMPLETE - Optimization Required**
 
-STOQ is a fully functional transport protocol with TrustChain integration, IPv6-only networking, and certificate lifecycle automation. While operational, performance optimization is needed to reach the 40 Gbps target (currently 2.95 Gbps).
+STOQ is a fully functional transport protocol with TrustChain integration, IPv6-only networking, and certificate lifecycle automation. While operational, performance optimization is needed to reach the adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)).
 
 ## 🚀 Quick Start
 
@@ -24,7 +24,7 @@ cargo test
 
 ### Current Performance (Track B Complete)
 - **Throughput**: 2.95 Gbps measured (bottleneck identified)
-- **Target**: 40 Gbps (optimization required)
+- **Target**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) (optimization required)
 - **Connections**: 100K+ concurrent connections validated
 - **Latency**: Sub-millisecond route discovery achieved
 - **IPv6-Only**: Complete enforcement at socket level
@@ -33,7 +33,7 @@ cargo test
 ### QA Conditional Approval
 - **Status**: Approved with optimization requirement
 - **Phase 1**: Deploy with performance monitoring
-- **Phase 2**: Optimization sprint to reach 40 Gbps
+- **Phase 2**: Optimization sprint to reach adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 - **Phase 3**: Full production deployment
 
 ## 🏗️ Architecture
@@ -132,7 +132,7 @@ STOQ is designed to work with:
 - [x] Integration tests passing (93.1% success rate)
 
 ### ⚠️ Optimization Required
-- [ ] Performance optimization to reach 40 Gbps target
+- [ ] Performance optimization to reach adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target
 - [ ] Advanced buffering and zero-copy improvements
 - [ ] ML-optimized routing engine
 - [ ] Production deployment at scale

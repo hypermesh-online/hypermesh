@@ -42,7 +42,7 @@ infrastructure/
 - **Instance Type**: c6g.4xlarge (ARM-based, 16 vCPU, 32GB RAM)
 - **Auto Scaling**: 2-6 instances with performance-based scaling
 - **Placement Groups**: Cluster placement for enhanced networking
-- **Enhanced Networking**: SR-IOV for 40+ Gbps throughput
+- **Enhanced Networking**: SR-IOV for adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput
 - **Storage**: GP3 SSD with 3,000 IOPS and 125 MB/s throughput
 
 ### **Load Balancing**
@@ -109,7 +109,7 @@ infrastructure/
 ### **Performance Targets**
 - **Certificate Operations**: <35ms response time
 - **DNS Resolution**: <100ms for IPv6 queries
-- **STOQ Throughput**: 40+ Gbps target bandwidth
+- **STOQ Throughput**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target bandwidth
 - **Availability**: 99.99% uptime target
 - **Certificate Processing**: 1,000+ operations per second
 
@@ -250,7 +250,7 @@ infrastructure/
 1. **Configure Domain**: Set up trust.hypermesh.online in Route 53
 2. **Deploy Infrastructure**: Run complete deployment with production settings
 3. **Security Review**: Conduct security audit and penetration testing
-4. **Performance Testing**: Validate 40+ Gbps STOQ throughput requirements
+4. **Performance Testing**: Validate adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) STOQ throughput requirements
 
 ### **Production Optimization**
 1. **Cost Optimization**: Enable reserved instances and spot instances for dev

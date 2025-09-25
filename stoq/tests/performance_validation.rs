@@ -1,4 +1,4 @@
-//! Performance validation test for 40+ Gbps STOQ optimizations
+//! Performance validation test for adaptive network tiers STOQ optimizations
 //! 
 //! This test validates that our optimizations achieve the target performance improvements
 
@@ -13,7 +13,7 @@ async fn test_40gbps_optimizations() {
         // Already installed, ignore error
     }
     
-    println!("🚀 Testing 40+ Gbps STOQ optimizations");
+    println!("🚀 Testing adaptive network tiers STOQ optimizations");
     
     // Test baseline performance (minimal config)
     let baseline_throughput = test_baseline_performance().await;
@@ -43,7 +43,7 @@ async fn test_40gbps_optimizations() {
     println!("🔥 Combined optimizations throughput: {:.2} Gbps ({:+.1}% improvement)", 
              combined_throughput, combined_improvement);
     
-    // Validate we're approaching 40 Gbps target
+    // Validate we're approaching adaptive network tiers target
     println!("\n📈 Performance Analysis:");
     println!("   Baseline (20.1 Gbps):        {:.1}% of target", (baseline_throughput / 40.0) * 100.0);
     println!("   Combined optimizations:      {:.1}% of target", (combined_throughput / 40.0) * 100.0);

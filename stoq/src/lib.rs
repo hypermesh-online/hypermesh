@@ -7,7 +7,7 @@
 //! STOQ is designed as a pure transport protocol without application-layer features.
 
 #![warn(missing_docs)]
-// Allow unsafe code for 40 Gbps performance optimizations (memory pools, zero-copy)
+// Allow unsafe code for adaptive network tiers performance optimizations (memory pools, zero-copy)
 #![allow(unsafe_code)]
 
 pub mod transport;

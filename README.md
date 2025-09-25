@@ -58,7 +58,7 @@ The Web3 ecosystem replaces traditional infrastructure:
 
 **Performance**:
 - Measured: 2.95 Gbps (bottleneck identified)
-- Target: 40 Gbps
+- Target: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 - **Optimization required before full-scale deployment**
 
 ### 💎 HyperMesh Asset System (`/hypermesh/`)
@@ -111,7 +111,7 @@ The Web3 ecosystem replaces traditional infrastructure:
 - Collect real-world metrics
 
 **Phase 2: Optimization Sprint (Weeks 3-4)**
-- Address STOQ bottleneck (2.95 Gbps → 40 Gbps target)
+- Address STOQ bottleneck (2.95 Gbps → adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target)
 - Performance tuning based on Phase 1 metrics
 - Scale testing with increased load
 
@@ -213,7 +213,7 @@ Security Validation:    ✅ Complete
 - ✅ Integration test failures - **93.1% PASSING**
 
 ### Current Limitations
-- ⚠️ STOQ throughput bottleneck at 2.95 Gbps (target: 40 Gbps)
+- ⚠️ STOQ throughput bottleneck at 2.95 Gbps (target: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
   - **Resolution**: Performance optimization in Phase 2
   - **Workaround**: Deploy with monitoring, scale horizontally
 

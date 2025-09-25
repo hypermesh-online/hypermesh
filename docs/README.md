@@ -32,13 +32,13 @@ Complete documentation for the Web3 decentralized compute and storage ecosystem.
 | HyperMesh | ✅ Core Complete | 500x target | 0.002s asset operations |
 | Caesar | ✅ Functional | 2.2x target | Full economic model working |
 | Catalog | ✅ Production Ready | 592x target | 1.69ms VM operations |
-| STOQ | ⚠️ **BOTTLENECK** | 7.4% target | 2.95 Gbps (need 40 Gbps) |
+| STOQ | ⚠️ **BOTTLENECK** | 7.4% target | 2.95 Gbps (need adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)) |
 | UI | ✅ Beta Ready | Good | Minor import fix needed |
 
 **Overall Readiness: 85%** - Ready for staged deployment with monitoring
 
 ## Critical Issue
-**STOQ Performance**: Current throughput of 2.95 Gbps is the primary bottleneck preventing full production deployment. Optimization path identified with 2-3 week timeline to achieve 40 Gbps target.
+**STOQ Performance**: Current throughput of 2.95 Gbps is the primary bottleneck preventing full production deployment. Optimization path identified with 2-3 week timeline to achieve adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target.
 
 ## Repository Organization
 ```

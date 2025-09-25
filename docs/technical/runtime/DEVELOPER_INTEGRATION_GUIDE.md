@@ -409,7 +409,7 @@ async fn run_performance_benchmark() -> Result<(), BenchmarkError> {
     
     if let Some(throughput) = &results.throughput_results {
         println!("  Peak Throughput: {:.1} Gbps", throughput.peak_sustained_throughput_gbps);
-        println!("  40Gbps Capability: {}", throughput.achieved_40gbps_capability);
+        println!("  adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)_capability);
         println!("  Packet Loss Rate: {:.2}%", throughput.packet_loss_rate_percent);
     }
     
@@ -1017,7 +1017,7 @@ async fn test_stoq_performance_benchmarks() -> Result<(), Box<dyn std::error::Er
     let results = run_stoq_benchmark(benchmark_config).await?;
     
     // Verify performance targets
-    assert!(results.achieved_40gbps_capability);
+    assert!(results.achieved_adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)_capability);
     assert!(results.peak_sustained_throughput_gbps >= 40.0);
     assert!(results.packet_loss_rate_percent < 2.0);
     

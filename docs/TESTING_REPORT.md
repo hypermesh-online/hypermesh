@@ -34,7 +34,7 @@
 
 #### 1. STOQ Performance Bottleneck (CRITICAL)
 - **Current**: 2.95 Gbps throughput
-- **Required**: 40 Gbps minimum
+- **Required**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) minimum
 - **Impact**: Major limiting factor for production deployment
 - **Root Cause**: QUIC implementation bottlenecks in packet processing
 - **Resolution**: 2-3 weeks optimization required
@@ -84,7 +84,7 @@
 - Transport layer: ✅ QUIC over IPv6 working
 - Routing: ✅ ML-enhanced Dijkstra functional
 - CDN features: ✅ Edge caching operational
-- **Throughput**: ❌ 2.95 Gbps (need 40 Gbps)
+- **Throughput**: ❌ 2.95 Gbps (need adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 
 ## Security Validation
 
@@ -115,7 +115,7 @@
 | HyperMesh | 1s | 2ms | ✅ 500x |
 | Catalog | 1s | 1.69ms | ✅ 592x |
 | Caesar | 1s | 450ms | ✅ 2.2x |
-| STOQ | 40 Gbps | 2.95 Gbps | ❌ 7.4% |
+| STOQ | adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) | ❌ 7.4% |
 
 ### Load Testing Results
 - **Concurrent Connections**: 10,000+ supported
@@ -188,7 +188,7 @@
 4. Document known limitations
 
 ### Phase 2: Optimization (Weeks 2-3)
-1. Fix STOQ 40 Gbps bottleneck
+1. Fix STOQ adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) bottleneck
 2. Implement CI/CD pipeline
 3. Fix hardware detection
 4. Split oversized files
@@ -238,7 +238,7 @@ The Web3 ecosystem has achieved **85% production readiness** with strong foundat
 - **Sub-millisecond DNS resolution**: Achieved <1ms target
 - **Byzantine fault tolerance**: 33% malicious node resistance verified
 - **Certificate transparency validation**: <100ms validation at kernel level
-- **STOQ integration**: 40Gbps+ packet processing validated
+- **STOQ integration**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing validated
 - **Cache performance**: 95% hit rate with 256MB memory limit
 - **Concurrent operations**: 1000+ simultaneous DNS queries handled
 

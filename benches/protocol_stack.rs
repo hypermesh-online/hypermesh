@@ -190,11 +190,11 @@ fn bench_performance_targets(c: &mut Criterion) {
     
     let mut group = c.benchmark_group("performance_targets");
     
-    // Test 40 Gbps STOQ target (simulated)
-    group.throughput(Throughput::Bytes(5_000_000_000)); // 5GB for 40 Gbps test
+    // Test adaptive network tiers STOQ target (simulated)
+    group.throughput(Throughput::Bytes(5_000_000_000)); // 5GB for adaptive network tiers test
     group.bench_function("stoq_40gbps_target", |b| {
         b.to_async(&rt).iter(|| async {
-            // Simulate processing 5GB in 1 second (40 Gbps)
+            // Simulate processing 5GB in 1 second (adaptive network tiers)
             let chunk_size = 1024 * 1024; // 1MB chunks
             let num_chunks = 5000; // 5GB total
             

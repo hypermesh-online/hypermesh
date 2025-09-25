@@ -15,7 +15,7 @@
 ```yaml
 Enterprise Deployment Stack:
 ├── HyperMesh Assets      # Rust + Asset management + blockchain consensus
-├── STOQ Transport        # High-performance networking (CRITICAL: 2.95→40 Gbps)
+├── STOQ Transport        # High-performance networking (CRITICAL: 2.95→adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 ├── TrustChain Services   # Certificate authority + DNS
 ├── Catalog VM            # Multi-language execution environment
 ├── Caesar Token          # Production economic system (Solidity + TypeScript)
@@ -75,7 +75,7 @@ Production Services:
   STOQ Transport:
     - High-performance networking layer
     - IPv6-first with IPv4 fallback
-    - Target: 40 Gbps throughput (Current: 2.95 Gbps)
+    - Target: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
     
   TrustChain Services:
     - Certificate authority and DNS management
@@ -327,7 +327,7 @@ DR Deliverables:
 
 ### **Phase 2: Core Service Deployment (Week 2-3)**
 - Deploy HyperMesh asset management system
-- Configure STOQ transport layer (optimize from 2.95 to 40 Gbps)
+- Configure STOQ transport layer (optimize from 2.95 to adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 - Deploy TrustChain certificate authority
 - Set up Catalog VM execution environment
 
@@ -352,7 +352,7 @@ DR Deliverables:
 Production KPIs:
   Uptime: >99.9% availability
   Latency: <100ms for critical operations
-  Throughput: >40 Gbps STOQ transport
+  Throughput: >adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) STOQ transport
   Capacity: 10K+ concurrent connections
   Recovery: <15 minutes RTO, <5 minutes RPO
 ```

@@ -26,7 +26,7 @@ The HyperMesh system has successfully completed final performance optimization a
 - **MFN Layer 3 (ALM)**: 1,783% routing improvement + 42% allocation reduction
 - **MFN Layer 4 (CPE)**: 96.8% ML accuracy + 38% memory optimization
 - **Container Startup**: <50ms average (50% improvement over 100ms target)
-- **STOQ Throughput**: 47.2 Gbps peak (18% above 40 Gbps target)
+- **STOQ Throughput**: 47.2 Gbps peak (18% above adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target)
 
 ---
 
@@ -40,7 +40,7 @@ The HyperMesh system has successfully completed final performance optimization a
 - **Overall**: <450MB per node (10% under target)
 
 ### 2. STOQ Protocol Tuning
-- **Peak Throughput**: 47.2 Gbps (18% above 40 Gbps target)
+- **Peak Throughput**: 47.2 Gbps (18% above adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target)
 - **Sustained Throughput**: 42.8 Gbps average over 1 hour
 - **Connection Setup**: <2ms (60% improvement)
 - **Packet Loss**: <0.8% under maximum load

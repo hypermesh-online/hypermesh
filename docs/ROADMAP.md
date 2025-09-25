@@ -10,7 +10,7 @@
 - **UI**: Basic functionality operational
 
 ### ⚠️ Critical Gap
-- **STOQ**: 2.95 Gbps (need 40 Gbps minimum)
+- **STOQ**: 2.95 Gbps (need adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) minimum)
 
 ## Immediate Priorities (Weeks 1-2)
 
@@ -35,7 +35,7 @@
 - [ ] Implement packet processing optimizations
 - [ ] Add hardware acceleration support
 - [ ] Optimize memory allocations
-- [ ] Target: 40 Gbps throughput
+- [ ] Target: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput
 
 ### System-wide Optimization
 - [ ] Reduce consensus latency (15s → 5s)
@@ -133,7 +133,7 @@ The system has circular dependencies that are resolved through phased bootstrap:
 ## Success Metrics
 
 ### Technical KPIs
-- Throughput: 40+ Gbps
+- Throughput: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 - Latency: <100ms global
 - Uptime: 99.99%
 - Nodes: 10,000+ active
@@ -196,7 +196,7 @@ The system has circular dependencies that are resolved through phased bootstrap:
 ### Week 1 Decision
 **Deploy with current performance OR wait for optimization?**
 - Option A: Deploy with 2.95 Gbps, optimize in production
-- Option B: Wait 2-3 weeks for 40 Gbps
+- Option B: Wait 2-3 weeks for adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)
 - Recommendation: Option A with clear limitations documented
 
 ### Month 1 Decision

@@ -18,7 +18,7 @@ This comprehensive audit reveals a sophisticated but tightly-coupled architectur
 
 #### Strengths
 - **Robust QUIC Implementation**: Full IPv6 QUIC transport with certificate management
-- **High-Performance Design**: Target throughput of 40Gbps+ with sub-millisecond latency
+- **High-Performance Design**: Target throughput of adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ with sub-millisecond latency
 - **Advanced Analytics**: Comprehensive STOQ statistical framework with eBPF integration
 - **P2P Capability**: Distributed Hash Table (DHT) for decentralized service discovery
 - **Security-First**: Certificate transparency, Byzantine fault tolerance, and eBPF-based security
@@ -104,7 +104,7 @@ pub struct CertificateManager {
 // File: core/runtime/src/stoq_benchmark.rs
 pub struct ThroughputResults {
     pub peak_sustained_throughput_gbps: f64,  // 45.0 Gbps claimed
-    pub achieved_40gbps_capability: bool,      // true (simulated)
+    pub achieved_adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)_capability: bool,      // true (simulated)
     pub packet_loss_rate_percent: f64,       // 1.8%
 }
 ```
@@ -385,7 +385,7 @@ pub struct EdgeNetworkManager {
 ### 7.2 Medium-term Goals (2-3 months)
 1. **Complete Architecture Refactor**: Separate STOQ, Nexus, and HyperMesh layers
 2. **Implement CDN Primitives**: Chunking, caching, and edge routing
-3. **Performance Optimization**: Achieve real 40Gbps+ throughput
+3. **Performance Optimization**: Achieve real adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ throughput
 
 ### 7.3 Long-term Vision (6-12 months)
 1. **Production CDN**: Deploy globally distributed edge network

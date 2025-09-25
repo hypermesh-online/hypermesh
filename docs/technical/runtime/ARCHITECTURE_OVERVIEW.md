@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-HyperMesh represents a revolutionary approach to distributed computing infrastructure, combining DNS/CT eBPF breakthrough technology, STOQ statistical framework, and Byzantine fault tolerance to create a next-generation container orchestration platform. This architecture achieves sub-millisecond DNS resolution, 40Gbps+ packet processing, and Byzantine-resilient consensus while maintaining enterprise-grade security and scalability.
+HyperMesh represents a revolutionary approach to distributed computing infrastructure, combining DNS/CT eBPF breakthrough technology, STOQ statistical framework, and Byzantine fault tolerance to create a next-generation container orchestration platform. This architecture achieves sub-millisecond DNS resolution, adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing, and Byzantine-resilient consensus while maintaining enterprise-grade security and scalability.
 
 ## System Architecture
 
@@ -38,7 +38,7 @@ HyperMesh represents a revolutionary approach to distributed computing infrastru
 │                       Infrastructure Layer                             │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
 │  │  DNS/CT eBPF    │  │  STOQ Analytics │  │    Security Layer       │  │
-│  │   (Sub-ms)      │  │  (40Gbps+)      │  │   (Certificates)        │  │
+│  │   (Sub-ms)      │  │  (adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+)      │  │   (Certificates)        │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -193,7 +193,7 @@ struct consensus_state {
     ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────────┐
 │  Packet Stream  │───▶│   eBPF Data     │───▶│   Statistical          │
-│  (40Gbps+)      │    │   Collection    │    │   Processing           │
+│  (adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+)      │    │   Collection    │    │   Processing           │
 └─────────────────┘    └─────────────────┘    └─────────────────────────┘
                                 │                       │
                                 ▼                       ▼

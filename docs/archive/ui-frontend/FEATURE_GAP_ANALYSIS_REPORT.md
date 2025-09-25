@@ -68,7 +68,7 @@
 | Tunnel Management | ✅ Complete (4 components) | ❌ Missing | **CRITICAL** |
 | Traffic Analysis | ✅ Real-time (3 components) | ❌ Missing | **CRITICAL** |
 | Routing/Load Balancing | ✅ Advanced (3 components) | ❌ Missing | **CRITICAL** |
-| Performance Metrics | ✅ 2.95/40 Gbps tracking | 🟡 Static display | **HIGH** |
+| Performance Metrics | ✅ 2.95/adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) tracking | 🟡 Static display | **HIGH** |
 
 ### **Caesar (Economic System)**
 | Feature Category | Legacy Status | New Status | Gap Severity |

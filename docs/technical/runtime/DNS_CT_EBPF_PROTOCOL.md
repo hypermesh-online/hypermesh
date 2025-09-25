@@ -11,7 +11,7 @@ The DNS/CT (Domain Name System with Certificate Transparency) eBPF protocol repr
 #### 1. DNS/CT eBPF Engine
 - **Location**: Kernel-space eBPF programs
 - **Function**: High-performance packet processing and DNS resolution
-- **Performance**: Sub-millisecond DNS resolution, 40Gbps+ packet processing
+- **Performance**: Sub-millisecond DNS resolution, adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ packet processing
 - **Security**: Hardware-assisted validation with certificate transparency integration
 
 #### 2. Byzantine Fault-Tolerant Consensus
@@ -40,7 +40,7 @@ Certificate Validation → Encrypted Response
 #### Key Performance Metrics
 - **Resolution Time**: 0.1ms - 0.8ms (average 0.3ms)
 - **Cache Hit Rate**: >95% for frequently accessed domains
-- **Throughput**: 40Gbps+ sustained packet processing
+- **Throughput**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+ sustained packet processing
 - **Concurrent Queries**: >1M simultaneous queries per node
 
 ### eBPF Program Architecture

@@ -34,7 +34,7 @@ use hardware_acceleration::{HardwareAccelerator, HardwareAccelConfig, HardwareAc
 // Forward declaration for protocol handler integration
 use crate::protocol::StoqProtocolHandler;
 
-/// High-performance STOQ Transport configuration optimized for 40 Gbps
+/// High-performance STOQ Transport configuration optimized for adaptive network tiers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportConfig {
     /// Bind address (IPv6 only)
@@ -53,17 +53,17 @@ pub struct TransportConfig {
     pub max_idle_timeout: Duration,
     /// Certificate rotation interval
     pub cert_rotation_interval: Duration,
-    /// Maximum concurrent streams per connection (40 Gbps optimization)
+    /// Maximum concurrent streams per connection (adaptive network tiers optimization)
     pub max_concurrent_streams: u32,
-    /// Send buffer size (40 Gbps optimization)
+    /// Send buffer size (adaptive network tiers optimization)
     pub send_buffer_size: usize,
-    /// Receive buffer size (40 Gbps optimization)
+    /// Receive buffer size (adaptive network tiers optimization)
     pub receive_buffer_size: usize,
     /// Connection pool size for multiplexing
     pub connection_pool_size: usize,
     /// Enable zero-copy operations
     pub enable_zero_copy: bool,
-    /// Maximum datagram size (40 Gbps optimization)
+    /// Maximum datagram size (adaptive network tiers optimization)
     pub max_datagram_size: usize,
     /// Congestion control algorithm
     pub congestion_control: CongestionControl,
@@ -94,7 +94,7 @@ pub enum CongestionControl {
 
 impl Default for CongestionControl {
     fn default() -> Self {
-        Self::Bbr2 // BBR v2 for 40 Gbps performance
+        Self::Bbr2 // BBR v2 for adaptive network tiers performance
     }
 }
 
@@ -109,14 +109,14 @@ impl Default for TransportConfig {
             enable_0rtt: true,
             max_idle_timeout: Duration::from_secs(120), // Increased for connection reuse
             cert_rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
-            max_concurrent_streams: 1000, // 10x increase for 40 Gbps
-            send_buffer_size: 16 * 1024 * 1024, // 16MB for 40 Gbps
-            receive_buffer_size: 16 * 1024 * 1024, // 16MB for 40 Gbps
+            max_concurrent_streams: 1000, // 10x increase for adaptive network tiers
+            send_buffer_size: 16 * 1024 * 1024, // 16MB for adaptive network tiers
+            receive_buffer_size: 16 * 1024 * 1024, // 16MB for adaptive network tiers
             connection_pool_size: 100, // Connection multiplexing
             enable_zero_copy: true, // Zero-copy optimization
             max_datagram_size: 65507, // Maximum UDP datagram
             congestion_control: CongestionControl::default(),
-            enable_memory_pool: true, // Memory pool for 40 Gbps
+            enable_memory_pool: true, // Memory pool for adaptive network tiers
             memory_pool_size: 1024, // 1024 buffers per pool
             frame_batch_size: 64, // Batch 64 frames per syscall
             enable_cpu_affinity: true, // CPU affinity optimization
@@ -168,7 +168,7 @@ pub struct MemoryPool {
 }
 
 impl MemoryPool {
-    /// Create a new memory pool optimized for 40 Gbps performance
+    /// Create a new memory pool optimized for adaptive network tiers performance
     pub fn new(buffer_size: usize, max_buffers: usize) -> Self {
         Self {
             buffers: SegQueue::new(),
@@ -254,7 +254,7 @@ impl FrameBatch {
     }
 }
 
-/// Active QUIC connection with 40 Gbps optimizations
+/// Active QUIC connection with adaptive network tiers optimizations
 pub struct Connection {
     inner: quinn::Connection,
     endpoint: Endpoint,
@@ -265,7 +265,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Create new connection with 40 Gbps optimizations
+    /// Create new connection with adaptive network tiers optimizations
     pub fn new_optimized(
         inner: quinn::Connection,
         endpoint: Endpoint,
@@ -360,7 +360,7 @@ impl Stream {
     }
 }
 
-/// High-performance STOQ transport optimized for 40 Gbps
+/// High-performance STOQ transport optimized for adaptive network tiers
 pub struct StoqTransport {
     config: TransportConfig,
     endpoint: Arc<quinn::Endpoint>,
@@ -376,7 +376,7 @@ pub struct StoqTransport {
     protocol_handler: Option<Arc<StoqProtocolHandler>>,
 }
 
-/// Performance statistics for 40 Gbps monitoring
+/// Performance statistics for adaptive network tiers monitoring
 #[derive(Debug, Default)]
 pub struct PerformanceStats {
     pub total_bytes_sent: AtomicU64,
@@ -390,7 +390,7 @@ pub struct PerformanceStats {
 }
 
 impl StoqTransport {
-    /// Create a new high-performance STOQ transport optimized for 40 Gbps
+    /// Create a new high-performance STOQ transport optimized for adaptive network tiers
     pub async fn new(config: TransportConfig) -> Result<Self> {
         info!("Initializing high-performance STOQ transport on [{}]:{}", config.bind_address, config.port);
         info!("Performance optimizations: zero_copy={}, pool_size={}, max_streams={}", 
@@ -409,13 +409,13 @@ impl StoqTransport {
         
         let cert_manager = Arc::new(CertificateManager::new(cert_config).await?);
         
-        // Configure QUIC transport for 40 Gbps performance
+        // Configure QUIC transport for adaptive network tiers performance
         let mut server_transport_config = QuinnTransportConfig::default();
         server_transport_config.max_concurrent_bidi_streams(config.max_concurrent_streams.into());
         server_transport_config.max_concurrent_uni_streams(config.max_concurrent_streams.into());
         server_transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
         
-        // 40 Gbps optimizations
+        // adaptive network tiers optimizations
         server_transport_config.send_window(config.send_buffer_size as u64);
         server_transport_config.receive_window(VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX));
         server_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
@@ -431,11 +431,11 @@ impl StoqTransport {
         client_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
         client_transport_config.datagram_send_buffer_size(config.max_datagram_size);
         
-        // Advanced congestion control for 40 Gbps
+        // Advanced congestion control for adaptive network tiers
         match config.congestion_control {
             CongestionControl::Bbr2 => {
                 // BBR v2 would be configured here when available in Quinn
-                debug!("Using BBR-optimized settings for 40 Gbps performance");
+                debug!("Using BBR-optimized settings for adaptive network tiers performance");
             }
             CongestionControl::Cubic => {
                 debug!("Using CUBIC congestion control");
@@ -469,7 +469,7 @@ impl StoqTransport {
         
         let socket = std::net::UdpSocket::bind(socket_addr)?;
         
-        // Set socket options for 40 Gbps performance
+        // Set socket options for adaptive network tiers performance
         let socket = if let std::net::SocketAddr::V6(_) = socket_addr {
             let socket2_sock = socket2::Socket::from(socket);
             
@@ -500,7 +500,7 @@ impl StoqTransport {
         
         endpoint.set_default_client_config(client_config.clone());
         
-        // Initialize metrics and 40 Gbps optimizations
+        // Initialize metrics and adaptive network tiers optimizations
         let metrics = Arc::new(TransportMetrics::new());
         
         // Initialize memory pool for zero-copy operations
@@ -509,7 +509,7 @@ impl StoqTransport {
             config.memory_pool_size,
         ));
         
-        // Initialize hardware accelerator for 40+ Gbps performance
+        // Initialize hardware accelerator for adaptive network tiers performance
         let hardware_accelerator = if config.enable_cpu_affinity || config.enable_large_send_offload {
             match HardwareAccelerator::new(config.hardware_accel.clone()) {
                 Ok(accel) => {
@@ -542,7 +542,7 @@ impl StoqTransport {
         })
     }
     
-    /// Connect to a remote endpoint with connection pooling for 40 Gbps performance
+    /// Connect to a remote endpoint with connection pooling for adaptive network tiers performance
     pub async fn connect(&self, endpoint: &Endpoint) -> Result<Arc<Connection>> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         
@@ -578,7 +578,7 @@ impl StoqTransport {
         Ok(connection)
     }
     
-    /// Return connection to pool for reuse (40 Gbps optimization)
+    /// Return connection to pool for reuse (adaptive network tiers optimization)
     pub fn return_to_pool(&self, connection: Arc<Connection>) {
         if !connection.is_active() {
             return; // Don't pool inactive connections
@@ -644,7 +644,7 @@ impl StoqTransport {
         Ok(connection)
     }
     
-    /// Send data with advanced 40+ Gbps optimizations including hardware acceleration
+    /// Send data with advanced adaptive network tiers optimizations including hardware acceleration
     pub async fn send(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let start_time = std::time::Instant::now();
         
@@ -717,7 +717,7 @@ impl StoqTransport {
         Ok(())
     }
     
-    /// Send large data with frame batching for 40 Gbps performance
+    /// Send large data with frame batching for adaptive network tiers performance
     async fn send_large_data_batched(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let chunk_size = self.config.max_datagram_size;
         let mut chunks = data.chunks(chunk_size);
@@ -758,7 +758,7 @@ impl StoqTransport {
         Ok(())
     }
     
-    /// Receive data with zero-copy optimization for 40 Gbps performance
+    /// Receive data with zero-copy optimization for adaptive network tiers performance
     pub async fn receive(&self, conn: &Connection) -> Result<Bytes> {
         if self.config.enable_zero_copy {
             // Try datagram receive first for maximum performance
@@ -772,15 +772,15 @@ impl StoqTransport {
         stream.receive().await
     }
     
-    /// Get enhanced transport statistics with 40 Gbps metrics
+    /// Get enhanced transport statistics with adaptive network tiers metrics
     pub fn stats(&self) -> crate::TransportStats {
         let base_stats = self.metrics.get_stats(self.connections.len());
         
-        // Add 40 Gbps performance metrics
+        // Add adaptive network tiers performance metrics
         let perf_stats = self.performance_stats.read();
         let (pool_available, pool_allocated) = self.memory_pool.stats();
         
-        info!("40 Gbps Performance Stats: Peak {} Gbps, Zero-copy ops: {}, Pool hits/misses: {}/{}, Frame batches: {}",
+        info!("adaptive network tiers, Zero-copy ops: {}, Pool hits/misses: {}/{}, Frame batches: {}",
               perf_stats.peak_throughput_gbps.load(Ordering::Relaxed) as f64 / 1000.0,
               perf_stats.zero_copy_operations.load(Ordering::Relaxed),
               perf_stats.memory_pool_hits.load(Ordering::Relaxed),
@@ -816,7 +816,7 @@ impl StoqTransport {
         info!("STOQ transport shutdown complete");
     }
     
-    /// Get comprehensive connection pool statistics for 40 Gbps monitoring
+    /// Get comprehensive connection pool statistics for adaptive network tiers monitoring
     pub fn pool_stats(&self) -> Vec<(String, usize)> {
         self.connection_pool
             .iter()
@@ -824,7 +824,7 @@ impl StoqTransport {
             .collect()
     }
     
-    /// Get 40 Gbps performance statistics
+    /// Get adaptive network tiers performance statistics
     pub fn performance_stats(&self) -> (f64, u64, u64, u64) {
         let stats = self.performance_stats.read();
         let peak_gbps = stats.peak_throughput_gbps.load(Ordering::Relaxed) as f64 / 1000.0;
@@ -841,7 +841,7 @@ impl StoqTransport {
         (peak_gbps, zero_copy_ops, pool_hits, frame_batches)
     }
     
-    /// Enable connection multiplexing for specific endpoint (40 Gbps optimization)
+    /// Enable connection multiplexing for specific endpoint (adaptive network tiers optimization)
     pub async fn enable_multiplexing(&self, endpoint: &Endpoint, connection_count: usize) -> Result<()> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         let mut connections = VecDeque::with_capacity(connection_count);
@@ -855,13 +855,13 @@ impl StoqTransport {
         }
         
         self.connection_multiplexer.insert(pool_key, connections);
-        info!("Enabled {}x connection multiplexing for [{}]:{} (40 Gbps optimization)", 
+        info!("Enabled {}x connection multiplexing for [{}]:{} (adaptive network tiers optimization)", 
               connection_count, endpoint.address, endpoint.port);
         
         Ok(())
     }
     
-    /// Send data using connection multiplexing for maximum 40 Gbps throughput
+    /// Send data using connection multiplexing for maximum adaptive network tiers throughput
     pub async fn send_multiplexed(&self, endpoint: &Endpoint, data: &[u8]) -> Result<()> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         

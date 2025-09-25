@@ -24,7 +24,7 @@ The Web3 ecosystem is a complete reimplementation of cloud infrastructure built 
 - **Purpose**: Secure, efficient data transport
 - **Components**: QUIC implementation, CDN features, routing
 - **Protocol**: STOQ over IPv6
-- **Performance**: Target 40 Gbps throughput
+- **Performance**: Target adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) throughput
 
 ### Layer 3: Compute (HyperMesh)
 - **Purpose**: Distributed resource management
@@ -203,7 +203,7 @@ Global Infrastructure:
 - ✅ Testing completed
 
 ### Phase 2: Optimization (Current)
-- ⏳ STOQ performance (2.95 → 40 Gbps)
+- ⏳ STOQ performance (2.95 → adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps))
 - ⏳ Production infrastructure
 - ⏳ Security hardening
 

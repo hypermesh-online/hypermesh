@@ -40,7 +40,7 @@ The Nexus Distributed DNS and Certificate Transparency (CT) system represents a 
 ```
 
 **Capabilities:**
-- Parse DNS packets at wire speed (40Gbps+)
+- Parse DNS packets at wire speed (adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps)+)
 - Validate packet structure and detect anomalies
 - Cache hot DNS responses in eBPF maps
 - Drop malicious packets before kernel processing
@@ -793,7 +793,7 @@ Latency Targets:
 Throughput Targets:
   - Per Node: 10M queries/second
   - Per Cluster: 100M queries/second
-  - Per eBPF Program: 40Gbps packet processing
+  - Per eBPF Program: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) packet processing
 
 Availability Targets:
   - System Availability: 99.99% (52 minutes downtime/year)
