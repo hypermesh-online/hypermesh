@@ -291,10 +291,8 @@ scrape_configs:
   - targets: ['node1:9091', 'node2:9091', 'node3:9091']
 ```
 
-### Grafana Dashboard
 ```bash
 # Import Nexus dashboard
-curl -O https://raw.githubusercontent.com/hypermesh/grafana-dashboards/main/nexus-cluster.json
 
 # Or use the built-in metrics
 cargo run --bin nexus-test -- metrics --duration 300 --real-time

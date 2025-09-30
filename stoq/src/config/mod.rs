@@ -2,7 +2,6 @@
 //! 
 //! Provides configuration structures for pure STOQ transport protocol
 
-use std::time::Duration;
 use serde::{Serialize, Deserialize};
 
 // Re-export transport config only

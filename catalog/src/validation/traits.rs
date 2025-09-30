@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use crate::assets::Asset;
+use crate::assets::AssetPackage;
 use super::results::{SecurityValidationResult, SyntaxValidationResult};
 
 /// Type-specific validator trait
@@ -17,7 +17,7 @@ pub trait TypeValidator: Send + Sync {
     fn supported_types(&self) -> Vec<String>;
 
     /// Validate asset syntax
-    async fn validate_syntax(&self, asset: &Asset) -> Result<SyntaxValidationResult>;
+    async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult>;
 
     /// Check if validator supports asset type
     fn supports(&self, asset_type: &str) -> bool {
@@ -35,5 +35,5 @@ pub trait SecurityScanner: Send + Sync {
     fn capabilities(&self) -> Vec<String>;
 
     /// Perform security scan
-    async fn scan(&self, asset: &Asset) -> Result<SecurityValidationResult>;
+    async fn scan(&self, asset: &AssetPackage) -> Result<SecurityValidationResult>;
 }

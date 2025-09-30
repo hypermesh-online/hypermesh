@@ -1,0 +1,383 @@
+# HyperMesh Stack Helm Values
+
+global:
+  environment: production
+  version: latest
+  domain: hypermesh.online
+
+  # Image configuration
+  imageRegistry: ghcr.io
+  imagePullSecrets: []
+
+  # Security
+  rbac:
+    create: true
+  serviceAccount:
+    create: true
+    name: hypermesh
+
+  # Monitoring
+  monitoring:
+    enabled: true
+    ebpf: true
+
+# STOQ Protocol Layer
+stoq:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: hypermesh-online/stoq
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 6001
+    protocol: UDP
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+  config:
+    maxConnections: 10000
+    memoryPoolSize: 1073741824
+    adaptiveTiers:
+      - name: baseline
+        bandwidth: 100  # Mbps
+      - name: standard
+        bandwidth: 1000  # 1 Gbps
+      - name: performance
+        bandwidth: 2500  # 2.5 Gbps
+
+# TrustChain Certificate Authority
+trustchain:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: hypermesh-online/trustchain
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 8443
+    dnsPort: 8853
+    quicPort: 6002
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 10Gi
+
+  config:
+    bootstrapCA: true
+    certRotationHours: 24
+    dnsCacheTTL: 300
+
+# HyperMesh Core
+hypermesh:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: hypermesh-online/hypermesh
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 8080
+    quicPort: 6003
+    metricsPort: 9090
+
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 100Gi
+
+  config:
+    mode: production
+    consensusRequired: true
+    assetAdapters:
+      cpu: enabled
+      gpu: enabled
+      memory: enabled
+      storage: enabled
+
+# Catalog VM Service
+catalog:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: hypermesh-online/catalog
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 7001
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  cache:
+    size: 2147483648  # 2GB
+
+  config:
+    enableJIT: true
+    maxWorkers: 8
+
+# Caesar Economic System
+caesar:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: hypermesh-online/caesar
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 8081
+    quicPort: 6004
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 50Gi
+
+  config:
+    network: mainnet
+    enableRewards: true
+
+# Nexus UI Dashboard
+nexusUI:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: hypermesh-online/nexus-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  config:
+    enableRealTime: true
+    refreshInterval: 5
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+
+  hosts:
+    - host: hypermesh.online
+      paths:
+        - path: /
+          service: nexus-ui
+          port: 3000
+    - host: api.hypermesh.online
+      paths:
+        - path: /
+          service: hypermesh
+          port: 8080
+    - host: trust.hypermesh.online
+      paths:
+        - path: /
+          service: trustchain
+          port: 8443
+    - host: monitoring.hypermesh.online
+      paths:
+        - path: /
+          service: nexus-ui
+          port: 3000
+
+  tls:
+    - secretName: hypermesh-tls
+      hosts:
+        - hypermesh.online
+        - api.hypermesh.online
+        - trust.hypermesh.online
+        - monitoring.hypermesh.online
+
+# PostgreSQL Database
+postgresql:
+  enabled: true
+  auth:
+    database: hypermesh
+    username: hypermesh
+    existingSecret: hypermesh-db-secret
+
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: gp3
+
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+  metrics:
+    enabled: true
+
+# Redis Cache
+redis:
+  enabled: true
+  architecture: replication
+
+  auth:
+    enabled: true
+    existingSecret: hypermesh-redis-secret
+
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: gp3
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  metrics:
+    enabled: true
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Disruption Budgets
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Monitoring and Metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        annotations:
+          summary: High CPU usage detected
+
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        annotations:
+          summary: High memory usage detected
+
+      - alert: PodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        annotations:
+          summary: Pod is crash looping
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30  # days
+  storageLocation: s3://hypermesh-backups

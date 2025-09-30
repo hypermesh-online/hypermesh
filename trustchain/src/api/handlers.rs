@@ -976,7 +976,7 @@ mod tests {
             san_entries: vec!["test.example.com".to_string()],
             node_id: "test_node".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: crate::consensus::ConsensusProof::default_for_testing(),
+            consensus_proof: crate::consensus::ConsensusProof::generate_from_network(&node_id).await?,
         };
         
         let result = issue_certificate(State(state), Json(request)).await;

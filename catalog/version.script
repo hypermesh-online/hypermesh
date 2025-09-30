@@ -1,0 +1,8 @@
+{
+    global:
+        hypermesh_extension_create;
+        hypermesh_extension_destroy;
+        hypermesh_extension_metadata;
+    local:
+        *;
+};

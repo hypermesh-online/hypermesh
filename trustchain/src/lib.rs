@@ -1,11 +1,11 @@
-//! TrustChain - Certificate Authority with Certificate Transparency and DNS
-//! 
-//! A secure, IPv6-only certificate authority with NKrypt consensus validation
-//! and mandatory security monitoring for the Web3 ecosystem. Provides CA, CT, 
-//! and DNS services with real-time certificate fingerprinting, Byzantine fault 
-//! tolerance, and comprehensive security integration.
+//! TrustChain - Certificate Authority Foundation for STOQ Transport
+//!
+//! Certificate Authority, Certificate Transparency, and DNS foundation designed
+//! to provide trust services for STOQ transport security in the HyperMesh ecosystem.
+//! Core focus: trust.hypermesh.online services and STOQ certificate validation.
 
 pub mod consensus;
+pub mod validation;
 pub mod ca;
 pub mod ct;
 pub mod dns;
@@ -17,6 +17,7 @@ pub mod stoq_client;
 pub mod security; // NEW: Security monitoring and Byzantine detection
 pub mod crypto;   // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
 pub mod deployment; // NEW: Quality gates and deployment validation
+pub mod monitoring; // NEW: Native monitoring system without external dependencies
 
 // Re-export main types
 pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
@@ -425,7 +426,7 @@ mod tests {
             san_entries: vec!["test.secure.com".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
             timestamp: std::time::SystemTime::now(),
         };
         
@@ -449,7 +450,7 @@ mod tests {
     async fn test_consensus_validation() {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
-        let consensus_proof = ConsensusProof::default_for_testing();
+        let consensus_proof = ConsensusProof::generate_from_network(&node_id).await?;
         let result = trustchain.validate_consensus_proof(&consensus_proof, "test_operation").await.unwrap();
         
         // Should complete validation (result depends on proof validity)

@@ -1,8 +1,9 @@
 //! Stream management for STOQ transport
 
-use anyhow::Result;
+// Stream management utilities
 
 pub struct StreamManager {
+    #[allow(dead_code)]
     max_streams: u32,
 }
 

@@ -11,6 +11,7 @@
 pub mod transport;
 pub mod config;
 pub mod extensions;
+pub mod protocol;
 
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
@@ -19,11 +20,10 @@ use async_trait::async_trait;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
-use bytes::Bytes;
 use serde::{Serialize, Deserialize};
 
 // Re-export pure transport types and protocol extensions
-pub use transport::{StoqTransport, Connection, Endpoint, Stream};
+pub use transport::{StoqTransport, TransportConfig, Connection, Endpoint, Stream, NetworkTier};
 pub use transport::falcon::{
     FalconEngine, FalconTransport, FalconVariant, FalconPublicKey,
     FalconPrivateKey, FalconSignature

@@ -35,7 +35,6 @@ interface DashboardArchitecture {
         hosting: 'AWS' | 'GCP' | 'Azure';
         container: 'Docker' | 'Podman';
         orchestration: 'Kubernetes' | 'Docker Swarm';
-        monitoring: 'Prometheus' | 'Grafana';
         cdn: 'CloudFlare' | 'AWS CloudFront';
     };
 }

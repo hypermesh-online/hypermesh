@@ -14,7 +14,6 @@
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
 
-pub mod consensus;
 pub mod assets;
 pub mod template;
 pub mod registry;
@@ -23,13 +22,45 @@ pub mod documentation;
 pub mod versioning;
 pub mod scripting;
 pub mod hypermesh_integration;
+pub mod library;
+pub mod hypermesh_bridge;
+pub mod extension;
+pub mod plugin;
+pub mod distribution;
+pub mod security;
+pub mod sharing;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 
-// Re-export key types
-pub use consensus::{ConsensusProof, ConsensusContext, AssetId, ExecutionResult};
+// Re-export key types from HyperMesh
+pub use hypermesh::consensus::nkrypt_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
+pub use hypermesh::assets::core::{AssetId, AssetType};
+
+// Define ExecutionResult locally (Catalog-specific)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionResult {
+    /// Whether execution was successful
+    pub success: bool,
+    /// Result data or error message
+    pub message: String,
+    /// Optional output data
+    pub output: Option<serde_json::Value>,
+}
+
+// Define ConsensusContext locally (Catalog-specific configuration)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ConsensusContext {
+    /// Network difficulty for PoW
+    pub network_difficulty: u64,
+    /// Minimum space commitment for PoS
+    pub min_space_commitment: u64,
+    /// Minimum stake amount
+    pub min_stake_amount: u64,
+    /// Time synchronization tolerance (ms)
+    pub time_sync_tolerance_ms: u64,
+}
 pub use assets::{
     AssetPackage, AssetSpec, AssetMetadata, AssetContent, AssetSecurity,
     AssetResources, AssetExecution, AssetDependency
@@ -41,13 +72,14 @@ pub use documentation::DocumentationGenerator;
 pub use versioning::{VersionManager, SemanticVersion, DependencyResolver};
 pub use scripting::{ScriptingEngine, ScriptResult};
 pub use hypermesh_integration::{HyperMeshClient, HyperMeshAssetAdapter};
+pub use hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig};
 
 /// Catalog version
 pub const CATALOG_VERSION: &str = "0.1.0";
 
 /// Main Catalog instance - HyperMesh Asset Package Manager
 pub struct Catalog {
-    consensus_config: Arc<ConsensusContext>,
+    consensus_context: Arc<ConsensusContext>,
     asset_registry: Arc<registry::AssetRegistry>,
     template_generator: Arc<template::CatalogTemplateGenerator>,
     asset_validator: Arc<validation::AssetValidator>,
@@ -92,7 +124,7 @@ impl Default for CatalogConfig {
 impl Catalog {
     /// Create a new Catalog instance with HyperMesh integration
     pub async fn new(config: CatalogConfig) -> Result<Self> {
-        let consensus_config = Arc::new(config.consensus);
+        let consensus_context = Arc::new(config.consensus);
 
         // Initialize components
         let asset_registry = Arc::new(registry::AssetRegistry::new(config.registry).await?);
@@ -114,7 +146,7 @@ impl Catalog {
         hypermesh_client.connect().await?;
 
         Ok(Self {
-            consensus_config,
+            consensus_context,
             asset_registry,
             template_generator,
             asset_validator,
@@ -125,8 +157,8 @@ impl Catalog {
     }
     
     /// Get consensus configuration
-    pub fn consensus_config(&self) -> Arc<ConsensusContext> {
-        Arc::clone(&self.consensus_config)
+    pub fn consensus_context(&self) -> Arc<ConsensusContext> {
+        Arc::clone(&self.consensus_context)
     }
     
     /// Get asset registry

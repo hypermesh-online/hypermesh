@@ -23,7 +23,6 @@
 
 ### Week 2: Infrastructure
 - [ ] Setup CI/CD pipelines (GitHub Actions)
-- [ ] Configure Prometheus/Grafana monitoring
 - [ ] Implement production PostgreSQL
 - [ ] Deploy load balancer
 - [ ] Configure auto-scaling

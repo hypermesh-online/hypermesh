@@ -1,8 +1,12 @@
 # STOQ Protocol - Pure QUIC over IPv6 Transport
 
-**Status: ✅ PRODUCTION READY - Pure Transport Protocol**
+**Status: 🚧 DEVELOPMENT - Pure Transport Protocol (Phase 1 Complete)**
 
-STOQ is a quantum-resistant QUIC transport protocol with built-in protocol extensions for tokenization, sharding, and post-quantum security. Clean, professional architecture with no application layer contamination.
+STOQ is a pure transport protocol providing QUIC over IPv6 with zero application logic. Like TCP/IP, STOQ focuses exclusively on packet delivery, connection management, and transport-layer concerns. Features adaptive network tier detection, FALCON-1024 quantum-resistant cryptography, and protocol extension framework.
+
+## ⚡ Architecture Principle
+
+**STOQ is a pure transport protocol** - it contains NO application logic, NO SDKs, NO monitoring dashboards. Applications (like HyperMesh) use STOQ the same way HTTP uses TCP - as a transport layer only.
 
 ## 🚀 Quick Start
 
@@ -22,18 +26,18 @@ cargo test falcon --lib
 
 ## 🏗️ Architecture
 
-### Pure Transport Layer
-- **Protocol**: QUIC over IPv6 (transport only)
-- **Security**: FALCON-1024 quantum-resistant cryptography
-- **Extensions**: Packet tokenization, sharding, routing, seeding
-- **Performance**: Memory pooling, zero-copy, frame batching
-- **Integration**: Certificate management with TrustChain
+### Core Transport Features
+- **Protocol**: QUIC over IPv6 (quinn-based implementation)
+- **Security**: FALCON-1024 post-quantum cryptography (fully implemented)
+- **Adaptive Tiers**: Network performance detection and configuration adaptation
+- **Memory Safety**: Eliminated unsafe operations, secure memory management
+- **DoS Protection**: Connection limits and 0-RTT replay attack mitigation
 
-### Protocol Extensions
-- **Packet Tokenization**: SHA-256 cryptographic validation with sequence numbers
-- **Packet Sharding**: Automatic fragmentation/reassembly with integrity verification
-- **Multi-hop Routing**: IPv6-based hop chain tracking for protocol routing
-- **Seeding Protocol**: Foundation for distributed packet replication
+### Protocol Extensions Framework
+- **Packet Tokenization**: SHA-256 cryptographic validation (defined, not integrated)
+- **Packet Sharding**: Fragmentation/reassembly logic (available as library functions)
+- **Multi-hop Routing**: IPv6 hop chain tracking framework (extensible design)
+- **Extension Integration**: Framework exists, transport integration pending
 
 ### Quantum-Resistant Security
 - **FALCON-1024**: NIST Post-Quantum Cryptography standard
@@ -130,19 +134,20 @@ cargo test transport
 - `extensions.rs` - Protocol extensions (tokenization, sharding, etc)
 - `config.rs` - Configuration management
 
-### Key Features
-- **Pure Transport**: No application logic contamination
-- **Quantum Secure**: FALCON-1024 post-quantum signatures
-- **Protocol Extensions**: Real tokenization, sharding, routing protocols
-- **Professional Architecture**: Clean separation of concerns
-- **Production Ready**: Full test coverage and validation
+### Current Status
+- **Transport Core**: QUIC over IPv6 with quinn library foundation ✅
+- **Quantum Security**: FALCON-1024 cryptography fully implemented ✅
+- **Adaptive Networks**: Tier detection and configuration adaptation ✅
+- **Memory Safety**: Unsafe operations eliminated, secure by design ✅
+- **Extension Framework**: Protocol extensions defined, integration pending ⚠️
 
 ## 🛡️ Security
 
 ### Transport Security
-- TLS 1.3 with perfect forward secrecy
-- Certificate-based authentication
-- 24-hour certificate rotation
+- TLS 1.3 with QUIC integration
+- Certificate-based authentication via TrustChain
+- 0-RTT replay attack protection (disabled by default)
+- DoS protection with connection limits
 
 ### Post-Quantum Security
 - FALCON-1024 digital signatures

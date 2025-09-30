@@ -1,0 +1,380 @@
+{
+  "security_score": 0,
+  "production_ready": false,
+  "total_violations": 189,
+  "critical_violations": 31,
+  "high_violations": 21,
+  "categories": {
+    "security_theater": {
+      "total_violations": 55,
+      "critical": 31,
+      "high": 21,
+      "violations": [
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ct/storage.rs",
+          "line": 527,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ct/merkle_log.rs",
+          "line": 306,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/deployment/quality_gates.rs",
+          "line": 212,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/production_certificate_authority.rs",
+          "line": 4,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/production_certificate_authority.rs",
+          "line": 306,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/production_certificate_authority.rs",
+          "line": 732,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/security_integration.rs",
+          "line": 570,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/security/monitoring.rs",
+          "line": 506,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/mod.rs",
+          "line": 605,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Security Theater",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/mod.rs",
+          "line": 624,
+          "pattern": "default_for_testing",
+          "remediation": "Remove default_for_testing and implement real security: Testing bypass in production code"
+        }
+      ]
+    },
+    "hsm_dependencies": {
+      "total_violations": 113,
+      "requires_removal": true,
+      "violations": [
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 3,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 27,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 28,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 33,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 57,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 67,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 84,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 118,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 131,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "HSM Dependency",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/ca/certificate_authority.rs",
+          "line": 135,
+          "pattern": "hsm_imports",
+          "remediation": "Remove HSM dependency: HSM import found"
+        }
+      ]
+    },
+    "dns_infrastructure": {
+      "total_violations": 19,
+      "production_ready": false,
+      "violations": [
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/production_zones.rs",
+          "line": 3,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/production_zones.rs",
+          "line": 132,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 185,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 186,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 187,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 314,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 318,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 347,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 350,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        },
+        {
+          "severity": "HIGH",
+          "category": "DNS Infrastructure",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/dns/cert_validator.rs",
+          "line": 362,
+          "pattern": "localhost_refs",
+          "remediation": "Replace with production DNS: Localhost reference in DNS code"
+        }
+      ]
+    },
+    "consensus_validation": {
+      "has_real_validation": true,
+      "total_violations": 2,
+      "violations": [
+        {
+          "severity": "CRITICAL",
+          "category": "Consensus Validation",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/consensus/mod.rs",
+          "line": 55,
+          "pattern": "testing_bypass",
+          "remediation": "Remove default_for_testing() from production code"
+        },
+        {
+          "severity": "CRITICAL",
+          "category": "Consensus Validation",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/consensus/mod.rs",
+          "line": 80,
+          "pattern": "testing_bypass",
+          "remediation": "Remove default_for_testing() from production code"
+        }
+      ]
+    },
+    "api_security": {
+      "mock_responses": 8,
+      "production_ready": false,
+      "violations": [
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 632,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 642,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 656,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 670,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 676,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 703,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 727,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        },
+        {
+          "severity": "HIGH",
+          "category": "API Security",
+          "file": "/home/persist/repos/projects/web3/trustchain/src/api/handlers.rs",
+          "line": 787,
+          "pattern": "mock_response",
+          "remediation": "Replace mock response with real implementation"
+        }
+      ]
+    },
+    "production_readiness": {
+      "production_ready": false,
+      "checks": {
+        "no_testing_bypasses": false,
+        "no_mock_implementations": true,
+        "real_dns_infrastructure": true,
+        "no_hsm_dependencies": false,
+        "consensus_validation": true
+      },
+      "blocking_issues": [
+        "no_testing_bypasses",
+        "no_hsm_dependencies"
+      ]
+    }
+  },
+  "deployment_recommendation": "\u274c BLOCKED: Significant security issues prevent deployment",
+  "immediate_actions": [
+    "Remove all default_for_testing() calls from production code",
+    "Remove HSM dependencies and implement software-only crypto",
+    "Replace localhost DNS stubs with production infrastructure"
+  ]
+}

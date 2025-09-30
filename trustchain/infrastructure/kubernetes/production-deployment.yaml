@@ -1,0 +1,858 @@
+# TrustChain Production Kubernetes Deployment
+# Federated Certificate Authority with Enterprise-Grade Reliability
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trustchain
+  labels:
+    name: trustchain
+    environment: production
+    component: certificate-authority
+
+---
+# ConfigMap for production configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trustchain-config
+  namespace: trustchain
+data:
+  production.toml: |
+    # TrustChain Production Configuration
+    [server]
+    bind_address = "::"
+    port = 8443
+    workers = 8
+    enable_http3 = true
+
+    [ca]
+    ca_id = "trustchain-ca-production"
+    mode = "ProductionSoftware"
+    cert_validity_hours = 24
+    rotation_interval_hours = 24
+    target_issuance_time_ms = 35
+    enable_ct_logging = true
+
+    [ca.consensus]
+    require_proof_of_space = true
+    require_proof_of_stake = true
+    require_proof_of_work = true
+    require_proof_of_time = true
+    min_confirmations = 6
+    consensus_timeout_ms = 30000
+
+    [ca.federation]
+    enabled = true
+    peer_cas = [
+      "https://ca-us-east-1.trust.hypermesh.online",
+      "https://ca-eu-west-1.trust.hypermesh.online",
+      "https://ca-ap-southeast-1.trust.hypermesh.online"
+    ]
+    cross_signing_enabled = true
+    min_signatures = 2
+
+    [ct]
+    log_id = "trustchain-ct-production"
+    max_log_size = 10000000
+    enable_realtime_fingerprinting = true
+    merkle_update_interval_ms = 1000
+    byzantine_consensus = true
+
+    [ct.storage]
+    type = "hybrid"
+    local_path = "/data/ct-logs"
+    s3_bucket = "trustchain-ct-logs-prod"
+    s3_region = "us-east-1"
+
+    [dns]
+    server_id = "trustchain-dns-production"
+    bind_address = "::"
+    quic_port = 853
+    enable_cert_validation = true
+    target_resolution_time_ms = 100
+    cache_ttl_seconds = 300
+    max_cache_entries = 100000
+
+    [monitoring]
+    enabled = true
+    collection_interval = 10
+    export_format = "prometheus"
+    retention_seconds = 86400
+
+    [security]
+    tls_version = "1.3"
+    enable_hsts = true
+    enable_certificate_pinning = true
+    audit_logging = true
+
+---
+# Certificate Authority StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: trustchain-ca
+  namespace: trustchain
+spec:
+  serviceName: trustchain-ca
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: trustchain-ca
+      component: certificate-authority
+  template:
+    metadata:
+      labels:
+        app: trustchain-ca
+        component: certificate-authority
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - trustchain-ca
+            topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/ca
+                operator: Exists
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: ca
+        effect: NoSchedule
+      initContainers:
+      - name: init-ca-certs
+        image: hypermesh/trustchain-init:latest
+        command: ["/app/init-ca"]
+        args:
+          - "--generate-if-missing"
+          - "--verify-chain"
+        volumeMounts:
+        - name: ca-certs
+          mountPath: /certs
+        - name: ca-keys
+          mountPath: /keys
+      containers:
+      - name: trustchain-ca
+        image: hypermesh/trustchain:v1.0.0
+        imagePullPolicy: Always
+        command: ["/app/trustchain-server"]
+        args:
+          - "--mode=ca"
+          - "--config=/config/production.toml"
+          - "--instance-id=$(POD_NAME)"
+        ports:
+        - name: https
+          containerPort: 8443
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info,trustchain=debug"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: ca-certs
+          mountPath: /certs
+          readOnly: true
+        - name: ca-keys
+          mountPath: /keys
+          readOnly: true
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+            ephemeral-storage: "10Gi"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "20Gi"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: trustchain-config
+      - name: ca-certs
+        secret:
+          secretName: trustchain-ca-certs
+          defaultMode: 0400
+      - name: ca-keys
+        secret:
+          secretName: trustchain-ca-keys
+          defaultMode: 0400
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+# Certificate Authority Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain-ca
+  namespace: trustchain
+  labels:
+    app: trustchain-ca
+    component: certificate-authority
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+  - name: https
+    port: 8443
+    targetPort: 8443
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: trustchain-ca
+
+---
+# Certificate Authority Load Balancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain-ca-lb
+  namespace: trustchain
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "alb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: https
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    app: trustchain-ca
+
+---
+# Certificate Transparency StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: trustchain-ct
+  namespace: trustchain
+spec:
+  serviceName: trustchain-ct
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: trustchain-ct
+      component: certificate-transparency
+  template:
+    metadata:
+      labels:
+        app: trustchain-ct
+        component: certificate-transparency
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - trustchain-ct
+            topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: ct
+        effect: NoSchedule
+      containers:
+      - name: trustchain-ct
+        image: hypermesh/trustchain:v1.0.0
+        imagePullPolicy: Always
+        command: ["/app/trustchain-server"]
+        args:
+          - "--mode=ct"
+          - "--config=/config/production.toml"
+          - "--instance-id=$(POD_NAME)"
+        ports:
+        - name: https
+          containerPort: 8444
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info,trustchain=debug"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: S3_BUCKET
+          value: "trustchain-ct-logs-prod"
+        - name: AWS_REGION
+          value: "us-east-1"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: ct-data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "50Gi"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            ephemeral-storage: "100Gi"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+      volumes:
+      - name: config
+        configMap:
+          name: trustchain-config
+  volumeClaimTemplates:
+  - metadata:
+      name: ct-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 500Gi
+
+---
+# Certificate Transparency Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain-ct
+  namespace: trustchain
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: https
+    port: 8444
+    targetPort: 8444
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: trustchain-ct
+
+---
+# DNS-over-QUIC DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: trustchain-dns
+  namespace: trustchain
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: trustchain-dns
+      component: dns-resolver
+  template:
+    metadata:
+      labels:
+        app: trustchain-dns
+        component: dns-resolver
+        version: v1.0.0
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        node-role.kubernetes.io/dns: "true"
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: dns
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: trustchain-dns
+        image: hypermesh/trustchain:v1.0.0
+        imagePullPolicy: Always
+        command: ["/app/trustchain-server"]
+        args:
+          - "--mode=dns"
+          - "--config=/config/production.toml"
+          - "--node-name=$(NODE_NAME)"
+        ports:
+        - name: dns-quic
+          containerPort: 853
+          protocol: UDP
+          hostPort: 853
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info,trustchain=debug"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: dns-cache
+          mountPath: /cache
+        livenessProbe:
+          exec:
+            command:
+            - /app/dns-health-check
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /app/dns-ready-check
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        securityContext:
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            - NET_ADMIN
+            drop:
+            - ALL
+          runAsUser: 0  # Required for port 853
+      volumes:
+      - name: config
+        configMap:
+          name: trustchain-config
+      - name: dns-cache
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+# DNS Service (Network Load Balancer for UDP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain-dns-nlb
+  namespace: trustchain
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: dns-quic
+    port: 853
+    targetPort: 853
+    protocol: UDP
+  selector:
+    app: trustchain-dns
+
+---
+# Monitoring Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trustchain-monitoring
+  namespace: trustchain
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trustchain-monitoring
+      component: monitoring
+  template:
+    metadata:
+      labels:
+        app: trustchain-monitoring
+        component: monitoring
+        version: v1.0.0
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - trustchain-monitoring
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: monitoring
+        image: hypermesh/trustchain-monitoring:v1.0.0
+        imagePullPolicy: Always
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: dashboard
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: MONITORING_MODE
+          value: "native"
+        - name: EBPF_ENABLED
+          value: "true"
+        - name: SCRAPE_TARGETS
+          value: "trustchain-ca:9090,trustchain-ct:9090,trustchain-dns:9090"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9090
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        securityContext:
+          privileged: true  # Required for eBPF
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - NET_ADMIN
+      volumes:
+      - name: config
+        configMap:
+          name: monitoring-config
+      - name: data
+        emptyDir:
+          sizeLimit: 20Gi
+
+---
+# Monitoring Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: trustchain-monitoring
+  namespace: trustchain
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "alb"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: dashboard
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: trustchain-monitoring
+
+---
+# HorizontalPodAutoscaler for CA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trustchain-ca-hpa
+  namespace: trustchain
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: trustchain-ca
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: cert_issuance_rate
+      target:
+        type: AverageValue
+        averageValue: "1000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+
+---
+# HorizontalPodAutoscaler for CT
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trustchain-ct-hpa
+  namespace: trustchain
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: trustchain-ct
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Pods
+    pods:
+      metric:
+        name: log_append_rate
+      target:
+        type: AverageValue
+        averageValue: "5000"
+
+---
+# PodDisruptionBudget for CA
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: trustchain-ca-pdb
+  namespace: trustchain
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: trustchain-ca
+
+---
+# PodDisruptionBudget for CT
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: trustchain-ct-pdb
+  namespace: trustchain
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: trustchain-ct
+
+---
+# NetworkPolicy for security isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trustchain-network-policy
+  namespace: trustchain
+spec:
+  podSelector:
+    matchLabels:
+      component: certificate-authority
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: trustchain
+    - podSelector:
+        matchLabels:
+          component: monitoring
+    ports:
+    - protocol: TCP
+      port: 8443
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: trustchain
+    ports:
+    - protocol: TCP
+      port: 8444
+    - protocol: UDP
+      port: 853
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  - to:
+    - cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 443  # For S3 and external APIs
+
+---
+# ServiceMonitor for Prometheus Operator (if available)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: trustchain-metrics
+  namespace: trustchain
+spec:
+  selector:
+    matchLabels:
+      component: certificate-authority
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http

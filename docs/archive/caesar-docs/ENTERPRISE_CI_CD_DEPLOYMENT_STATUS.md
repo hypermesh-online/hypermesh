@@ -31,7 +31,6 @@
 - **Namespace Management**: Resource quotas and security policies
 - **HyperMesh Deployment**: 3-replica asset management with persistent storage
 - **STOQ Transport**: High-performance networking (5 replicas for adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) target)
-- **Monitoring Stack**: Prometheus + Grafana with Caesar-specific metrics
 - **Load Balancing**: Network load balancers with health checks
 - **Persistent Storage**: Fast SSD storage for data and metrics
 
@@ -45,7 +44,6 @@
 - **Infrastructure Deploy**: `deploy-infrastructure.sh` - Complete stack deployment
 
 ### ✅ **4. Monitoring & Observability**
-**Components**: Prometheus + Grafana + ELK Stack
 
 **Monitoring Capabilities**:
 - **Real-time Metrics**: System performance and application metrics
@@ -89,7 +87,6 @@ Production Deployment:
     
   Monitoring Layer:
     - Prometheus: Metrics collection
-    - Grafana: Visualization dashboards
     - ELK Stack: Log aggregation
     - AlertManager: Incident response
 ```
@@ -224,7 +221,6 @@ kubectl top pods -n caesar-production
 ### **Production Deployment Checklist** ✅ **COMPLETE**
 - [x] **CI/CD Pipeline**: Fully automated with quality gates
 - [x] **Infrastructure**: Kubernetes production environment ready
-- [x] **Monitoring**: Prometheus + Grafana + ELK stack deployed
 - [x] **Security**: Vulnerability scanning and compliance validation
 - [x] **Performance**: adaptive network tiers (100 Mbps/1 Gbps/2.5 Gbps) STOQ + 10K connection testing ready
 - [x] **Deployment**: Blue-green deployment with automated rollback
@@ -289,7 +285,6 @@ cd /home/persist/repos/projects/web3/caesar
 ## 📞 **OPERATIONAL SUPPORT**
 
 ### **Monitoring Dashboards**
-- **Grafana**: `https://caesar.hypermesh.online:3000`
 - **Prometheus**: `https://caesar.hypermesh.online:9090`
 - **Kibana**: `https://caesar.hypermesh.online:5601`
 

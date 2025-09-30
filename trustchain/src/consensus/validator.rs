@@ -308,9 +308,9 @@ impl FourProofValidator {
             
             info!("✅ CONSENSUS VALIDATION SUCCESSFUL ({}ms)", validation_time);
             Ok(ConsensusResult::Valid {
-                proof_hash,
+                confidence_score: 1.0,
                 validation_timestamp: SystemTime::now(),
-                validator_id: "production-fourproof-validator".to_string(),
+                validation_duration: std::time::Duration::from_millis(validation_time as u64),
             })
         } else {
             self.metrics.failed_validations += 1;

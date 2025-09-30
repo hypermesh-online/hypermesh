@@ -1,0 +1,245 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  prepare:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      environment: ${{ steps.env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" != "" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+  build-release:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      matrix:
+        component: [stoq, trustchain, hypermesh, caesar, catalog]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ matrix.component }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build optimized release
+        run: |
+          cd ${{ matrix.component }}
+          cargo build --release --locked
+          strip target/release/${{ matrix.component }} || true
+
+      - name: Create tarball
+        run: |
+          cd ${{ matrix.component }}
+          tar -czf ../${{ matrix.component }}-${{ needs.prepare.outputs.version }}.tar.gz \
+            -C target/release ${{ matrix.component }} \
+            -C ../.. README.md LICENSE || true
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-${{ matrix.component }}-${{ needs.prepare.outputs.version }}
+          path: ${{ matrix.component }}-${{ needs.prepare.outputs.version }}.tar.gz
+
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [prepare, build-release]
+    environment: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        run: |
+          cd infrastructure/terraform
+          terraform init -backend-config="key=${{ needs.prepare.outputs.environment }}/terraform.tfstate"
+
+      - name: Terraform Plan
+        run: |
+          cd infrastructure/terraform
+          terraform plan \
+            -var="environment=${{ needs.prepare.outputs.environment }}" \
+            -var="version=${{ needs.prepare.outputs.version }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: needs.prepare.outputs.environment == 'production' || github.event_name == 'workflow_dispatch'
+        run: |
+          cd infrastructure/terraform
+          terraform apply tfplan
+
+  deploy-kubernetes:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [prepare, build-release, deploy-infrastructure]
+    environment: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.12.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: Deploy HyperMesh components
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+
+          # Update Helm charts
+          helm upgrade --install hypermesh-stack ./infrastructure/helm \
+            --namespace hypermesh \
+            --create-namespace \
+            --set global.version=${{ needs.prepare.outputs.version }} \
+            --set global.environment=${{ needs.prepare.outputs.environment }} \
+            --wait
+
+      - name: Verify deployment
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          kubectl -n hypermesh rollout status deployment/hypermesh
+          kubectl -n hypermesh rollout status deployment/trustchain
+          kubectl -n hypermesh rollout status deployment/stoq
+
+  smoke-tests:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-kubernetes, prepare]
+    environment: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup test environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq netcat
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..60}; do
+            if curl -sSf https://${{ needs.prepare.outputs.environment }}.hypermesh.online/health; then
+              echo "Services are ready!"
+              break
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 10
+          done
+
+      - name: Run smoke tests
+        run: |
+          ./scripts/smoke-tests.sh ${{ needs.prepare.outputs.environment }}
+
+      - name: Run integration tests
+        if: needs.prepare.outputs.environment == 'staging'
+        run: |
+          ./test-integration.sh
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [prepare, smoke-tests]
+    if: failure()
+    environment: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
+
+      - name: Rollback deployment
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          helm rollback hypermesh-stack -n hypermesh
+          kubectl -n hypermesh get pods
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "Deployment rollback initiated for ${{ needs.prepare.outputs.environment }}",
+              attachments: [{
+                color: 'danger',
+                text: 'Version ${{ needs.prepare.outputs.version }} failed smoke tests and was rolled back'
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

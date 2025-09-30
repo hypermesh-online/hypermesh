@@ -303,7 +303,7 @@ mod tests {
             timestamp: SystemTime::now(),
             common_name: format!("test{}.example.com", seq_num),
             issuer_ca_id: "test-ca".to_string(),
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
             entry_id: [seq_num as u8; 32],
             leaf_hash: [0u8; 32], // Will be calculated
         }

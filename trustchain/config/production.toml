@@ -110,6 +110,7 @@ port = 8446
 enable_cors = true
 max_request_size = 1048576
 rate_limit_requests_per_minute = 1000
+# Native metrics endpoint (no external dependencies)
 enable_metrics = true
 metrics_port = 9090
 
@@ -129,13 +130,23 @@ max_files = 10
 compress = true
 
 [monitoring]
-# Performance monitoring
-enable_prometheus = true
-prometheus_port = 9090
-enable_jaeger = true
-jaeger_endpoint = "http://localhost:14268/api/traces"
+# Native monitoring system (no external dependencies)
+enabled = true
+collection_interval = 10  # seconds
+health_check_interval = 30  # seconds
+enable_export = true
+export_format = "json"  # json, prometheus, plaintext, csv
+retention_seconds = 3600  # 1 hour
 
-# Health check configuration
+# Alert thresholds
+[monitoring.alert_thresholds]
+max_cert_issuance_ms = 100  # Alert if certificate issuance exceeds 100ms
+min_success_rate = 0.95      # Alert if success rate drops below 95%
+max_memory_mb = 4096         # Alert if memory usage exceeds 4GB
+max_error_rate = 0.05        # Alert if error rate exceeds 5%
+min_availability = 0.99      # Alert if availability drops below 99%
+
+# Health check endpoints
 [monitoring.health]
 endpoint = "/health"
 interval_seconds = 30
@@ -189,8 +200,8 @@ ca_service = "https://[::]:8443/ca"
 ct_service = "https://[::]:8443/ct"
 dns_service = "quic://[::]:853"
 api_service = "https://[::]:8446/api"
-metrics_service = "http://[::]:9090/metrics"
-health_service = "http://[::]:8446/health"
+metrics_service = "http://[::]:9090/metrics"  # Native monitoring endpoint
+health_service = "http://[::]:9090/health"  # Native health check endpoint
 
 # Certificate configuration
 [certificates]

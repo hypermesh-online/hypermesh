@@ -211,14 +211,9 @@ scrape_configs:
         - 'caesar:9093'
 ```
 
-#### Grafana
 ```bash
-# Deploy Grafana
 docker run -d \
-  --name grafana \
   -p 3000:3000 \
-  -v grafana-data:/var/lib/grafana \
-  grafana/grafana:latest
 
 # Import dashboards
 curl -X POST http://admin:admin@localhost:3000/api/dashboards/db \

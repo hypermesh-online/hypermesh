@@ -105,7 +105,6 @@ nano nginx/nginx.conf
 | Service | Port | Description |
 |---------|------|-------------|
 | `prometheus` | 9090 | Metrics collection |
-| `grafana` | 3000 | Dashboards |
 | `elasticsearch` | 9200 | Log storage |
 | `kibana` | 5601 | Log analysis |
 
@@ -297,9 +296,7 @@ scrape_configs:
       - targets: ['redis:6379']
 ```
 
-### Grafana Dashboard
 
-Access Grafana at `http://localhost:3000` (admin/admin123)
 
 Key dashboards include:
 - **System Overview**: CPU, memory, disk usage

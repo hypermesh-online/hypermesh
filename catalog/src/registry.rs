@@ -4,6 +4,7 @@
 //! and managing asset packages across the Catalog ecosystem.
 
 use crate::assets::*;
+use crate::hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig};
 use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,11 +18,9 @@ use std::sync::Arc;
 pub struct AssetRegistry {
     /// Registry configuration
     config: RegistryConfig,
-    /// Local asset index
-    local_index: Arc<RwLock<AssetIndex>>,
-    /// Remote registry clients
-    remote_registries: HashMap<String, Box<dyn RegistryClient>>,
-    /// Asset cache directory
+    /// HyperMesh-integrated registry bridge
+    hypermesh_registry: Arc<HyperMeshAssetRegistry>,
+    /// Asset cache directory (for compatibility)
     cache_dir: PathBuf,
 }
 
@@ -361,119 +360,48 @@ impl Default for RegistryConfig {
 }
 
 impl AssetRegistry {
-    /// Create a new asset registry
+    /// Create a new asset registry with HyperMesh integration
     pub async fn new(config: RegistryConfig) -> Result<Self> {
         let cache_dir = shellexpand::tilde(&config.cache_dir).into_owned().into();
         tokio::fs::create_dir_all(&cache_dir).await?;
-        
-        let local_index = Arc::new(RwLock::new(AssetIndex {
-            assets: HashMap::new(),
-            by_name: HashMap::new(),
-            by_tag: HashMap::new(),
-            by_type: HashMap::new(),
-            search_index: SearchIndex {
-                inverted_index: HashMap::new(),
-                term_frequencies: HashMap::new(),
-                total_documents: 0,
-            },
-            metadata: IndexMetadata {
-                version: "1.0.0".to_string(),
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-                total_assets: 0,
-                index_size: 0,
-            },
-        }));
-        
-        let mut registry = Self {
-            config: config.clone(),
-            local_index,
-            remote_registries: HashMap::new(),
+
+        // Get HyperMesh AssetManager instance
+        let asset_manager = Arc::new(hypermesh::assets::core::AssetManager::new());
+
+        // Configure bridge for HyperMesh integration
+        let bridge_config = BridgeConfig {
+            enable_consensus: config.verification.verify_signatures,
+            minimum_stake: 1000,
+            default_privacy: hypermesh::assets::core::PrivacyLevel::Private,
+            enable_zero_copy: true,
+            catalog_cache_size: 10000,
+        };
+
+        // Create HyperMesh-integrated registry
+        let hypermesh_registry = Arc::new(
+            HyperMeshAssetRegistry::new(asset_manager, bridge_config).await?
+        );
+
+        Ok(Self {
+            config,
+            hypermesh_registry,
             cache_dir,
-        };
-        
-        // Initialize remote registry clients
-        for remote in &config.remote_registries {
-            let client = HttpRegistryClient::new(remote.clone())?;
-            registry.remote_registries.insert(remote.name.clone(), Box::new(client));
-        }
-        
-        // Load existing index
-        registry.load_index().await?;
-        
-        Ok(registry)
+        })
     }
     
-    /// Publish an asset package to the registry
+    /// Publish an asset package through HyperMesh
     pub async fn publish(&self, package: AssetPackage) -> Result<AssetPackageId> {
-        let package_id = package.get_package_id();
-        
-        // Store package locally
-        let package_dir = self.cache_dir.join(package_id.to_string());
-        tokio::fs::create_dir_all(&package_dir).await?;
-        
-        // Save package files
-        let package_file = package_dir.join("package.json");
-        let package_json = serde_json::to_string_pretty(&package)?;
-        tokio::fs::write(package_file, package_json).await?;
-        
-        // Create index entry
-        let index_entry = AssetIndexEntry {
-            id: package_id,
-            name: package.spec.metadata.name.clone(),
-            version: package.spec.metadata.version.clone(),
-            asset_type: package.spec.spec.asset_type.clone(),
-            description: package.spec.metadata.description.clone(),
-            tags: package.spec.metadata.tags.clone(),
-            keywords: self.generate_keywords(&package),
-            location: package_dir.to_string_lossy().to_string(),
-            size: self.calculate_package_size(&package),
-            hash: package.package_hash.clone(),
-            published_at: Utc::now(),
-            updated_at: Utc::now(),
-            registry: "local".to_string(),
-            rating: 0.0,
-            download_count: 0,
-            verified: false, // TODO: Implement verification
-        };
-        
-        // Update index
-        self.add_to_index(index_entry).await?;
-        
-        // Publish to remote registries if configured
-        for (name, client) in &self.remote_registries {
-            if let Err(e) = client.upload(&package).await {
-                tracing::warn!("Failed to upload to registry {}: {}", name, e);
-            }
-        }
-        
-        Ok(package_id)
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.publish(package).await
     }
     
-    /// Install an asset package by ID
+    /// Install an asset package from HyperMesh
     pub async fn install(&self, id: &AssetPackageId) -> Result<AssetPackage> {
-        // Check local cache first
-        if let Some(package) = self.get_from_cache(id).await? {
-            return Ok(package);
-        }
-        
-        // Try to download from remote registries
-        for (name, client) in &self.remote_registries {
-            match client.download(id).await {
-                Ok(package) => {
-                    // Cache the downloaded package
-                    self.cache_package(&package).await?;
-                    return Ok(package);
-                }
-                Err(e) => {
-                    tracing::debug!("Failed to download from {}: {}", name, e);
-                }
-            }
-        }
-        
-        Err(anyhow::anyhow!("Asset package {} not found in any registry", id))
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.install(id).await
     }
     
+    /* Removed - now handled by HyperMesh bridge
     /// Generate search keywords for an asset
     fn generate_keywords(&self, package: &AssetPackage) -> Vec<String> {
         let mut keywords = Vec::new();
@@ -650,152 +578,35 @@ impl AssetRegistry {
         let index_file = self.cache_dir.join("index.json");
         let index_json = serde_json::to_string_pretty(index)?;
         tokio::fs::write(index_file, index_json).await?;
-        
+
         Ok(())
     }
-}
+    */
 
 #[async_trait::async_trait]
 impl AssetDiscovery for AssetRegistry {
     async fn search(&self, query: &SearchQuery) -> Result<SearchResults> {
-        let start_time = std::time::Instant::now();
-        let index = self.local_index.read().await;
-        
-        let mut results = Vec::new();
-        
-        if query.query.is_empty() {
-            // Return all assets if no query
-            for entry in index.assets.values() {
-                if self.matches_filters(entry, query) {
-                    results.push(AssetSearchResult {
-                        asset: entry.clone(),
-                        score: 1.0,
-                        highlights: vec![],
-                    });
-                }
-            }
-        } else {
-            // Perform text search
-            let query_terms: Vec<String> = query.query
-                .split_whitespace()
-                .map(|s| s.to_lowercase())
-                .collect();
-            
-            let mut scored_results: HashMap<AssetPackageId, f64> = HashMap::new();
-            
-            for term in &query_terms {
-                if let Some(asset_ids) = index.search_index.inverted_index.get(term) {
-                    for &asset_id in asset_ids {
-                        if let Some(entry) = index.assets.get(&asset_id) {
-                            if self.matches_filters(entry, query) {
-                                let score = self.calculate_relevance_score(entry, term, &index.search_index);
-                                *scored_results.entry(asset_id).or_insert(0.0) += score;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Convert to results and sort by score
-            let mut scored_vec: Vec<_> = scored_results.into_iter().collect();
-            scored_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            
-            for (asset_id, score) in scored_vec {
-                if let Some(entry) = index.assets.get(&asset_id) {
-                    results.push(AssetSearchResult {
-                        asset: entry.clone(),
-                        score: score / query_terms.len() as f64, // Normalize score
-                        highlights: self.generate_highlights(entry, &query_terms),
-                    });
-                }
-            }
-        }
-        
-        // Apply sorting
-        self.sort_results(&mut results, &query.sort_by);
-        
-        // Apply pagination
-        let total_count = results.len();
-        let end = std::cmp::min(query.offset + query.limit, results.len());
-        if query.offset < results.len() {
-            results = results[query.offset..end].to_vec();
-        } else {
-            results.clear();
-        }
-        
-        let execution_time = start_time.elapsed().as_millis() as u64;
-        
-        Ok(SearchResults {
-            assets: results,
-            total_count,
-            execution_time_ms: execution_time,
-            query: query.query.clone(),
-        })
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.search(query).await
     }
     
     async fn get_asset(&self, id: &AssetPackageId) -> Result<Option<AssetPackage>> {
-        self.get_from_cache(id).await
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.get_asset(id).await
     }
     
     async fn list_assets(&self, filters: &AssetFilters) -> Result<Vec<AssetIndexEntry>> {
-        let index = self.local_index.read().await;
-        let mut results = Vec::new();
-        
-        for entry in index.assets.values() {
-            if self.matches_asset_filters(entry, filters) {
-                results.push(entry.clone());
-            }
-        }
-        
-        // Sort by name
-        results.sort_by(|a, b| a.name.cmp(&b.name));
-        
-        Ok(results)
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.list_assets(filters).await
     }
     
     async fn get_recommendations(&self, context: &RecommendationContext) -> Result<Vec<AssetIndexEntry>> {
-        let index = self.local_index.read().await;
-        let mut recommendations = Vec::new();
-        
-        // Simple recommendation based on tags and types
-        for entry in index.assets.values() {
-            if context.current_assets.contains(&entry.id) {
-                continue; // Skip already used assets
-            }
-            
-            let mut score = 0.0;
-            
-            // Score by preferred tags
-            for tag in &entry.tags {
-                if context.preferred_tags.contains(tag) {
-                    score += 1.0;
-                }
-            }
-            
-            // Score by asset type preferences
-            if context.asset_type_preferences.contains(&entry.asset_type) {
-                score += 2.0;
-            }
-            
-            // Score by rating
-            score += entry.rating;
-            
-            if score > 0.0 {
-                recommendations.push((entry.clone(), score));
-            }
-        }
-        
-        // Sort by score
-        recommendations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        
-        // Return top recommendations
-        Ok(recommendations.into_iter()
-            .take(context.count)
-            .map(|(entry, _)| entry)
-            .collect())
+        // Delegate to HyperMesh-integrated registry
+        self.hypermesh_registry.get_recommendations(context).await
     }
 }
 
+/*
 impl AssetRegistry {
     /// Check if entry matches search query filters
     fn matches_filters(&self, entry: &AssetIndexEntry, query: &SearchQuery) -> bool {
@@ -913,6 +724,7 @@ impl AssetRegistry {
         }
     }
 }
+*/
 
 /// HTTP-based registry client implementation
 pub struct HttpRegistryClient {

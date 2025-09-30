@@ -6,7 +6,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::assets::Asset;
+use crate::assets::AssetPackage;
 use super::traits::TypeValidator;
 use super::results::{
     SyntaxValidationResult, SyntaxError, StyleViolation,
@@ -38,7 +38,7 @@ impl TypeValidator for JuliaValidator {
         ]
     }
 
-    async fn validate_syntax(&self, asset: &Asset) -> Result<SyntaxValidationResult> {
+    async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
         let mut errors = Vec::new();
         let mut style_violations = Vec::new();
         let mut best_practices = Vec::new();
@@ -188,7 +188,7 @@ impl TypeValidator for LuaValidator {
         ]
     }
 
-    async fn validate_syntax(&self, asset: &Asset) -> Result<SyntaxValidationResult> {
+    async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
         let mut errors = Vec::new();
         let mut style_violations = Vec::new();
         let mut best_practices = Vec::new();

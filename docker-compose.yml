@@ -1,0 +1,283 @@
+version: '3.9'
+
+services:
+  # STOQ Protocol Layer - High-performance QUIC transport
+  stoq:
+    build:
+      context: ./stoq
+      dockerfile: Dockerfile
+    container_name: hypermesh-stoq
+    restart: unless-stopped
+    ports:
+      - "6001:6001/udp"
+    volumes:
+      - stoq-data:/var/lib/stoq
+      - ./stoq/config:/etc/stoq:ro
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      STOQ_MAX_CONNECTIONS: ${STOQ_MAX_CONNECTIONS:-10000}
+      STOQ_BIND_ADDR: "[::]:6001"
+    networks:
+      - hypermesh-net
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "stoq", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # TrustChain Certificate Authority
+  trustchain:
+    build:
+      context: ./trustchain
+      dockerfile: Dockerfile
+    container_name: hypermesh-trustchain
+    restart: unless-stopped
+    ports:
+      - "8443:8443"   # HTTPS API
+      - "8853:8853/udp"   # DNS over TLS
+      - "6002:6002/udp"   # QUIC
+    volumes:
+      - trustchain-certs:/var/lib/trustchain/certs
+      - trustchain-data:/var/lib/trustchain/data
+      - ./trustchain/config:/etc/trustchain:ro
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      TRUSTCHAIN_BOOTSTRAP_CA: ${TRUSTCHAIN_BOOTSTRAP_CA:-true}
+    networks:
+      - hypermesh-net
+    depends_on:
+      - stoq
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # HyperMesh Core Service
+  hypermesh:
+    build:
+      context: ./hypermesh
+      dockerfile: Dockerfile
+    container_name: hypermesh-core
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # HTTP API
+      - "6003:6003/udp"   # QUIC
+      - "9090:9090"   # Metrics
+    volumes:
+      - hypermesh-data:/var/lib/hypermesh
+      - ./hypermesh/config:/etc/hypermesh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For container management
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      HYPERMESH_MODE: ${HYPERMESH_MODE:-production}
+      HYPERMESH_CLUSTER_NAME: ${CLUSTER_NAME:-local}
+    networks:
+      - hypermesh-net
+    depends_on:
+      - stoq
+      - trustchain
+      - catalog
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Catalog VM Service
+  catalog:
+    build:
+      context: ./catalog
+      dockerfile: Dockerfile
+    container_name: hypermesh-catalog
+    restart: unless-stopped
+    ports:
+      - "7001:7001"
+    volumes:
+      - catalog-cache:/var/lib/catalog/cache
+      - ./catalog/config:/etc/catalog:ro
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      CATALOG_CACHE_SIZE: ${CATALOG_CACHE_SIZE:-2147483648}
+    networks:
+      - hypermesh-net
+    depends_on:
+      - stoq
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "catalog", "status"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+
+  # Caesar Economic System
+  caesar:
+    build:
+      context: ./caesar
+      dockerfile: Dockerfile
+    container_name: hypermesh-caesar
+    restart: unless-stopped
+    ports:
+      - "8081:8081"   # API
+      - "6004:6004/udp"   # QUIC
+    volumes:
+      - caesar-data:/var/lib/caesar
+      - ./caesar/config:/etc/caesar:ro
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      CAESAR_NETWORK: ${CAESAR_NETWORK:-testnet}
+    networks:
+      - hypermesh-net
+    depends_on:
+      - stoq
+      - trustchain
+      - hypermesh
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Native Monitoring Dashboard
+  nexus-ui:
+    build:
+      context: ./hypermesh/nexus-ui
+      dockerfile: Dockerfile
+    container_name: hypermesh-nexus-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Web UI
+    environment:
+      REACT_APP_API_URL: ${API_URL:-http://localhost:8080}
+      REACT_APP_MONITORING_URL: ${MONITORING_URL:-http://localhost:9090}
+    networks:
+      - hypermesh-net
+    depends_on:
+      - hypermesh
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: hypermesh-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - hypermesh-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL for persistent data
+  postgres:
+    image: postgres:16-alpine
+    container_name: hypermesh-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hypermesh}
+      POSTGRES_USER: ${POSTGRES_USER:-hypermesh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    networks:
+      - hypermesh-net
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hypermesh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  hypermesh-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-hypermesh
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+volumes:
+  stoq-data:
+    driver: local
+  trustchain-certs:
+    driver: local
+  trustchain-data:
+    driver: local
+  hypermesh-data:
+    driver: local
+  catalog-cache:
+    driver: local
+  caesar-data:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local

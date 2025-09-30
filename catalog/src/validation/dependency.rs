@@ -6,7 +6,7 @@ use anyhow::{Result, Context};
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
-use crate::assets::Asset;
+use crate::assets::AssetPackage;
 
 /// Dependency information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,7 +46,7 @@ impl DependencyResolver {
     }
 
     /// Resolve asset dependencies
-    pub async fn resolve(&self, asset: &Asset) -> Result<DependencyGraph> {
+    pub async fn resolve(&self, asset: &AssetPackage) -> Result<DependencyGraph> {
         let mut graph = DependencyGraph::new();
         let mut visited = HashSet::new();
         let mut stack = vec![asset.id.to_string()];

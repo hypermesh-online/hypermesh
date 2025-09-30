@@ -71,7 +71,7 @@ pub struct CatalogExecutionContext {
     /// Execution ID
     pub execution_id: String,
     /// Asset ID being executed
-    pub asset_id: crate::consensus::AssetId,
+    pub asset_id: crate::AssetId,
     /// Allocated HyperMesh resources
     pub allocated_resources: Vec<HyperMeshResource>,
     /// Execution status

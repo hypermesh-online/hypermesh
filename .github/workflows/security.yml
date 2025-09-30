@@ -1,0 +1,235 @@
+name: Security Scanning
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: |
+          for component in stoq trustchain hypermesh caesar catalog; do
+            echo "Auditing $component dependencies..."
+            cd $component
+            cargo audit || true
+            cd ..
+          done
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: audit-results
+          path: |
+            **/Cargo.lock
+            **/audit.txt
+
+  vulnerability-scan:
+    name: Container Vulnerability Scanning
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [hypermesh, caesar]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          cd ${{ matrix.component }}
+          docker build -t ${{ matrix.component }}:scan .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.component }}:scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install security tools
+        run: |
+          cargo install cargo-geiger
+          cargo install cargo-deny
+
+      - name: Run Clippy security lints
+        run: |
+          cargo clippy --all-targets --all-features -- \
+            -W clippy::all \
+            -W clippy::pedantic \
+            -W clippy::nursery \
+            -W clippy::cargo \
+            -D warnings
+
+      - name: Check unsafe code usage
+        run: |
+          for component in stoq trustchain hypermesh caesar catalog; do
+            echo "Checking unsafe code in $component..."
+            cd $component
+            cargo geiger --all-features || true
+            cd ..
+          done
+
+      - name: License and advisory check
+        run: |
+          cargo deny init
+          cargo deny check
+
+  sast-scan:
+    name: SAST with Semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/rust
+            p/docker
+            p/github-actions
+            p/secrets
+
+  secrets-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect secrets with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: GitLeaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  infrastructure-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform security scan
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: ./infrastructure/terraform
+
+      - name: Kubernetes manifest scan
+        uses: azure/k8s-lint@v2.0
+        with:
+          manifests: |
+            infrastructure/kubernetes/*.yaml
+            hypermesh/deploy/kubernetes/*.yaml
+
+      - name: Helm chart security scan
+        run: |
+          if [ -d "infrastructure/helm" ]; then
+            helm plugin install https://github.com/databus23/helm-diff || true
+            helm plugin install https://github.com/rimusz/helm-tiller || true
+
+            cd infrastructure/helm
+            helm lint .
+            helm template . | kubectl apply --dry-run=client -f - || true
+          fi
+
+  compliance-check:
+    name: Compliance and Best Practices
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'hypermesh-ecosystem'
+          path: '.'
+          format: 'HTML'
+
+      - name: CIS Benchmark Check
+        run: |
+          # Check for common security misconfigurations
+          echo "Checking for hardcoded credentials..."
+          grep -r "password\|secret\|key\|token" --include="*.rs" --include="*.toml" . | grep -v "example\|test\|doc" || true
+
+          echo "Checking for insecure protocols..."
+          grep -r "http://" --include="*.rs" . | grep -v "localhost\|127.0.0.1\|test" || true
+
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: compliance-report
+          path: |
+            dependency-check-report.html
+            compliance-check.txt
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, vulnerability-scan, static-analysis, sast-scan, secrets-scan, infrastructure-scan, compliance-check]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "Date: $(date)" >> security-summary.md
+          echo "Repository: ${{ github.repository }}" >> security-summary.md
+          echo "Commit: ${{ github.sha }}" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "## Scan Results" >> security-summary.md
+          echo "- Dependency Audit: ${{ needs.dependency-audit.result }}" >> security-summary.md
+          echo "- Vulnerability Scan: ${{ needs.vulnerability-scan.result }}" >> security-summary.md
+          echo "- Static Analysis: ${{ needs.static-analysis.result }}" >> security-summary.md
+          echo "- SAST Scan: ${{ needs.sast-scan.result }}" >> security-summary.md
+          echo "- Secrets Scan: ${{ needs.secrets-scan.result }}" >> security-summary.md
+          echo "- Infrastructure Scan: ${{ needs.infrastructure-scan.result }}" >> security-summary.md
+          echo "- Compliance Check: ${{ needs.compliance-check.result }}" >> security-summary.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: security-summary.md

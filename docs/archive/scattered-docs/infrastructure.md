@@ -67,7 +67,6 @@ All infrastructure components have been designed to meet HyperMesh's ambitious p
 - **Byzantine Fault-Tolerant Cluster Setup**: 4+ node clusters with (3f+1) tolerance
 - **Certificate Management**: Automated CA and node certificate generation
 - **Docker Compose Integration**: Complete containerized deployment
-- **Monitoring Stack**: Prometheus, Grafana, and custom dashboards
 - **Cluster Management**: Scaling, health checks, and maintenance operations
 
 **Scripts:**
@@ -78,7 +77,6 @@ All infrastructure components have been designed to meet HyperMesh's ambitious p
 
 **Monitoring Integration:**
 - Prometheus metrics collection with custom HyperMesh metrics
-- Grafana dashboards for cluster visualization
 - Alert management with multiple notification channels
 - Performance benchmarking and capacity planning
 
@@ -89,7 +87,6 @@ All infrastructure components have been designed to meet HyperMesh's ambitious p
 - **Performance Analysis**: Trend detection and bottleneck identification
 - **Alert Management**: Multi-channel alerting with suppression and aggregation
 - **Web Dashboard**: Real-time visualization with custom charts
-- **Export Integration**: Prometheus, InfluxDB, and Grafana compatibility
 
 **Architecture:**
 - `PerformanceDashboard`: Central monitoring coordination
@@ -139,7 +136,6 @@ All infrastructure components have been designed to meet HyperMesh's ambitious p
 ./deployment/scripts/manage-cluster.sh status
 
 # 3. Access monitoring dashboards
-# Grafana: http://localhost:3000 (admin/admin)
 # Prometheus: http://localhost:9090
 # API endpoints: http://localhost:800[0-3] per node
 ```

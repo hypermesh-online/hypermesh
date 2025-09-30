@@ -16,7 +16,10 @@ use trustchain::{
     ct::CertificateTransparency,
     dns::DnsResolver,
     trust::HyperMeshTrustValidator,
+    monitoring::{MonitoringSystem, MonitoringConfig, MetricsExporter,
+                 export::{JsonExporter, PrometheusExporter}},
 };
+use axum::{Router, routing::get, Json, response::IntoResponse};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -101,7 +104,7 @@ async fn main() -> Result<()> {
     info!("  CT Service: https://[{}]:{}/ct", bind_addr, port);
     info!("  DNS Service: quic://[{}]:853", bind_addr);
     info!("  API Service: https://[{}]:{}/api", bind_addr, port + 3);
-    info!("  Metrics: http://[{}]:9090/metrics", bind_addr);
+    info!("  Monitoring: http://[{}]:9090/metrics (native)", bind_addr);
 
     // Wait for shutdown signal
     shutdown_signal().await;
@@ -128,6 +131,8 @@ struct TrustChainServer {
     trust_validator: Arc<HyperMeshTrustValidator>,
     /// Server configuration
     config: TrustChainServerConfig,
+    /// Native monitoring system
+    monitoring: Arc<MonitoringSystem>,
 }
 
 /// Server configuration
@@ -175,6 +180,23 @@ impl TrustChainServer {
         let trustchain = Arc::new(TrustChain::new(trustchain_config).await
             .context("Failed to initialize TrustChain coordinator")?); 
 
+        // Initialize native monitoring
+        let monitoring_config = MonitoringConfig {
+            enabled: true,
+            collection_interval: 10,
+            health_check_interval: 30,
+            enable_export: true,
+            export_format: trustchain::monitoring::export::ExportFormat::Json,
+            retention_seconds: 3600,
+            alert_thresholds: trustchain::monitoring::AlertThresholds::default(),
+        };
+        let monitoring = Arc::new(MonitoringSystem::new(monitoring_config).await
+            .context("Failed to initialize monitoring system")?);
+
+        // Add exporters for Prometheus compatibility
+        monitoring.add_exporter(Box::new(PrometheusExporter::new("trustchain"))).await;
+        monitoring.add_exporter(Box::new(JsonExporter)).await;
+
         Ok(Self {
             trustchain,
             ca,
@@ -182,6 +204,7 @@ impl TrustChainServer {
             dns,
             trust_validator,
             config,
+            monitoring,
         })
     }
 
@@ -253,20 +276,60 @@ impl TrustChainServer {
     }
 
     async fn start_monitoring(&self) -> Result<()> {
-        info!("Starting monitoring and health checks");
-        
-        // Start Prometheus metrics server
-        tokio::spawn(async {
-            // Placeholder for Prometheus metrics server
-            info!("Metrics server started on port 9090");
+        info!("Starting native monitoring and health checks");
+
+        // Start native monitoring system
+        self.monitoring.start().await
+            .context("Failed to start monitoring system")?;
+
+        // Start metrics HTTP endpoint
+        let monitoring = self.monitoring.clone();
+        let bind_addr = self.config.bind_address;
+        tokio::spawn(async move {
+            // Create simple HTTP server for metrics endpoint
+            let app = axum::Router::new()
+                .route("/metrics", axum::routing::get({
+                    let monitoring = monitoring.clone();
+                    move || {
+                        let monitoring = monitoring.clone();
+                        async move {
+                            let metrics = monitoring.get_metrics().await;
+                            let exporter = PrometheusExporter::new("trustchain");
+                            match exporter.export(&metrics).await {
+                                Ok(data) => (
+                                    [("Content-Type", "text/plain; version=0.0.4")],
+                                    data
+                                ).into_response(),
+                                Err(e) => (
+                                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    format!("Error: {}", e)
+                                ).into_response(),
+                            }
+                        }
+                    }
+                }))
+                .route("/health", axum::routing::get({
+                    let monitoring = monitoring.clone();
+                    move || {
+                        let monitoring = monitoring.clone();
+                        async move {
+                            let health = monitoring.get_health().await;
+                            Json(health)
+                        }
+                    }
+                }));
+
+            let addr = std::net::SocketAddr::from((bind_addr, 9090));
+            info!("Metrics server listening on http://[{}]:9090", bind_addr);
+
+            let listener = tokio::net::TcpListener::bind(addr).await
+                .expect("Failed to bind metrics server");
+            axum::serve(listener, app)
+                .await
+                .expect("Failed to start metrics server");
         });
 
-        // Start health check endpoint
-        tokio::spawn(async {
-            // Placeholder for health check server
-            info!("Health check endpoint started");
-        });
-
+        info!("Native monitoring system started");
         Ok(())
     }
 }

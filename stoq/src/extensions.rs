@@ -218,6 +218,8 @@ impl StoqPacket {
 pub struct DefaultStoqExtensions {
     /// Packet sequence counter
     sequence_counter: std::sync::atomic::AtomicU64,
+    /// Optional metrics reference for recording protocol events
+    metrics: Option<std::sync::Arc<crate::transport::metrics::TransportMetrics>>,
 }
 
 impl DefaultStoqExtensions {
@@ -225,6 +227,15 @@ impl DefaultStoqExtensions {
     pub fn new() -> Self {
         Self {
             sequence_counter: std::sync::atomic::AtomicU64::new(0),
+            metrics: None,
+        }
+    }
+
+    /// Create with metrics collection
+    pub fn with_metrics(metrics: std::sync::Arc<crate::transport::metrics::TransportMetrics>) -> Self {
+        Self {
+            sequence_counter: std::sync::atomic::AtomicU64::new(0),
+            metrics: Some(metrics),
         }
     }
 }
@@ -238,15 +249,34 @@ impl Default for DefaultStoqExtensions {
 impl StoqProtocolExtension for DefaultStoqExtensions {
     fn tokenize_packet(&self, data: &[u8]) -> PacketToken {
         let sequence = self.sequence_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        PacketToken::new(data, sequence)
+        let token = PacketToken::new(data, sequence);
+
+        // Record metrics if available
+        if let Some(ref metrics) = self.metrics {
+            metrics.record_packet_tokenized();
+        }
+
+        token
     }
 
     fn validate_token(&self, data: &[u8], token: &PacketToken) -> bool {
-        token.validate(data)
+        let valid = token.validate(data);
+
+        // Record validation failure if metrics available
+        if !valid {
+            if let Some(ref metrics) = self.metrics {
+                metrics.record_token_validation_failure();
+            }
+        }
+
+        valid
     }
 
     fn shard_packet(&self, data: &[u8], max_shard_size: usize) -> Result<Vec<PacketShard>> {
         if max_shard_size == 0 {
+            if let Some(ref metrics) = self.metrics {
+                metrics.record_sharding_error();
+            }
             return Err(anyhow!("Maximum shard size must be greater than 0"));
         }
 
@@ -268,11 +298,19 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
             });
         }
 
+        // Record sharding metrics
+        if let Some(ref metrics) = self.metrics {
+            metrics.record_packet_sharded(total_shards as u32);
+        }
+
         Ok(shards)
     }
 
     fn reassemble_shards(&self, mut shards: Vec<PacketShard>) -> Result<Bytes> {
         if shards.is_empty() {
+            if let Some(ref metrics) = self.metrics {
+                metrics.record_reassembly_error();
+            }
             return Err(anyhow!("No shards to reassemble"));
         }
 
@@ -283,12 +321,21 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
 
         for shard in &shards {
             if shard.shard_id != shard_id {
+                if let Some(ref metrics) = self.metrics {
+                    metrics.record_reassembly_error();
+                }
                 return Err(anyhow!("Mismatched shard IDs"));
             }
             if shard.packet_hash != packet_hash {
+                if let Some(ref metrics) = self.metrics {
+                    metrics.record_reassembly_error();
+                }
                 return Err(anyhow!("Mismatched packet hashes"));
             }
             if shard.total_shards != total_shards {
+                if let Some(ref metrics) = self.metrics {
+                    metrics.record_reassembly_error();
+                }
                 return Err(anyhow!("Mismatched total shard counts"));
             }
         }
@@ -298,11 +345,17 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
 
         // Verify we have all shards
         if shards.len() != total_shards as usize {
+            if let Some(ref metrics) = self.metrics {
+                metrics.record_reassembly_error();
+            }
             return Err(anyhow!("Missing shards: expected {}, got {}", total_shards, shards.len()));
         }
 
         for (i, shard) in shards.iter().enumerate() {
             if shard.sequence != i as u32 {
+                if let Some(ref metrics) = self.metrics {
+                    metrics.record_reassembly_error();
+                }
                 return Err(anyhow!("Missing shard sequence {}", i));
             }
         }
@@ -321,7 +374,15 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
         let computed_hash: [u8; 32] = hasher.finalize().into();
 
         if computed_hash != packet_hash {
+            if let Some(ref metrics) = self.metrics {
+                metrics.record_reassembly_error();
+            }
             return Err(anyhow!("Reassembled data hash mismatch"));
+        }
+
+        // Record successful reassembly
+        if let Some(ref metrics) = self.metrics {
+            metrics.record_shards_reassembled();
         }
 
         Ok(result)
@@ -329,6 +390,12 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
 
     fn add_hop_info(&self, packet: &mut StoqPacket, hop: HopInfo) -> Result<()> {
         packet.hops.push(hop);
+
+        // Record hop routing metrics
+        if let Some(ref metrics) = self.metrics {
+            metrics.record_hop_route();
+        }
+
         Ok(())
     }
 

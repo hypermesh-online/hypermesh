@@ -1,0 +1,47 @@
+{
+  "timestamp": "2025-09-28T15:45:07.888281",
+  "total_tests": 26,
+  "passed": 23,
+  "failed": 3,
+  "vulnerabilities": [
+    "XSS Protection",
+    "CSRF Protection"
+  ],
+  "pass_rate": "88.5%",
+  "details": {
+    "passed": [
+      "FALCON Post-Quantum Crypto",
+      "Certificate Management",
+      "TrustChain Consensus",
+      "Input validation",
+      "stoq/src/transport/mod.rs error handling",
+      "trustchain/src/lib.rs error handling",
+      "hypermesh/src/lib.rs error handling",
+      "Certificate: RSA key generation",
+      "Certificate: Certificate validation",
+      "Certificate: Fingerprint calculation",
+      "Certificate: Certificate rotation",
+      "Certificate: TrustChain integration",
+      "Consensus: StakeProof",
+      "Consensus: TimeProof",
+      "Consensus: SpaceProof",
+      "Consensus: WorkProof",
+      "Security: SQL Injection",
+      "Security: Command Injection",
+      "Security: Path Traversal",
+      "Network: IPv6 only support",
+      "Network: QUIC transport",
+      "Network: TLS 1.3 support",
+      "Network: Rate limiting"
+    ],
+    "failed": [
+      "21 security bypasses",
+      "Security: XSS Protection",
+      "Security: CSRF Protection"
+    ],
+    "vulnerabilities": [
+      "XSS Protection",
+      "CSRF Protection"
+    ]
+  }
+}

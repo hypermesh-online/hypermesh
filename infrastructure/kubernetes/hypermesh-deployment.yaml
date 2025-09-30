@@ -1,0 +1,324 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hypermesh
+  labels:
+    name: hypermesh
+    environment: production
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hypermesh-config
+  namespace: hypermesh
+data:
+  config.toml: |
+    [server]
+    bind_addr = "[::]:8080"
+    quic_port = 6003
+    metrics_port = 9090
+
+    [cluster]
+    mode = "production"
+    bootstrap_nodes = []
+
+    [security]
+    enable_tls = true
+    cert_rotation_hours = 24
+
+    [monitoring]
+    enable_metrics = true
+    enable_tracing = true
+    sampling_rate = 0.01
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+  labels:
+    app: hypermesh
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hypermesh
+  template:
+    metadata:
+      labels:
+        app: hypermesh
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hypermesh
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: hypermesh
+        image: ghcr.io/hypermesh-online/hypermesh:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 6003
+          name: quic
+          protocol: UDP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: HYPERMESH_MODE
+          value: "production"
+        - name: HYPERMESH_NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: HYPERMESH_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: HYPERMESH_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/hypermesh
+        - name: data
+          mountPath: /var/lib/hypermesh
+        - name: cache
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: hypermesh-config
+      - name: data
+        emptyDir:
+          sizeLimit: 10Gi
+      - name: cache
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - hypermesh
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+  labels:
+    app: hypermesh
+spec:
+  type: ClusterIP
+  selector:
+    app: hypermesh
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: quic
+    port: 6003
+    targetPort: 6003
+    protocol: UDP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypermesh-nodeport
+  namespace: hypermesh
+  labels:
+    app: hypermesh
+spec:
+  type: NodePort
+  selector:
+    app: hypermesh
+  ports:
+  - name: quic
+    port: 6003
+    targetPort: 6003
+    protocol: UDP
+    nodePort: 30603
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hypermesh
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hypermesh
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hypermesh
+subjects:
+- kind: ServiceAccount
+  name: hypermesh
+  namespace: hypermesh
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hypermesh
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+spec:
+  podSelector:
+    matchLabels:
+      app: hypermesh
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: hypermesh
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: UDP
+      port: 6003
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector: {}
+    - namespaceSelector: {}
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.169.254/32  # Block IMDS
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hypermesh
+  namespace: hypermesh
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: hypermesh

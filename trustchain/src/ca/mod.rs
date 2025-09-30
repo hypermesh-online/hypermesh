@@ -602,7 +602,7 @@ mod tests {
             san_entries: vec!["test.localhost".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
             timestamp: SystemTime::now(),
         };
         
@@ -621,7 +621,7 @@ mod tests {
             san_entries: vec!["test.localhost".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
             timestamp: SystemTime::now(),
         };
         

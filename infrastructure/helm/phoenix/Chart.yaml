@@ -1,0 +1,42 @@
+apiVersion: v2
+name: phoenix-stack
+description: Phoenix Distributed Computing Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - phoenix
+  - distributed-computing
+  - quic
+  - transport
+  - certificates
+
+home: https://phoenix-distributed.com
+sources:
+  - https://github.com/phoenix-distributed/phoenix-sdk
+  - https://github.com/phoenix-distributed/phoenix-transport
+  - https://github.com/phoenix-distributed/phoenix-certs
+
+maintainers:
+  - name: Phoenix Team
+    email: team@phoenix-distributed.com
+
+dependencies:
+  - name: postgresql
+    version: "~13.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+
+  - name: redis
+    version: "~18.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/signKey: |
+    fingerprint: PHOENIX2024
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+    - url: https://artifacthub.io/packages/helm/jetstack/cert-manager

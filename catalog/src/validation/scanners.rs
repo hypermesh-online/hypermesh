@@ -6,7 +6,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::assets::Asset;
+use crate::assets::AssetPackage;
 use super::traits::SecurityScanner;
 use super::results::{
     SecurityValidationResult, Vulnerability, MalwareDetection,
@@ -115,7 +115,7 @@ impl StaticSecurityScanner {
     }
 
     /// Check for known vulnerabilities
-    fn check_vulnerabilities(&self, asset: &Asset) -> Vec<Vulnerability> {
+    fn check_vulnerabilities(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
         let mut vulnerabilities = Vec::new();
 
         // Check dependencies for known vulnerabilities
@@ -196,7 +196,7 @@ impl SecurityScanner for StaticSecurityScanner {
         ]
     }
 
-    async fn scan(&self, asset: &Asset) -> Result<SecurityValidationResult> {
+    async fn scan(&self, asset: &AssetPackage) -> Result<SecurityValidationResult> {
         let mut vulnerabilities = Vec::new();
         let mut malware = Vec::new();
         let mut injection_risks = Vec::new();

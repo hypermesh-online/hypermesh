@@ -108,7 +108,6 @@ Infrastructure Services:
 ```yaml
 Metrics Pipeline:
   Collection: Prometheus with custom exporters
-  Visualization: Grafana with Caesar-specific dashboards
   Alerting: AlertManager with PagerDuty integration
   
 Key Performance Indicators:
@@ -272,7 +271,6 @@ Infrastructure Deliverables:
 Monitoring Deliverables:
   Observability Stack:
     - Prometheus metrics collection
-    - Grafana visualization dashboards
     - ELK log aggregation and analysis
     - Distributed tracing with Jaeger
     

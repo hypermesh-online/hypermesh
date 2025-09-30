@@ -14,6 +14,7 @@ pub mod proof;
 pub mod validator;
 pub mod block_matrix;
 pub mod hypermesh_client;
+pub mod real_validator;
 
 pub use proof::*;
 pub use validator::*;
@@ -76,6 +77,7 @@ impl ConsensusProof {
     /// DEPRECATED - SECURITY BYPASS - DO NOT USE IN PRODUCTION
     /// This method creates invalid proofs and bypasses security validation
     /// TODO: Replace all calls to this method with generate_from_network()
+    #[cfg(test)]
     pub fn default_for_testing() -> Self {
         Self {
             stake_proof: StakeProof::default(),
@@ -192,9 +194,9 @@ impl ConsensusRequirements {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ConsensusResult {
     Valid {
-        proof_hash: [u8; 32],
+        confidence_score: f64,
         validation_timestamp: SystemTime,
-        validator_id: String,
+        validation_duration: Duration,
     },
     Invalid {
         reason: String,
@@ -258,22 +260,22 @@ mod tests {
 
     #[test]
     fn test_consensus_proof_creation() {
-        let proof = ConsensusProof::default_for_testing();
+        let proof = ConsensusProof::generate_from_network(&node_id).await?;
         assert!(proof.validate());
     }
 
     #[test]
     fn test_consensus_proof_serialization() {
-        let proof = ConsensusProof::default_for_testing();
-        let bytes = proof.to_bytes().unwrap();
-        let deserialized = ConsensusProof::from_bytes(&bytes).unwrap();
+        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+        let bytes = proof.to_bytes()?;
+        let deserialized = ConsensusProof::from_bytes(&bytes)?;
         
         assert_eq!(proof.stake_proof.stake_amount, deserialized.stake_proof.stake_amount);
     }
 
     #[test]
     fn test_consensus_requirements_validation() {
-        let proof = ConsensusProof::default_for_testing();
+        let proof = ConsensusProof::generate_from_network(&node_id).await?;
         let requirements = ConsensusRequirements::localhost_testing();
         
         assert!(proof.validate_with_requirements(&requirements));
@@ -281,9 +283,9 @@ mod tests {
 
     #[test]
     fn test_consensus_proof_hash() {
-        let proof = ConsensusProof::default_for_testing();
-        let hash1 = proof.hash().unwrap();
-        let hash2 = proof.hash().unwrap();
+        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+        let hash1 = proof.hash()?;
+        let hash2 = proof.hash()?;
         
         assert_eq!(hash1, hash2); // Same proof should have same hash
     }

@@ -42,7 +42,6 @@ Network Stack:
   - QUIC support (ngtcp2)
 Monitoring:
   - Prometheus 2.47.0
-  - Grafana 10.2.0
   - Jaeger 1.49.0
 ```
 

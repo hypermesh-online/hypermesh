@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use crate::assets::Asset;
+use crate::assets::AssetPackage;
 use super::config::{ValidationConfig, SecuritySeverity};
 use super::dependency::{DependencyResolver, VersionConflict};
 use super::results::{
@@ -83,7 +83,7 @@ impl AssetValidator {
     }
 
     /// Validate an asset package
-    pub async fn validate(&self, asset: &Asset) -> Result<ValidationResult> {
+    pub async fn validate(&self, asset: &AssetPackage) -> Result<ValidationResult> {
         let start = Instant::now();
         let mut security_result = None;
         let mut syntax_result = None;
@@ -149,7 +149,7 @@ impl AssetValidator {
     }
 
     /// Validate asset syntax
-    async fn validate_syntax(&self, asset: &Asset) -> Result<SyntaxValidationResult> {
+    async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
         if let Some(validator) = self.type_validators.get(&asset.asset_type) {
             validator.validate_syntax(asset).await
         } else {
@@ -166,7 +166,7 @@ impl AssetValidator {
     }
 
     /// Validate asset security
-    async fn validate_security(&self, asset: &Asset) -> Result<SecurityValidationResult> {
+    async fn validate_security(&self, asset: &AssetPackage) -> Result<SecurityValidationResult> {
         let mut combined_result = SecurityValidationResult {
             score: 100,
             vulnerabilities: Vec::new(),
@@ -195,7 +195,7 @@ impl AssetValidator {
     }
 
     /// Validate asset performance
-    async fn validate_performance(&self, _asset: &Asset) -> Result<PerformanceValidationResult> {
+    async fn validate_performance(&self, _asset: &AssetPackage) -> Result<PerformanceValidationResult> {
         // Simplified performance validation
         Ok(PerformanceValidationResult {
             resource_usage: ResourceUsage {
@@ -227,7 +227,7 @@ impl AssetValidator {
     }
 
     /// Validate asset compliance
-    async fn validate_compliance(&self, _asset: &Asset) -> Result<ComplianceValidationResult> {
+    async fn validate_compliance(&self, _asset: &AssetPackage) -> Result<ComplianceValidationResult> {
         // Simplified compliance validation
         Ok(ComplianceValidationResult {
             compliant: true,
@@ -348,7 +348,7 @@ impl AssetValidator {
     }
 
     /// Validate dependencies
-    pub async fn validate_dependencies(&self, asset: &Asset) -> Result<Vec<VersionConflict>> {
+    pub async fn validate_dependencies(&self, asset: &AssetPackage) -> Result<Vec<VersionConflict>> {
         let graph = self.dependency_resolver.resolve(asset).await?;
 
         // Check dependency depth

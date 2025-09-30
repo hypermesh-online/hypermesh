@@ -1,0 +1,66 @@
+# Cargo configuration for Web3 workspace
+
+[build]
+# Use all available cores for parallel compilation
+jobs = 16
+# Enable incremental compilation for faster rebuilds
+incremental = true
+
+[target.x86_64-unknown-linux-gnu]
+# Use lld linker for faster linking
+linker = "clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+    "-C", "target-cpu=native",
+    # Enable frame pointers for better profiling
+    "-C", "force-frame-pointers=yes",
+]
+
+[profile.dev]
+# Faster compilation, slower runtime
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+incremental = true
+
+[profile.release]
+# Maximum optimization
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+
+[profile.bench]
+# Benchmarking profile
+inherits = "release"
+debug = true
+strip = false
+
+[profile.test]
+# Testing profile
+opt-level = 1
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+# Custom profile for production builds
+[profile.production]
+inherits = "release"
+lto = "fat"
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Alias common commands
+[alias]
+b = "build"
+c = "check"
+t = "test"
+r = "run"
+br = "build --release"
+ws = "check --workspace"
+wst = "test --workspace"

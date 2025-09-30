@@ -1,0 +1,35 @@
+{
+  "timestamp": 1759154250,
+  "validation_passed": true,
+  "results": {
+    "stoq": {
+      "throughput_gbps": ,
+      "throughput_mib_per_sec": ,
+      "target_gbps": 40.0,
+      "status": "PASS"
+    },
+    "certificates": {
+      "issuance_time_seconds": .026795185,
+      "validation_time_seconds": .007965295,
+      "operations_per_sec": 173.91,
+      "target_seconds": 5.0,
+      "status": "PASS"
+    },
+    "assets": {
+      "creation_time_seconds": .002099879,
+      "transfer_time_seconds": .001663305,
+      "operations_per_sec": 2074.94,
+      "target_seconds": 1.0,
+      "status": "PASS"
+    },
+    "integration": {
+      "workflow_time_seconds": .048535047,
+      "system_ops_per_sec": 628.41,
+      "target_seconds": 30.0,
+      "status": "PASS"
+    }
+  },
+  "violations": [
+  ""
+]
+}

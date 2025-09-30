@@ -63,7 +63,6 @@ The HyperMesh system has successfully completed final performance optimization a
 
 ## Comprehensive Monitoring Deployment
 
-### Monitoring Stack (Prometheus + Grafana + AlertManager)
 - **Overhead**: 0.7% CPU, 0.3% memory, 0.1% network (within <1% target)
 - **Metrics Collection**: 5000+ metrics across all components
 - **Alert Rules**: 150+ intelligent rules with ML-based anomaly detection
@@ -130,12 +129,10 @@ The HyperMesh system has successfully completed final performance optimization a
 - **Performance Module**: `/src/performance/mod.rs`
 - **Prometheus Config**: `/monitoring/prometheus/hypermesh-config.yml`
 - **Alert Rules**: `/monitoring/prometheus/hypermesh-rules.yml`
-- **Grafana Dashboard**: `/monitoring/grafana/hypermesh-executive-dashboard.json`
 - **Deployment Script**: `/monitoring/deployment/monitoring-stack-deploy.sh`
 
 ### Monitoring Infrastructure
 - **Prometheus**: High-performance metrics collection with 15d retention
-- **Grafana**: Real-time visualization with executive/operational dashboards
 - **AlertManager**: Intelligent alerting with Slack, email, PagerDuty integration
 - **Node Exporters**: System-level metrics across all nodes
 - **Ingress**: Secure external access with TLS termination

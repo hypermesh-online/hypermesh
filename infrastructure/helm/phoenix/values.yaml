@@ -1,0 +1,462 @@
+# Phoenix Stack Helm Values
+# Production-ready configuration for Phoenix distributed computing platform
+
+global:
+  environment: production
+  version: v1.0.0
+  domain: phoenix-distributed.com
+
+  # Container registry
+  imageRegistry: ""
+  imagePullSecrets: []
+
+  # Storage class for persistent volumes
+  storageClass: gp3
+
+  # Network configuration
+  network:
+    enableIPv6: true
+    serviceMesh:
+      enabled: false
+      provider: istio
+
+# Phoenix Transport (STOQ) Configuration
+transport:
+  enabled: true
+
+  image:
+    repository: phoenix-transport
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 3
+
+  # Performance tiers
+  performanceTier: HighThroughput  # LowLatency, Adaptive, HighThroughput
+
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    ports:
+      quic:
+        port: 9292
+        protocol: UDP
+      health:
+        port: 9293
+        protocol: TCP
+
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+  # QUIC configuration
+  quic:
+    maxStreams: 10000
+    streamWindowSize: 16777216
+    connectionWindowSize: 67108864
+    keepAliveInterval: 30s
+    maxIdleTimeout: 120s
+
+  nodeSelector:
+    NodeType: performance
+
+  tolerations:
+  - key: workload
+    operator: Equal
+    value: phoenix-transport
+    effect: NoSchedule
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - phoenix-transport
+        topologyKey: kubernetes.io/hostname
+
+# Phoenix Certificates (TrustChain) Configuration
+certificates:
+  enabled: true
+
+  image:
+    repository: phoenix-certs
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 3
+
+  service:
+    type: ClusterIP
+    port: 8443
+    targetPort: 8443
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: gp3
+    accessMode: ReadWriteOnce
+
+  # Certificate Authority configuration
+  ca:
+    rootKeyType: rsa4096
+    validityDays: 3650
+    intermediateValidityDays: 1825
+    leafValidityDays: 365
+
+  # HSM configuration (for production)
+  hsm:
+    enabled: false
+    type: softhsm  # aws-cloudhsm, softhsm
+    pin: ""  # Set via secret
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+# Phoenix Dashboard Configuration
+dashboard:
+  enabled: true
+
+  image:
+    repository: phoenix-dashboard
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+    - host: dashboard.phoenix-distributed.com
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: phoenix-dashboard-tls
+      hosts:
+      - dashboard.phoenix-distributed.com
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# Phoenix CLI Configuration
+cli:
+  enabled: true
+
+  image:
+    repository: phoenix-cli
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # CLI server for remote operations
+  server:
+    enabled: true
+    replicaCount: 2
+    service:
+      type: ClusterIP
+      port: 8080
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+
+  # Native Phoenix metrics
+  metrics:
+    enabled: true
+    port: 9090
+    path: /metrics
+
+  # Prometheus ServiceMonitor
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
+    scrapeTimeout: 10s
+
+  # Grafana dashboards
+  dashboards:
+    enabled: true
+    namespace: monitoring
+
+  # Custom alerts
+  alerts:
+    enabled: true
+    rules:
+    - name: PhoenixTransportDown
+      expr: up{job="phoenix-transport"} == 0
+      for: 5m
+      severity: critical
+      annotations:
+        summary: "Phoenix Transport instance is down"
+        description: "Phoenix Transport instance {{ $labels.instance }} has been down for more than 5 minutes"
+
+    - name: HighMemoryUsage
+      expr: container_memory_usage_bytes{pod=~"phoenix-.*"} / container_spec_memory_limit_bytes > 0.8
+      for: 5m
+      severity: warning
+      annotations:
+        summary: "High memory usage detected"
+        description: "Pod {{ $labels.pod }} is using more than 80% of its memory limit"
+
+    - name: HighLatency
+      expr: histogram_quantile(0.95, phoenix_transport_latency_seconds_bucket) > 0.1
+      for: 5m
+      severity: warning
+      annotations:
+        summary: "High latency detected"
+        description: "95th percentile latency is above 100ms"
+
+# PostgreSQL Configuration (if using bundled)
+postgresql:
+  enabled: false  # Use external RDS in production
+  auth:
+    database: phoenix
+    username: phoenix
+    existingSecret: phoenix-postgresql
+
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: gp3
+
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "2000m"
+      limits:
+        memory: "16Gi"
+        cpu: "8000m"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Redis Configuration (if using bundled)
+redis:
+  enabled: false  # Use external ElastiCache in production
+  auth:
+    enabled: true
+    existingSecret: phoenix-redis
+
+  master:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: gp3
+
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "8Gi"
+        cpu: "4000m"
+
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "8Gi"
+        cpu: "4000m"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# External Services Configuration
+externalServices:
+  # RDS PostgreSQL
+  postgresql:
+    host: ""  # Set via terraform output
+    port: 5432
+    database: phoenix
+    username: phoenix_admin
+    existingSecret: phoenix-rds
+    sslMode: require
+
+  # ElastiCache Redis
+  redis:
+    host: ""  # Set via terraform output
+    port: 6379
+    existingSecret: phoenix-elasticache
+    tls:
+      enabled: true
+
+# Security Configuration
+security:
+  podSecurityPolicy:
+    enabled: true
+
+  networkPolicy:
+    enabled: true
+    policyTypes:
+    - Ingress
+    - Egress
+
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: ""  # Set IRSA role ARN
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - NET_BIND_SERVICE
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+
+  s3:
+    bucket: phoenix-backups
+    region: us-east-1
+    prefix: kubernetes
+
+  retention:
+    days: 30
+    weeks: 12
+    months: 12
+
+# Rollout Strategy
+rolloutStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Probes Configuration
+probes:
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+  readiness:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+
+  startup:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 30
+
+# Feature Flags
+features:
+  # Enable native monitoring without external dependencies
+  nativeMonitoring: true
+
+  # Enable eBPF-based performance monitoring
+  ebpfMonitoring: true
+
+  # Enable adaptive performance tiers
+  adaptivePerformance: true
+
+  # Enable GPU support
+  gpuSupport: false
+
+  # Enable multi-region deployment
+  multiRegion: false
+
+# Development/Testing overrides
+development:
+  enabled: false
+
+  # Use NodePort for local development
+  serviceType: NodePort
+
+  # Reduce resource requirements
+  resources:
+    reduced: true
+
+  # Skip TLS verification
+  insecureSkipVerify: false

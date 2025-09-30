@@ -1,0 +1,122 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2025-09-25T20:50:23.698Z",
+  "rules": [
+    {
+      "id": "hardcoded-api-key",
+      "name": "Hardcoded API Key",
+      "description": "Detects hardcoded API keys in source code",
+      "severity": "high",
+      "category": "security",
+      "pattern": "(api[_-]?key|apikey)\\s*[=:]\\s*[\"'][a-zA-Z0-9]{20,}[\"']",
+      "filePatterns": [
+        "*.js",
+        "*.ts",
+        "*.py",
+        "*.java",
+        "*.go"
+      ],
+      "excludePatterns": [
+        "test/**",
+        "tests/**",
+        "**/*.test.*",
+        "**/*.spec.*"
+      ],
+      "messageTemplate": "Hardcoded API key detected: {matchedText}",
+      "remediation": "Move API keys to environment variables or a secure configuration service",
+      "references": [
+        "https://owasp.org/www-community/vulnerabilities/Use_of_hard-coded_password"
+      ],
+      "enabled": true,
+      "createdAt": "2025-09-25T20:50:23.698Z",
+      "lastModified": "2025-09-25T20:50:23.698Z"
+    },
+    {
+      "id": "weak-password-hash",
+      "name": "Weak Password Hashing",
+      "description": "Detects use of weak password hashing algorithms",
+      "severity": "high",
+      "category": "security",
+      "pattern": "(md5|sha1)\\s*\\(",
+      "filePatterns": [
+        "*.js",
+        "*.ts",
+        "*.py",
+        "*.java",
+        "*.php"
+      ],
+      "messageTemplate": "Weak password hashing algorithm detected: {matchedText}",
+      "remediation": "Use bcrypt, scrypt, or Argon2 for password hashing",
+      "references": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html"
+      ],
+      "enabled": true,
+      "createdAt": "2025-09-25T20:50:23.698Z",
+      "lastModified": "2025-09-25T20:50:23.698Z"
+    },
+    {
+      "id": "console-log-production",
+      "name": "Console Log in Production",
+      "description": "Detects console.log statements that should not be in production",
+      "severity": "low",
+      "category": "maintainability",
+      "pattern": "console\\.(log|debug|info)\\s*\\(",
+      "filePatterns": [
+        "*.js",
+        "*.ts"
+      ],
+      "excludePatterns": [
+        "test/**",
+        "tests/**",
+        "dev/**"
+      ],
+      "messageTemplate": "Console statement detected: {matchedText}",
+      "remediation": "Use proper logging library or remove console statements from production code",
+      "enabled": true,
+      "createdAt": "2025-09-25T20:50:23.698Z",
+      "lastModified": "2025-09-25T20:50:23.698Z"
+    },
+    {
+      "id": "sql-injection-risk",
+      "name": "SQL Injection Risk",
+      "description": "Detects potential SQL injection vulnerabilities",
+      "severity": "critical",
+      "category": "security",
+      "pattern": "(query|execute)\\s*\\(\\s*[\"'][^\"']*\\+",
+      "filePatterns": [
+        "*.js",
+        "*.ts",
+        "*.py",
+        "*.java",
+        "*.php"
+      ],
+      "messageTemplate": "Potential SQL injection vulnerability: {matchedText}",
+      "remediation": "Use parameterized queries or prepared statements",
+      "references": [
+        "https://owasp.org/www-community/attacks/SQL_Injection"
+      ],
+      "enabled": true,
+      "createdAt": "2025-09-25T20:50:23.698Z",
+      "lastModified": "2025-09-25T20:50:23.698Z"
+    },
+    {
+      "id": "insecure-random",
+      "name": "Insecure Random Number Generation",
+      "description": "Detects use of insecure random number generators",
+      "severity": "medium",
+      "category": "security",
+      "pattern": "(Math\\.random|random\\.randint|rand\\()",
+      "filePatterns": [
+        "*.js",
+        "*.ts",
+        "*.py",
+        "*.java"
+      ],
+      "messageTemplate": "Insecure random number generation: {matchedText}",
+      "remediation": "Use cryptographically secure random number generators",
+      "enabled": true,
+      "createdAt": "2025-09-25T20:50:23.698Z",
+      "lastModified": "2025-09-25T20:50:23.698Z"
+    }
+  ]
+}
