@@ -14,7 +14,7 @@ use tokio::sync::{RwLock, Mutex};
 use tracing::{info, debug, warn, error};
 use hex;
 use ring::digest;
-use rustls::{Certificate as CertificateDer, PrivateKey as PrivateKeyDer};
+use rustls::pki_types::{CertificateDer as RustlsCertDer, PrivateKeyDer as RustlsPrivateKeyDer};
 use rcgen::{Certificate as RcgenCertificate, CertificateParams, KeyPair};
 use x509_parser::parse_x509_certificate;
 use uuid::Uuid;
@@ -218,18 +218,27 @@ impl TrustChainCA {
     async fn generate_self_signed_root(ca_id: &str) -> TrustChainResult<CACertificate> {
         info!("Generating self-signed root CA for: {}", ca_id);
 
-        let mut params = CertificateParams::new(vec![ca_id.to_string()]);
+        // rcgen 0.13 API: CertificateParams::new() returns Result
+        let mut params = CertificateParams::new(vec![ca_id.to_string()])
+            .map_err(|e| TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to create certificate params: {}", e),
+            })?;
         params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
 
-        let cert = RcgenCertificate::from_params(params)
+        // rcgen 0.13 API: Generate key pair separately
+        let key_pair = KeyPair::generate()
             .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
+                reason: format!("Failed to generate key pair: {}", e),
             })?;
 
-        let cert_der = cert.serialize_der()
+        // rcgen 0.13 API: Use self_signed() instead of from_params()
+        let cert = params.self_signed(&key_pair)
             .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
+                reason: format!("Failed to create self-signed certificate: {}", e),
             })?;
+
+        // rcgen 0.13 API: Use der() instead of serialize_der()
+        let cert_der = cert.der().to_vec();
 
         let ca_cert = CACertificate {
             certificate_der: cert_der,
@@ -247,24 +256,32 @@ impl TrustChainCA {
     /// Generate certificate using local signing
     async fn generate_certificate_local(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
         let root_ca = self.root_ca.read().await;
-        
-        let mut params = CertificateParams::new(vec![request.common_name.clone()]);
-        
+
+        // rcgen 0.13 API: CertificateParams::new() returns Result
+        let mut params = CertificateParams::new(vec![request.common_name.clone()])
+            .map_err(|e| TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to create certificate params: {}", e),
+            })?;
+
         // Set validity period
         let now = SystemTime::now();
         params.not_before = now.into();
         params.not_after = (now + self.config.validity_period).into();
 
-        // Generate certificate
-        let cert = RcgenCertificate::from_params(params)
+        // rcgen 0.13 API: Generate key pair separately
+        let key_pair = KeyPair::generate()
+            .map_err(|e| TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to generate key pair: {}", e),
+            })?;
+
+        // rcgen 0.13 API: Use self_signed() for now (TODO: needs CA signing)
+        let cert = params.self_signed(&key_pair)
             .map_err(|e| TrustChainError::CertificateGenerationFailed {
                 reason: e.to_string(),
             })?;
 
-        let cert_der = cert.serialize_der()
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: e.to_string(),
-            })?;
+        // rcgen 0.13 API: Use der() instead of serialize_der()
+        let cert_der = cert.der().to_vec();
 
         // Calculate fingerprint
         let fingerprint = self.calculate_certificate_fingerprint(&cert_der);

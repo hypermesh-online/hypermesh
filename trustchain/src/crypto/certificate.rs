@@ -8,7 +8,7 @@ use anyhow::{Result, anyhow};
 use tracing::{info, debug, warn, error};
 use serde::{Serialize, Deserialize};
 
-use rcgen::{Certificate as RcgenCertificate, CertificateParams, DnType, SanType};
+use rcgen::{Certificate as RcgenCertificate, CertificateParams, DnType, SanType, Ia5String};
 use x509_parser::parse_x509_certificate;
 
 use super::{
@@ -154,9 +154,9 @@ impl PQCertificateManager {
     ) -> Result<PQCSR> {
         info!("🔏 Generating post-quantum CSR for: {}", subject.common_name);
         
-        // Create certificate parameters
-        let mut params = CertificateParams::new(vec![subject.common_name.clone()]);
-        
+        // Create certificate parameters (rcgen 0.13: returns Result)
+        let mut params = CertificateParams::new(vec![subject.common_name.clone()])?;
+
         // Set subject information
         params.distinguished_name.push(DnType::CommonName, subject.common_name.clone());
         if let Some(ref org) = subject.organization {
@@ -166,34 +166,39 @@ impl PQCertificateManager {
             params.distinguished_name.push(DnType::CountryName, country.clone());
         }
         
-        // Add subject alternative names
+        // Add subject alternative names (rcgen 0.13: SanType uses Ia5String)
         for san in &san_entries {
             if san.contains('@') {
-                params.subject_alt_names.push(SanType::Rfc822Name(san.clone()));
+                params.subject_alt_names.push(SanType::Rfc822Name(
+                    Ia5String::try_from(san.as_str())?
+                ));
             } else if san.parse::<std::net::IpAddr>().is_ok() {
                 params.subject_alt_names.push(SanType::IpAddress(san.parse().unwrap()));
             } else {
-                params.subject_alt_names.push(SanType::DnsName(san.clone()));
+                params.subject_alt_names.push(SanType::DnsName(
+                    Ia5String::try_from(san.as_str())?
+                ));
             }
         }
-        
+
         // Add FALCON-1024 public key as extension
         let falcon_extension = self.encode_falcon_public_key_extension(&keypair.public_key)?;
         params.custom_extensions.push(falcon_extension);
-        
+
         // Add Kyber public key if present
         if let Some(kyber_kp) = kyber_keypair {
             let kyber_extension = self.encode_kyber_public_key_extension(&kyber_kp.public_key)?;
             params.custom_extensions.push(kyber_extension);
         }
-        
-        // Create certificate for CSR generation
-        let cert = RcgenCertificate::from_params(params)?;
-        let csr_der = cert.serialize_request_der()?;
-        
+
+        // rcgen 0.13: Generate key pair and create CSR
+        let key_pair = rcgen::KeyPair::generate()?;
+        let csr = params.serialize_request(&key_pair)?;
+        let csr_der = csr.der().to_vec();
+
         // Create self-signature with FALCON-1024
         let self_signature = self.pqc.sign_with_falcon(&csr_der, &keypair.private_key).await?;
-        
+
         let pq_csr = PQCSR {
             csr_der,
             subject,
@@ -232,16 +237,16 @@ impl PQCertificateManager {
             return Err(anyhow!("CSR self-signature verification failed"));
         }
         
-        // Create certificate parameters
-        let mut params = CertificateParams::new(vec![csr.subject.common_name.clone()]);
-        
+        // Create certificate parameters (rcgen 0.13: returns Result)
+        let mut params = CertificateParams::new(vec![csr.subject.common_name.clone()])?;
+
         // Set validity period
         let now = SystemTime::now();
         let validity_duration = std::time::Duration::from_secs(
             self.ca_config.cert_validity_days as u64 * 24 * 60 * 60
         );
         let not_after = now + validity_duration;
-        
+
         params.not_before = now.into();
         params.not_after = not_after.into();
         
@@ -268,13 +273,16 @@ impl PQCertificateManager {
             params.custom_extensions.push(kyber_extension);
         }
         
-        // Generate certificate
-        let cert = RcgenCertificate::from_params(params)?;
-        
+        // rcgen 0.13: Generate key pair for the certificate
+        let key_pair = rcgen::KeyPair::generate()?;
+
+        // rcgen 0.13: Create self-signed certificate (TODO: should be CA-signed)
+        let cert = params.self_signed(&key_pair)?;
+
         // Sign with CA FALCON-1024 key (this is a simplified approach)
         // In a full implementation, we would need to modify rcgen to support FALCON-1024 signing
         // For now, we create the certificate with standard algorithms and add FALCON signature separately
-        let certificate_der = cert.serialize_der()?;
+        let certificate_der = cert.der().to_vec();
         
         // Create CA signature with FALCON-1024
         let ca_signature = self.pqc.sign_with_falcon(&certificate_der, &self.ca_config.ca_keypair.private_key).await?;

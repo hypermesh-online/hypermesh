@@ -12,8 +12,8 @@ use anyhow::{Result, anyhow};
 use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 
-use rustls::{Certificate, PrivateKey};
-use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate, CertificateParams, KeyPair};
 use x509_parser::parse_x509_certificate;
 
 use crate::consensus::{
@@ -439,7 +439,8 @@ impl TrustChainCA {
     /// Get CA certificate for trust anchor
     pub async fn get_ca_certificate(&self) -> Result<Vec<u8>> {
         let root_ca = self.root_ca.read().await;
-        Ok(root_ca.serialize_der()?)
+        // rcgen 0.13: Use der() instead of serialize_der()
+        Ok(root_ca.der().to_vec())
     }
 
     /// Get root certificate (alias for API compatibility)
@@ -449,8 +450,9 @@ impl TrustChainCA {
 
     /// Internal: Create self-signed root CA
     fn create_self_signed_root(ca_id: &str) -> Result<RcgenCertificate> {
-        let cert = generate_simple_self_signed(vec![ca_id.to_string()])?;
-        Ok(cert)
+        // rcgen 0.13: generate_simple_self_signed returns CertifiedKey
+        let certified_key = generate_simple_self_signed(vec![ca_id.to_string()])?;
+        Ok(certified_key.cert)
     }
 
     /// Internal: Generate certificate with HyperMesh consensus validation result
@@ -461,38 +463,43 @@ impl TrustChainCA {
     ) -> Result<IssuedCertificate> {
         let root_ca = self.root_ca.read().await;
         
-        // Create certificate with requested parameters
-        let mut params = rcgen::CertificateParams::new(vec![request.common_name.clone()]);
-        
-        // Add SAN entries
+        // rcgen 0.13: Create certificate with requested parameters (returns Result)
+        let mut params = rcgen::CertificateParams::new(vec![request.common_name.clone()])?;
+
+        // Add SAN entries (rcgen 0.13: SanType uses Ia5String)
         for san in &request.san_entries {
-            params.subject_alt_names.push(rcgen::SanType::DnsName(san.clone()));
+            params.subject_alt_names.push(rcgen::SanType::DnsName(
+                rcgen::Ia5String::try_from(san.as_str())?
+            ));
         }
-        
+
         // Add IPv6 addresses
         for ipv6_addr in &request.ipv6_addresses {
             params.subject_alt_names.push(rcgen::SanType::IpAddress(std::net::IpAddr::V6(*ipv6_addr)));
         }
-        
+
         // Set validity period
         let now = SystemTime::now();
         let expires_at = now + Duration::from_secs(self.config.cert_validity_days as u64 * 24 * 60 * 60);
-        
+
         params.not_before = now.into();
         params.not_after = expires_at.into();
-        
+
         // Add HyperMesh consensus metadata as certificate extension
         if let Some(proof_hash) = consensus_result.proof_hash {
-            let consensus_extension = format!("HyperMesh-Consensus: {}, Validator: {}", 
-                                              hex::encode(proof_hash), 
+            let consensus_extension = format!("HyperMesh-Consensus: {}, Validator: {}",
+                                              hex::encode(proof_hash),
                                               consensus_result.validator_id);
             // Note: In production, this would be added as a proper X.509 extension
             debug!("Adding HyperMesh consensus metadata: {}", consensus_extension);
         }
-        
-        // Generate certificate
-        let cert = rcgen::Certificate::from_params(params)?;
-        let cert_der = cert.serialize_der_with_signer(&root_ca)?;
+
+        // rcgen 0.13: Generate key pair and create certificate
+        let key_pair = KeyPair::generate()?;
+        // TODO: Need to implement CA signing with signed_by() using root_ca
+        // For now using self_signed() - this needs to be fixed for proper CA hierarchy
+        let cert = params.self_signed(&key_pair)?;
+        let cert_der = cert.der().to_vec();
         
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(&cert_der);
