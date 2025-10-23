@@ -1,0 +1,81 @@
+[package]
+name = "hypermesh-transport"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "HyperMesh Transport Layer - QUIC/IPv6 with STOQ integration"
+license = "MIT OR Apache-2.0"
+
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Core async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# STOQ Protocol - Our transport layer abstraction
+stoq = { workspace = true }
+
+# These are now handled by STOQ internally, but kept for error handling compatibility
+quinn = "0.10"
+rustls = "0.21"
+bytes = { workspace = true }
+
+# Data structures and concurrency
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+crossbeam = { workspace = true }
+parking_lot = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Crypto and security (handled by STOQ, kept for compatibility)
+sha2 = { workspace = true }
+blake3 = { workspace = true }
+ring = { workspace = true }
+x509-parser = { workspace = true }
+
+# Metrics and observability
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Configuration
+config = "0.14"
+
+# Required dependencies
+uuid = { workspace = true }
+crc32fast = "1.3"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+proptest = "1.4"
+tempfile = "3.10"
+tokio-test = "0.4"
+
+[features]
+default = ["monitoring", "certificate-management"]
+monitoring = []
+certificate-management = []
+benchmark = []
+
+[[bench]]
+name = "connection_benchmarks"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

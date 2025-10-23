@@ -1,0 +1,74 @@
+[package]
+name = "nexus-runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Secure container runtime for Nexus with hardware-assisted isolation"
+
+[dependencies]
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+nexus-consensus = { path = "../consensus" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Time
+chrono.workspace = true
+
+# Cryptography for state validation
+sha2 = "0.10"
+bincode = "1.3"
+uuid = { version = "1.0", features = ["v4"] }
+
+# Process and system
+nix = "0.27"
+libc = "0.2"
+
+# Container image handling
+oci-spec = "0.6"
+tar = "0.4"
+flate2 = "1.0"
+
+# Filesystem
+tempfile = "3.8"
+
+# Additional dependencies
+rand = "0.8"
+tokio-stream = "0.1"
+blake3 = "1.5"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific container runtime dependencies
+caps = "0.5"
+users = "0.11"
+procfs = "0.16"
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile = "3.8"
+
+# Benchmarks would be defined here when implemented
+# [[bench]]
+# name = "container_bench"
+# harness = false

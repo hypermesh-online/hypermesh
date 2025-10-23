@@ -1,0 +1,113 @@
+[package]
+name = "hypermesh"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/hypermesh/hypermesh"
+description = "HyperMesh - Distributed Computing Platform with NKrypt Consensus"
+
+[lib]
+name = "hypermesh"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hypermesh"
+path = "src/main.rs"
+
+[[bench]]
+name = "basic_benchmark"
+harness = false
+
+[dependencies]
+# Core dependencies
+tokio = { version = "1.38", features = ["full"] }
+tokio-util = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+clap = { version = "4.5", features = ["derive", "env"] }
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3.10"
+uuid = { version = "1.6", features = ["v4", "v5", "serde"] }
+lazy_static = { workspace = true }
+
+# STOQ Protocol - Our transport layer
+stoq = { git = "https://github.com/hypermesh-online/stoq.git", features = ["high-performance"] }
+
+# Async runtime
+async-trait = "0.1"
+futures = "0.3"
+
+# Cryptography
+ring = "0.17"
+x509-parser = "0.16"
+sha2 = "0.10"
+blake3 = "1.5"
+hex = "0.4"
+ed25519-dalek = { workspace = true }
+
+# Storage
+bincode = "1.3"
+sled = { workspace = true }
+
+# Collections and concurrency
+dashmap = "6.0"
+arc-swap = "1.7"
+parking_lot = "0.12"
+crossbeam = "0.8"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Compression
+zstd = { workspace = true }
+lz4 = { workspace = true }
+
+# Random number generation
+rand = "0.8"
+
+# Configuration and file formats
+toml = { workspace = true }
+
+# Testing
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+proptest = "1.4"
+
+# Networking
+quinn = "0.11"
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2.0"
+rcgen = "0.13"
+bytes = { version = "1.6", features = ["serde"] }
+socket2 = "0.5"
+webpki-roots = "0.26"
+
+# HTTP
+http = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+
+# Missing dependencies now added
+warp = { workspace = true }
+semver = { workspace = true }
+config = "0.14"
+rust_decimal = { workspace = true }
+fastrand = { workspace = true }
+which = { workspace = true }
+prometheus = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+tempfile = "3.10"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+proptest = "1.4"
+
+[features]
+default = ["consensus", "assets"]
+consensus = []

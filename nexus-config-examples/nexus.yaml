@@ -1,0 +1,72 @@
+# Nexus CLI Configuration Example
+apiVersion: nexus.io/v1
+kind: Config
+
+# Current context to use
+current-context: production
+
+# Available contexts
+contexts:
+- name: production
+  context:
+    cluster: prod-cluster
+    namespace: default
+    user: admin
+- name: staging
+  context:
+    cluster: staging-cluster
+    namespace: default
+    user: dev-user
+- name: local
+  context:
+    cluster: local-cluster
+    namespace: default
+    user: local-admin
+
+# Cluster configurations
+clusters:
+- name: prod-cluster
+  cluster:
+    server: https://nexus-api.production.company.com:8443
+    certificate-authority: /home/user/.nexus/ca-prod.crt
+    insecure-skip-tls-verify: false
+- name: staging-cluster
+  cluster:
+    server: https://nexus-api.staging.company.com:8443
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...
+    insecure-skip-tls-verify: false
+- name: local-cluster
+  cluster:
+    server: https://localhost:8443
+    insecure-skip-tls-verify: true
+
+# User credentials
+users:
+- name: admin
+  user:
+    client-certificate: /home/user/.nexus/admin.crt
+    client-key: /home/user/.nexus/admin.key
+- name: dev-user
+  user:
+    token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuZXh1cy1hcGkiLCJzdWIiOiJkZXYtdXNlciIsImV4cCI6MTYzNzY4ODAwMH0...
+- name: local-admin
+  user:
+    username: admin
+    password: local-password
+
+# CLI preferences
+preferences:
+  colors: true
+  editor: vim
+  output: table
+  confirm-deletions: true
+  
+# Plugin configuration
+plugins:
+  directory: ~/.nexus/plugins
+  
+# Default resource limits
+defaults:
+  cpu: "100m"
+  memory: "128Mi"
+  timeout: "30s"

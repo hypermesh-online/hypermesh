@@ -1,0 +1,635 @@
+//! HyperMesh Consensus Layer - Raft with Byzantine Fault Tolerance
+//!
+//! This module implements a distributed consensus algorithm based on Raft with
+//! Byzantine fault tolerance extensions, supporting:
+//! - Leader election with randomized timeouts
+//! - Log replication with batching
+//! - Byzantine detection and mitigation
+//! - ACID transactions with MVCC
+//! - Automatic sharding and rebalancing
+//! - Real-time Byzantine fault detection (Track E)
+//! - Quantum-resistant security validation
+//! - **NKrypt Four-Proof Consensus Integration**
+//!
+//! # Architecture
+//!
+//! The consensus system consists of several key components:
+//! - `ConsensusEngine`: Core Raft implementation with BFT extensions
+//! - `ReplicatedLog`: Write-ahead log with consistent replication
+//! - `ByzantineDetector`: Detection and mitigation of malicious nodes
+//! - `TransactionManager`: ACID transactions with serializable isolation
+//! - `MVCCStorage`: Multi-version concurrency control storage
+//! - `ShardManager`: Automatic data sharding and rebalancing
+//! - `ByzantineFaultDetectionSystem`: Real-time Byzantine fault detection (Track E)
+//! - **`NKryptIntegration`**: Complete NKrypt Four-Proof Consensus System
+//!
+//! # NKrypt Four-Proof Consensus
+//! 
+//! Every HyperMesh asset operation requires validation through all four proofs:
+//! - **PoSpace (PoSp)**: WHERE - storage location and physical/network location
+//! - **PoStake (PoSt)**: WHO - ownership, access rights, and economic stake  
+//! - **PoWork (PoWk)**: WHAT/HOW - computational resources and processing
+//! - **PoTime (PoTm)**: WHEN - temporal ordering and timestamp validation
+
+#![warn(missing_docs)]
+#![deny(unsafe_code)]
+
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
+use crate::transport::{NodeId, Connection, Endpoint};
+
+// Core modules
+pub mod engine;
+pub mod log;
+pub mod byzantine;
+pub mod transaction;
+pub mod storage;
+pub mod sharding;
+pub mod config;
+pub mod error;
+pub mod metrics;
+pub mod proof;
+
+// NKrypt Four-Proof Consensus Integration
+pub mod nkrypt_integration;
+
+// Track E: Byzantine Fault Detection System
+pub mod detection;
+
+// External validation service for TrustChain and other services
+pub mod validation_service;
+
+// HTTP API server for external consensus validation
+pub mod api_server;
+
+// Re-exports for public API
+pub use engine::ConsensusEngine;
+pub use log::{ReplicatedLog, LogEntry};
+pub use byzantine::{ByzantineDetector, ByzantineEvidence};
+pub use transaction::{TransactionManager, Transaction, TransactionId, IsolationLevel};
+pub use storage::{MVCCStorage, StorageEngine};
+pub use sharding::{ShardManager, ShardId};
+pub use config::ConsensusConfig;
+pub use error::{ConsensusError, Result as ConsensusResult};
+pub use metrics::ConsensusMetrics;
+
+// Original proof system re-exports (for backward compatibility)
+pub use proof::{
+    ConsensusProof as OriginalConsensusProof, ProofOfSpace as OriginalProofOfSpace, 
+    ProofOfStake as OriginalProofOfStake, ProofOfWork as OriginalProofOfWork, 
+    ProofOfTime as OriginalProofOfTime,
+    NetworkPosition, AccessPermissions, AccessLevel,
+};
+
+// NKrypt Four-Proof Consensus Integration re-exports (PRIMARY SYSTEM)
+pub use nkrypt_integration::{
+    ConsensusProof as NKryptConsensusProof,
+    SpaceProof as NKryptSpaceProof, 
+    StakeProof as NKryptStakeProof,
+    WorkProof as NKryptWorkProof,
+    TimeProof as NKryptTimeProof,
+    WorkloadType, WorkState,
+    DistributedClient, NetworkCapabilities,
+    ClientCredentials, Proof,
+    // Use NKrypt proofs as the primary consensus system
+    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+};
+
+// Track E: Byzantine Fault Detection re-exports
+pub use detection::{
+    ByzantineFaultDetectionSystem, ByzantineDetectionSystemConfig,
+    RealTimeByzantineDetector, ReputationManager, NodeIsolationManager,
+    ConsensusRecoveryManager, AttackPreventionSystem, QuantumSecureValidator,
+    ByzantineAlert, IsolationStatus, RecoveryResult,
+    AttackPreventionConfig, SecurityLevel,
+};
+
+// External validation service re-exports
+pub use validation_service::{
+    ConsensusValidationService, ValidationServiceConfig, ValidationServiceMetrics,
+    ExternalValidationRequest, CertificateValidationRequest, FourProofValidationRequest,
+    ValidationResult, ValidationStatus, ValidationMetrics, ValidationDetails,
+    TrustChainCertificateRequest, TrustChainConsensusProof, ExternalFourProofSet,
+};
+
+// API server re-exports
+pub use api_server::{
+    ConsensusApiServer, ConsensusApiConfig, ApiResponse, ApiServerMetrics,
+};
+
+/// Node states in Raft consensus protocol
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NodeState {
+    /// Follower state - accepts entries from leader
+    Follower,
+    /// Candidate state - requesting votes for leadership
+    Candidate,
+    /// Leader state - coordinating cluster consensus
+    Leader,
+}
+
+/// Current term number for Raft consensus
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub struct Term(pub u64);
+
+impl Term {
+    /// Create a new term
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+    
+    /// Get the term value
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+    
+    /// Increment the term
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
+/// Log index for entries in the replicated log
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub struct LogIndex(pub u64);
+
+impl LogIndex {
+    /// Create a new log index
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+    
+    /// Get the index value
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+    
+    /// Increment the index
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
+/// Consensus message types for inter-node communication
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ConsensusMessage {
+    /// Vote request message for leader election
+    VoteRequest {
+        /// Term for this election
+        term: u64,
+        /// Candidate requesting vote
+        candidate_id: String,
+        /// Index of candidate's last log entry
+        last_log_index: u64,
+        /// Term of candidate's last log entry
+        last_log_term: u64,
+    },
+    /// Vote response message
+    VoteResponse {
+        /// Current term for checking stale request
+        term: u64,
+        /// True if candidate received vote
+        vote_granted: bool,
+    },
+    /// Append entries message for log replication
+    AppendEntries {
+        /// Leader's current term
+        term: u64,
+        /// Leader's node ID
+        leader_id: String,
+        /// Index of log entry immediately preceding new ones
+        prev_log_index: u64,
+        /// Term of prev_log_index entry
+        prev_log_term: u64,
+        /// Log entries to store (empty for heartbeat)
+        entries: Vec<Vec<u8>>,
+        /// Leader's commit index
+        leader_commit: u64,
+    },
+    /// Append entries response
+    AppendEntriesResponse {
+        /// Current term for leader to update itself
+        term: u64,
+        /// True if follower contained entry matching prev_log_index and prev_log_term
+        success: bool,
+    },
+    /// Byzantine evidence reporting
+    ByzantineReport {
+        /// Term when evidence was collected
+        term: u64,
+        /// Reporter node ID
+        reporter_id: String,
+        /// Accused node ID
+        accused_id: String,
+        /// Evidence of malicious behavior
+        evidence: Vec<u8>,
+    },
+}
+
+/// Vote struct for leader election
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Vote {
+    /// Voting term
+    pub term: u64,
+    /// Node ID that received the vote
+    pub voted_for: String,
+    /// Timestamp of vote
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// Digital signature of vote
+    pub signature: Vec<u8>,
+}
+
+/// Main consensus struct that coordinates the entire system
+pub struct Consensus {
+    /// Core consensus engine
+    pub engine: Arc<ConsensusEngine>,
+    /// Transaction manager for ACID operations
+    pub transaction_manager: Arc<TransactionManager>,
+    /// Shard manager for data distribution
+    pub shard_manager: Arc<ShardManager>,
+    /// Byzantine fault detection system (Track E)
+    pub byzantine_detection: Arc<ByzantineFaultDetectionSystem>,
+    /// External validation service for TrustChain and other services
+    pub validation_service: Arc<ConsensusValidationService>,
+    /// API server for external consensus validation
+    pub api_server: Option<Arc<ConsensusApiServer>>,
+    /// Configuration
+    config: ConsensusConfig,
+}
+
+impl Consensus {
+    /// Create a new consensus instance
+    pub async fn new(
+        node_id: NodeId,
+        config: ConsensusConfig,
+        transport: Arc<dyn crate::transport::HyperMeshTransport>,
+    ) -> ConsensusResult<Self> {
+        // Initialize storage engine
+        let storage = MVCCStorage::new(&config.storage)
+            .await
+            .map_err(|e| ConsensusError::StorageError(format!("Failed to initialize storage: {}", e)))?;
+        
+        // Initialize Byzantine detector
+        let byzantine_detector = ByzantineDetector::new(config.byzantine.clone());
+        
+        // Initialize replicated log
+        let log = Arc::new(RwLock::new(
+            ReplicatedLog::new(storage.clone())
+                .await
+                .map_err(|e| ConsensusError::LogError(format!("Failed to initialize log: {}", e)))?
+        ));
+        
+        // Initialize consensus engine
+        let engine = Arc::new(
+            ConsensusEngine::new(
+                node_id.clone(),
+                log.clone(),
+                storage.clone(),
+                transport.clone(),
+                byzantine_detector,
+                config.raft.clone(),
+            ).await?
+        );
+        
+        // Initialize transaction manager
+        let transaction_manager = Arc::new(
+            TransactionManager::new(
+                storage.clone(),
+                config.transaction.clone(),
+            ).await?
+        );
+        
+        // Initialize shard manager
+        let shard_manager = Arc::new(
+            ShardManager::new(
+                node_id.clone(),
+                storage.clone(),
+                transport.clone(),
+                config.sharding.clone(),
+            ).await?
+        );
+        
+        // Initialize Track E: Byzantine Fault Detection System
+        let byzantine_detection_config = ByzantineDetectionSystemConfig {
+            enable_real_time_detection: true,
+            target_response_time_us: 1_000_000, // 1 second
+            max_byzantine_ratio: config.byzantine.max_byzantine_ratio,
+            enable_auto_isolation: config.byzantine.enable_quarantine,
+            enable_consensus_recovery: true,
+            enable_attack_prevention: true,
+            enable_quantum_security: true,
+            detection_sensitivity: 0.8,
+            isolation_threshold: config.byzantine.detection_threshold,
+            recovery_timeout: std::time::Duration::from_secs(30),
+            monitoring_interval: std::time::Duration::from_secs(10),
+        };
+        
+        let byzantine_detection = Arc::new(
+            ByzantineFaultDetectionSystem::new(
+                byzantine_detection_config,
+                node_id.clone(),
+            ).await?
+        );
+
+        // Create consensus instance without validation service first
+        let consensus = Arc::new(Self {
+            engine,
+            transaction_manager,
+            shard_manager,
+            byzantine_detection,
+            validation_service: Arc::new(validation_service::ConsensusValidationService::create_placeholder(
+                node_id.clone()
+            ).await?),
+            config,
+        });
+
+        // Initialize external validation service with real consensus
+        let validation_service_config = ValidationServiceConfig {
+            max_concurrent_validations: 50,
+            validation_timeout: Duration::from_secs(60),
+            byzantine_tolerance: consensus.config.byzantine.max_byzantine_ratio,
+            min_confidence_level: 0.8,
+            enable_detailed_logging: true,
+        };
+
+        let validation_service = Arc::new(
+            validation_service::ConsensusValidationService::new(
+                consensus.clone(),
+                node_id,
+                validation_service_config,
+            ).await?
+        );
+
+        // Return consensus with initialized validation service
+        Ok(Self {
+            engine: consensus.engine.clone(),
+            transaction_manager: consensus.transaction_manager.clone(),
+            shard_manager: consensus.shard_manager.clone(),
+            byzantine_detection: consensus.byzantine_detection.clone(),
+            validation_service,
+            api_server: None, // Will be initialized when starting external API
+            config: consensus.config.clone(),
+        })
+    }
+    
+    /// Start the consensus system
+    pub async fn start(&self) -> ConsensusResult<()> {
+        tracing::info!("Starting HyperMesh consensus system with Byzantine fault detection");
+        
+        // Start the Byzantine fault detection system first
+        self.byzantine_detection.start().await?;
+        
+        // Start the consensus engine
+        self.engine.start().await?;
+        
+        // Start the shard manager
+        self.shard_manager.clone().start().await?;
+        
+        tracing::info!("HyperMesh consensus system started successfully");
+        Ok(())
+    }
+    
+    /// Stop the consensus system gracefully
+    pub async fn stop(&self) -> ConsensusResult<()> {
+        tracing::info!("Stopping HyperMesh consensus system");
+        
+        // Stop shard manager first
+        self.shard_manager.stop().await?;
+        
+        // Stop consensus engine
+        self.engine.stop().await?;
+        
+        // Stop Byzantine fault detection system
+        self.byzantine_detection.stop().await?;
+        
+        tracing::info!("HyperMesh consensus system stopped");
+        Ok(())
+    }
+    
+    /// Get current consensus state
+    pub async fn state(&self) -> NodeState {
+        self.engine.current_state().await
+    }
+    
+    /// Get current term
+    pub async fn term(&self) -> Term {
+        self.engine.current_term().await
+    }
+    
+    /// Check if this node is the leader
+    pub async fn is_leader(&self) -> bool {
+        self.engine.is_leader().await
+    }
+    
+    /// Check if a node is considered Byzantine (malicious)
+    pub async fn is_node_byzantine(&self, node_id: &NodeId) -> ConsensusResult<bool> {
+        self.byzantine_detection.is_node_byzantine(node_id).await
+    }
+    
+    /// Report Byzantine behavior for real-time detection
+    pub async fn report_byzantine_behavior(
+        &self,
+        reported_node: NodeId,
+        reporter_node: NodeId,
+        evidence: Vec<u8>,
+    ) -> ConsensusResult<()> {
+        self.byzantine_detection.report_byzantine_behavior(
+            reported_node,
+            reporter_node,
+            evidence,
+        ).await
+    }
+    
+    /// Get Byzantine detection system status
+    pub async fn get_byzantine_detection_status(&self) -> detection::ByzantineDetectionState {
+        self.byzantine_detection.get_system_status().await
+    }
+    
+    /// Calculate consensus threshold with Byzantine fault tolerance
+    pub async fn calculate_consensus_threshold(&self, total_nodes: usize) -> ConsensusResult<usize> {
+        self.byzantine_detection.calculate_consensus_threshold(total_nodes).await
+    }
+    
+    /// Attempt consensus recovery if Byzantine faults are detected
+    pub async fn attempt_consensus_recovery(&self) -> ConsensusResult<RecoveryResult> {
+        self.byzantine_detection.attempt_consensus_recovery().await
+    }
+    
+    /// Validate quantum-resistant security proofs
+    pub async fn validate_quantum_security(
+        &self,
+        node_id: &NodeId,
+        proof_data: &[u8],
+    ) -> ConsensusResult<bool> {
+        self.byzantine_detection.validate_quantum_security(node_id, proof_data).await
+    }
+    
+    /// Validate consensus proof for asset operations (NKrypt Four-Proof System)
+    pub async fn validate_consensus_proof(
+        &self,
+        proof: &ConsensusProof,
+    ) -> ConsensusResult<bool> {
+        proof.validate_comprehensive().await
+    }
+    
+    /// Start external consensus validation API server
+    pub async fn start_validation_api_server(
+        &mut self,
+        api_config: ConsensusApiConfig,
+    ) -> ConsensusResult<()> {
+        info!("Starting HyperMesh consensus validation API server");
+
+        let api_server = Arc::new(
+            api_server::ConsensusApiServer::new(
+                self.validation_service.clone(),
+                api_config,
+            ).await
+            .map_err(|e| ConsensusError::ServiceError(format!("Failed to create API server: {}", e)))?
+        );
+
+        self.api_server = Some(api_server.clone());
+
+        // Start API server in background
+        let api_server_clone = api_server.clone();
+        tokio::spawn(async move {
+            if let Err(e) = api_server_clone.start().await {
+                error!("API server failed: {}", e);
+            }
+        });
+
+        info!("HyperMesh consensus validation API server started");
+        Ok(())
+    }
+
+    /// Get API server metrics if available
+    pub async fn get_api_server_metrics(&self) -> Option<ApiServerMetrics> {
+        if let Some(api_server) = &self.api_server {
+            Some(api_server.get_metrics().await)
+        } else {
+            None
+        }
+    }
+
+    /// Create a new consensus proof for asset operation using NKrypt Four-Proof System
+    pub async fn create_consensus_proof(
+        &self,
+        asset_id: &str,
+        node_id: &NodeId,
+        operation: &str,
+    ) -> ConsensusResult<ConsensusProof> {
+        // Generate PoStake proof - WHO (asset ownership/authority)
+        let stake_proof = StakeProof::new(
+            format!("hypermesh-node-{:?}", node_id),  // stake_holder (entity)
+            format!("{:?}", node_id),                 // stake_holder_id (validating node)
+            1000,                                     // stake_amount (authority level)
+        );
+        
+        // Generate PoSpace proof - WHERE (storage location and network position)
+        let mut space_proof = SpaceProof::new(
+            1_000_000_000, // 1GB default allocation
+            format!("/hypermesh/assets/{}", asset_id),
+        );
+        space_proof.node_id = format!("{:?}", node_id);
+        
+        // Generate PoWork proof - WHAT/HOW (computational resources and processing)
+        let work_proof = WorkProof::new(
+            100,                                      // computational_power
+            format!("{}:{}", asset_id, operation),    // workload_id
+            std::process::id() as u64,                // pid (current process)
+            format!("{:?}", node_id),                 // owner_id
+            match operation {
+                "allocate" => WorkloadType::Genesis,
+                "modify" => WorkloadType::Modify,
+                "delete" => WorkloadType::Delete,
+                "compute" => WorkloadType::Compute,
+                "storage" => WorkloadType::Storage,
+                "network" => WorkloadType::Network,
+                _ => WorkloadType::Genesis,
+            },
+            WorkState::Completed,
+        );
+        
+        // Generate PoTime proof - WHEN (temporal ordering and timestamp validation)
+        let network_time_offset = Duration::from_millis(50); // Low network latency
+        let time_proof = TimeProof::new(network_time_offset);
+        
+        Ok(ConsensusProof::new(
+            stake_proof,
+            space_proof,
+            work_proof,
+            time_proof,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_term_operations() {
+        let mut term = Term::new(5);
+        assert_eq!(term.value(), 5);
+        
+        term.increment();
+        assert_eq!(term.value(), 6);
+    }
+    
+    #[test]
+    fn test_log_index_operations() {
+        let mut index = LogIndex::new(10);
+        assert_eq!(index.value(), 10);
+        
+        index.increment();
+        assert_eq!(index.value(), 11);
+    }
+    
+    #[test]
+    fn test_node_state_enum() {
+        let state = NodeState::Follower;
+        assert_eq!(state, NodeState::Follower);
+        assert_ne!(state, NodeState::Leader);
+    }
+    
+    #[tokio::test]
+    async fn test_consensus_proof_validation() {
+        // Test the NKrypt Four-Proof system integration
+        let stake_proof = StakeProof::new(
+            "test-user-123".to_string(),      // stake_holder
+            "test-node-456".to_string(),      // stake_holder_id  
+            500,                              // stake_amount
+        );
+
+        let mut space_proof = SpaceProof::new(
+            1024,                             // total_storage (1KB test)
+            "/hypermesh/assets/test-asset".to_string(), // storage_path
+        );
+        space_proof.node_id = "test-node-456".to_string();
+
+        let work_proof = WorkProof::new(
+            100,                              // computational_power
+            "test-workload".to_string(),      // workload_id
+            12345,                            // pid
+            "test-worker".to_string(),        // owner_id
+            WorkloadType::Compute,            // workload_type
+            WorkState::Completed,             // work_state
+        );
+
+        let time_proof = TimeProof::new(Duration::from_millis(100));
+
+        let consensus_proof = ConsensusProof::new(
+            stake_proof,
+            space_proof,
+            work_proof,
+            time_proof,
+        );
+
+        // Validate the proof using comprehensive validation
+        let is_valid = consensus_proof.validate_comprehensive().await.unwrap();
+        assert!(is_valid, "NKrypt consensus proof should be valid");
+        
+        // Also test basic validation
+        assert!(consensus_proof.validate(), "Basic validation should also pass");
+    }
+}

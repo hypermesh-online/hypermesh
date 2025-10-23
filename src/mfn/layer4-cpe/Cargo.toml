@@ -1,0 +1,100 @@
+[package]
+name = "mfn-layer4-cpe"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "MFN Layer 4: Context Prediction Engine with LSTM/Transformer-based ML pipeline"
+license = "MIT OR Apache-2.0"
+
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Core async runtime
+tokio = { version = "1.38", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Machine learning and neural networks
+candle-core = "0.4"
+candle-nn = "0.4"
+candle-transformers = "0.4"
+ndarray = "0.15"
+nalgebra = "0.32"
+
+# Tensor operations and CUDA support (optional)
+tch = { version = "0.14", optional = true }
+
+# Data structures and concurrency
+dashmap = "6.0"
+arc-swap = "1.7"
+crossbeam = "0.8"
+parking_lot = "0.12"
+lru = "0.12"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+
+# Hashing and utilities
+sha2 = "0.10"
+blake3 = "1.5"
+uuid = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Time and metrics
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+
+# Random number generation
+rand = "0.8"
+rand_distr = "0.4"
+fastrand = "2.0"
+
+# Probabilistic data structures
+probabilistic-collections = "0.7"
+bloomfilter = "1.0"
+
+# Integration with other MFN layers
+# Note: Layer 1 (IFR) is implemented in Zig, Layer 3 (ALM) in Go
+# Direct Rust integration available only with Layer 2 (DSR)
+mfn-layer2-dsr = { path = "../layer2-dsr" }
+
+# Integration with STOQ protocol
+stoq = { path = "../../../protocols/stoq", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+proptest = "1.4"
+tempfile = "3.10"
+tokio-test = "0.4"
+
+[features]
+default = ["layer-integration", "metrics", "attention"]
+layer-integration = []
+stoq-integration = ["stoq"]
+metrics = []
+attention = [] # Transformer attention mechanisms
+cuda = ["tch"]
+benchmarks = []
+
+[[bench]]
+name = "cpe_performance"
+harness = false
+
+[[bench]]
+name = "prediction_accuracy"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+debug = true

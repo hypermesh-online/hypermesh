@@ -1,0 +1,42 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+
+# Local environment
+.env
+.env.local
+
+# RocksDB
+*.sst
+*.log
+CURRENT
+IDENTITY
+LOCK
+LOG*
+MANIFEST-*
+OPTIONS-*
+rocksdb-data/
+
+# eBPF
+*.o
+*.bpf.c
+*.bpf.o

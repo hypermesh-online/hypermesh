@@ -1,0 +1,73 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "core-tests",
+    "benchmarks", 
+    "mocks",
+    "simulators",
+    "dev-tools",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+license = "Apache-2.0"
+repository = "https://github.com/hypermesh-platform/hypermesh"
+description = "Phase 1 testing environment for Nexus core components"
+
+[workspace.dependencies]
+# Core dependencies
+nexus-shared = { path = "../../core/shared" }
+nexus-transport = { path = "../../core/transport" }
+nexus-runtime = { path = "../../core/runtime" }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-test = "0.4"
+tokio-stream = "0.1"
+
+# Testing frameworks
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.0"
+quickcheck = "1.0"
+rstest = "0.18"
+
+# Mocking and simulation
+mockall = "0.11"
+wiremock = "0.5"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging and observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-test = "0.2"
+
+# Time and utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+rand = "0.8"
+
+# Network testing
+socket2 = "0.5"
+
+# Metrics and monitoring
+metrics = "0.21"
+
+[profile.test]
+opt-level = 0
+debug = true
+
+[profile.bench]
+opt-level = 3
+debug = true
+lto = true

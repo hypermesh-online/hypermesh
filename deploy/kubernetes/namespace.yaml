@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus-system
+  labels:
+    name: nexus-system
+    app.kubernetes.io/name: nexus
+    app.kubernetes.io/version: "0.1.0"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nexus-service-account
+  namespace: nexus-system
+  labels:
+    app.kubernetes.io/name: nexus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nexus-cluster-role
+  labels:
+    app.kubernetes.io/name: nexus
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nexus-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: nexus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nexus-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: nexus-service-account
+  namespace: nexus-system
