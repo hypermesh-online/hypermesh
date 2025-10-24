@@ -84,7 +84,7 @@ rustls-pemfile = "2.0"
 rcgen = "0.13"
 bytes = { version = "1.6", features = ["serde"] }
 socket2 = "0.5"
-webpki-roots = "0.26"
+# webpki-roots  # REMOVED: Use TrustChain CA only = "0.26"
 
 # HTTP
 http = { workspace = true }
@@ -100,7 +100,7 @@ config = "0.14"
 rust_decimal = { workspace = true }
 fastrand = { workspace = true }
 which = { workspace = true }
-prometheus = { workspace = true }
+# prometheus  # REMOVED: Build native eBPF monitoring = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
