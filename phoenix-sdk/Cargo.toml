@@ -33,7 +33,7 @@ lz4 = { version = "1.24", optional = true }
 
 # Performance monitoring
 sysinfo = "0.30"
-prometheus = { version = "0.13", optional = true }
+# prometheus = ... # REMOVED: Build native monitoring (100% standalone requirement)
 
 # Error handling and logging
 anyhow = "1.0"

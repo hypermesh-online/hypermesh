@@ -135,7 +135,7 @@ libloading = "0.8"
 semver = "1.0"
 fastrand = "2.0"
 which = "6.0"
-prometheus = { version = "0.13", features = ["process"] }
+# prometheus = ... # REMOVED: Build native monitoring (100% standalone requirement)
 
 [package]
 name = "web3"
