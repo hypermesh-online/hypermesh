@@ -52,9 +52,9 @@ chrono = { version = "0.4", features = ["serde"] }
 humantime = "2.1"
 
 # Web dashboard (optional)
-axum = { version = "0.7", optional = true }
-tower = { version = "0.4", optional = true }
-tower-http = { version = "0.5", features = ["fs", "cors", "trace"], optional = true }
+# axum = ... # REMOVED: STOQ-only transport
+# tower = ... # REMOVED: STOQ-only transport (HTTP middleware)
+# tower-http = ... # REMOVED: STOQ-only transport
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }

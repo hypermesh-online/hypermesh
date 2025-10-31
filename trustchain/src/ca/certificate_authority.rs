@@ -286,9 +286,15 @@ impl TrustChainCA {
         // Calculate fingerprint
         let fingerprint = self.calculate_certificate_fingerprint(&cert_der);
 
+        // Convert to PEM format
+        let certificate_pem = String::from_utf8_lossy(&cert_der).to_string(); // TODO: Proper DER to PEM conversion
+        let chain_pem = String::new(); // TODO: Build proper certificate chain
+
         let issued_cert = IssuedCertificate {
             serial_number: hex::encode(&fingerprint[..16]),
             certificate_der: cert_der,
+            certificate_pem,
+            chain_pem,
             fingerprint,
             common_name: request.common_name,
             issued_at: now,

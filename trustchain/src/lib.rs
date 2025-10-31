@@ -41,8 +41,8 @@ pub struct TrustChain {
     ct: Arc<ct::CertificateTransparency>,
     /// DNS resolver
     dns: Arc<dns::DnsResolver>,
-    /// API server with security endpoints
-    api: Arc<api::ApiServer>,
+    /// STOQ API server (replacement for HTTP API)
+    stoq_api: Arc<api::TrustChainStoqApi>,
     /// STOQ client for all network operations
     stoq_client: Arc<TrustChainStoqClient>,
     /// Security monitoring system
@@ -139,14 +139,19 @@ impl TrustChain {
         // Initialize DNS resolver with STOQ client
         let dns = Arc::new(dns::DnsResolver::new(config.dns.clone()).await?);
 
-        // Initialize API server
-        let api = Arc::new(api::ApiServer::new(config.api.clone()).await?);
+        // Initialize STOQ API server (replacement for HTTP)
+        let stoq_api_config = api::TrustChainStoqConfig::default();
+        let stoq_api = Arc::new(api::TrustChainStoqApi::new(
+            security_ca.get_ca(), // Get underlying TrustChainCA from SecurityIntegratedCA
+            Arc::clone(&dns),
+            stoq_api_config,
+        ).await?);
 
         let trustchain = Self {
             security_ca,
             ct,
             dns,
-            api,
+            stoq_api,
             stoq_client,
             security_monitor,
             config: Arc::new(config),
@@ -317,7 +322,7 @@ impl TrustChain {
         info!("Shutting down TrustChain services");
 
         // Shutdown services in reverse order
-        self.api.shutdown().await?;
+        self.stoq_api.stop(); // Changed from self.api to self.stoq_api
         self.dns.shutdown().await?;
         self.ct.shutdown().await?;
         // Security-integrated CA doesn't need explicit shutdown

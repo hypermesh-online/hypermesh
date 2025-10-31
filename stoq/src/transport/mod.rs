@@ -367,6 +367,18 @@ impl Connection {
     pub fn id(&self) -> String {
         format!("{:?}", self.inner.stable_id())
     }
+
+    /// Accept a bidirectional stream
+    pub async fn accept_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
+        self.inner.accept_bi().await
+            .map_err(|e| anyhow!("Failed to accept bidirectional stream: {}", e))
+    }
+
+    /// Open a bidirectional stream
+    pub async fn open_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
+        self.inner.open_bi().await
+            .map_err(|e| anyhow!("Failed to open bidirectional stream: {}", e))
+    }
     
     /// Get the remote endpoint
     pub fn endpoint(&self) -> &Endpoint {

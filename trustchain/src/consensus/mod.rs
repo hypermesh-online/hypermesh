@@ -87,6 +87,17 @@ impl ConsensusProof {
         }
     }
 
+    /// Create a testing proof (non-test builds, for API placeholder usage only)
+    /// TODO: Replace all calls to this method with generate_from_network()
+    pub fn new_for_testing() -> Self {
+        Self {
+            stake_proof: StakeProof::default(),
+            time_proof: TimeProof::default(),
+            space_proof: SpaceProof::default(),
+            work_proof: WorkProof::default(),
+        }
+    }
+
     /// Validate all four proofs
     pub fn validate(&self) -> bool {
         self.stake_proof.validate() &&

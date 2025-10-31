@@ -38,16 +38,16 @@ falcon-rust = "0.1"  # Alternative FALCON implementation
 serde_arrays = "0.1"  # For serializing fixed-size arrays
 
 # HTTP client
-reqwest = { workspace = true }
+# reqwest = ... # REMOVED: STOQ-only transport
 
 # Compression
 flate2 = { workspace = true }
 
 # Web and API
-axum = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
-hyper = { workspace = true }
+# axum = ... # REMOVED: STOQ-only transport
+# tower = ... # REMOVED: STOQ-only transport (HTTP middleware)
+# tower-http = ... # REMOVED: STOQ-only transport
+# hyper = ... # REMOVED: STOQ-only transport
 
 # DNS
 trust-dns-client = { workspace = true }

@@ -149,6 +149,10 @@ pub struct IssuedCertificate {
     pub serial_number: String,
     /// DER-encoded certificate
     pub certificate_der: Vec<u8>,
+    /// PEM-encoded certificate (for API compatibility)
+    pub certificate_pem: String,
+    /// PEM-encoded certificate chain (for API compatibility)
+    pub chain_pem: String,
     /// Certificate fingerprint (SHA-256)
     pub fingerprint: [u8; 32],
     /// Common name
@@ -500,27 +504,40 @@ impl TrustChainCA {
         // For now using self_signed() - this needs to be fixed for proper CA hierarchy
         let cert = params.self_signed(&key_pair)?;
         let cert_der = cert.der().to_vec();
-        
+
+        // Convert to PEM format for API compatibility
+        let certificate_pem = cert.pem();
+        let private_key_pem = key_pair.serialize_pem();
+
+        // Get root CA for chain
+        let root_ca_der = root_ca.der().to_vec();
+        let root_ca_pem = root_ca.pem();
+
+        // Build certificate chain (leaf + root)
+        let chain_pem = format!("{}\n{}", certificate_pem, root_ca_pem);
+
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(&cert_der);
-        
+
         // Generate serial number
         let serial_number = hex::encode(&fingerprint[..16]);
-        
+
         // Create enhanced metadata with HyperMesh consensus information
         let mut metadata = CertificateMetadata::default();
         metadata.tags.insert("consensus_validator".to_string(), consensus_result.validator_id);
         if let Some(proof_hash) = consensus_result.proof_hash {
             metadata.tags.insert("consensus_proof_hash".to_string(), hex::encode(proof_hash));
         }
-        metadata.tags.insert("consensus_validation_time".to_string(), 
+        metadata.tags.insert("consensus_validation_time".to_string(),
                              consensus_result.metrics.validation_time_us.to_string());
-        metadata.tags.insert("consensus_confidence".to_string(), 
+        metadata.tags.insert("consensus_confidence".to_string(),
                              consensus_result.metrics.confidence_level.to_string());
-        
+
         Ok(IssuedCertificate {
             serial_number,
             certificate_der: cert_der,
+            certificate_pem,
+            chain_pem,
             fingerprint,
             common_name: request.common_name,
             issued_at: now,

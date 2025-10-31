@@ -1,29 +1,30 @@
 //! HyperMesh Consensus Client for TrustChain
-//! 
+//!
 //! This module provides the client interface for TrustChain to request
 //! consensus validation from HyperMesh. It implements the architectural
 //! separation where TrustChain focuses on certificate operations while
 //! HyperMesh provides the four-proof consensus validation services.
+//!
+//! **STOQ Protocol**: Uses STOQ API (QUIC transport) instead of HTTP
 
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tokio::time::timeout;
 use tracing::{info, debug, warn, error};
+
+use stoq::{StoqApiClient, transport::{StoqTransport, TransportConfig}};
 
 use crate::ca::CertificateRequest;
 use super::{ConsensusProof, ConsensusResult, ConsensusRequirements};
 
 /// HyperMesh consensus validation client
 pub struct HyperMeshConsensusClient {
-    /// HyperMesh service endpoint
-    hypermesh_endpoint: String,
+    /// STOQ API client for consensus requests
+    stoq_client: Arc<StoqApiClient>,
     /// Client configuration
     config: HyperMeshClientConfig,
-    /// HTTP client for consensus requests
-    http_client: reqwest::Client,
     /// Performance metrics
     metrics: Arc<RwLock<ConsensusClientMetrics>>,
 }
@@ -31,8 +32,6 @@ pub struct HyperMeshConsensusClient {
 /// Configuration for HyperMesh consensus client
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HyperMeshClientConfig {
-    /// HyperMesh consensus service endpoint
-    pub hypermesh_endpoint: String,
     /// Request timeout for consensus validation
     pub request_timeout: Duration,
     /// Maximum retries for failed requests
@@ -43,45 +42,29 @@ pub struct HyperMeshClientConfig {
     pub enable_caching: bool,
     /// Cache TTL for valid consensus results
     pub cache_ttl: Duration,
-    /// TLS verification mode for HyperMesh connection
-    pub tls_verification: TlsVerificationMode,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum TlsVerificationMode {
-    /// Full TLS verification (production)
-    Full,
-    /// Skip TLS verification (localhost testing)
-    Skip,
-    /// Custom CA certificate
-    CustomCA { ca_cert_path: String },
 }
 
 impl Default for HyperMeshClientConfig {
     fn default() -> Self {
         Self {
-            hypermesh_endpoint: "https://[::1]:8080".to_string(), // IPv6 localhost
             request_timeout: Duration::from_secs(30),
             max_retries: 3,
             retry_backoff: Duration::from_millis(500),
             enable_caching: true,
             cache_ttl: Duration::from_secs(300), // 5 minutes
-            tls_verification: TlsVerificationMode::Skip, // For localhost testing
         }
     }
 }
 
 impl HyperMeshClientConfig {
     /// Production configuration for HyperMesh integration
-    pub fn production(hypermesh_endpoint: String) -> Self {
+    pub fn production(_hypermesh_endpoint: String) -> Self {
         Self {
-            hypermesh_endpoint,
             request_timeout: Duration::from_secs(60),
             max_retries: 5,
             retry_backoff: Duration::from_secs(1),
             enable_caching: true,
             cache_ttl: Duration::from_secs(600), // 10 minutes
-            tls_verification: TlsVerificationMode::Full,
         }
     }
 
@@ -280,40 +263,20 @@ pub struct ConsensusClientMetrics {
 }
 
 impl HyperMeshConsensusClient {
-    /// Create new HyperMesh consensus client
+    /// Create new HyperMesh consensus client with STOQ transport
     pub async fn new(config: HyperMeshClientConfig) -> Result<Self> {
-        info!("Initializing HyperMesh consensus client: {}", config.hypermesh_endpoint);
+        info!("Initializing HyperMesh consensus client (STOQ protocol)");
 
-        // Configure HTTP client with TLS settings
-        let mut client_builder = reqwest::Client::builder()
-            .timeout(config.request_timeout)
-            .tcp_keepalive(Duration::from_secs(60));
+        // Create STOQ transport for client
+        let transport_config = TransportConfig::default();
+        let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
-        // Configure TLS verification
-        match &config.tls_verification {
-            TlsVerificationMode::Full => {
-                // Use default TLS verification
-            }
-            TlsVerificationMode::Skip => {
-                client_builder = client_builder.danger_accept_invalid_certs(true);
-            }
-            TlsVerificationMode::CustomCA { ca_cert_path } => {
-                // Load custom CA certificate
-                let ca_cert = tokio::fs::read(ca_cert_path).await
-                    .map_err(|e| anyhow!("Failed to load CA certificate: {}", e))?;
-                let ca_cert = reqwest::Certificate::from_pem(&ca_cert)
-                    .map_err(|e| anyhow!("Failed to parse CA certificate: {}", e))?;
-                client_builder = client_builder.add_root_certificate(ca_cert);
-            }
-        }
-
-        let http_client = client_builder.build()
-            .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
+        // Create STOQ API client
+        let stoq_client = Arc::new(StoqApiClient::new(transport));
 
         Ok(Self {
-            hypermesh_endpoint: config.hypermesh_endpoint.clone(),
+            stoq_client,
             config,
-            http_client,
             metrics: Arc::new(RwLock::new(ConsensusClientMetrics::default())),
         })
     }
@@ -389,21 +352,20 @@ impl HyperMeshConsensusClient {
     pub async fn check_validation_status(&self, request_id: &str) -> Result<ConsensusValidationResult> {
         debug!("Checking validation status for request: {}", request_id);
 
-        let url = format!("{}/consensus/validation/status/{}", self.hypermesh_endpoint, request_id);
-        
-        let response = timeout(
-            self.config.request_timeout,
-            self.http_client.get(&url).send()
-        ).await
-            .map_err(|_| anyhow!("Request timeout checking validation status"))?
-            .map_err(|e| anyhow!("HTTP error checking validation status: {}", e))?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!("HyperMesh returned error status: {}", response.status()));
+        #[derive(Serialize)]
+        struct StatusRequest {
+            request_id: String,
         }
 
-        let result: ConsensusValidationResult = response.json().await
-            .map_err(|e| anyhow!("Failed to parse validation status response: {}", e))?;
+        let request = StatusRequest {
+            request_id: request_id.to_string(),
+        };
+
+        // Call HyperMesh validation status handler via STOQ
+        let result: ConsensusValidationResult = self.stoq_client
+            .call("hypermesh", "consensus/validation_status", &request)
+            .await
+            .map_err(|e| anyhow!("STOQ API error checking validation status: {}", e))?;
 
         Ok(result)
     }
@@ -444,54 +406,30 @@ impl HyperMeshConsensusClient {
         Err(last_error.unwrap_or_else(|| anyhow!("All validation attempts failed")))
     }
 
-    // Internal: Send single validation request
+    // Internal: Send single validation request via STOQ
     async fn send_validation_request(
         &self,
         request: &ConsensusValidationRequest,
     ) -> Result<ConsensusValidationResult> {
-        let url = format!("{}/consensus/validation/certificate", self.hypermesh_endpoint);
-        
-        let response = timeout(
-            self.config.request_timeout,
-            self.http_client.post(&url).json(request).send()
-        ).await
-            .map_err(|_| anyhow!("Request timeout sending validation request"))?
-            .map_err(|e| anyhow!("HTTP error sending validation request: {}", e))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(anyhow!("HyperMesh returned error status {}: {}", status, error_text));
-        }
-
-        let result: ConsensusValidationResult = response.json().await
-            .map_err(|e| anyhow!("Failed to parse validation response: {}", e))?;
+        // Call HyperMesh consensus validation handler via STOQ
+        let result: ConsensusValidationResult = self.stoq_client
+            .call("hypermesh", "consensus/validate_certificate", request)
+            .await
+            .map_err(|e| anyhow!("STOQ API error sending validation request: {}", e))?;
 
         Ok(result)
     }
 
-    // Internal: Send four-proof validation request
+    // Internal: Send four-proof validation request via STOQ
     async fn send_four_proof_validation_request(
         &self,
         request: FourProofValidationRequest,
     ) -> Result<ConsensusValidationResult> {
-        let url = format!("{}/consensus/validation/four-proof", self.hypermesh_endpoint);
-        
-        let response = timeout(
-            self.config.request_timeout,
-            self.http_client.post(&url).json(&request).send()
-        ).await
-            .map_err(|_| anyhow!("Request timeout sending four-proof validation"))?
-            .map_err(|e| anyhow!("HTTP error sending four-proof validation: {}", e))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(anyhow!("HyperMesh returned error status {}: {}", status, error_text));
-        }
-
-        let result: ConsensusValidationResult = response.json().await
-            .map_err(|e| anyhow!("Failed to parse four-proof validation response: {}", e))?;
+        // Call HyperMesh four-proof validation handler via STOQ
+        let result: ConsensusValidationResult = self.stoq_client
+            .call("hypermesh", "consensus/validate_proofs", &request)
+            .await
+            .map_err(|e| anyhow!("STOQ API error sending four-proof validation: {}", e))?;
 
         Ok(result)
     }
@@ -571,15 +509,15 @@ mod tests {
     #[test]
     fn test_client_config_creation() {
         let config = HyperMeshClientConfig::default();
-        assert!(config.hypermesh_endpoint.contains("::1"));
         assert!(config.request_timeout > Duration::ZERO);
+        assert_eq!(config.max_retries, 3);
     }
 
     #[test]
     fn test_production_config() {
-        let config = HyperMeshClientConfig::production("https://hypermesh.example.com".to_string());
-        assert_eq!(config.hypermesh_endpoint, "https://hypermesh.example.com");
-        assert!(matches!(config.tls_verification, TlsVerificationMode::Full));
+        let config = HyperMeshClientConfig::production("hypermesh.example.com".to_string());
+        assert_eq!(config.max_retries, 5);
+        assert!(config.request_timeout > Duration::from_secs(30));
     }
 
     #[tokio::test]

@@ -12,6 +12,7 @@ pub mod transport;
 pub mod config;
 pub mod extensions;
 pub mod protocol;
+pub mod api;
 
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
@@ -32,6 +33,11 @@ pub use config::StoqConfig;
 pub use extensions::{
     StoqProtocolExtension, DefaultStoqExtensions, PacketToken, PacketShard,
     HopInfo, SeedInfo, SeedNode, SeedPriority, StoqPacket
+};
+
+// Re-export API layer for application protocol
+pub use api::{
+    StoqApiServer, StoqApiClient, ApiHandler, ApiRequest, ApiResponse, ApiError
 };
 
 /// STOQ Protocol version

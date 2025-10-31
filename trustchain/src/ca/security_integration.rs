@@ -161,6 +161,11 @@ impl SecurityIntegratedCA {
         self.security_monitor.clone()
     }
 
+    /// Get underlying TrustChain CA instance
+    pub fn get_ca(&self) -> Arc<TrustChainCA> {
+        Arc::clone(&self.ca)
+    }
+
     /// Issue certificate with mandatory security validation
     pub async fn issue_certificate_secure(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
         let operation_id = uuid::Uuid::new_v4().to_string();

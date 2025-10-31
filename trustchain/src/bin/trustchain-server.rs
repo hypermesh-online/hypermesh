@@ -19,7 +19,8 @@ use trustchain::{
     monitoring::{MonitoringSystem, MonitoringConfig, MetricsExporter,
                  export::{JsonExporter, PrometheusExporter}},
 };
-use axum::{Router, routing::get, Json, response::IntoResponse};
+// REMOVED: HTTP dependency - replaced with STOQ protocol
+// use axum::{Router, routing::get, Json, response::IntoResponse};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -282,54 +283,12 @@ impl TrustChainServer {
         self.monitoring.start().await
             .context("Failed to start monitoring system")?;
 
-        // Start metrics HTTP endpoint
-        let monitoring = self.monitoring.clone();
-        let bind_addr = self.config.bind_address;
-        tokio::spawn(async move {
-            // Create simple HTTP server for metrics endpoint
-            let app = axum::Router::new()
-                .route("/metrics", axum::routing::get({
-                    let monitoring = monitoring.clone();
-                    move || {
-                        let monitoring = monitoring.clone();
-                        async move {
-                            let metrics = monitoring.get_metrics().await;
-                            let exporter = PrometheusExporter::new("trustchain");
-                            match exporter.export(&metrics).await {
-                                Ok(data) => (
-                                    [("Content-Type", "text/plain; version=0.0.4")],
-                                    data
-                                ).into_response(),
-                                Err(e) => (
-                                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    format!("Error: {}", e)
-                                ).into_response(),
-                            }
-                        }
-                    }
-                }))
-                .route("/health", axum::routing::get({
-                    let monitoring = monitoring.clone();
-                    move || {
-                        let monitoring = monitoring.clone();
-                        async move {
-                            let health = monitoring.get_health().await;
-                            Json(health)
-                        }
-                    }
-                }));
+        // TODO: Implement STOQ-based metrics endpoint
+        // Native monitoring system exports metrics via file-based exporters (JSON/Prometheus format)
+        // HTTP metrics endpoint removed - use STOQ API for remote metrics access
 
-            let addr = std::net::SocketAddr::from((bind_addr, 9090));
-            info!("Metrics server listening on http://[{}]:9090", bind_addr);
-
-            let listener = tokio::net::TcpListener::bind(addr).await
-                .expect("Failed to bind metrics server");
-            axum::serve(listener, app)
-                .await
-                .expect("Failed to start metrics server");
-        });
-
-        info!("Native monitoring system started");
+        info!("Native monitoring system started (file-based export only)");
+        info!("Metrics available via native exporters: JSON, Prometheus format");
         Ok(())
     }
 }

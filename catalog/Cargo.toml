@@ -62,7 +62,7 @@ handlebars = { workspace = true }
 regex = { workspace = true }
 
 # HTTP client
-reqwest = { workspace = true }
+# reqwest = ... # REMOVED: STOQ-only transport
 
 # Encoding utilities
 base64 = { workspace = true }
