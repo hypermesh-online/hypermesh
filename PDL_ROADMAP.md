@@ -8,19 +8,72 @@
 
 ---
 
+## 🎯 Strategic Approach: OS Integration + eBPF (Updated 2025-10-31)
+
+**CRITICAL**: We are **NOT building a new OS**. We are building user-space services that **integrate with existing operating systems** via abstraction layer.
+
+### Platform Strategy
+- **Phase 1**: Linux + Windows (Weeks 1-16, highest priority)
+- **Phase 2**: BSD (Weeks 17-24, medium priority)
+- **Phase 3**: macOS (Weeks 25-32, lower priority)
+
+### eBPF Integration (Mandatory)
+**eBPF is a core requirement across ALL platforms**, not an optional performance enhancement.
+
+**Platform Support**:
+- **Linux**: `libbpf`, XDP, TC, LSM hooks (kernel 4.4+) - Full eBPF
+- **Windows**: `eBpf-for-windows` (Microsoft port) - Limited eBPF
+- **BSD**: `bpf(4)` kernel interface - Classic + Extended BPF
+- **macOS**: Native BPF implementation - BSD-style with extensions
+
+**Use Cases**:
+- Real-time resource monitoring (CPU, GPU, memory, network)
+- Zero-copy packet processing (XDP on Linux)
+- Byzantine node detection via kernel-level tracing
+- Low-latency consensus validation (eBPF fast-path)
+- Cross-platform performance profiling
+
+### Architecture Layers
+- **Layer 0**: STOQ Protocol (standalone transport)
+- **Layer 1**: HyperMesh Core + **OS Integration Layer** (NEW)
+- **Layer 2**: System Services (TrustChain, Auth, Federation)
+- **Layer 3**: Applications (Caesar, Satchel, Catalog)
+- **Layer 4**: UI & Management
+
+### OS Abstraction Layer
+```rust
+pub trait OsAbstraction {
+    // Hardware detection via OS APIs
+    fn detect_cpu() -> Result<CpuInfo>;        // /proc, WMI, sysctl, IOKit
+    fn detect_gpu() -> Result<Vec<GpuInfo>>;   // lspci, WMI, pciconf, system_profiler
+    fn detect_memory() -> Result<MemoryInfo>;  // /proc, WMI, sysctl, vm_stat
+    fn detect_storage() -> Result<Vec<StorageInfo>>;
+    fn get_resource_usage() -> Result<ResourceUsage>;
+
+    // eBPF integration (ALL platforms)
+    fn load_ebpf_program(&self, program: &[u8]) -> Result<EbpfHandle>;
+    fn attach_ebpf_monitor(&self, handle: EbpfHandle) -> Result<()>;
+    fn read_ebpf_metrics(&self, handle: EbpfHandle) -> Result<EbpfMetrics>;
+}
+```
+
+**Implementations**: `LinuxAbstraction`, `WindowsAbstraction`, `BsdAbstraction`, `MacOsAbstraction`
+
+---
+
 ## Strategic Vision (12-18 Months)
 
 Build a complete decentralized infrastructure ecosystem enabling:
 - **STOQ Protocol**: Quantum-resistant transport layer
 - **TrustChain**: Decentralized certificate authority
-- **HyperMesh**: Distributed asset orchestration
+- **HyperMesh**: Distributed asset orchestration via **OS integration**
 - **Caesar**: Economic incentive system
 - **Catalog**: Package management (MVP scope)
 
 **Success Metrics**:
-- Multi-node deployment operational
+- Multi-node deployment operational across Linux/Windows/BSD/macOS
 - 10,000+ TPS transaction throughput
-- <100ms consensus latency
+- <100ms consensus latency (eBPF-accelerated)
 - 99.99% uptime SLA
 - Zero security incidents
 
@@ -129,34 +182,87 @@ Each sprint follows the 7 Universal PDL Steps:
 
 ---
 
-### Sprint 2: Service Discovery & Integration (Weeks 3-4)
+### Sprint 2: OS Abstraction Layer & eBPF Foundation (Weeks 3-4)
 
-**Primary Goal**: Replace hardcoded endpoints with dynamic service discovery
+**Primary Goal**: Create OS abstraction layer with eBPF integration for all platforms
 
-#### Development Tasks (Parallel)
+**CRITICAL**: eBPF integration is a core requirement across all operating systems
 
-**Task 1**: STOQ Service Discovery (Days 1-8)
+#### Step 1-2: Discovery & Definition (Days 1-3)
 **Agent**: @developer
-- Implement TrustChain DNS integration in STOQ
-- Replace hardcoded endpoints with DNS SRV queries
-- Update all STOQ clients to use service discovery
+- Research OS-specific APIs for hardware detection:
+  - **Linux**: /proc/cpuinfo, /sys/class, lspci + eBPF via libbpf
+  - **Windows**: WMI, Performance Counters + eBPF via eBpf-for-windows
+  - **BSD**: sysctl, pciconf + eBPF via bpf(4) kernel interface
+  - **macOS**: IOKit, sysctl + eBPF via native BPF implementation
+- Research eBPF capabilities per platform
+- Define unified `OsAbstraction` trait with eBPF support
 
-**Task 2**: Caesar STOQ Handler Implementation (Days 1-10)
+#### Step 3: Design & Prototyping (Days 4-5)
 **Agent**: @developer
-- Complete all 8 STOQ handler implementations
-- Replace TODO placeholders with real logic
-- Integrate with HyperMesh telemetry for real resource data
+- Design trait hierarchy with eBPF integration:
+  ```rust
+  pub trait OsAbstraction {
+      fn detect_cpu() -> Result<CpuInfo>;
+      fn detect_gpu() -> Result<Vec<GpuInfo>>;
+      fn detect_memory() -> Result<MemoryInfo>;
+      fn detect_storage() -> Result<Vec<StorageInfo>>;
+      fn get_resource_usage() -> Result<ResourceUsage>;
 
-**Task 3**: TrustChain Integration Tests (Days 5-10)
+      // eBPF integration
+      fn load_ebpf_program(&self, program: &[u8]) -> Result<EbpfHandle>;
+      fn attach_ebpf_monitor(&self, handle: EbpfHandle) -> Result<()>;
+      fn read_ebpf_metrics(&self, handle: EbpfHandle) -> Result<EbpfMetrics>;
+  }
+  ```
+
+#### Step 4: Development & Implementation (Days 6-12)
+**Agents**: 4x @developer (parallel, one per platform)
+
+**Linux Implementation** (4 days):
+- Hardware detection via /proc, /sys
+- eBPF programs via libbpf (kernel 4.4+)
+- eBPF for network monitoring (XDP, TC)
+- eBPF for resource tracking (CPU, memory, I/O)
+- eBPF for security enforcement (LSM hooks)
+
+**Windows Implementation** (4 days):
+- Hardware detection via WMI
+- eBPF via eBpf-for-windows project
+- Network packet filtering via eBPF
+- Resource monitoring via Performance Counters + eBPF
+- Note: Windows eBPF more limited than Linux
+
+**BSD Implementation** (3 days):
+- Hardware detection via sysctl
+- BPF via bpf(4) kernel interface
+- Network filtering via BPF (traditional + extended BPF)
+- Resource monitoring via kqueue + BPF
+- Note: BSD has classic BPF + modern eBPF extensions
+
+**macOS Implementation** (3 days):
+- Hardware detection via IOKit
+- BPF via native implementation
+- Network filtering (similar to BSD BPF)
+- Resource monitoring via Grand Central Dispatch + BPF
+- Note: macOS uses BSD-style BPF with extensions
+
+#### Step 5: Testing & QA (Days 13-14)
 **Agent**: @qa
-- Write 20+ integration tests for TrustChain ↔ HyperMesh
-- Test certificate issuance flow end-to-end
-- Test consensus validation with various proof sets
+- Unit tests for each OS implementation
+- eBPF program loading and attachment tests
+- Cross-platform integration tests
+- Verify hardware detection accuracy
+- Verify eBPF metrics collection
 
 **Sprint 2 Deliverables**:
-- ✅ STOQ uses dynamic service discovery
-- ✅ Caesar STOQ handlers complete
-- ✅ 20+ integration tests passing
+- ✅ OsAbstraction trait implemented with eBPF support
+- ✅ Linux + eBPF complete (libbpf integration)
+- ✅ Windows + eBPF complete (eBpf-for-windows integration)
+- ✅ BSD + BPF complete (bpf(4) integration)
+- ✅ macOS + BPF complete (native BPF integration)
+- ✅ Hardware detection working on all 4 platforms
+- ✅ eBPF monitoring operational on all 4 platforms
 
 ---
 
@@ -249,33 +355,37 @@ Each sprint follows the 7 Universal PDL Steps:
 
 ---
 
-### Sprint 7: Hardware Detection Adapters (Weeks 13-14)
+### Sprint 7: Hardware Detection via OS Abstraction (Weeks 13-14)
 
-**Primary Goal**: Implement real hardware detection
+**Primary Goal**: Implement hardware detection through OS abstraction layer with eBPF monitoring
 
 #### Development Tasks (Parallel)
 
-**Task 1**: CPU Adapter (Days 1-7)
+**Task 1**: Linux Hardware Detection with eBPF (Days 1-7)
 **Agent**: @developer
-- Detect CPU cores, frequency, architecture
-- Measure real CPU usage
-- Integrate with asset management
+- Implement LinuxAbstraction::detect_cpu/gpu/memory/storage using `/proc`, `/sys`, `lspci`
+- Integrate libbpf for real-time resource monitoring
+- Deploy XDP/TC for network metrics
+- Enable eBPF-based CPU/memory usage tracking
 
-**Task 2**: GPU Adapter (Days 1-7)
+**Task 2**: Windows Hardware Detection with eBPF (Days 1-7)
 **Agent**: @developer
-- Detect GPU models (CUDA, Metal, Vulkan)
-- Query GPU memory and capabilities
-- Enable GPU resource sharing
+- Implement WindowsAbstraction using WMI APIs (Win32_Processor, Win32_VideoController)
+- Integrate eBpf-for-windows for performance counters
+- Enable cross-platform resource monitoring
+- Test against Windows 10/11 and Server 2019/2022
 
-**Task 3**: Memory & Storage Adapters (Days 1-7)
+**Task 3**: BSD/macOS Hardware Detection (Days 1-7)
 **Agent**: @developer
-- Detect system memory and usage
-- Detect storage devices and capacity
-- Enable memory/storage sharing
+- Implement BsdAbstraction using `sysctl`, `pciconf`
+- Implement MacOsAbstraction using IOKit, `system_profiler`
+- Integrate native BPF for both platforms
+- Enable unified asset management across all 4 OS types
 
 **Deliverables**:
-- ✅ All 4 hardware adapters operational
-- ✅ Real hardware telemetry flowing
+- ✅ All 4 OS abstractions operational (Linux/Windows/BSD/macOS)
+- ✅ eBPF monitoring on all platforms
+- ✅ Hardware telemetry flowing through unified interface
 
 ---
 
@@ -314,49 +424,64 @@ Each sprint follows the 7 Universal PDL Steps:
 
 ### Sprint 9-10: Multi-Node Consensus (Weeks 17-20)
 
-**Primary Goal**: Enable 3+ node distributed consensus
+**Primary Goal**: Enable 3+ node distributed consensus with eBPF monitoring
 
 #### Development Tasks (Sequential)
 
-**Sprint 9**: Network Layer (Days 1-10)
+**Sprint 9**: Network Layer with eBPF Monitoring (Days 1-10)
 **Agent**: @system-admin
-- Implement peer-to-peer networking
-- Add node discovery and handshake
-- Enable cross-node communication via STOQ
+- Implement peer-to-peer networking via STOQ (QUIC/IPv6)
+- Add node discovery and handshake with TrustChain validation
+- Enable cross-node communication on all 4 OS types
+- Deploy eBPF network monitoring (XDP on Linux, eBpf-for-windows, BPF on BSD/macOS)
+- Track peer connections, packet loss, latency via eBPF
 
-**Sprint 10**: Consensus Protocol (Days 11-20)
+**Sprint 10**: Consensus Protocol with eBPF Validation (Days 11-20)
 **Agent**: @developer
-- Implement Byzantine fault tolerance (BFT)
-- Add leader election
-- Enable distributed consensus validation
+- Implement Byzantine fault tolerance (BFT) with eBPF fast-path
+- Add leader election with consensus proof validation
+- Enable distributed Four-Proof validation (PoSpace+PoStake+PoWork+PoTime)
+- Use eBPF for Byzantine node detection and performance tracking
+- Ensure cross-platform consensus (Linux/Windows/BSD/macOS nodes)
 
 **Deliverables**:
-- ✅ 3-node cluster operational
-- ✅ Distributed consensus working
+- ✅ 3-node cluster operational across OS types
+- ✅ Distributed consensus with eBPF monitoring
+- ✅ Byzantine detection via eBPF tracing
 
 ---
 
 ### Sprint 11: Remote Proxy/NAT Completion (Weeks 21-22)
 
-**Primary Goal**: Complete HyperMesh NAT-like addressing
+**Primary Goal**: Complete HyperMesh NAT-like addressing with eBPF packet routing
 
 #### Development Tasks (Parallel)
 
-**Task 1**: Global Addressing (Days 1-10)
+**Task 1**: Global Addressing with eBPF Routing (Days 1-10)
 **Agent**: @developer
-- Implement IPv6-like global proxy addresses
-- Enable remote resource addressing
-- Add address resolution protocol
+- Implement IPv6-like global proxy addresses for HyperMesh assets
+- Enable remote resource addressing through OS abstraction layer
+- Add address resolution protocol (ARP-like for HyperMesh)
+- Deploy eBPF packet routing for low-latency proxy forwarding
+- Enable NAT-like memory addressing across all 4 OS types
 
-**Task 2**: Trust-Based Routing (Days 1-10)
+**Task 2**: Trust-Based Routing with eBPF (Days 1-10)
 **Agent**: @integration
-- Implement PoSt-based proxy selection
-- Integrate with TrustChain certificates
-- Enable federated trust routing
+- Implement PoSt-based proxy selection (Proof of Stake validation)
+- Integrate with TrustChain certificate hierarchy
+- Enable federated trust routing with eBPF fast-path
+- Use eBPF for proxy selection optimization and monitoring
+
+**Task 3**: Cross-Platform Proxy Testing (Days 5-10)
+**Agent**: @qa
+- Test proxy routing between Linux/Windows/BSD/macOS nodes
+- Validate eBPF monitoring on all platforms
+- Test NAT-like memory addressing across heterogeneous clusters
 
 **Deliverables**:
-- ✅ Remote proxy addressing operational
-- ✅ Trust-based routing working
+- ✅ Remote proxy addressing operational on all OS types
+- ✅ Trust-based routing with eBPF acceleration
+- ✅ Cross-platform NAT addressing validated
 
 ---
 
@@ -410,17 +535,34 @@ Each sprint follows the 7 Universal PDL Steps:
 
 ### Sprint 14: Performance Optimization (Weeks 27-28)
 
-**Primary Goal**: Optimize for production scale
+**Primary Goal**: Optimize for production scale using eBPF across all platforms
 
-#### Tasks
-- Implement eBPF optimizations in STOQ
-- Optimize consensus latency
+#### Tasks (Parallel)
+
+**Task 1**: STOQ eBPF Optimization (Days 1-10)
+**Agent**: @developer
+- Deploy XDP for zero-copy packet processing (Linux)
+- Implement eBPF-based connection tracking (all platforms)
+- Enable kernel-bypass networking where supported
+- Target: 15+ Gbps throughput with eBPF acceleration
+
+**Task 2**: Consensus Latency Optimization (Days 1-10)
+**Agent**: @developer
+- Use eBPF for fast-path consensus validation
+- Implement eBPF-based Byzantine detection
 - Add caching and connection pooling
+- Target: <50ms consensus latency
+
+**Task 3**: Cross-Platform eBPF Profiling (Days 1-10)
+**Agent**: @system-admin
+- Deploy eBPF profilers on all 4 OS types
+- Identify bottlenecks via real-time metrics
+- Optimize hot paths discovered by eBPF tracing
 
 **Deliverables**:
-- ✅ 15+ Gbps STOQ throughput (eBPF enabled)
-- ✅ <50ms consensus latency
-- ✅ 10,000+ TPS sustained
+- ✅ 15+ Gbps STOQ throughput (eBPF enabled on Linux/Windows/BSD/macOS)
+- ✅ <50ms consensus latency with eBPF fast-path
+- ✅ 10,000+ TPS sustained with eBPF monitoring
 
 ---
 
