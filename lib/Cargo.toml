@@ -1,0 +1,14 @@
+[package]
+name = "hypermesh-lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+[lib]
+name = "hypermesh_lib"
+path = "src/lib.rs"
