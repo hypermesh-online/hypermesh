@@ -46,7 +46,7 @@ pub use image::{
     ContainerImage, ImageManager,
 };
 
-pub use network_usage::{
+pub use network::{
     NetworkConfig,
 };
 

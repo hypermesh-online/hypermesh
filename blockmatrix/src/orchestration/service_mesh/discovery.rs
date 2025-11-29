@@ -841,10 +841,10 @@ impl ServiceRegistry {
     }
     
     /// Update endpoint metrics
-    pub async fn update_endpoint_metrics(&mut self, 
+    pub async fn update_endpoint_metrics(&mut self,
         service_id: &ServiceId,
         endpoint_id: &str,
-        metrics: crate::service_mesh::EndpointMetrics,
+        metrics: EndpointMetrics,
     ) -> Result<()> {
         if let Some(service_entry) = self.services.get_mut(service_id) {
             if let Some(endpoint) = service_entry.endpoints.iter_mut().find(|ep| ep.id == endpoint_id) {

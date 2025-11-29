@@ -1,6 +1,7 @@
 //! Intrusion detection and threat analysis
 
-use crate::{NetworkPacket, SecurityEvent, SeverityLevel, error::{Result, SecurityError}};
+use super::{NetworkPacket, SeverityLevel, error::{Result, SecurityError}};
+use super::ebpf::SecurityEvent;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::SystemTime;

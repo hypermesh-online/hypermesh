@@ -16,25 +16,15 @@
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
 
-// Core security modules
-pub mod ebpf;
-pub mod capabilities;
-pub mod certificates;
-pub mod intrusion;
-pub mod policies;
-pub mod monitoring;
-pub mod config;
-pub mod error;
-
-// Re-exports
-pub use ebpf::{EBPFSecurityManager, EBPFProgram, SecurityEvent};
-pub use capabilities::{CapabilitySystem, Capability, PermissionSet};
-pub use certificates::{PKIManager, CertificateRotationManager};
-pub use intrusion::{IntrusionDetectionSystem, ThreatIndicator};
-pub use policies::{SecurityPolicy, PolicyEngine};
-pub use monitoring::{SecurityMonitor, SecurityMetrics};
-pub use config::SecurityConfig;
-pub use error::{SecurityError, Result};
+// Re-exports from sibling modules
+pub use super::ebpf::{EBPFSecurityManager, EBPFProgram, SecurityEvent};
+pub use super::capabilities::{CapabilitySystem, Capability, PermissionSet};
+pub use super::certificates::{PKIManager, CertificateRotationManager};
+pub use super::intrusion::{IntrusionDetectionSystem, ThreatIndicator};
+pub use super::policies::{SecurityPolicy, PolicyEngine};
+pub use super::monitoring::{SecurityMonitor, SecurityMetrics};
+pub use super::config::SecurityConfig;
+pub use super::error::{SecurityError, Result};
 
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;

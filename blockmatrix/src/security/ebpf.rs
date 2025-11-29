@@ -1,7 +1,7 @@
 //! eBPF security framework implementation
 
-use crate::{
-    NetworkPacket, SystemCall, ProcessContext, 
+use super::{
+    NetworkPacket, SystemCall, ProcessContext,
     error::{Result, SecurityError},
     config::EBPFConfig,
 };

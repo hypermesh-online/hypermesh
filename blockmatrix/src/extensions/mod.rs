@@ -92,6 +92,7 @@ pub use traits::{
 };
 
 pub use extension_manager::ExtensionManager;
+pub use manager::UnifiedExtensionManager;
 
 /// Integration flow for Catalog as a HyperMesh extension
 ///

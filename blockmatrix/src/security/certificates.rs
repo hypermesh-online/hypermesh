@@ -1,6 +1,6 @@
 //! Certificate and key management
 
-use crate::{error::{Result, SecurityError}, config::CertificateConfig};
+use super::{error::{Result, SecurityError}, config::CertificateConfig};
 use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};

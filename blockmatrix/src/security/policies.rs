@@ -1,6 +1,6 @@
 //! Security policy engine
 
-use crate::{SecurityContext, AccessDecision, error::Result};
+use super::{SecurityContext, AccessDecision, error::Result};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use tokio::sync::RwLock;

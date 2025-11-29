@@ -1,6 +1,6 @@
 //! Capability-based security system
 
-use crate::{Principal, Resource, Operation, error::{Result, SecurityError}};
+use super::{Principal, Resource, Operation, error::{Result, SecurityError}};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, HashSet};

@@ -10,14 +10,28 @@ pub mod ebpf;
 pub mod intrusion;
 pub mod monitoring;
 pub mod policies;
+pub mod types;
 
 #[cfg(test)]
 pub mod tests;
 
 // Re-export main types from config module
-pub use config::SecurityConfig;
+pub use config::{
+    SecurityConfig, EBPFConfig, CertificateConfig, CapabilityConfig,
+    IntrusionDetectionConfig, PolicyConfig, MonitoringConfig,
+};
 
-use anyhow::Result;
+// Re-export error types
+pub use error::{SecurityError, Result};
+
+// Re-export core security types
+pub use types::{
+    HyperMeshSecurity, SecurityContext, Principal, Resource, Operation,
+    AccessDecision, SeverityLevel, NetworkPacket, SystemCall, ProcessContext,
+    SecurityEvent,
+};
+
+use anyhow::Result as AnyhowResult;
 
 /// Security manager for HyperMesh
 pub struct SecurityManager {
