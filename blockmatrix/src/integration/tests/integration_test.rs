@@ -60,7 +60,7 @@ impl IntegrationTestHarness {
             max_retries: 3,
             health_check_interval: Duration::from_secs(1),
             auto_transition: true,
-            network: NetworkConfig {
+            network_usage: NetworkConfig {
                 stoq_bind: "[::1]:19292".parse()?,
                 trustchain_bind: "[::1]:18443".parse()?,
                 hypermesh_bind: "[::1]:18080".parse()?,

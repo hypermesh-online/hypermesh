@@ -4,7 +4,7 @@ use super::{
     types::{ContainerId, ContainerSpec, ContainerStatus, ContainerState},
     lifecycle::{ContainerLifecycle, DefaultContainerLifecycle},
     image::{ImageManager, DefaultImageManager},
-    network::{ContainerNetwork, DefaultContainerNetwork},
+    network_usage::{ContainerNetwork, DefaultContainerNetwork},
     filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
     resources::{ResourceManager, CgroupResourceManager, ResourceUsage},
     migration::{MigrationManager, DefaultMigrationManager, MigrationRequest},
@@ -91,7 +91,7 @@ pub struct ContainerRuntime {
     /// Image manager
     image_manager: Arc<dyn ImageManager>,
     /// Network manager
-    network: Arc<dyn ContainerNetwork>,
+    network_usage: Arc<dyn ContainerNetwork>,
     /// Filesystem manager
     filesystem: Arc<dyn ContainerFilesystem>,
     /// Resource manager
@@ -155,7 +155,7 @@ impl ContainerRuntime {
         config: ContainerConfig,
         lifecycle: Arc<dyn ContainerLifecycle>,
         image_manager: Arc<dyn ImageManager>,
-        network: Arc<dyn ContainerNetwork>,
+        network_usage: Arc<dyn ContainerNetwork>,
         filesystem: Arc<dyn ContainerFilesystem>,
         resource_manager: Arc<dyn ResourceManager>,
         migration_manager: Arc<dyn MigrationManager>,
@@ -477,7 +477,7 @@ impl Clone for ContainerRuntime {
             config: self.config.clone(),
             lifecycle: Arc::clone(&self.lifecycle),
             image_manager: Arc::clone(&self.image_manager),
-            network: Arc::clone(&self.network),
+            network_usage: Arc::clone(&self.network),
             filesystem: Arc::clone(&self.filesystem),
             resource_manager: Arc::clone(&self.resource_manager),
             migration_manager: Arc::clone(&self.migration_manager),

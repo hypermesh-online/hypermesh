@@ -80,13 +80,13 @@ pub struct ResourceRequirements {
     /// CPU requirements
     pub cpu: Option<CpuRequirements>,
     /// GPU requirements
-    pub gpu: Option<GpuRequirements>,
+    pub gpu_usage: Option<GpuRequirements>,
     /// Memory requirements
-    pub memory: Option<MemoryRequirements>,
+    pub memory_usage: Option<MemoryRequirements>,
     /// Storage requirements
-    pub storage: Option<StorageRequirements>,
+    pub storage_usage: Option<StorageRequirements>,
     /// Network requirements
-    pub network: Option<NetworkRequirements>,
+    pub network_usage: Option<NetworkRequirements>,
     /// Container requirements
     pub container: Option<ContainerRequirements>,
     /// Economic requirements
@@ -406,10 +406,10 @@ impl Default for ResourceRequirements {
     fn default() -> Self {
         Self {
             cpu: None,
-            gpu: None,
-            memory: None,
-            storage: None,
-            network: None,
+            gpu_usage: None,
+            memory_usage: None,
+            storage_usage: None,
+            network_usage: None,
             container: None,
         }
     }
@@ -468,7 +468,7 @@ mod tests {
                 architecture: Some("x86_64".to_string()),
                 required_features: vec!["AVX2".to_string()],
             }),
-            memory: Some(MemoryRequirements {
+            memory_usage: Some(MemoryRequirements {
                 size_bytes: 8 * 1024 * 1024 * 1024, // 8GB
                 memory_type: Some("DDR4".to_string()),
                 ecc_required: false,

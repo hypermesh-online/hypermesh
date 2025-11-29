@@ -75,7 +75,7 @@ fn create_gpu_allocation_request() -> AssetAllocationRequest {
     AssetAllocationRequest {
         asset_type: AssetType::Gpu,
         requested_resources: ResourceRequirements {
-            gpu: Some(GpuRequirements {
+            gpu_usage: Some(GpuRequirements {
                 units: 1,
                 min_memory_mb: Some(8192), // 8GB
                 compute_capability: Some("8.0".to_string()),
@@ -96,7 +96,7 @@ fn create_memory_allocation_request() -> AssetAllocationRequest {
     AssetAllocationRequest {
         asset_type: AssetType::Memory,
         requested_resources: ResourceRequirements {
-            memory: Some(MemoryRequirements {
+            memory_usage: Some(MemoryRequirements {
                 size_bytes: 1024 * 1024 * 1024, // 1GB
                 memory_type: Some("DDR4".to_string()),
                 ecc_required: false,
@@ -117,7 +117,7 @@ fn create_storage_allocation_request() -> AssetAllocationRequest {
     AssetAllocationRequest {
         asset_type: AssetType::Storage,
         requested_resources: ResourceRequirements {
-            storage: Some(StorageRequirements {
+            storage_usage: Some(StorageRequirements {
                 size_bytes: 10 * 1024 * 1024 * 1024, // 10GB
                 storage_type: StorageType::Nvme,
                 min_iops: Some(100000),

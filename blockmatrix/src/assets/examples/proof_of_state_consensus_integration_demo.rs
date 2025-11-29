@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 architecture: "x86_64".to_string(),
                 features: vec!["sse4".to_string(), "avx2".to_string()],
             }),
-            memory: Some(MemoryRequirements {
+            memory_usage: Some(MemoryRequirements {
                 size_bytes: 8_000_000_000, // 8GB
                 memory_type: "DDR4".to_string(),
                 speed_mhz: 3200,

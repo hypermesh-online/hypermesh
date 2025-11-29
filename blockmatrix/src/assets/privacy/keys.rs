@@ -24,7 +24,7 @@ pub enum KeyDerivationMethod {
     /// PBKDF2 with SHA-256
     PBKDF2SHA256 { iterations: u32 },
     /// Argon2id (recommended)
-    Argon2id { memory: u32, iterations: u32, parallelism: u32 },
+    Argon2id { memory_usage: u32, iterations: u32, parallelism: u32 },
     /// scrypt
     Scrypt { n: u32, r: u32, p: u32 },
     /// Hardware-based derivation

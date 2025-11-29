@@ -164,7 +164,7 @@ pub enum AuthenticationType {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TokenManagement {
     /// Token storage
-    pub storage: TokenStorage,
+    pub storage_usage: TokenStorage,
     
     /// Token refresh settings
     pub refresh_settings: HashMap<String, String>,
@@ -560,7 +560,7 @@ impl Default for AlgorithmPerformance {
 impl Default for TokenManagement {
     fn default() -> Self {
         Self {
-            storage: TokenStorage::Encrypted,
+            storage_usage: TokenStorage::Encrypted,
             refresh_settings: HashMap::new(),
             expiration_handling: "auto_refresh".to_string(),
             rotation_policy: "weekly".to_string(),

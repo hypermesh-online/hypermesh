@@ -3,7 +3,7 @@
 //! Implements ML-based routing decisions using the spiking neural network
 //! to optimize path selection and achieve the target performance gains.
 
-use crate::network::NeuralNetwork;
+use crate::network_usage::NeuralNetwork;
 use anyhow::Result;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -710,7 +710,7 @@ pub struct RoutingStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::NeuralNetwork;
+    use crate::network_usage::NeuralNetwork;
     use std::sync::Arc;
     use tokio::sync::RwLock;
     

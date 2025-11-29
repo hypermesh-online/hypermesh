@@ -274,7 +274,7 @@ mod tests {
         let hex_string = asset_id.to_hex_string();
         
         // Note: from_hex_string loses timestamp precision, so we don't test round-trip
-        assert!(hex_string.starts_with("memory:"));
+        assert!(hex_string.starts_with("memory_usage:"));
         assert!(hex_string.contains(':'));
     }
     

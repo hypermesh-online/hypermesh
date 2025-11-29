@@ -840,7 +840,7 @@ impl CatalogHyperMeshBridge {
                     args: container_config.args.clone(),
                     environment: container_config.environment_variables.clone(),
                     resources: ResourceRequirements::default(),
-                    network: Default::default(),
+                    network_usage: Default::default(),
                 };
                 
                 let hypermesh_spec = HyperMeshContainerSpec {

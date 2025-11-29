@@ -58,7 +58,7 @@ pub struct EBPFProgramConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyDefaults {
     /// Network policy defaults
-    pub network: NetworkPolicyDefaults,
+    pub network_usage: NetworkPolicyDefaults,
     /// System call policy defaults
     pub syscall: SyscallPolicyDefaults,
 }
@@ -373,7 +373,7 @@ impl Default for EBPFConfig {
 impl Default for PolicyDefaults {
     fn default() -> Self {
         Self {
-            network: NetworkPolicyDefaults {
+            network_usage: NetworkPolicyDefaults {
                 default_action: "deny".to_string(),
                 allowed_protocols: vec!["tcp".to_string(), "udp".to_string(), "icmp".to_string()],
                 rate_limits: vec![

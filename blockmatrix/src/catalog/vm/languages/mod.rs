@@ -520,7 +520,7 @@ impl MultiLanguageSupport {
             let available_memory = context.get_available_memory_bytes()?;
             if available_memory < mem_req.min_ram_bytes {
                 return Err(anyhow::anyhow!(
-                    "Insufficient memory: required {}, available {}",
+                    "Insufficient memory_usage: required {}, available {}",
                     mem_req.min_ram_bytes, available_memory
                 ));
             }
@@ -535,7 +535,7 @@ impl MultiLanguageSupport {
             let available_gpu_memory = context.get_available_gpu_memory_bytes()?;
             if available_gpu_memory < gpu_req.min_memory_bytes {
                 return Err(anyhow::anyhow!(
-                    "Insufficient GPU memory: required {}, available {}",
+                    "Insufficient GPU memory_usage: required {}, available {}",
                     gpu_req.min_memory_bytes, available_gpu_memory
                 ));
             }

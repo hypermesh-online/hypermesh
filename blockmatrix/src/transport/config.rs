@@ -14,7 +14,7 @@ pub type TransportConfig = HyperMeshTransportConfig;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HyperMeshTransportConfig {
     /// Network configuration
-    pub network: NetworkConfig,
+    pub network_usage: NetworkConfig,
     /// Connection pool configuration
     pub pool: ConnectionPoolConfig,
     /// Authentication configuration
@@ -126,7 +126,7 @@ impl HyperMeshTransportConfig {
 impl Default for HyperMeshTransportConfig {
     fn default() -> Self {
         Self {
-            network: NetworkConfig::default(),
+            network_usage: NetworkConfig::default(),
             pool: ConnectionPoolConfig::default(),
             auth: AuthenticationConfig::default(),
             monitoring: MonitoringConfig::default(),

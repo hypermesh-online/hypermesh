@@ -109,7 +109,7 @@ pub struct BootstrapConfig {
     /// Enable automatic phase transitions
     pub auto_transition: bool,
     /// Network configuration
-    pub network: NetworkConfig,
+    pub network_usage: NetworkConfig,
 }
 
 /// Network configuration for bootstrap
@@ -1084,7 +1084,7 @@ mod tests {
             max_retries: 3,
             health_check_interval: Duration::from_secs(5),
             auto_transition: true,
-            network: NetworkConfig {
+            network_usage: NetworkConfig {
                 stoq_bind: "[::1]:9292".parse().unwrap(),
                 trustchain_bind: "[::1]:8443".parse().unwrap(),
                 hypermesh_bind: "[::1]:8080".parse().unwrap(),

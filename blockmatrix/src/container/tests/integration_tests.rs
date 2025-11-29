@@ -22,7 +22,7 @@ async fn test_container_lifecycle() {
         environment: HashMap::new(),
         working_dir: None,
         resources: ResourceQuota::default(),
-        network: NetworkConfig::default(),
+        network_usage: NetworkConfig::default(),
         mounts: vec![],
         security: SecurityConfig::default(),
     };
@@ -72,7 +72,7 @@ async fn test_resource_management() {
             cpu_quota: Some(1.0), // 1 CPU core
             ..ResourceQuota::default()
         },
-        network: NetworkConfig::default(),
+        network_usage: NetworkConfig::default(),
         mounts: vec![],
         security: SecurityConfig::default(),
     };
@@ -104,7 +104,7 @@ async fn test_container_migration() {
         environment: HashMap::new(),
         working_dir: None,
         resources: ResourceQuota::default(),
-        network: NetworkConfig::default(),
+        network_usage: NetworkConfig::default(),
         mounts: vec![],
         security: SecurityConfig::default(),
     };
@@ -140,7 +140,7 @@ async fn test_container_performance_targets() {
         environment: HashMap::new(),
         working_dir: None,
         resources: ResourceQuota::default(),
-        network: NetworkConfig::default(),
+        network_usage: NetworkConfig::default(),
         mounts: vec![],
         security: SecurityConfig::default(),
     };
@@ -184,7 +184,7 @@ async fn test_multiple_containers() {
         environment: HashMap::new(),
         working_dir: None,
         resources: ResourceQuota::default(),
-        network: NetworkConfig::default(),
+        network_usage: NetworkConfig::default(),
         mounts: vec![],
         security: SecurityConfig::default(),
     };

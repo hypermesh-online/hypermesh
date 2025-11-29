@@ -392,7 +392,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         if available < memory_req.size_bytes {
             return Err(AssetError::AllocationFailed {
                 reason: format!(
-                    "Insufficient memory: {} bytes requested, {} available",
+                    "Insufficient memory_usage: {} bytes requested, {} available",
                     memory_req.size_bytes, available
                 )
             });
@@ -740,7 +740,7 @@ mod tests {
         AssetAllocationRequest {
             asset_type: AssetType::Memory,
             requested_resources: crate::assets::core::ResourceRequirements {
-                memory: Some(MemoryRequirements {
+                memory_usage: Some(MemoryRequirements {
                     size_bytes: 1024 * 1024 * 1024, // 1GB
                     memory_type: Some("DDR4".to_string()),
                     ecc_required: false,

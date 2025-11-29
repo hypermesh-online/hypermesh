@@ -115,7 +115,7 @@
 //!     8080 // Asset port
 //! );
 //!
-//! println!("Proxy address: {}", proxy_addr); // hypermesh://network:node/port
+//! println!("Proxy address: {}", proxy_addr); // hypermesh://network_usage:node/port
 //! # Ok(())
 //! # }
 //! ```

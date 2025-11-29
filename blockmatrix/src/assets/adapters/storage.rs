@@ -980,7 +980,7 @@ mod tests {
         AssetAllocationRequest {
             asset_type: AssetType::Storage,
             requested_resources: crate::assets::core::ResourceRequirements {
-                storage: Some(StorageRequirements {
+                storage_usage: Some(StorageRequirements {
                     size_bytes: 100 * 1024 * 1024 * 1024, // 100GB
                     storage_type: StorageType::Ssd,
                     min_iops: Some(1000),

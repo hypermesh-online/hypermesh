@@ -321,7 +321,7 @@ impl PatternCache {
             // Trigger cleanup to fit new size
             self.ensure_capacity(0)?;
             
-            debug!("Decreased cache size to {} entries (hit rate: {:.1}%, memory: {}MB)", 
+            debug!("Decreased cache size to {} entries (hit rate: {:.1}%, memory_usage: {}MB)", 
                   self.config.max_entries, performance.recent_hit_rate * 100.0,
                   self.current_memory_bytes / (1024 * 1024));
         }

@@ -244,10 +244,10 @@ impl AssetAdapter for EconomicAssetAdapter {
             status: asset_state.status,
             resource_usage: ResourceUsage {
                 cpu: None,
-                gpu: None,
-                memory: None,
-                storage: None,
-                network: None,
+                gpu_usage: None,
+                memory_usage: None,
+                storage_usage: None,
+                network_usage: None,
                 economic: Some(usage),
             },
             proxy_address: None,
@@ -287,10 +287,10 @@ impl AssetAdapter for EconomicAssetAdapter {
         if let Some(asset_state) = assets.get(asset_id) {
             Ok(ResourceUsage {
                 cpu: None,
-                gpu: None,
-                memory: None,
-                storage: None,
-                network: None,
+                gpu_usage: None,
+                memory_usage: None,
+                storage_usage: None,
+                network_usage: None,
                 economic: Some(asset_state.usage.clone()),
             })
         } else {

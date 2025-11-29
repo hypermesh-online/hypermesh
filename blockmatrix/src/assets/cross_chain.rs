@@ -391,7 +391,7 @@ impl CrossChainValidationManager {
                 }
                 Err(e) => {
                     return Err(CrossChainValidationError::NetworkValidationFailed {
-                        network: step.network_domain.clone(),
+                        network_usage: step.network_domain.clone(),
                         error: e.to_string(),
                     });
                 }
@@ -706,7 +706,7 @@ impl CrossChainValidationManager {
 pub enum CrossChainValidationError {
     /// Network validation failed
     #[error("Network validation failed for {network}: {error}")]
-    NetworkValidationFailed { network: String, error: String },
+    NetworkValidationFailed { network_usage: String, error: String },
     
     /// Zero-knowledge proof validation failed
     #[error("ZK proof validation failed for statement {statement_id}: {error}")]
@@ -722,7 +722,7 @@ pub enum CrossChainValidationError {
     
     /// Network not found
     #[error("Network not found: {network}")]
-    NetworkNotFound { network: String },
+    NetworkNotFound { network_usage: String },
     
     /// Asset not found
     #[error("Asset not found: {asset_id}")]

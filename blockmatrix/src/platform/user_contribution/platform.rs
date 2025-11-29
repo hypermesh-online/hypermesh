@@ -188,7 +188,7 @@ impl UserContributionPlatform {
                 GpuInfo {
                     model: "NVIDIA RTX 4090".to_string(),
                     vendor: "NVIDIA".to_string(),
-                    memory: 24 * 1024 * 1024 * 1024,
+                    memory_usage: 24 * 1024 * 1024 * 1024,
                     compute_units: 128,
                     base_clock: 2520,
                     memory_clock: 10500,

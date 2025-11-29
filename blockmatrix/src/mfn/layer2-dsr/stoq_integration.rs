@@ -747,7 +747,7 @@ mod stoq {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::NeuralNetwork;
+    use crate::network_usage::NeuralNetwork;
     use crate::routing::RoutingOptimizer;
     use crate::service_mesh::ServiceMeshIntelligence;
     use std::sync::Arc;

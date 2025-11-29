@@ -333,7 +333,7 @@ fn create_test_host(host_id: &str, name: &str) -> P2PHost {
             cpu_cores: 4,
             memory_mb: 8192,
             storage_mb: 100000,
-            gpu: None,
+            gpu_usage: None,
             network_mbps: 100,
         },
         supported_asset_types: vec!["JuliaScript".to_string(), "PythonScript".to_string()],

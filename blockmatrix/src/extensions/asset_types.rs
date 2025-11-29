@@ -98,9 +98,9 @@ pub struct DeploymentSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceRequirements {
     pub cpu: CpuRequirement,
-    pub memory: MemoryRequirement,
-    pub storage: Option<StorageRequirement>,
-    pub gpu: Option<GpuRequirement>,
+    pub memory_usage: MemoryRequirement,
+    pub storage_usage: Option<StorageRequirement>,
+    pub gpu_usage: Option<GpuRequirement>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

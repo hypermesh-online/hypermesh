@@ -791,7 +791,7 @@ mod tests {
         AssetAllocationRequest {
             asset_type: AssetType::Gpu,
             requested_resources: crate::assets::core::ResourceRequirements {
-                gpu: Some(GpuRequirements {
+                gpu_usage: Some(GpuRequirements {
                     units: 1,
                     min_memory_mb: Some(8192), // 8GB
                     compute_capability: Some("8.0".to_string()),

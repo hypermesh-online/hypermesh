@@ -3,7 +3,7 @@
 //! Provides intelligent load balancing, circuit breaking, and traffic analysis
 //! using the spiking neural network for enhanced service mesh operations.
 
-use crate::network::NeuralNetwork;
+use crate::network_usage::NeuralNetwork;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -782,7 +782,7 @@ pub struct ServiceMeshStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::NeuralNetwork;
+    use crate::network_usage::NeuralNetwork;
     use std::sync::Arc;
     use tokio::sync::RwLock;
     

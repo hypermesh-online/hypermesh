@@ -872,7 +872,7 @@ mod tests {
         AssetAllocationRequest {
             asset_type: AssetType::Network,
             requested_resources: crate::assets::core::ResourceRequirements {
-                network: Some(NetworkRequirements {
+                network_usage: Some(NetworkRequirements {
                     bandwidth_mbps: 1000, // 1 Gbps
                     max_latency_us: Some(1000),
                     max_packet_loss_percent: Some(0.1),

@@ -33,7 +33,7 @@ pub struct CpuInfo {
 pub struct GpuInfo {
     pub model: String,
     pub vendor: String,
-    pub memory: u64,
+    pub memory_usage: u64,
     pub compute_units: u32,
     pub base_clock: u64,
     pub memory_clock: u64,

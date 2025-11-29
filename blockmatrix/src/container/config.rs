@@ -10,9 +10,9 @@ pub struct ContainerConfig {
     /// Runtime configuration
     pub runtime: RuntimeConfig,
     /// Storage configuration
-    pub storage: StorageConfig,
+    pub storage_usage: StorageConfig,
     /// Network configuration
-    pub network: NetworkConfig,
+    pub network_usage: NetworkConfig,
     /// Security configuration
     pub security: SecurityConfig,
     /// Resource limits
@@ -177,8 +177,8 @@ impl Default for ContainerConfig {
     fn default() -> Self {
         Self {
             runtime: RuntimeConfig::default(),
-            storage: StorageConfig::default(),
-            network: NetworkConfig::default(),
+            storage_usage: StorageConfig::default(),
+            network_usage: NetworkConfig::default(),
             security: SecurityConfig::default(),
             limits: ResourceLimits::default(),
             monitoring: MonitoringConfig::default(),

@@ -3,7 +3,7 @@
 //! Implements Spike-Timing-Dependent Plasticity (STDP) and online learning algorithms
 //! for dynamic adaptation of the neural network based on routing feedback.
 
-use crate::network::{NeuralNetwork, SynapticConnection};
+use crate::network_usage::{NeuralNetwork, SynapticConnection};
 use crate::spiking::SpikeEvent;
 use anyhow::Result;
 use rand::{thread_rng, Rng};
@@ -267,7 +267,7 @@ impl OnlineLearning {
     
     /// Perform online adaptation step
     pub async fn adapt_step(&mut self, 
-        network: &mut NeuralNetwork,
+        network_usage: &mut NeuralNetwork,
         recent_performance: f64
     ) -> Result<f64> {
         if self.pattern_history.is_empty() {
@@ -335,7 +335,7 @@ impl OnlineLearning {
     
     /// Apply gradient-based weight updates
     async fn apply_gradient_updates(&mut self,
-        network: &mut NeuralNetwork,
+        network_usage: &mut NeuralNetwork,
         learning_rate: f64
     ) -> Result<f64> {
         let mut total_change = 0.0;
@@ -391,7 +391,7 @@ impl OnlineLearning {
     }
     
     /// Apply forgetting to prevent overfitting
-    async fn apply_forgetting(&mut self, network: &mut NeuralNetwork) -> Result<()> {
+    async fn apply_forgetting(&mut self, network_usage: &mut NeuralNetwork) -> Result<()> {
         if self.forgetting_rate <= 0.0 {
             return Ok(());
         }
@@ -470,7 +470,7 @@ impl AdaptationEngine {
     
     /// Adapt neural network using both STDP and online learning
     pub async fn adapt_network(&mut self, 
-        network: &mut NeuralNetwork,
+        network_usage: &mut NeuralNetwork,
         training_data: &[(Vec<f64>, Vec<f64>, f64)]
     ) -> Result<()> {
         info!("Starting network adaptation with {} training samples", training_data.len());
@@ -513,7 +513,7 @@ impl AdaptationEngine {
     }
     
     /// Continuous adaptation for real-time learning
-    pub async fn continuous_adaptation(&mut self, network: &mut NeuralNetwork) -> Result<()> {
+    pub async fn continuous_adaptation(&mut self, network_usage: &mut NeuralNetwork) -> Result<()> {
         if self.last_adaptation.elapsed() >= self.adaptation_interval {
             let avg_performance = if !self.recent_performance.is_empty() {
                 self.recent_performance.iter().sum::<f64>() / self.recent_performance.len() as f64
