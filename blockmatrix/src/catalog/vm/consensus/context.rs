@@ -144,20 +144,25 @@ impl VMConsensusContext {
         // Update temporal state with time proof
         {
             let mut temporal = self.temporal_state.write().unwrap();
-            let time_proof = &operation.consensus_proof().proof_of_time;
-            
-            // Update logical timestamp
-            if temporal.last_logical_timestamp.is_none() || 
-               time_proof.logical_timestamp > temporal.last_logical_timestamp.unwrap_or(0) {
-                temporal.last_logical_timestamp = Some(time_proof.logical_timestamp);
+            let time_proof = &operation.consensus_proof().time_proof;
+
+            // Track time verification timestamp as logical progression
+            let current_timestamp = time_proof.time_verification_timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            if temporal.last_logical_timestamp.is_none() ||
+               current_timestamp > temporal.last_logical_timestamp.unwrap_or(0) {
+                temporal.last_logical_timestamp = Some(current_timestamp);
             }
-            
-            // Update temporal hash chain
-            temporal.last_temporal_hash = Some(time_proof.temporal_hash);
-            
+
+            // Update temporal hash using proof hash
+            temporal.last_temporal_hash = Some(format!("{:x}", time_proof.proof_hash.iter().take(32).fold(0u64, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u64))));
+
             // Increment sequence number
             temporal.sequence_number += 1;
-            
+
             // Update clock synchronization state
             self.update_clock_sync_state(&mut temporal, time_proof).await?;
         }
@@ -277,10 +282,10 @@ impl VMConsensusContext {
     async fn update_clock_sync_state(
         &self,
         temporal: &mut TemporalState,
-        time_proof: &crate::consensus::ProofOfTime,
+        time_proof: &crate::consensus::TimeProof,
     ) -> Result<()> {
         let current_time = SystemTime::now();
-        let proof_time = time_proof.wall_clock;
+        let proof_time = time_proof.time_verification_timestamp;
         
         // Calculate time drift
         let drift_micros = current_time.duration_since(proof_time)
@@ -523,7 +528,7 @@ impl ResourceUtilizationStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, ConsensusProof};
+    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, ConsensusProof};
     
     #[tokio::test]
     async fn test_context_creation() {
@@ -539,10 +544,10 @@ mod tests {
         
         // Create mock consensus operation
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         let operation = super::ConsensusOperation::new(

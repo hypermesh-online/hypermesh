@@ -90,7 +90,7 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 // Re-export core types
-pub use crate::consensus::{ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
+pub use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 pub use consensus::{ConsensusVM, VMConsensusContext, ConsensusOperation};
 pub use execution::{VMExecutor, ExecutionContext, ExecutionResult};
 pub use crate::assets::AssetAdapter;
@@ -674,7 +674,7 @@ mod tests {
         // Create base execution context
         let base_context = ExecutionContext {
             consensus_proof: ConsensusProof::new(
-                crate::consensus::proof::ProofOfSpace::new(
+                crate::consensus::proof::SpaceProof::new(
                     "/test".to_string(),
                     crate::consensus::proof::NetworkPosition {
                         address: "test.hypermesh.online".to_string(),
@@ -683,7 +683,7 @@ mod tests {
                     },
                     0,
                 ),
-                crate::consensus::proof::ProofOfStake::new(
+                crate::consensus::proof::StakeProof::new(
                     "test.hypermesh.online".to_string(),
                     "test-node".to_string(),
                     1000,
@@ -695,12 +695,12 @@ mod tests {
                     },
                     vec!["test-allowance".to_string()],
                 ),
-                crate::consensus::proof::ProofOfWork::new(
+                crate::consensus::proof::WorkProof::new(
                     b"test-challenge",
                     4,
                     "test".to_string(),
                 ).unwrap(),
-                crate::consensus::proof::ProofOfTime::new(0, None, 0),
+                crate::consensus::proof::TimeProof::new(0, None, 0),
             ),
             language: "julia".to_string(),
             asset_allocations: std::collections::HashMap::new(),

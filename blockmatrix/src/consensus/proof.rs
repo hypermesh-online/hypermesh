@@ -15,10 +15,10 @@ pub use super::{
     WorkProof,
 
     // Legacy aliases
-    ProofOfStake,
-    ProofOfTime,
-    ProofOfSpace,
-    ProofOfWork,
+    StakeProof,
+    TimeProof,
+    SpaceProof,
+    WorkProof,
 
     // BlockMatrix-specific types
     AccessLevel,

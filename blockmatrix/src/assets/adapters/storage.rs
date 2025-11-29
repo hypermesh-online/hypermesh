@@ -586,27 +586,27 @@ impl AssetAdapter for StorageAssetAdapter {
         
         // Storage-specific validation - CRITICAL PoSpace validation
         // PoSpace: MOST IMPORTANT for storage - validate actual storage commitment
-        if proof.proof_of_space.committed_space == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         
         // Verify storage location and network position
-        if proof.proof_of_space.storage_location.is_empty() {
+        if proof.space_proof.storage_path.is_empty() {
             return Ok(false);
         }
         
         // PoStake: Validate storage access stake
-        if proof.proof_of_stake.stake_amount < 75 { // Moderate minimum for storage
+        if proof.stake_proof.stake_amount < 75 { // Moderate minimum for storage
             return Ok(false);
         }
         
         // PoWork: Validate computational work for storage management
-        if proof.proof_of_work.difficulty < 14 { // Medium difficulty for storage
+        if proof.work_proof.difficulty < 14 { // Medium difficulty for storage
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for storage operations
-        let time_valid = proof.proof_of_time.logical_timestamp > 0;
+        let time_valid = proof.time_proof.logical_timestamp > 0;
         
         Ok(time_valid)
     }

@@ -386,23 +386,23 @@ impl AssetAdapter for CpuAssetAdapter {
         
         // CPU-specific validation
         // PoSpace: Validate CPU allocation has committed space
-        if proof.proof_of_space.committed_space == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         
         // PoStake: Validate CPU access stake (lower minimum for CPU)
-        if proof.proof_of_stake.stake_amount < 50 {
+        if proof.stake_proof.stake_amount < 50 {
             return Ok(false);
         }
         
         // PoWork: CRITICAL for CPU - validate computational difficulty
-        if proof.proof_of_work.difficulty < 16 { // Minimum 16-bit difficulty for CPU
+        if proof.work_proof.difficulty < 16 { // Minimum 16-bit difficulty for CPU
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for CPU scheduling
-        let time_valid = proof.proof_of_time.logical_timestamp > 0 &&
-                        proof.proof_of_time.sequence_number > 0;
+        let time_valid = proof.time_proof.logical_timestamp > 0 &&
+                        proof.time_proof.sequence_number > 0;
         
         Ok(time_valid)
     }

@@ -8,7 +8,7 @@ use std::time::{SystemTime, Duration};
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, AccessLevel};
+use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, AccessLevel};
 use super::{ProofValidator, ProofRequirement, VMConsensusContext};
 
 /// Validator for Proof of Space - WHERE operations occur
@@ -43,7 +43,7 @@ impl SpaceProofValidator {
     }
     
     /// Validate network position and routing
-    async fn validate_network_position(&self, proof: &ProofOfSpace) -> Result<bool> {
+    async fn validate_network_position(&self, proof: &SpaceProof) -> Result<bool> {
         // Validate network position is within acceptable distance
         if proof.network_position.distance_metric > self.max_location_distance {
             return Ok(false);
@@ -60,15 +60,15 @@ impl SpaceProofValidator {
 }
 
 #[async_trait]
-impl ProofValidator<ProofOfSpace> for SpaceProofValidator {
-    async fn validate(&self, proof: &ProofOfSpace, _context: &VMConsensusContext) -> Result<bool> {
+impl ProofValidator<SpaceProof> for SpaceProofValidator {
+    async fn validate(&self, proof: &SpaceProof, _context: &VMConsensusContext) -> Result<bool> {
         // 1. Check minimum space commitment
-        if proof.committed_space < self.min_space_commitment {
+        if proof.total_size < self.min_space_commitment {
             return Ok(false);
         }
         
         // 2. Validate storage location
-        if !self.validate_storage_location(&proof.storage_location).await? {
+        if !self.validate_storage_location(&proof.storage_path).await? {
             return Ok(false);
         }
         
@@ -154,7 +154,7 @@ impl StakeProofValidator {
     /// Validate access permissions for operation
     async fn validate_access_permissions(
         &self, 
-        proof: &ProofOfStake, 
+        proof: &StakeProof, 
         operation_type: &str
     ) -> Result<bool> {
         if let Some(required_level) = self.access_requirements.get(operation_type) {
@@ -175,8 +175,8 @@ impl StakeProofValidator {
 }
 
 #[async_trait]
-impl ProofValidator<ProofOfStake> for StakeProofValidator {
-    async fn validate(&self, proof: &ProofOfStake, context: &VMConsensusContext) -> Result<bool> {
+impl ProofValidator<StakeProof> for StakeProofValidator {
+    async fn validate(&self, proof: &StakeProof, context: &VMConsensusContext) -> Result<bool> {
         // 1. Check minimum authority level
         if proof.authority_level < self.min_authority_level {
             return Ok(false);
@@ -250,7 +250,7 @@ impl WorkProofValidator {
     }
     
     /// Validate computational work meets difficulty target
-    async fn validate_difficulty(&self, proof: &ProofOfWork) -> Result<bool> {
+    async fn validate_difficulty(&self, proof: &WorkProof) -> Result<bool> {
         // Check difficulty meets minimum requirement
         if proof.difficulty < self.min_difficulty {
             return Ok(false);
@@ -285,15 +285,15 @@ impl WorkProofValidator {
 }
 
 #[async_trait]
-impl ProofValidator<ProofOfWork> for WorkProofValidator {
-    async fn validate(&self, proof: &ProofOfWork, _context: &VMConsensusContext) -> Result<bool> {
+impl ProofValidator<WorkProof> for WorkProofValidator {
+    async fn validate(&self, proof: &WorkProof, _context: &VMConsensusContext) -> Result<bool> {
         // 1. Validate difficulty and work hash
         if !self.validate_difficulty(proof).await? {
             return Ok(false);
         }
         
         // 2. Validate resource type
-        if !self.validate_resource_type(&proof.resource_type).await? {
+        if !self.validate_resource_type(&proof.workload_type).await? {
             return Ok(false);
         }
         
@@ -356,12 +356,12 @@ impl TimeProofValidator {
     }
     
     /// Validate time synchronization and drift
-    async fn validate_time_sync(&self, proof: &ProofOfTime) -> Result<bool> {
+    async fn validate_time_sync(&self, proof: &TimeProof) -> Result<bool> {
         let current_time = SystemTime::now();
         
         // Check wall clock drift
-        let wall_clock_drift = current_time.duration_since(proof.wall_clock)
-            .or_else(|_| proof.wall_clock.duration_since(current_time))?;
+        let wall_clock_drift = current_time.duration_since(proof.time_verification_timestamp)
+            .or_else(|_| proof.time_verification_timestamp.duration_since(current_time))?;
         
         if wall_clock_drift.as_micros() as u64 > self.max_time_drift {
             return Ok(false);
@@ -371,7 +371,7 @@ impl TimeProofValidator {
     }
     
     /// Validate logical timestamp ordering
-    async fn validate_logical_ordering(&self, proof: &ProofOfTime, context: &VMConsensusContext) -> Result<bool> {
+    async fn validate_logical_ordering(&self, proof: &TimeProof, context: &VMConsensusContext) -> Result<bool> {
         if let Some(last_timestamp) = context.last_logical_timestamp() {
             // Ensure logical timestamp increases
             if proof.logical_timestamp <= last_timestamp {
@@ -388,7 +388,7 @@ impl TimeProofValidator {
     }
     
     /// Validate temporal chain integrity
-    async fn validate_temporal_chain(&self, proof: &ProofOfTime, context: &VMConsensusContext) -> Result<bool> {
+    async fn validate_temporal_chain(&self, proof: &TimeProof, context: &VMConsensusContext) -> Result<bool> {
         if let Some(previous_hash) = &proof.previous_hash {
             if let Some(expected_previous) = context.last_temporal_hash() {
                 if previous_hash != &expected_previous {
@@ -402,8 +402,8 @@ impl TimeProofValidator {
 }
 
 #[async_trait]
-impl ProofValidator<ProofOfTime> for TimeProofValidator {
-    async fn validate(&self, proof: &ProofOfTime, context: &VMConsensusContext) -> Result<bool> {
+impl ProofValidator<TimeProof> for TimeProofValidator {
+    async fn validate(&self, proof: &TimeProof, context: &VMConsensusContext) -> Result<bool> {
         // 1. Validate time synchronization
         if !self.validate_time_sync(proof).await? {
             return Ok(false);
@@ -420,7 +420,7 @@ impl ProofValidator<ProofOfTime> for TimeProofValidator {
         }
         
         // 4. Check proof age
-        let age = SystemTime::now().duration_since(proof.wall_clock)
+        let age = SystemTime::now().duration_since(proof.time_verification_timestamp)
             .unwrap_or(Duration::from_secs(0));
         if age.as_secs() > self.max_time_proof_age {
             return Ok(false);
@@ -474,7 +474,7 @@ mod tests {
         let validator = SpaceProofValidator::new(1024).unwrap();
         let context = VMConsensusContext::new();
         
-        let proof = ProofOfSpace::new(
+        let proof = SpaceProof::new(
             "/test/storage".to_string(),
             NetworkPosition {
                 address: "::1".to_string(),
@@ -493,7 +493,7 @@ mod tests {
         let validator = WorkProofValidator::new(16).unwrap();
         
         // Test difficulty validation
-        let proof = ProofOfWork::new(
+        let proof = WorkProof::new(
             b"test-challenge",
             20, // Above minimum
             "cpu".to_string(),

@@ -19,7 +19,7 @@ use hypermesh_catalog::blockchain::{
     p2p::VoluntaryParticipation,
 };
 
-use crate::consensus::{ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, NetworkPosition};
+use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof, NetworkPosition};
 use uuid::Uuid;
 
 /// Test the complete blockchain-native compute flow
@@ -290,7 +290,7 @@ async fn test_blockchain_blocks() {
 // Helper functions
 
 fn create_test_consensus_proof() -> ConsensusProof {
-    let space_proof = ProofOfSpace::new(
+    let space_proof = SpaceProof::new(
         "/test/space".to_string(),
         NetworkPosition {
             address: "test-address".to_string(),
@@ -300,7 +300,7 @@ fn create_test_consensus_proof() -> ConsensusProof {
         1024, // 1KB space commitment
     );
     
-    let stake_proof = ProofOfStake::new(
+    let stake_proof = StakeProof::new(
         "test-stakeholder".to_string(),
         "test-node".to_string(),
         1000, // Authority level
@@ -313,13 +313,13 @@ fn create_test_consensus_proof() -> ConsensusProof {
         vec![], // No allowances for test
     );
     
-    let work_proof = ProofOfWork::new(
+    let work_proof = WorkProof::new(
         b"test-challenge",
         8, // Low difficulty for testing
         "test-compute".to_string(),
     ).unwrap();
     
-    let time_proof = ProofOfTime::new(1000, None, 1);
+    let time_proof = TimeProof::new(1000, None, 1);
     
     ConsensusProof::new(space_proof, stake_proof, work_proof, time_proof)
 }

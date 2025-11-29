@@ -6,7 +6,7 @@
 use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
-use crate::consensus::{ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, Consensus, ConsensusResult, LogIndex};
+use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof, Consensus, ConsensusResult, LogIndex};
 
 /// Asset record types for blockchain operations
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -405,7 +405,7 @@ mod tests {
         let asset_id = AssetId::new(AssetType::Cpu);
         
         // Create real consensus proof for testing
-        let space_proof = ProofOfSpace::new(
+        let space_proof = SpaceProof::new(
             format!("/hypermesh/assets/{}", asset_id.to_hex_string()),
             crate::consensus::proof::NetworkPosition {
                 address: "hypermesh://test-node".to_string(),
@@ -415,7 +415,7 @@ mod tests {
             1024, // 1KB allocation
         );
 
-        let stake_proof = ProofOfStake::new(
+        let stake_proof = StakeProof::new(
             "test-authority".to_string(),
             "test-node-id".to_string(),
             1000,
@@ -428,13 +428,13 @@ mod tests {
             vec!["delegate:cpu".to_string()],
         );
 
-        let work_proof = ProofOfWork::new(
+        let work_proof = WorkProof::new(
             b"test-challenge",
             8, // Low difficulty for testing
             "Creation".to_string(),
         ).unwrap();
 
-        let time_proof = ProofOfTime::new(1000, None, 1);
+        let time_proof = TimeProof::new(1000, None, 1);
 
         let consensus_proof = ConsensusProof::new(
             space_proof,

@@ -738,7 +738,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         let offers = self.sharing_offers.read().await;
         let matching_offers: Vec<ResourceSharingOffer> = offers.iter()
             .filter(|offer| {
-                offer.resource_type == request.resource_type &&
+                offer.workload_type == request.workload_type &&
                 offer.valid_until > SystemTime::now()
             })
             .cloned()

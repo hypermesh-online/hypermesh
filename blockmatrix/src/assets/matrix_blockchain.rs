@@ -333,7 +333,7 @@ impl EntityBlockchain {
             data: genesis_data,
             consensus_proof: ConsensusProof::new(
                 // TODO: Generate real consensus proofs
-                crate::consensus::proof::ProofOfSpace::new(
+                crate::consensus::proof::SpaceProof::new(
                     "/genesis".to_string(),
                     crate::consensus::proof::NetworkPosition {
                         address: config.network_domain.clone(),
@@ -342,7 +342,7 @@ impl EntityBlockchain {
                     },
                     0,
                 ),
-                crate::consensus::proof::ProofOfStake::new(
+                crate::consensus::proof::StakeProof::new(
                     config.network_domain.clone(),
                     "genesis-node".to_string(),
                     1000,
@@ -354,12 +354,12 @@ impl EntityBlockchain {
                     },
                     vec!["genesis-allowance".to_string()],
                 ),
-                crate::consensus::proof::ProofOfWork::new(
+                crate::consensus::proof::WorkProof::new(
                     b"genesis-challenge",
                     4,
                     "genesis".to_string(),
                 ).unwrap(),
-                crate::consensus::proof::ProofOfTime::new(0, None, 0),
+                crate::consensus::proof::TimeProof::new(0, None, 0),
             ),
             hash: [0u8; 32], // Would be calculated
             entity_signature: vec![],

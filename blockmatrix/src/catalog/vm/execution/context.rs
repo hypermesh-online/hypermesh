@@ -517,15 +517,15 @@ impl ExecutionContextBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, ConsensusProof};
+    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, ConsensusProof};
     
     #[test]
     fn test_execution_context_creation() {
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         let context = ExecutionContext::new(
@@ -542,10 +542,10 @@ mod tests {
     #[test]
     fn test_execution_context_builder() {
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         let context = ExecutionContextBuilder::new("python".to_string())
@@ -570,10 +570,10 @@ mod tests {
             permissions,
             ..ExecutionContext::new(
                 ConsensusProof::new(
-                    ProofOfSpace::default(),
-                    ProofOfStake::default(),
-                    ProofOfWork::default(),
-                    ProofOfTime::default(),
+                    SpaceProof::default(),
+                    StakeProof::default(),
+                    WorkProof::default(),
+                    TimeProof::default(),
                 ),
                 "test".to_string(),
                 HashMap::new(),

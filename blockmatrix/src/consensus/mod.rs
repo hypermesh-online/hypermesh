@@ -14,10 +14,10 @@ pub use trustchain::consensus::*;
 
 // Backward compatibility type aliases for legacy naming convention
 // These map the old ProofOf* names to the new *Proof names
-pub type ProofOfStake = StakeProof;
-pub type ProofOfTime = TimeProof;
-pub type ProofOfSpace = SpaceProof;
-pub type ProofOfWork = WorkProof;
+pub type StakeProof = StakeProof;
+pub type TimeProof = TimeProof;
+pub type SpaceProof = SpaceProof;
+pub type WorkProof = WorkProof;
 
 // BlockMatrix-specific consensus types that extend TrustChain
 use serde::{Serialize, Deserialize};

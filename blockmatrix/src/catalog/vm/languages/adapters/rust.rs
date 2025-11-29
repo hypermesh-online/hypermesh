@@ -455,10 +455,10 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
         julia_code.push_str("# Consensus validation\n");
         julia_code.push_str(&format!(
             "proof = ConsensusProof({}, {}, {}, {})\n",
-            consensus_proof.proof_of_space.committed_space,
-            consensus_proof.proof_of_stake.authority_level,
-            consensus_proof.proof_of_work.difficulty,
-            consensus_proof.proof_of_time.sequence_number
+            consensus_proof.space_proof.total_size,
+            consensus_proof.stake_proof.authority_level,
+            consensus_proof.work_proof.difficulty,
+            consensus_proof.time_proof.sequence_number
         ));
         
         julia_code.push_str("\n");

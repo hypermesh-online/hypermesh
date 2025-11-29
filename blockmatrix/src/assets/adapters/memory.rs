@@ -353,22 +353,22 @@ impl AssetAdapter for MemoryAssetAdapter {
         
         // Memory-specific validation
         // PoSpace: Validate memory space has committed storage
-        if proof.proof_of_space.committed_space == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         
         // PoStake: Validate memory access stake (higher minimum for memory)
-        if proof.proof_of_stake.stake_amount < 100 { 
+        if proof.stake_proof.stake_amount < 100 { 
             return Ok(false);
         }
         
         // PoWork: Validate computational work for memory allocation
-        if proof.proof_of_work.difficulty < 12 { // Lower difficulty for memory allocation
+        if proof.work_proof.difficulty < 12 { // Lower difficulty for memory allocation
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for memory management
-        let time_valid = proof.proof_of_time.logical_timestamp > 0;
+        let time_valid = proof.time_proof.logical_timestamp > 0;
         
         Ok(time_valid)
     }

@@ -91,6 +91,30 @@ pub enum AssetError {
     #[error("Network error: {message}")]
     NetworkError { message: String },
 
+    /// Resource unavailable
+    #[error("Resource unavailable: {0}")]
+    ResourceUnavailable(String),
+
+    /// Memory mapping failed
+    #[error("Memory mapping failed: {reason}")]
+    MemoryMappingFailed { reason: String },
+
+    /// Memory not mapped
+    #[error("Memory not mapped: {address}")]
+    MemoryNotMapped { address: String },
+
+    /// Permission denied
+    #[error("Permission denied: {reason}")]
+    PermissionDenied { reason: String },
+
+    /// Memory access failed
+    #[error("Memory access failed: {reason}")]
+    MemoryAccessFailed { reason: String },
+
+    /// Operation timeout
+    #[error("Operation timeout: {operation}")]
+    OperationTimeout { operation: String },
+
     /// Internal error
     #[error("Internal error: {0}")]
     Internal(#[from] anyhow::Error),

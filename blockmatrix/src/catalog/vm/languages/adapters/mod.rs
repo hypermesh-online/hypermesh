@@ -151,7 +151,7 @@ impl BaseAdapter {
         // Validate space proof if required
         if requirements.require_space_proof {
             if let Some(min_space) = requirements.minimum_proof_values.get("space") {
-                if proof.proof_of_space.committed_space < *min_space {
+                if proof.space_proof.total_size < *min_space {
                     return Ok(false);
                 }
             }
@@ -160,7 +160,7 @@ impl BaseAdapter {
         // Validate stake proof if required
         if requirements.require_stake_proof {
             if let Some(min_stake) = requirements.minimum_proof_values.get("stake") {
-                if proof.proof_of_stake.authority_level < *min_stake {
+                if proof.stake_proof.authority_level < *min_stake {
                     return Ok(false);
                 }
             }
@@ -169,7 +169,7 @@ impl BaseAdapter {
         // Validate work proof if required
         if requirements.require_work_proof {
             if let Some(min_difficulty) = requirements.minimum_proof_values.get("work") {
-                if (proof.proof_of_work.difficulty as u64) < *min_difficulty {
+                if (proof.work_proof.difficulty as u64) < *min_difficulty {
                     return Ok(false);
                 }
             }

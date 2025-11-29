@@ -401,7 +401,7 @@ pub struct ExecutionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, ConsensusProof};
+    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, ConsensusProof};
     use crate::catalog::vm::{ConsensusRequirements, VMConfig};
     use uuid::Uuid;
     

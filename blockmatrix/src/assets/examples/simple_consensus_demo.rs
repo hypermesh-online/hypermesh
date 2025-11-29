@@ -7,7 +7,7 @@ use hypermesh_assets::blockchain::{
 };
 use hypermesh_assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
-    ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
+    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     NetworkPosition, AccessPermissions, AccessLevel,
 };
 
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. Generate all four proofs (Proof of State pattern)
     
     // WHERE: Proof of Space
-    let space_proof = ProofOfSpace::new(
+    let space_proof = SpaceProof::new(
         format!("/hypermesh/assets/{}", asset_id.to_hex_string()),
         NetworkPosition {
             address: "hypermesh://demo-node".to_string(),
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Generated PoSpace (WHERE): Storage location proof");
     
     // WHO: Proof of Stake (ownership/authority)
-    let stake_proof = ProofOfStake::new(
+    let stake_proof = StakeProof::new(
         "demo-user".to_string(),      // asset owner
         "demo-node-123".to_string(),  // validating node
         1000,                         // authority level
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Generated PoStake (WHO): Ownership proof");
     
     // WHAT/HOW: Proof of Work
-    let work_proof = ProofOfWork::new(
+    let work_proof = WorkProof::new(
         b"demo-asset-creation-challenge",
         8, // Low difficulty for demo
         "Creation".to_string(),
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Generated PoWork (WHAT/HOW): Computational proof");
     
     // WHEN: Proof of Time
-    let time_proof = ProofOfTime::new(1000, None, 1);
+    let time_proof = TimeProof::new(1000, None, 1);
     println!("✅ Generated PoTime (WHEN): Temporal ordering proof");
     
     // 3. Create unified ConsensusProof

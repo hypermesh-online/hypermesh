@@ -34,6 +34,8 @@ pub struct HyperMeshSystem {
     asset_manager: Arc<AssetManager>,
     /// Asset adapter registry
     adapter_registry: Arc<AdapterRegistry>,
+    /// Extension manager
+    extension_manager: Arc<UnifiedExtensionManager>,
 }
 
 impl HyperMeshSystem {
@@ -50,12 +52,16 @@ impl HyperMeshSystem {
             asset_manager.register_adapter(asset_type, adapter).await?;
         }
 
+        // Initialize extension manager
+        let extension_manager = Arc::new(UnifiedExtensionManager::new());
+
         tracing::info!("HyperMesh Asset System initialized with all adapters");
 
         Ok(Self {
             config,
             asset_manager,
             adapter_registry,
+            extension_manager,
         })
     }
 
@@ -67,6 +73,11 @@ impl HyperMeshSystem {
     /// Get adapter registry reference
     pub fn adapter_registry(&self) -> Arc<AdapterRegistry> {
         Arc::clone(&self.adapter_registry)
+    }
+
+    /// Get extension manager reference
+    pub fn extension_manager(&self) -> Arc<UnifiedExtensionManager> {
+        Arc::clone(&self.extension_manager)
     }
 
     /// Shutdown system cleanly
@@ -145,6 +156,8 @@ pub use assets::adapters::{
     CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
     NetworkAssetAdapter, ContainerAssetAdapter, AdapterRegistry,
 };
+
+pub use extensions::UnifiedExtensionManager;
 
 // Re-export OS integration types for easy access
 pub use os_integration::{

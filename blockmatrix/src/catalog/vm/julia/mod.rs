@@ -470,20 +470,20 @@ impl JuliaVM {
         match &requirement.proof_type {
             ConsensusProofType::Space => {
                 if let Some(min_space) = requirement.minimum_values.get("space") {
-                    if consensus_proof.proof_of_space.committed_space < *min_space {
+                    if consensus_proof.space_proof.total_size < *min_space {
                         return Err(anyhow::anyhow!(
                             "Insufficient space commitment: required {}, got {}",
-                            min_space, consensus_proof.proof_of_space.committed_space
+                            min_space, consensus_proof.space_proof.total_size
                         ));
                     }
                 }
             },
             ConsensusProofType::Work => {
                 if let Some(min_difficulty) = requirement.minimum_values.get("difficulty") {
-                    if (consensus_proof.proof_of_work.difficulty as u64) < *min_difficulty {
+                    if (consensus_proof.work_proof.difficulty as u64) < *min_difficulty {
                         return Err(anyhow::anyhow!(
                             "Insufficient work difficulty: required {}, got {}",
-                            min_difficulty, consensus_proof.proof_of_work.difficulty
+                            min_difficulty, consensus_proof.work_proof.difficulty
                         ));
                     }
                 }
@@ -714,10 +714,10 @@ mod tests {
         assert!(matches!(value, JuliaValue::Integer(42)));
         
         let consensus_proof = ConsensusProof::new(
-            crate::consensus::ProofOfSpace::default(),
-            crate::consensus::ProofOfStake::default(),
-            crate::consensus::ProofOfWork::default(),
-            crate::consensus::ProofOfTime::default(),
+            crate::consensus::SpaceProof::default(),
+            crate::consensus::StakeProof::default(),
+            crate::consensus::WorkProof::default(),
+            crate::consensus::TimeProof::default(),
         );
         
         let consensus_value = JuliaValue::ConsensusProof(consensus_proof);

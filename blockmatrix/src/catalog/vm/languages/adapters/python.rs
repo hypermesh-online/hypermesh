@@ -246,10 +246,10 @@ class BlockchainStorage:
         wrapper.push_str("    # Validate consensus proof\n");
         wrapper.push_str(&format!(
             "    proof = ConsensusProof({:?}, {:?}, {:?}, {:?})\n",
-            consensus_proof.proof_of_space.committed_space,
-            consensus_proof.proof_of_stake.authority_level,
-            consensus_proof.proof_of_work.difficulty,
-            consensus_proof.proof_of_time.sequence_number
+            consensus_proof.space_proof.total_size,
+            consensus_proof.stake_proof.authority_level,
+            consensus_proof.work_proof.difficulty,
+            consensus_proof.time_proof.sequence_number
         ));
         wrapper.push_str("    \n");
         wrapper.push_str("    if validate_consensus_proof(proof)\n");
@@ -876,10 +876,10 @@ def test_function():
     }
     
     fn create_test_consensus_proof() -> ConsensusProof {
-        use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, NetworkPosition, AccessPermissions, AccessLevel};
+        use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, NetworkPosition, AccessPermissions, AccessLevel};
         
         ConsensusProof::new(
-            ProofOfSpace::new(
+            SpaceProof::new(
                 "/tmp/test".to_string(),
                 NetworkPosition {
                     address: "::1".to_string(),
@@ -888,7 +888,7 @@ def test_function():
                 },
                 1024,
             ),
-            ProofOfStake::new(
+            StakeProof::new(
                 "test".to_string(),
                 "test-node".to_string(),
                 1000,
@@ -900,8 +900,8 @@ def test_function():
                 },
                 vec![],
             ),
-            ProofOfWork::new(b"test", 16, "test".to_string()).unwrap(),
-            ProofOfTime::new(0, None, 0),
+            WorkProof::new(b"test", 16, "test".to_string()).unwrap(),
+            TimeProof::new(0, None, 0),
         )
     }
 }

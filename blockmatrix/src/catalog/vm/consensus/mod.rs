@@ -18,7 +18,7 @@ use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
 // Re-export from main consensus module
-pub use crate::consensus::proof::{ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
+pub use crate::consensus::proof::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 pub use operations::ConsensusOperation;
 pub use crate::consensus::validation::ConsensusValidator;
 pub use context::VMConsensusContext;
@@ -40,10 +40,10 @@ pub struct ConsensusVM {
 /// Consensus validators for all proof types
 #[derive(Clone)]
 pub struct ConsensusValidators {
-    pub space_validator: Arc<dyn ProofValidator<ProofOfSpace>>,
-    pub stake_validator: Arc<dyn ProofValidator<ProofOfStake>>,
-    pub work_validator: Arc<dyn ProofValidator<ProofOfWork>>,
-    pub time_validator: Arc<dyn ProofValidator<ProofOfTime>>,
+    pub space_validator: Arc<dyn ProofValidator<SpaceProof>>,
+    pub stake_validator: Arc<dyn ProofValidator<StakeProof>>,
+    pub work_validator: Arc<dyn ProofValidator<WorkProof>>,
+    pub time_validator: Arc<dyn ProofValidator<TimeProof>>,
 }
 
 /// Generic proof validator trait
@@ -86,22 +86,22 @@ impl ConsensusVM {
         // Proof of State pattern: ALL four proofs must be valid for any operation
         let space_valid = if self.requirements.require_proof_of_space {
             self.validators.space_validator
-                .validate(&proof.proof_of_space, &self.context).await?
+                .validate(&proof.space_proof, &self.context).await?
         } else { true };
         
         let stake_valid = if self.requirements.require_proof_of_stake {
             self.validators.stake_validator
-                .validate(&proof.proof_of_stake, &self.context).await?
+                .validate(&proof.stake_proof, &self.context).await?
         } else { true };
         
         let work_valid = if self.requirements.require_proof_of_work {
             self.validators.work_validator
-                .validate(&proof.proof_of_work, &self.context).await?
+                .validate(&proof.work_proof, &self.context).await?
         } else { true };
         
         let time_valid = if self.requirements.require_proof_of_time {
             self.validators.time_validator
-                .validate(&proof.proof_of_time, &self.context).await?
+                .validate(&proof.time_proof, &self.context).await?
         } else { true };
         
         // Combined validation from HyperMesh consensus system
@@ -287,13 +287,13 @@ impl ConsensusExecutionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConsensusVMPrimitive {
     /// Load data with space proof requirement
-    Load { asset_id: AssetId, space_proof: ProofOfSpace },
+    Load { asset_id: AssetId, space_proof: SpaceProof },
     /// Store data with stake proof requirement
-    Store { asset_id: AssetId, data: Vec<u8>, stake_proof: ProofOfStake },
+    Store { asset_id: AssetId, data: Vec<u8>, stake_proof: StakeProof },
     /// Compute with work proof requirement
-    Compute { operation: String, input: Vec<u8>, work_proof: ProofOfWork },
+    Compute { operation: String, input: Vec<u8>, work_proof: WorkProof },
     /// Synchronize with time proof requirement
-    Sync { timestamp: SystemTime, time_proof: ProofOfTime },
+    Sync { timestamp: SystemTime, time_proof: TimeProof },
     /// Combined operation requiring all four proofs
     FullConsensus { 
         operation: String, 
@@ -316,9 +316,9 @@ impl ConsensusVMPrimitive {
                 // Create minimal consensus proof with space validation
                 let minimal_proof = ConsensusProof::new(
                     space_proof.clone(),
-                    ProofOfStake::default(),
-                    ProofOfWork::default(),
-                    ProofOfTime::default(),
+                    StakeProof::default(),
+                    WorkProof::default(),
+                    TimeProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -332,10 +332,10 @@ impl ConsensusVMPrimitive {
             
             ConsensusVMPrimitive::Store { asset_id, data, stake_proof } => {
                 let minimal_proof = ConsensusProof::new(
-                    ProofOfSpace::default(),
+                    SpaceProof::default(),
                     stake_proof.clone(),
-                    ProofOfWork::default(),
-                    ProofOfTime::default(),
+                    WorkProof::default(),
+                    TimeProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -349,10 +349,10 @@ impl ConsensusVMPrimitive {
             
             ConsensusVMPrimitive::Compute { operation: op_type, input, work_proof } => {
                 let minimal_proof = ConsensusProof::new(
-                    ProofOfSpace::default(),
-                    ProofOfStake::default(),
+                    SpaceProof::default(),
+                    StakeProof::default(),
                     work_proof.clone(),
-                    ProofOfTime::default(),
+                    TimeProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -366,9 +366,9 @@ impl ConsensusVMPrimitive {
             
             ConsensusVMPrimitive::Sync { timestamp: _, time_proof } => {
                 let minimal_proof = ConsensusProof::new(
-                    ProofOfSpace::default(),
-                    ProofOfStake::default(),
-                    ProofOfWork::default(),
+                    SpaceProof::default(),
+                    StakeProof::default(),
+                    WorkProof::default(),
                     time_proof.clone(),
                 );
                 
@@ -394,7 +394,7 @@ impl ConsensusVMPrimitive {
     }
 }
 
-impl Default for ProofOfSpace {
+impl Default for SpaceProof {
     fn default() -> Self {
         use crate::consensus::proof::NetworkPosition;
         
@@ -410,7 +410,7 @@ impl Default for ProofOfSpace {
     }
 }
 
-impl Default for ProofOfStake {
+impl Default for StakeProof {
     fn default() -> Self {
         use crate::consensus::proof::{AccessPermissions, AccessLevel};
         
@@ -429,7 +429,7 @@ impl Default for ProofOfStake {
     }
 }
 
-impl Default for ProofOfWork {
+impl Default for WorkProof {
     fn default() -> Self {
         // Create minimal work proof for testing
         Self::new(
@@ -451,7 +451,7 @@ impl Default for ProofOfWork {
     }
 }
 
-impl Default for ProofOfTime {
+impl Default for TimeProof {
     fn default() -> Self {
         Self::new(0, None, 0)
     }
@@ -475,10 +475,10 @@ mod tests {
         
         // Create consensus proof with all four proofs
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         // Test validation (will likely fail due to minimal proofs, but tests structure)
@@ -493,7 +493,7 @@ mod tests {
         
         let primitive = ConsensusVMPrimitive::Load {
             asset_id: uuid::Uuid::new_v4(),
-            space_proof: ProofOfSpace::default(),
+            space_proof: SpaceProof::default(),
         };
         
         // Test primitive execution

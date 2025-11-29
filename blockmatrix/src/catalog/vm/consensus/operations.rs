@@ -163,19 +163,19 @@ impl ConsensusOperation {
     /// Execute load operation with space proof validation
     async fn execute_load(&self, _data: &[u8]) -> Result<serde_json::Value> {
         // Validate Proof of Space is present and valid
-        let space_valid = self.consensus_proof.proof_of_space.validate().await?;
+        let space_valid = self.consensus_proof.space_proof.validate().await?;
         if !space_valid {
             return Err(anyhow::anyhow!("Space proof validation failed for load operation"));
         }
         
         // Simulate loading asset data based on space proof location
-        let location = &self.consensus_proof.proof_of_space.storage_location;
+        let location = &self.consensus_proof.space_proof.storage_path;
         
         Ok(serde_json::json!({
             "operation": "load",
             "asset_id": self.asset_id,
             "location": location,
-            "size": self.consensus_proof.proof_of_space.committed_space,
+            "size": self.consensus_proof.space_proof.total_size,
             "loaded_at": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()
         }))
     }
@@ -183,25 +183,23 @@ impl ConsensusOperation {
     /// Execute store operation with stake proof validation
     async fn execute_store(&self, data: &[u8]) -> Result<serde_json::Value> {
         // Validate Proof of Stake for write permissions
-        let stake_valid = self.consensus_proof.proof_of_stake.validate().await?;
+        let stake_valid = self.consensus_proof.stake_proof.validate().await?;
         if !stake_valid {
             return Err(anyhow::anyhow!("Stake proof validation failed for store operation"));
         }
-        
-        // Check write permissions
-        use crate::consensus::proof::AccessLevel;
-        let write_level = &self.consensus_proof.proof_of_stake.permissions.write_level;
-        if matches!(write_level, AccessLevel::None) {
-            return Err(anyhow::anyhow!("Insufficient write permissions for store operation"));
+
+        // Check stake amount meets minimum requirements
+        if self.consensus_proof.stake_proof.stake_amount < 1000 {
+            return Err(anyhow::anyhow!("Insufficient stake for store operation"));
         }
-        
+
         // Simulate storing data
         Ok(serde_json::json!({
             "operation": "store",
             "asset_id": self.asset_id,
             "data_size": data.len(),
-            "stake_holder": self.consensus_proof.proof_of_stake.stake_holder,
-            "authority_level": self.consensus_proof.proof_of_stake.authority_level,
+            "stake_holder": self.consensus_proof.stake_proof.stake_holder,
+            "stake_amount": self.consensus_proof.stake_proof.stake_amount,
             "stored_at": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()
         }))
     }
@@ -209,26 +207,26 @@ impl ConsensusOperation {
     /// Execute compute operation with work proof validation
     async fn execute_compute(&self, data: &[u8]) -> Result<serde_json::Value> {
         // Validate Proof of Work for computational resources
-        let work_valid = self.consensus_proof.proof_of_work.validate().await?;
+        let work_valid = self.consensus_proof.work_proof.validate().await?;
         if !work_valid {
             return Err(anyhow::anyhow!("Work proof validation failed for compute operation"));
         }
-        
-        // Validate difficulty meets minimum requirements
-        if self.consensus_proof.proof_of_work.difficulty < 16 {
-            return Err(anyhow::anyhow!("Insufficient work difficulty for compute operation"));
+
+        // Validate computational power meets minimum requirements
+        if self.consensus_proof.work_proof.computational_power < 100 {
+            return Err(anyhow::anyhow!("Insufficient computational power for compute operation"));
         }
-        
+
         // Simulate computation based on work proof
         let computation_result = self.simulate_computation(data)?;
-        
+
         Ok(serde_json::json!({
             "operation": "compute",
             "asset_id": self.asset_id,
             "input_size": data.len(),
             "result": computation_result,
-            "difficulty": self.consensus_proof.proof_of_work.difficulty,
-            "resource_type": self.consensus_proof.proof_of_work.resource_type,
+            "computational_power": self.consensus_proof.work_proof.computational_power,
+            "workload_type": format!("{:?}", self.consensus_proof.work_proof.workload_type),
             "computed_at": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()
         }))
     }
@@ -236,26 +234,26 @@ impl ConsensusOperation {
     /// Execute sync operation with time proof validation
     async fn execute_sync(&self, _data: &[u8]) -> Result<serde_json::Value> {
         // Validate Proof of Time for temporal consistency
-        let time_valid = self.consensus_proof.proof_of_time.validate().await?;
+        let time_valid = self.consensus_proof.time_proof.validate().await?;
         if !time_valid {
             return Err(anyhow::anyhow!("Time proof validation failed for sync operation"));
         }
-        
+
         // Check time drift is within acceptable bounds
         let current_time = SystemTime::now();
-        let proof_time = self.consensus_proof.proof_of_time.wall_clock;
+        let proof_time = self.consensus_proof.time_proof.time_verification_timestamp;
         let time_diff = current_time.duration_since(proof_time)
             .or_else(|_| proof_time.duration_since(current_time))?;
-        
+
         if time_diff.as_micros() > 1_000_000 { // 1 second max drift
             return Err(anyhow::anyhow!("Time drift too large for sync operation"));
         }
-        
+
         Ok(serde_json::json!({
             "operation": "sync",
             "asset_id": self.asset_id,
-            "logical_timestamp": self.consensus_proof.proof_of_time.logical_timestamp,
-            "sequence_number": self.consensus_proof.proof_of_time.sequence_number,
+            "network_time_offset_micros": self.consensus_proof.time_proof.network_time_offset.as_micros(),
+            "nonce": self.consensus_proof.time_proof.nonce,
             "time_drift_micros": time_diff.as_micros(),
             "synced_at": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()
         }))
@@ -286,12 +284,12 @@ impl ConsensusOperation {
         // based on work proof difficulty
         let mut hasher = Sha256::new();
         hasher.update(data);
-        hasher.update(&self.consensus_proof.proof_of_work.nonce.to_le_bytes());
+        hasher.update(&self.consensus_proof.work_proof.nonce.to_le_bytes());
         
         let mut result = hasher.finalize().to_vec();
         
         // Additional computational work based on difficulty
-        for _ in 0..self.consensus_proof.proof_of_work.difficulty {
+        for _ in 0..self.consensus_proof.work_proof.difficulty {
             hasher = Sha256::new();
             hasher.update(&result);
             result = hasher.finalize().to_vec();
@@ -304,10 +302,10 @@ impl ConsensusOperation {
     async fn create_proof_validation_results(&self, overall_valid: bool) -> ProofValidationResults {
         // In a real implementation, these would be actual validation results
         ProofValidationResults {
-            space_proof_valid: overall_valid && self.consensus_proof.proof_of_space.validate().await.unwrap_or(false),
-            stake_proof_valid: overall_valid && self.consensus_proof.proof_of_stake.validate().await.unwrap_or(false),
-            work_proof_valid: overall_valid && self.consensus_proof.proof_of_work.validate().await.unwrap_or(false),
-            time_proof_valid: overall_valid && self.consensus_proof.proof_of_time.validate().await.unwrap_or(false),
+            space_proof_valid: overall_valid && self.consensus_proof.space_proof.validate().await.unwrap_or(false),
+            stake_proof_valid: overall_valid && self.consensus_proof.stake_proof.validate().await.unwrap_or(false),
+            work_proof_valid: overall_valid && self.consensus_proof.work_proof.validate().await.unwrap_or(false),
+            time_proof_valid: overall_valid && self.consensus_proof.time_proof.validate().await.unwrap_or(false),
             combined_proof_hash_valid: overall_valid,
             validation_timestamp: SystemTime::now(),
         }
@@ -318,7 +316,7 @@ impl ConsensusOperation {
         match operation_type {
             "load" => 1000,
             "store" => 2000,
-            "compute" => (self.consensus_proof.proof_of_work.difficulty as u64) * 1000,
+            "compute" => (self.consensus_proof.work_proof.difficulty as u64) * 1000,
             "sync" => 500,
             _ => 1500,
         }
@@ -479,17 +477,17 @@ impl ConsensusOperationBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
+    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof};
     use std::sync::Arc;
     
     #[tokio::test]
     async fn test_consensus_operation_creation() {
         let context = Arc::new(VMConsensusContext::new());
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         let operation = ConsensusOperation::new(
@@ -507,10 +505,10 @@ mod tests {
     async fn test_operation_builder() {
         let context = Arc::new(VMConsensusContext::new());
         let consensus_proof = ConsensusProof::new(
-            ProofOfSpace::default(),
-            ProofOfStake::default(),
-            ProofOfWork::default(),
-            ProofOfTime::default(),
+            SpaceProof::default(),
+            StakeProof::default(),
+            WorkProof::default(),
+            TimeProof::default(),
         );
         
         let operation = ConsensusOperationBuilder::new("test".to_string())

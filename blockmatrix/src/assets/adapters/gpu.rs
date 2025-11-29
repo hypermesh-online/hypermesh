@@ -435,23 +435,23 @@ impl AssetAdapter for GpuAssetAdapter {
         
         // GPU-specific validation
         // PoSpace: Validate GPU memory space allocation
-        if proof.proof_of_space.committed_space == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         
         // PoStake: Validate GPU access stake (higher requirement for GPU resources)
-        if proof.proof_of_stake.stake_amount < 200 { // Higher minimum for GPU
+        if proof.stake_proof.stake_amount < 200 { // Higher minimum for GPU
             return Ok(false);
         }
         
         // PoWork: Validate computational work (GPU provides high compute power)
-        if proof.proof_of_work.difficulty < 20 { // Higher difficulty for GPU
+        if proof.work_proof.difficulty < 20 { // Higher difficulty for GPU
             return Ok(false);
         }
         
         // PoTime: Validate temporal constraints (GPUs need tight synchronization)
-        let time_valid = proof.proof_of_time.logical_timestamp > 0 &&
-                        proof.proof_of_time.sequence_number > 0;
+        let time_valid = proof.time_proof.logical_timestamp > 0 &&
+                        proof.time_proof.sequence_number > 0;
         
         Ok(time_valid)
     }

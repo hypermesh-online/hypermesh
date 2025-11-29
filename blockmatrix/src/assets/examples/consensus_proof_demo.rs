@@ -9,7 +9,7 @@ use hypermesh_assets::blockchain::{
 };
 use hypermesh_assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
-    ConsensusProof, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
+    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     NetworkPosition, AccessPermissions, AccessLevel, Consensus, ConsensusConfig,
 };
 use crate::transport::NodeId;
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. Create all four consensus proofs following Proof of State patterns
     
     // PoSpace (WHERE): Storage location and network position
-    let space_proof = ProofOfSpace::new(
+    let space_proof = SpaceProof::new(
         format!("/hypermesh/assets/{}", asset_id.to_hex_string()),
         NetworkPosition {
             address: "hypermesh://proxy/demo-node".to_string(),
@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Generated PoSpace proof - WHERE: storage location validated");
     
     // PoStake (WHO): Asset ownership and authority
-    let stake_proof = ProofOfStake::new(
+    let stake_proof = StakeProof::new(
         "demo-authority".to_string(),          // stake_holder (entity owning the asset)
         "demo-node-123".to_string(),           // stake_holder_id (validating node)
         1000,                                  // authority_level (not economic tokens)
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // PoWork (WHAT/HOW): Computational validation
     let work_challenge = format!("asset-creation-{}", asset_id.to_hex_string());
-    let work_proof = ProofOfWork::new(
+    let work_proof = WorkProof::new(
         work_challenge.as_bytes(),
         16, // 16-bit difficulty (adjustable based on network load)
         "Creation".to_string(),
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Generated PoWork proof - WHAT/HOW: computational work validated");
     
     // PoTime (WHEN): Temporal ordering
-    let time_proof = ProofOfTime::new(
+    let time_proof = TimeProof::new(
         1000,        // logical timestamp
         None,        // previous hash (would link to previous proof in chain)
         1,           // sequence number

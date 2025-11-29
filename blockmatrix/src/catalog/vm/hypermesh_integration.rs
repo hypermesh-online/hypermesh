@@ -348,7 +348,7 @@ impl AssetUtilizationStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime, NetworkPosition, AccessPermissions, AccessLevel};
+    use crate::consensus::{SpaceProof, StakeProof, WorkProof, TimeProof, NetworkPosition, AccessPermissions, AccessLevel};
     use std::time::SystemTime;
 
     #[tokio::test]
@@ -410,7 +410,7 @@ mod tests {
     #[tokio::test]
     async fn test_execution_request_validation() {
         // Create mock consensus proof components
-        let space_proof = ProofOfSpace::new(
+        let space_proof = SpaceProof::new(
             "/test/storage".to_string(),
             NetworkPosition {
                 address: "test-address".to_string(),
@@ -420,7 +420,7 @@ mod tests {
             1024 * 1024 * 1024,
         );
 
-        let stake_proof = ProofOfStake::new(
+        let stake_proof = StakeProof::new(
             "test-holder".to_string(),
             "test-node".to_string(),
             1000,
@@ -433,13 +433,13 @@ mod tests {
             vec!["test-allowance".to_string()],
         );
 
-        let work_proof = ProofOfWork::new(
+        let work_proof = WorkProof::new(
             b"test-challenge",
             16,
             "cpu".to_string(),
         ).unwrap();
 
-        let time_proof = ProofOfTime::new(1000, None, 1);
+        let time_proof = TimeProof::new(1000, None, 1);
 
         let consensus_proof = ConsensusProof::new(
             space_proof,

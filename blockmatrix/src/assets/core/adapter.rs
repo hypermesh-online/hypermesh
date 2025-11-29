@@ -190,6 +190,8 @@ pub enum StorageType {
     Memory,
     /// Distributed storage
     Distributed,
+    /// Network storage
+    Network,
 }
 
 /// Container volume mount
