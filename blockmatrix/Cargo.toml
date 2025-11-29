@@ -1,0 +1,141 @@
+[package]
+name = "blockmatrix"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/hypermesh/hypermesh"
+description = "HyperMesh - Distributed Computing Platform with Proof of State Consensus"
+
+[lib]
+name = "blockmatrix"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blockmatrix"
+path = "src/main.rs"
+
+[[bench]]
+name = "basic_benchmark"
+harness = false
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tempfile = { workspace = true }
+uuid = { workspace = true }
+lazy_static = { workspace = true }
+
+# Shared library - Common types
+hypermesh-lib = { path = "../lib" }
+
+# TrustChain - Consensus and certificate system
+trustchain = { path = "../trustchain" }
+
+# STOQ Protocol - Our transport layer
+stoq = { path = "../stoq" }
+
+# Async runtime
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Cryptography
+ring = { workspace = true }
+x509-parser = { workspace = true }
+sha2 = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+ed25519-dalek = { workspace = true }
+
+# Storage
+bincode = { workspace = true }
+sled = { workspace = true }
+
+# Collections and concurrency
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Compression
+zstd = { workspace = true }
+lz4 = { workspace = true }
+
+# Random number generation
+rand = { workspace = true }
+
+# Configuration and file formats
+toml = { workspace = true }
+
+# Testing
+criterion = { workspace = true }
+proptest = { workspace = true }
+
+# Networking
+quinn = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+rcgen = { workspace = true }
+bytes = { workspace = true }
+socket2 = { workspace = true }
+# webpki-roots = { workspace = true }  # REMOVED: Use TrustChain CA only
+
+# HTTP
+# http = ... # REMOVED: STOQ-only transport
+# axum = ... # REMOVED: STOQ-only transport
+# tower = ... # REMOVED: STOQ-only transport
+# tower-http = ... # REMOVED: STOQ-only transport
+# hyper = ... # REMOVED: STOQ-only transport
+
+# Missing dependencies now added
+# warp = ... # REMOVED: STOQ-only transport
+semver = { workspace = true }
+config = { workspace = true }
+rust_decimal = { workspace = true }
+fastrand = { workspace = true }
+which = { workspace = true }
+# prometheus = { workspace = true }  # REMOVED: Build native eBPF monitoring
+
+# OS Integration - Sprint 2
+num_cpus = "1.16"  # Cross-platform CPU core detection
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.29", features = ["fs"] }  # statvfs for storage detection
+aya = { version = "0.12", features = ["async_tokio"] }  # Pure Rust eBPF library
+libc = "0.2"  # For kernel version checks
+
+[target.'cfg(target_os = "windows")'.dependencies]
+wmi = "0.13"  # Windows Management Instrumentation
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_SystemInformation",
+    "Win32_System_Performance",
+    "Win32_System_Memory",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+] }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+tempfile = { workspace = true }
+criterion = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+default = ["consensus", "assets"]
+consensus = []
+assets = []

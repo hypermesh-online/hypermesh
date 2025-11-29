@@ -1,0 +1,94 @@
+[package]
+name = "nexus-integration-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Integration tests for Nexus core components"
+
+[dependencies]
+# Core components to test
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+nexus-consensus = { path = "../consensus" }
+nexus-runtime = { path = "../runtime" }
+nexus-ebpf = { path = "../ebpf-integration" }
+
+# Additional dependencies for tests
+sysinfo = "0.30"
+
+# Test utilities
+tokio = { workspace = true, features = ["full"] }
+tokio-test = { workspace = true }
+tempfile = { workspace = true }
+criterion = { workspace = true }
+
+# Async utilities
+futures = { workspace = true }
+tokio-util = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization for test data
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging for test visibility
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time utilities for timeouts
+chrono = { workspace = true, features = ["serde"] }
+
+# CLI framework
+clap = { workspace = true }
+
+# Property-based testing
+proptest = { workspace = true }
+
+# Mock utilities
+mockall = "0.12"
+
+# HTTP client for API testing
+# reqwest = ... # REMOVED: STOQ-only transport
+
+# Random data generation
+rand = { workspace = true }
+uuid = "1.0"
+
+# Container testing
+# bollard = ... # REMOVED: No Docker dependency (standalone requirement)
+
+# Network testing
+socket2 = { workspace = true }
+
+# Crypto testing
+ring = { workspace = true }
+ed25519-dalek = { workspace = true }
+
+# DNS/CT eBPF test dependencies
+sha2 = "0.10"
+hex = "0.4"
+anyhow = "1.0"
+
+# Performance benchmarking (using workspace version)
+
+[[bin]]
+name = "test-runner"
+path = "src/bin/test_runner.rs"
+
+[[bin]]
+name = "deploy_staging"
+path = "src/bin/deploy_staging.rs"
+
+[[bin]]
+name = "run_tests"
+path = "src/bin/run_tests.rs"
+
+[[bin]]
+name = "demo"
+path = "src/bin/demo.rs"
+
+[[bin]]
+name = "nexus-test"
+path = "src/bin/nexus_test.rs"

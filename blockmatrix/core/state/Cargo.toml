@@ -1,0 +1,61 @@
+[package]
+name = "nexus-state"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Distributed state management with Byzantine fault tolerance for Nexus"
+
+[dependencies]
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+tokio-stream = "0.1"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Storage
+# rocksdb.workspace = true  # Temporarily disabled for emergency stabilization
+sled.workspace = true
+
+# Cryptography
+ring.workspace = true
+blake3.workspace = true
+
+# Time
+chrono.workspace = true
+
+# Networking
+futures = "0.3"
+
+# Random number generation
+rand = "0.8"
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile = "3.8"
+tokio-test.workspace = true
+
+# Benchmarks would be defined here when implemented
+# [[bench]]
+# name = "consensus_bench"
+# harness = false

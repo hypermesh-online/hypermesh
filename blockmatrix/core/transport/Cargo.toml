@@ -1,0 +1,57 @@
+[package]
+name = "nexus-transport"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QUIC-based transport layer for Nexus core"
+
+[dependencies]
+nexus-shared = { path = "../shared" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+
+# QUIC implementation
+quinn = "0.10"
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0"
+rcgen = "0.11"
+
+# Networking
+socket2.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Crypto
+ring.workspace = true
+
+# Time
+chrono.workspace = true
+time = "0.3"
+
+[dev-dependencies]
+criterion.workspace = true
+tokio-test = "0.4"
+
+# Benchmarks would be defined here when implemented
+# [[bench]]
+# name = "transport_bench"
+# harness = false

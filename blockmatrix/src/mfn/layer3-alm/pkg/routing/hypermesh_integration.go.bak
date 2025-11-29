@@ -1,0 +1,692 @@
+// Package routing implements integration with HyperMesh transport layer
+package routing
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/NeoTecDigital/hypermesh/layer3-alm/pkg/graph"
+	"github.com/NeoTecDigital/hypermesh/layer3-alm/pkg/integration"
+)
+
+// HyperMeshIntegration provides seamless integration with HyperMesh transport
+type HyperMeshIntegration struct {
+	routingTable    *RoutingTable
+	transportLayer  integration.HyperMeshTransport
+	
+	// Performance optimization
+	connectionPool  *ConnectionPool
+	circuitBreaker  *CircuitBreaker
+	
+	// Metrics and monitoring
+	integrationMetrics *IntegrationMetrics
+	
+	// Configuration
+	config *IntegrationConfig
+	
+	mutex sync.RWMutex
+}
+
+// IntegrationConfig configures the HyperMesh integration
+type IntegrationConfig struct {
+	// Connection management
+	MaxConnections     int
+	ConnectionTimeout  time.Duration
+	IdleTimeout       time.Duration
+	KeepAliveInterval time.Duration
+	
+	// Circuit breaker settings
+	FailureThreshold   int
+	RecoveryTimeout   time.Duration
+	
+	// Performance tuning
+	MaxConcurrentRequests int
+	RequestTimeout       time.Duration
+	RetryAttempts        int
+	RetryBackoff         time.Duration
+	
+	// Transport optimization
+	EnableMultiplexing   bool
+	EnableCompression    bool
+	CompressionLevel     int
+	BufferSize          int
+	
+	// Security settings
+	EnableTLS           bool
+	CertificatePath     string
+	KeyPath            string
+	VerifyPeer         bool
+}
+
+// ConnectionPool manages HyperMesh transport connections
+type ConnectionPool struct {
+	connections map[string]*HyperMeshConnection
+	available   chan *HyperMeshConnection
+	maxSize     int
+	
+	mutex sync.RWMutex
+}
+
+// HyperMeshConnection wraps a HyperMesh transport connection
+type HyperMeshConnection struct {
+	ID           string
+	RemoteAddr   string
+	Transport    integration.Connection
+	CreatedAt    time.Time
+	LastUsed     time.Time
+	RequestCount int64
+	
+	// Health status
+	IsHealthy    bool
+	LastError    error
+	
+	mutex sync.RWMutex
+}
+
+// CircuitBreaker implements circuit breaker pattern for fault tolerance
+type CircuitBreaker struct {
+	state           BreakerState
+	failureCount    int
+	lastFailureTime time.Time
+	
+	// Configuration
+	failureThreshold int
+	timeout         time.Duration
+	
+	mutex sync.RWMutex
+}
+
+type BreakerState int
+
+const (
+	BreakerClosed BreakerState = iota
+	BreakerOpen
+	BreakerHalfOpen
+)
+
+// IntegrationMetrics tracks HyperMesh integration performance
+type IntegrationMetrics struct {
+	// Connection metrics
+	TotalConnections    int64
+	ActiveConnections   int64
+	FailedConnections   int64
+	ConnectionLatency   time.Duration
+	
+	// Request metrics
+	TotalRequests       int64
+	SuccessfulRequests  int64
+	FailedRequests      int64
+	AverageResponseTime time.Duration
+	
+	// Transport metrics
+	BytesSent          int64
+	BytesReceived      int64
+	CompressionRatio   float64
+	MultiplexingRatio  float64
+	
+	// Circuit breaker metrics
+	CircuitBreakerTrips int64
+	CircuitBreakerResets int64
+	
+	mutex sync.RWMutex
+}
+
+// RoutingRequest enhanced for HyperMesh integration
+type EnhancedRoutingRequest struct {
+	RoutingRequest
+	
+	// HyperMesh specific parameters
+	TransportOptions TransportOptions
+	SecurityContext  SecurityContext
+	QualityOfService QualityOfService
+}
+
+// TransportOptions configures HyperMesh transport behavior
+type TransportOptions struct {
+	PreferredProtocol string
+	Multiplexing     bool
+	Compression      bool
+	EncryptionLevel  EncryptionLevel
+	Priority         Priority
+	StreamID         int64
+}
+
+type EncryptionLevel int
+
+const (
+	NoEncryption EncryptionLevel = iota
+	StandardEncryption
+	HighSecurityEncryption
+)
+
+type Priority int
+
+const (
+	LowPriority Priority = iota
+	NormalPriority
+	HighPriority
+	CriticalPriority
+)
+
+// SecurityContext provides security parameters for routing
+type SecurityContext struct {
+	UserID        string
+	Groups        []string
+	Permissions   []string
+	TenantID      string
+	EncryptionKey []byte
+}
+
+// QualityOfService defines service level requirements
+type QualityOfService struct {
+	MaxLatency       time.Duration
+	MinBandwidth     float64
+	MaxJitter        time.Duration
+	MaxPacketLoss    float64
+	Reliability      float64
+	AvailabilityZone []string
+}
+
+// NewHyperMeshIntegration creates a new HyperMesh integration
+func NewHyperMeshIntegration(
+	routingTable *RoutingTable,
+	transportLayer integration.HyperMeshTransport,
+	config *IntegrationConfig,
+) *HyperMeshIntegration {
+	if config == nil {
+		config = DefaultIntegrationConfig()
+	}
+	
+	integration := &HyperMeshIntegration{
+		routingTable:       routingTable,
+		transportLayer:     transportLayer,
+		connectionPool:     NewConnectionPool(config.MaxConnections),
+		circuitBreaker:     NewCircuitBreaker(config.FailureThreshold, config.RecoveryTimeout),
+		integrationMetrics: NewIntegrationMetrics(),
+		config:            config,
+	}
+	
+	return integration
+}
+
+// RouteAndExecute performs optimized routing and executes request via HyperMesh
+func (hmi *HyperMeshIntegration) RouteAndExecute(ctx context.Context, request EnhancedRoutingRequest) (*ExecutionResult, error) {
+	// Check circuit breaker state
+	if !hmi.circuitBreaker.AllowRequest() {
+		return nil, fmt.Errorf("circuit breaker is open")
+	}
+	
+	startTime := time.Now()
+	
+	// Perform ALM routing
+	routingResponse, err := hmi.routingTable.LookupRoute(request.RoutingRequest)
+	if err != nil {
+		hmi.circuitBreaker.RecordFailure()
+		return nil, fmt.Errorf("routing failed: %w", err)
+	}
+	
+	// Select optimal connection based on routing decision
+	connection, err := hmi.selectOptimalConnection(routingResponse.Route, request.TransportOptions)
+	if err != nil {
+		hmi.circuitBreaker.RecordFailure()
+		return nil, fmt.Errorf("connection selection failed: %w", err)
+	}
+	
+	// Execute request via HyperMesh transport
+	result, err := hmi.executeViaHyperMesh(ctx, connection, request, routingResponse)
+	if err != nil {
+		hmi.circuitBreaker.RecordFailure()
+		hmi.releaseConnection(connection)
+		return nil, fmt.Errorf("execution failed: %w", err)
+	}
+	
+	// Record success metrics
+	hmi.circuitBreaker.RecordSuccess()
+	hmi.integrationMetrics.RecordRequest(time.Since(startTime), true)
+	hmi.releaseConnection(connection)
+	
+	return result, nil
+}
+
+// selectOptimalConnection chooses the best HyperMesh connection for the route
+func (hmi *HyperMeshIntegration) selectOptimalConnection(route *RouteEntry, options TransportOptions) (*HyperMeshConnection, error) {
+	hmi.mutex.RLock()
+	defer hmi.mutex.RUnlock()
+	
+	// Get next hop from route
+	if len(route.Path) < 2 {
+		return nil, fmt.Errorf("invalid route: insufficient path length")
+	}
+	
+	nextHop := route.Path[1] // First hop after source
+	connectionKey := fmt.Sprintf("%s:%d", nextHop.Address, 8080) // Default HyperMesh port
+	
+	// Try to get existing connection
+	if conn, exists := hmi.connectionPool.connections[connectionKey]; exists {
+		if conn.IsHealthy && time.Since(conn.LastUsed) < hmi.config.IdleTimeout {
+			conn.LastUsed = time.Now()
+			conn.RequestCount++
+			return conn, nil
+		}
+	}
+	
+	// Create new connection
+	return hmi.createNewConnection(connectionKey, nextHop, options)
+}
+
+// createNewConnection establishes a new HyperMesh connection
+func (hmi *HyperMeshIntegration) createNewConnection(
+	connectionKey string,
+	targetNode *graph.NetworkNode,
+	options TransportOptions,
+) (*HyperMeshConnection, error) {
+	
+	// Configure transport based on options
+	transportConfig := &integration.TransportConfig{
+		Address:           targetNode.Address,
+		EnableMultiplexing: options.Multiplexing,
+		EnableCompression: options.Compression,
+		EncryptionLevel:   int(options.EncryptionLevel),
+		BufferSize:       hmi.config.BufferSize,
+		ConnectTimeout:   hmi.config.ConnectionTimeout,
+	}
+	
+	// Establish connection via HyperMesh transport layer
+	transport, err := hmi.transportLayer.Connect(transportConfig)
+	if err != nil {
+		hmi.integrationMetrics.RecordConnectionFailure()
+		return nil, fmt.Errorf("failed to establish HyperMesh connection: %w", err)
+	}
+	
+	connection := &HyperMeshConnection{
+		ID:           fmt.Sprintf("conn-%d", time.Now().UnixNano()),
+		RemoteAddr:   connectionKey,
+		Transport:    transport,
+		CreatedAt:    time.Now(),
+		LastUsed:     time.Now(),
+		RequestCount: 0,
+		IsHealthy:    true,
+	}
+	
+	// Add to connection pool
+	hmi.connectionPool.connections[connectionKey] = connection
+	hmi.integrationMetrics.RecordNewConnection()
+	
+	return connection, nil
+}
+
+// executeViaHyperMesh executes the request using HyperMesh transport
+func (hmi *HyperMeshIntegration) executeViaHyperMesh(
+	ctx context.Context,
+	connection *HyperMeshConnection,
+	request EnhancedRoutingRequest,
+	routingResponse *RoutingResponse,
+) (*ExecutionResult, error) {
+	
+	// Prepare HyperMesh request
+	hyperMeshRequest := &integration.Request{
+		Method:      "ROUTE",
+		Path:        fmt.Sprintf("/route/%d", request.Destination),
+		Headers:     hmi.buildHeaders(request),
+		Body:        hmi.serializeRouteInfo(routingResponse.Route),
+		Priority:    int(request.TransportOptions.Priority),
+		Timeout:     hmi.config.RequestTimeout,
+		Context:     ctx,
+	}
+	
+	// Execute request with retry logic
+	var response *integration.Response
+	var err error
+	
+	for attempt := 0; attempt <= hmi.config.RetryAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(hmi.config.RetryBackoff * time.Duration(attempt))
+		}
+		
+		response, err = connection.Transport.Execute(hyperMeshRequest)
+		if err == nil {
+			break
+		}
+		
+		// Mark connection as unhealthy on persistent errors
+		if attempt == hmi.config.RetryAttempts {
+			connection.IsHealthy = false
+			connection.LastError = err
+		}
+	}
+	
+	if err != nil {
+		return nil, fmt.Errorf("HyperMesh execution failed after %d attempts: %w", hmi.config.RetryAttempts+1, err)
+	}
+	
+	// Process response
+	result := &ExecutionResult{
+		Route:           routingResponse.Route,
+		Response:        response,
+		Latency:         routingResponse.DecisionTime,
+		ConnectionID:    connection.ID,
+		HopCount:        len(routingResponse.Route.Path),
+		CacheHit:        routingResponse.CacheHit,
+		LoadBalanced:    routingResponse.LoadBalanced,
+		ExecutedAt:      time.Now(),
+	}
+	
+	// Update metrics
+	hmi.integrationMetrics.RecordBytes(int64(len(hyperMeshRequest.Body)), int64(len(response.Body)))
+	
+	return result, nil
+}
+
+// ExecutionResult contains the results of route execution
+type ExecutionResult struct {
+	Route          *RouteEntry
+	Response       *integration.Response
+	Latency        time.Duration
+	ConnectionID   string
+	HopCount       int
+	CacheHit       bool
+	LoadBalanced   bool
+	ExecutedAt     time.Time
+	
+	// HyperMesh specific metrics
+	TransportLatency time.Duration
+	CompressionRatio float64
+	SecurityLevel    int
+}
+
+// buildHeaders creates HyperMesh headers from request context
+func (hmi *HyperMeshIntegration) buildHeaders(request EnhancedRoutingRequest) map[string]string {
+	headers := make(map[string]string)
+	
+	headers["X-HyperMesh-Version"] = "1.0"
+	headers["X-Route-Source"] = fmt.Sprintf("%d", request.Source)
+	headers["X-Route-Destination"] = fmt.Sprintf("%d", request.Destination)
+	headers["X-Service-Type"] = request.ServiceType
+	headers["X-QoS-Class"] = fmt.Sprintf("%d", int(request.QoSClass))
+	
+	// Security headers
+	if request.SecurityContext.UserID != "" {
+		headers["X-User-ID"] = request.SecurityContext.UserID
+		headers["X-Tenant-ID"] = request.SecurityContext.TenantID
+	}
+	
+	// Transport options
+	headers["X-Transport-Priority"] = fmt.Sprintf("%d", int(request.TransportOptions.Priority))
+	headers["X-Transport-Encryption"] = fmt.Sprintf("%d", int(request.TransportOptions.EncryptionLevel))
+	
+	return headers
+}
+
+// serializeRouteInfo serializes route information for transport
+func (hmi *HyperMeshIntegration) serializeRouteInfo(route *RouteEntry) []byte {
+	// Simple JSON serialization of route info
+	// In production, would use efficient binary serialization
+	routeInfo := fmt.Sprintf(`{
+		"destination": %d,
+		"next_hop": %d,
+		"hop_count": %d,
+		"latency_ms": %.3f,
+		"throughput": %.2f,
+		"reliability": %.3f,
+		"cost": %.2f,
+		"confidence": %.3f
+	}`,
+		route.Destination,
+		route.NextHop,
+		route.Metrics.HopCount,
+		float64(route.Metrics.Latency.Microseconds())/1000.0,
+		route.Metrics.Throughput,
+		route.Metrics.Reliability,
+		route.Metrics.Cost,
+		route.Confidence,
+	)
+	
+	return []byte(routeInfo)
+}
+
+// releaseConnection returns connection to pool or closes it
+func (hmi *HyperMeshIntegration) releaseConnection(connection *HyperMeshConnection) {
+	if !connection.IsHealthy || time.Since(connection.CreatedAt) > hmi.config.IdleTimeout {
+		// Close unhealthy or old connections
+		connection.Transport.Close()
+		delete(hmi.connectionPool.connections, connection.RemoteAddr)
+		hmi.integrationMetrics.RecordConnectionClosure()
+	} else {
+		// Return healthy connection to pool
+		select {
+		case hmi.connectionPool.available <- connection:
+		default:
+			// Pool is full, close connection
+			connection.Transport.Close()
+			delete(hmi.connectionPool.connections, connection.RemoteAddr)
+		}
+	}
+}
+
+// Health checking and maintenance methods
+
+// PerformHealthCheck checks the health of all connections
+func (hmi *HyperMeshIntegration) PerformHealthCheck() {
+	hmi.mutex.Lock()
+	defer hmi.mutex.Unlock()
+	
+	for key, conn := range hmi.connectionPool.connections {
+		if time.Since(conn.LastUsed) > hmi.config.IdleTimeout {
+			// Close idle connections
+			conn.Transport.Close()
+			delete(hmi.connectionPool.connections, key)
+			hmi.integrationMetrics.RecordConnectionClosure()
+		} else {
+			// Perform health check
+			healthy := hmi.checkConnectionHealth(conn)
+			conn.IsHealthy = healthy
+			
+			if !healthy {
+				hmi.integrationMetrics.RecordConnectionFailure()
+			}
+		}
+	}
+}
+
+// checkConnectionHealth performs a lightweight health check on a connection
+func (hmi *HyperMeshIntegration) checkConnectionHealth(conn *HyperMeshConnection) bool {
+	// Simple ping-based health check
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	
+	pingRequest := &integration.Request{
+		Method:  "PING",
+		Path:    "/health",
+		Context: ctx,
+	}
+	
+	_, err := conn.Transport.Execute(pingRequest)
+	return err == nil
+}
+
+// GetIntegrationMetrics returns current integration performance metrics
+func (hmi *HyperMeshIntegration) GetIntegrationMetrics() IntegrationStatistics {
+	hmi.integrationMetrics.mutex.RLock()
+	defer hmi.integrationMetrics.mutex.RUnlock()
+	
+	return IntegrationStatistics{
+		TotalConnections:    hmi.integrationMetrics.TotalConnections,
+		ActiveConnections:   hmi.integrationMetrics.ActiveConnections,
+		FailedConnections:   hmi.integrationMetrics.FailedConnections,
+		TotalRequests:       hmi.integrationMetrics.TotalRequests,
+		SuccessfulRequests:  hmi.integrationMetrics.SuccessfulRequests,
+		FailedRequests:      hmi.integrationMetrics.FailedRequests,
+		AverageResponseTime: hmi.integrationMetrics.AverageResponseTime,
+		BytesSent:          hmi.integrationMetrics.BytesSent,
+		BytesReceived:      hmi.integrationMetrics.BytesReceived,
+		CompressionRatio:   hmi.integrationMetrics.CompressionRatio,
+		CircuitBreakerTrips: hmi.integrationMetrics.CircuitBreakerTrips,
+	}
+}
+
+// Helper types and constructors
+
+// NewConnectionPool creates a new connection pool
+func NewConnectionPool(maxSize int) *ConnectionPool {
+	return &ConnectionPool{
+		connections: make(map[string]*HyperMeshConnection),
+		available:   make(chan *HyperMeshConnection, maxSize),
+		maxSize:     maxSize,
+	}
+}
+
+// NewCircuitBreaker creates a new circuit breaker
+func NewCircuitBreaker(threshold int, timeout time.Duration) *CircuitBreaker {
+	return &CircuitBreaker{
+		state:            BreakerClosed,
+		failureCount:     0,
+		failureThreshold: threshold,
+		timeout:          timeout,
+	}
+}
+
+// AllowRequest checks if circuit breaker allows the request
+func (cb *CircuitBreaker) AllowRequest() bool {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	
+	switch cb.state {
+	case BreakerClosed:
+		return true
+	case BreakerOpen:
+		if time.Since(cb.lastFailureTime) > cb.timeout {
+			cb.state = BreakerHalfOpen
+			return true
+		}
+		return false
+	case BreakerHalfOpen:
+		return true
+	}
+	
+	return false
+}
+
+// RecordSuccess records a successful request
+func (cb *CircuitBreaker) RecordSuccess() {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	
+	cb.failureCount = 0
+	if cb.state == BreakerHalfOpen {
+		cb.state = BreakerClosed
+	}
+}
+
+// RecordFailure records a failed request
+func (cb *CircuitBreaker) RecordFailure() {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	
+	cb.failureCount++
+	cb.lastFailureTime = time.Now()
+	
+	if cb.failureCount >= cb.failureThreshold {
+		cb.state = BreakerOpen
+	}
+}
+
+// NewIntegrationMetrics creates new integration metrics collector
+func NewIntegrationMetrics() *IntegrationMetrics {
+	return &IntegrationMetrics{}
+}
+
+// RecordRequest records request metrics
+func (im *IntegrationMetrics) RecordRequest(latency time.Duration, success bool) {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	
+	im.TotalRequests++
+	if success {
+		im.SuccessfulRequests++
+	} else {
+		im.FailedRequests++
+	}
+	
+	// Update average response time using exponential moving average
+	alpha := 0.1
+	if im.TotalRequests == 1 {
+		im.AverageResponseTime = latency
+	} else {
+		im.AverageResponseTime = time.Duration(float64(im.AverageResponseTime)*(1-alpha) + float64(latency)*alpha)
+	}
+}
+
+// RecordNewConnection records new connection metrics
+func (im *IntegrationMetrics) RecordNewConnection() {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	
+	im.TotalConnections++
+	im.ActiveConnections++
+}
+
+// RecordConnectionFailure records connection failure metrics
+func (im *IntegrationMetrics) RecordConnectionFailure() {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	
+	im.FailedConnections++
+}
+
+// RecordConnectionClosure records connection closure metrics
+func (im *IntegrationMetrics) RecordConnectionClosure() {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	
+	if im.ActiveConnections > 0 {
+		im.ActiveConnections--
+	}
+}
+
+// RecordBytes records data transfer metrics
+func (im *IntegrationMetrics) RecordBytes(sent, received int64) {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	
+	im.BytesSent += sent
+	im.BytesReceived += received
+}
+
+// IntegrationStatistics provides integration performance metrics
+type IntegrationStatistics struct {
+	TotalConnections    int64
+	ActiveConnections   int64
+	FailedConnections   int64
+	TotalRequests       int64
+	SuccessfulRequests  int64
+	FailedRequests      int64
+	AverageResponseTime time.Duration
+	BytesSent          int64
+	BytesReceived      int64
+	CompressionRatio   float64
+	CircuitBreakerTrips int64
+}
+
+// DefaultIntegrationConfig returns default integration configuration
+func DefaultIntegrationConfig() *IntegrationConfig {
+	return &IntegrationConfig{
+		MaxConnections:        1000,
+		ConnectionTimeout:     5 * time.Second,
+		IdleTimeout:          30 * time.Second,
+		KeepAliveInterval:    10 * time.Second,
+		FailureThreshold:     5,
+		RecoveryTimeout:      30 * time.Second,
+		MaxConcurrentRequests: 100,
+		RequestTimeout:       10 * time.Second,
+		RetryAttempts:        3,
+		RetryBackoff:         100 * time.Millisecond,
+		EnableMultiplexing:   true,
+		EnableCompression:    true,
+		CompressionLevel:     6,
+		BufferSize:          64 * 1024, // 64KB
+		EnableTLS:           true,
+		VerifyPeer:          true,
+	}
+}

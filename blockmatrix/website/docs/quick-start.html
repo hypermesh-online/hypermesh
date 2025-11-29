@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Start - Hypermesh Nexus</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="../logo.svg" alt="Hypermesh Nexus" class="logo">
+                <span>Hypermesh Nexus</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="architecture.html">Architecture</a></li>
+                <li><a href="../examples/hello-world.html">Examples</a></li>
+                <li><a href="api.html">API</a></li>
+                <li><a href="https://github.com/hypermesh/nexus" class="github-link">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="docs-container">
+        <aside class="docs-sidebar">
+            <div class="docs-nav">
+                <h3>Getting Started</h3>
+                <ul>
+                    <li><a href="quick-start.html" class="active">Quick Start</a></li>
+                    <li><a href="installation.html">Installation</a></li>
+                    <li><a href="first-cluster.html">Your First Cluster</a></li>
+                    <li><a href="troubleshooting.html">Troubleshooting</a></li>
+                </ul>
+
+                <h3>Architecture</h3>
+                <ul>
+                    <li><a href="architecture.html">System Overview</a></li>
+                    <li><a href="consensus.html">Byzantine Consensus</a></li>
+                    <li><a href="transport.html">QUIC Transport</a></li>
+                    <li><a href="security.html">Security Model</a></li>
+                </ul>
+
+                <h3>Operations</h3>
+                <ul>
+                    <li><a href="deployment.html">Deployment Guide</a></li>
+                    <li><a href="monitoring.html">Monitoring</a></li>
+                    <li><a href="scaling.html">Scaling</a></li>
+                    <li><a href="maintenance.html">Maintenance</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="docs-content">
+            <div class="docs-header">
+                <h1>Quick Start Guide</h1>
+                <p class="docs-subtitle">Get Hypermesh Nexus running in under 5 minutes!</p>
+            </div>
+
+            <section class="docs-section">
+                <h2>🚀 Installation</h2>
+                
+                <h3>Prerequisites</h3>
+                <div class="code-block">
+                    <code># Ensure you have Rust 1.75+
+rustup update stable
+
+# Install system dependencies (Ubuntu/Debian)
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config clang llvm
+
+# For eBPF support (optional but recommended)
+sudo apt-get install -y linux-headers-$(uname -r) libelf-dev</code>
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                </div>
+
+                <h3>Get the Code</h3>
+                <div class="code-block">
+                    <code>git clone https://github.com/your-org/hypermesh.git
+cd hypermesh</code>
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                </div>
+            </section>
+
+            <section class="docs-section">
+                <h2>⚡ 2-Minute Demo</h2>
+                
+                <div class="demo-steps">
+                    <div class="demo-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Run the Test Suite</h3>
+                            <div class="code-block">
+                                <code>cd core/tests
+cargo run --bin nexus-test -- all --detailed-report</code>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                            
+                            <div class="expected-output">
+                                <strong>Expected Output:</strong>
+                                <div class="terminal-output">
+                                    <div class="terminal-line success">🚀 Nexus Testing Framework v1.0.0</div>
+                                    <div class="terminal-line success">🧪 Running unit tests</div>
+                                    <div class="terminal-line success">  ✅ Runtime component tests passed</div>
+                                    <div class="terminal-line success">  ✅ Transport layer tests passed</div>
+                                    <div class="terminal-line success">  ✅ Consensus engine tests passed</div>
+                                    <div class="terminal-line success">  ✅ Networking tests passed</div>
+                                    <div class="terminal-line success">  ✅ eBPF integration tests passed</div>
+                                    <div class="terminal-line success">  ✅ Storage layer tests passed</div>
+                                    <div class="terminal-line success">✅ Tests completed successfully</div>
+                                    <div class="terminal-line info">📄 Report saved to: nexus-test-report.md</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="demo-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Deploy Local Cluster</h3>
+                            <div class="code-block">
+                                <code>cd ../deploy
+./deploy.sh deploy --type local --size 3 --env staging --verbose</code>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                            
+                            <div class="expected-output">
+                                <strong>Expected Output:</strong>
+                                <div class="terminal-output">
+                                    <div class="terminal-line success">🚀 Starting Nexus deployment...</div>
+                                    <div class="terminal-line">Configuration:</div>
+                                    <div class="terminal-line">  Type: local</div>
+                                    <div class="terminal-line">  Size: 3 nodes</div>
+                                    <div class="terminal-line">  Environment: staging</div>
+                                    <div class="terminal-line success">✅ System requirements validated</div>
+                                    <div class="terminal-line success">✅ Nexus components built successfully</div>
+                                    <div class="terminal-line success">✅ Pre-deployment tests passed</div>
+                                    <div class="terminal-line success">✅ Configuration generated for 3 nodes</div>
+                                    <div class="terminal-line success">✅ 3-node local cluster deployed successfully</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="demo-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Verify Deployment</h3>
+                            <div class="code-block">
+                                <code>./deploy.sh status</code>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="docs-section">
+                <h2>🎯 What Just Happened?</h2>
+                
+                <p>You just:</p>
+                <ol>
+                    <li><strong>Validated</strong> all Nexus core components work correctly</li>
+                    <li><strong>Deployed</strong> a 3-node Byzantine fault-tolerant cluster</li>
+                    <li><strong>Verified</strong> the cluster is running and healthy</li>
+                </ol>
+
+                <div class="info-box">
+                    <h3>The cluster includes:</h3>
+                    <ul>
+                        <li><strong>QUIC transport</strong> with TLS encryption between nodes</li>
+                        <li><strong>Byzantine consensus</strong> for distributed state management</li>
+                        <li><strong>eBPF networking</strong> for high-performance packet processing</li>
+                        <li><strong>Professional monitoring</strong> with real-time metrics</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="docs-section">
+                <h2>🔧 Next Steps</h2>
+
+                <h3>Explore Individual Components</h3>
+
+                <div class="next-steps-grid">
+                    <div class="next-step-card">
+                        <h4>Test Transport Layer</h4>
+                        <div class="code-block">
+                            <code>cd core/tests
+cargo run --bin nexus-test -- unit --component transport</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="next-step-card">
+                        <h4>Test Consensus Engine</h4>
+                        <div class="code-block">
+                            <code>cargo run --bin nexus-test -- unit --component consensus</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="next-step-card">
+                        <h4>Run Performance Benchmarks</h4>
+                        <div class="code-block">
+                            <code>cargo run --bin nexus-test -- unit --component runtime
+cargo run --bin nexus-test -- unit --component networking</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Deploy to Different Environments</h3>
+
+                <div class="deployment-options">
+                    <div class="deployment-option">
+                        <h4>Staging Environment (5 nodes)</h4>
+                        <div class="code-block">
+                            <code>./deploy.sh deploy --type local --size 5 --env staging</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="deployment-option">
+                        <h4>Production Environment (7 nodes)</h4>
+                        <div class="code-block">
+                            <code>./deploy.sh deploy --type systemd --size 7 --env prod</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="deployment-option">
+                        <h4>Docker Environment</h4>
+                        <div class="code-block">
+                            <code>./deploy.sh deploy --type docker --size 3 --env dev</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Monitor Performance</h3>
+                <div class="code-block">
+                    <code># Real-time metrics for 60 seconds
+cargo run --bin nexus-test -- metrics --duration 60 --real-time
+
+# Run deployment tests
+cargo run --bin nexus-test -- deploy --nodes 5
+
+# Run staging tests
+cargo run --bin nexus-test -- staging --size 7 --deployment local</code>
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                </div>
+            </section>
+
+            <section class="docs-section">
+                <h2>🔍 Troubleshooting</h2>
+
+                <div class="troubleshooting-grid">
+                    <div class="troubleshoot-item">
+                        <h3>Build Errors</h3>
+                        <div class="code-block">
+                            <code># Clean and rebuild
+cd core
+cargo clean
+cargo build --release</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="troubleshoot-item">
+                        <h3>Port Conflicts</h3>
+                        <div class="code-block">
+                            <code># Check for port usage
+netstat -tulpn | grep :8080
+netstat -tulpn | grep :8081
+
+# Deploy with different ports
+./deploy.sh deploy --type local --size 3 --config custom-ports.toml</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="troubleshoot-item">
+                        <h3>Permission Issues</h3>
+                        <div class="code-block">
+                            <code># For eBPF features (requires root)
+sudo cargo run --bin nexus-test -- unit --component ebpf
+
+# For systemd deployment
+sudo ./deploy.sh deploy --type systemd --size 3</code>
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="docs-section">
+                <h2>📚 What's Next?</h2>
+
+                <div class="whats-next-grid">
+                    <a href="architecture.html" class="next-link">
+                        <h3>Architecture Guide</h3>
+                        <p>Understand how Nexus works under the hood</p>
+                    </a>
+
+                    <a href="deployment.html" class="next-link">
+                        <h3>Deployment Guide</h3>
+                        <p>Production deployment strategies</p>
+                    </a>
+
+                    <a href="api.html" class="next-link">
+                        <h3>API Reference</h3>
+                        <p>Integrate with your applications</p>
+                    </a>
+
+                    <a href="../examples/hello-world.html" class="next-link">
+                        <h3>Examples</h3>
+                        <p>Real-world use cases and tutorials</p>
+                    </a>
+                </div>
+            </section>
+
+            <div class="docs-footer">
+                <div class="docs-navigation">
+                    <a href="../index.html" class="nav-prev">← Home</a>
+                    <a href="architecture.html" class="nav-next">Architecture →</a>
+                </div>
+                
+                <div class="docs-meta">
+                    <p>Last updated: <time datetime="2025-08-28">August 28, 2025</time></p>
+                    <p><a href="https://github.com/hypermesh/nexus/edit/main/website/docs/quick-start.html">Edit this page</a></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../script.js"></script>
+    <script>
+        // Copy code functionality
+        function copyCode(button) {
+            const codeBlock = button.parentNode.querySelector('code');
+            const text = codeBlock.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#10b981';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#6366f1';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

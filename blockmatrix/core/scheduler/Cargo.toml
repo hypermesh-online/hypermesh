@@ -1,0 +1,62 @@
+[package]
+name = "nexus-scheduler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Intelligent resource scheduling and orchestration for Nexus"
+
+[dependencies]
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+nexus-state = { path = "../state" }
+nexus-networking = { path = "../networking" }
+nexus-runtime = { path = "../runtime" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+tokio-stream = "0.1"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Time
+chrono.workspace = true
+rand.workspace = true
+
+# Mathematics and algorithms
+ordered-float = "4.2"
+
+# Machine learning (optional features)
+candle-core = { version = "0.4", optional = true }
+candle-nn = { version = "0.4", optional = true }
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile = "3.8"
+tokio-test.workspace = true
+
+[features]
+default = []
+ml = ["candle-core", "candle-nn"]
+
+# Benchmarks would be defined here when implemented
+# [[bench]]
+# name = "scheduling_bench"
+# harness = false

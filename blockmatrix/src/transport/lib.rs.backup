@@ -1,0 +1,573 @@
+//! HyperMesh Transport Layer
+//!
+//! High-performance transport layer built on STOQ protocol with HyperMesh-specific
+//! enhancements for node authentication, connection pooling, and performance monitoring.
+//!
+//! # Architecture
+//!
+//! This layer uses STOQ as the underlying transport protocol instead of directly
+//! using Quinn/QUIC. This provides:
+//! - Proper layering and separation of concerns
+//! - Built-in CDN capabilities from STOQ
+//! - Edge network support
+//! - Content-aware routing and optimization
+//!
+//! # Key Features
+//! - STOQ protocol for all transport operations
+//! - Connection pooling and lifecycle management
+//! - Performance monitoring and metrics collection
+//! - Zero-copy data transfer where possible
+//! - HyperMesh-specific authentication and authorization
+
+#![warn(missing_docs)]
+#![deny(unsafe_code)]
+
+use async_trait::async_trait;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use anyhow::{Result, Context};
+use tracing::{info, debug, warn, error};
+
+// Import STOQ protocol types
+use stoq::{
+    Stoq, StoqBuilder, StoqConfig, StoqTransport,
+    Connection as StoqConnection,
+    Endpoint as StoqEndpoint,
+    Transport, Listener,
+    TransportStats as StoqStats,
+};
+use stoq::config::GlobalConfig;
+
+// Basic types for transport layer
+use serde::{Serialize, Deserialize};
+use std::net::Ipv6Addr;
+use bytes::Bytes;
+
+/// Node identifier for consensus and transport
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeId(pub String);
+
+impl NodeId {
+    /// Create a new node ID
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    /// Get the inner string
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for NodeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+// Internal modules
+pub mod auth;
+pub mod pool;
+pub mod monitoring;
+pub mod config;
+pub mod error;
+
+use auth::NodeAuthenticator;
+use pool::ConnectionPool;
+use monitoring::TransportMonitor;
+pub use config::HyperMeshTransportConfig;
+pub use error::{TransportError, Result as TransportResult};
+
+/// HyperMesh wrapper around STOQ endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HyperMeshEndpoint {
+    /// IPv6 address
+    pub address: Ipv6Addr,
+    /// Port number
+    pub port: u16,
+    /// Optional server name for SNI
+    pub server_name: Option<String>,
+    /// Node ID for HyperMesh authentication
+    pub node_id: Option<String>,
+}
+
+impl HyperMeshEndpoint {
+    /// Create a new endpoint
+    pub fn new(address: Ipv6Addr, port: u16) -> Self {
+        Self {
+            address,
+            port,
+            server_name: None,
+            node_id: None,
+        }
+    }
+
+    /// Set server name for SNI
+    pub fn with_server_name(mut self, name: String) -> Self {
+        self.server_name = Some(name);
+        self
+    }
+
+    /// Set node ID for authentication
+    pub fn with_node_id(mut self, id: String) -> Self {
+        self.node_id = Some(id);
+        self
+    }
+
+    /// Convert to socket address
+    pub fn to_socket_addr(&self) -> SocketAddr {
+        SocketAddr::from((self.address, self.port))
+    }
+
+    /// Convert to STOQ endpoint
+    pub fn to_stoq_endpoint(&self) -> StoqEndpoint {
+        StoqEndpoint {
+            address: self.address,
+            port: self.port,
+            server_name: self.server_name.clone(),
+        }
+    }
+}
+
+/// HyperMesh transport statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HyperMeshTransportStats {
+    /// Total bytes sent
+    pub bytes_sent: u64,
+    /// Total bytes received
+    pub bytes_received: u64,
+    /// Active connections
+    pub active_connections: usize,
+    /// Total connections established
+    pub total_connections: u64,
+    /// Current throughput in Gbps
+    pub throughput_gbps: f64,
+    /// Average latency in microseconds
+    pub avg_latency_us: u64,
+    /// HyperMesh-specific metrics
+    pub authenticated_nodes: usize,
+    pub failed_authentications: u64,
+}
+
+/// HyperMesh connection wrapping STOQ connection
+#[derive(Clone)]
+pub struct HyperMeshConnection {
+    /// Connection ID
+    pub id: String,
+    /// Remote endpoint
+    pub endpoint: HyperMeshEndpoint,
+    /// Underlying STOQ connection
+    stoq_connection: Arc<StoqConnection>,
+    /// Connection status
+    pub active: Arc<parking_lot::RwLock<bool>>,
+    /// Performance metrics
+    pub metrics: Arc<ConnectionMetrics>,
+    /// Node authentication state
+    pub authenticated: Arc<parking_lot::RwLock<bool>>,
+}
+
+#[derive(Debug)]
+pub struct ConnectionMetrics {
+    pub bytes_sent: Arc<parking_lot::RwLock<u64>>,
+    pub bytes_received: Arc<parking_lot::RwLock<u64>>,
+    pub messages_sent: Arc<parking_lot::RwLock<u64>>,
+    pub messages_received: Arc<parking_lot::RwLock<u64>>,
+    pub connection_established: Arc<parking_lot::RwLock<std::time::Instant>>,
+}
+
+impl HyperMeshConnection {
+    /// Create a new HyperMesh connection from STOQ connection
+    pub fn new(id: String, endpoint: HyperMeshEndpoint, stoq_connection: Arc<StoqConnection>) -> Self {
+        let metrics = Arc::new(ConnectionMetrics {
+            bytes_sent: Arc::new(parking_lot::RwLock::new(0)),
+            bytes_received: Arc::new(parking_lot::RwLock::new(0)),
+            messages_sent: Arc::new(parking_lot::RwLock::new(0)),
+            messages_received: Arc::new(parking_lot::RwLock::new(0)),
+            connection_established: Arc::new(parking_lot::RwLock::new(std::time::Instant::now())),
+        });
+
+        Self {
+            id,
+            endpoint,
+            stoq_connection,
+            active: Arc::new(parking_lot::RwLock::new(true)),
+            metrics,
+            authenticated: Arc::new(parking_lot::RwLock::new(false)),
+        }
+    }
+
+    /// Get connection ID
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Get endpoint
+    pub fn endpoint(&self) -> &HyperMeshEndpoint {
+        &self.endpoint
+    }
+
+    /// Check if connection is active
+    pub fn is_active(&self) -> bool {
+        *self.active.read()
+    }
+
+    /// Check if connection is authenticated
+    pub fn is_authenticated(&self) -> bool {
+        *self.authenticated.read()
+    }
+
+    /// Send data using STOQ protocol
+    pub async fn send(&self, data: &[u8]) -> Result<(), TransportError> {
+        if !self.is_active() {
+            return Err(TransportError::ConnectionClosed);
+        }
+
+        if !self.is_authenticated() {
+            return Err(TransportError::NotAuthenticated);
+        }
+
+        // Use STOQ's transport capabilities
+        let stoq_transport = StoqTransport::new(StoqConfig::default().transport).await
+            .map_err(|e| TransportError::StoqError(e))?;
+
+        stoq_transport.send(&self.stoq_connection, data).await
+            .map_err(|e| TransportError::StoqError(e))?;
+
+        // Update metrics
+        {
+            let mut bytes_sent = self.metrics.bytes_sent.write();
+            *bytes_sent += data.len() as u64;
+            let mut messages_sent = self.metrics.messages_sent.write();
+            *messages_sent += 1;
+        }
+
+        Ok(())
+    }
+
+    /// Receive data using STOQ protocol
+    pub async fn receive(&self) -> Result<Bytes, TransportError> {
+        if !self.is_active() {
+            return Err(TransportError::ConnectionClosed);
+        }
+
+        if !self.is_authenticated() {
+            return Err(TransportError::NotAuthenticated);
+        }
+
+        // Use STOQ's transport capabilities
+        let stoq_transport = StoqTransport::new(StoqConfig::default().transport).await
+            .map_err(|e| TransportError::StoqError(e))?;
+
+        let data = stoq_transport.receive(&self.stoq_connection).await
+            .map_err(|e| TransportError::StoqError(e))?;
+
+        // Update metrics
+        {
+            let mut bytes_received = self.metrics.bytes_received.write();
+            *bytes_received += data.len() as u64;
+            let mut messages_received = self.metrics.messages_received.write();
+            *messages_received += 1;
+        }
+
+        Ok(data)
+    }
+
+    /// Authenticate the connection
+    pub async fn authenticate(&self, authenticator: &NodeAuthenticator) -> Result<(), TransportError> {
+        // Perform HyperMesh-specific authentication
+        if let Some(ref node_id) = self.endpoint.node_id {
+            let auth_result = authenticator.authenticate_node(node_id).await?;
+            if auth_result {
+                *self.authenticated.write() = true;
+                Ok(())
+            } else {
+                Err(TransportError::AuthenticationFailed)
+            }
+        } else {
+            Err(TransportError::MissingNodeId)
+        }
+    }
+
+    /// Close connection gracefully
+    pub fn close(&self) {
+        *self.active.write() = false;
+        // STOQ connection will be closed when dropped
+    }
+
+    /// Get connection performance metrics
+    pub fn get_metrics(&self) -> ConnectionMetrics {
+        ConnectionMetrics {
+            bytes_sent: Arc::clone(&self.metrics.bytes_sent),
+            bytes_received: Arc::clone(&self.metrics.bytes_received),
+            messages_sent: Arc::clone(&self.metrics.messages_sent),
+            messages_received: Arc::clone(&self.metrics.messages_received),
+            connection_established: Arc::clone(&self.metrics.connection_established),
+        }
+    }
+}
+
+/// HyperMesh transport trait for consensus integration
+#[async_trait]
+pub trait HyperMeshTransportTrait: Send + Sync {
+    /// Connect to a remote endpoint
+    async fn connect(&self, endpoint: &HyperMeshEndpoint) -> Result<HyperMeshConnection>;
+
+    /// Listen for incoming connections
+    async fn listen(&self, addr: SocketAddr) -> Result<Box<dyn HyperMeshListener>>;
+
+    /// Send message to a node
+    async fn send(&self, node_id: &NodeId, message: &[u8]) -> Result<()>;
+
+    /// Receive message from any node
+    async fn receive(&self) -> Result<(NodeId, Vec<u8>)>;
+
+    /// Get transport statistics
+    fn get_stats(&self) -> HyperMeshTransportStats;
+}
+
+/// Main HyperMesh transport implementation using STOQ
+pub struct HyperMeshTransport {
+    /// Underlying STOQ instance
+    stoq: Arc<Stoq>,
+    /// Connection pool
+    pool: Arc<ConnectionPool>,
+    /// Node authenticator
+    authenticator: Arc<NodeAuthenticator>,
+    /// Transport monitor
+    monitor: Arc<TransportMonitor>,
+    /// Configuration
+    config: HyperMeshTransportConfig,
+}
+
+impl HyperMeshTransport {
+    /// Create a new HyperMesh transport instance
+    pub async fn new(config: HyperMeshTransportConfig) -> Result<Self> {
+        // Build STOQ instance with HyperMesh-specific configuration
+        let stoq_config = StoqConfig {
+            global: GlobalConfig::default(),
+            transport: config.to_stoq_transport_config(),
+            routing: config.to_stoq_routing_config(),
+            chunking: config.to_stoq_chunking_config(),
+            edge: config.to_stoq_edge_config(),
+        };
+
+        let stoq = Arc::new(
+            StoqBuilder::new()
+                .with_config(stoq_config)
+                .build()
+                .await
+                .context("Failed to create STOQ instance")?
+        );
+
+        let pool = Arc::new(ConnectionPool::new(config.pool.clone()));
+        let authenticator = Arc::new(NodeAuthenticator::new(config.auth.clone()));
+        let monitor = Arc::new(TransportMonitor::new());
+
+        Ok(Self {
+            stoq,
+            pool,
+            authenticator,
+            monitor,
+            config,
+        })
+    }
+
+    /// Connect to a remote endpoint
+    pub async fn connect(&self, endpoint: &HyperMeshEndpoint) -> Result<HyperMeshConnection> {
+        info!("Connecting to {:?}", endpoint);
+
+        // Check connection pool first
+        if let Some(conn) = self.pool.get_connection(&endpoint.to_socket_addr()).await {
+            if conn.is_active() && conn.is_authenticated() {
+                debug!("Reusing pooled connection to {:?}", endpoint);
+                return Ok(conn);
+            }
+        }
+
+        // Create new connection using STOQ
+        let stoq_endpoint = endpoint.to_stoq_endpoint();
+        let stoq_connection = self.stoq.transport().connect(&stoq_endpoint).await
+            .context("Failed to establish STOQ connection")?;
+
+        // Create HyperMesh connection wrapper
+        let conn_id = uuid::Uuid::new_v4().to_string();
+        let hypermesh_conn = HyperMeshConnection::new(
+            conn_id,
+            endpoint.clone(),
+            stoq_connection,
+        );
+
+        // Authenticate the connection
+        hypermesh_conn.authenticate(&self.authenticator).await?;
+
+        // Add to connection pool
+        self.pool.add_connection(endpoint.to_socket_addr(), hypermesh_conn.clone()).await;
+
+        // Update monitor
+        self.monitor.record_connection_established();
+
+        Ok(hypermesh_conn)
+    }
+
+    /// Listen for incoming connections
+    pub async fn listen(&self, addr: SocketAddr) -> Result<Box<dyn HyperMeshListener>> {
+        info!("Listening on {}", addr);
+
+        // Use STOQ to listen
+        let stoq_listener = self.stoq.transport().listen(addr).await
+            .context("Failed to create STOQ listener")?;
+
+        Ok(Box::new(HyperMeshListenerImpl {
+            stoq_listener,
+            authenticator: Arc::clone(&self.authenticator),
+            pool: Arc::clone(&self.pool),
+            monitor: Arc::clone(&self.monitor),
+        }))
+    }
+
+    /// Get transport statistics
+    pub fn stats(&self) -> HyperMeshTransportStats {
+        let stoq_stats = self.stoq.transport().stats();
+        let monitor_stats = self.monitor.get_stats();
+
+        HyperMeshTransportStats {
+            bytes_sent: stoq_stats.bytes_sent,
+            bytes_received: stoq_stats.bytes_received,
+            active_connections: stoq_stats.active_connections,
+            total_connections: stoq_stats.total_connections,
+            throughput_gbps: stoq_stats.throughput_gbps,
+            avg_latency_us: stoq_stats.avg_latency_us,
+            authenticated_nodes: monitor_stats.authenticated_nodes,
+            failed_authentications: monitor_stats.failed_authentications,
+        }
+    }
+
+    /// Shutdown the transport
+    pub async fn shutdown(&self) -> Result<()> {
+        info!("Shutting down HyperMesh transport");
+
+        // Close all pooled connections
+        self.pool.close_all().await;
+
+        // Shutdown monitoring
+        self.monitor.shutdown().await;
+
+        Ok(())
+    }
+}
+
+/// Implementation of HyperMeshTransportTrait for HyperMeshTransport
+#[async_trait]
+impl HyperMeshTransportTrait for HyperMeshTransport {
+    async fn connect(&self, endpoint: &HyperMeshEndpoint) -> Result<HyperMeshConnection> {
+        self.connect(endpoint).await
+    }
+
+    async fn listen(&self, addr: SocketAddr) -> Result<Box<dyn HyperMeshListener>> {
+        self.listen(addr).await
+    }
+
+    async fn send(&self, node_id: &NodeId, message: &[u8]) -> Result<()> {
+        // Find connection for node_id from pool or create new one
+        // This is a simplified implementation
+        let endpoint = HyperMeshEndpoint::new("::1".parse().unwrap(), 9292)
+            .with_node_id(node_id.to_string());
+
+        let conn = self.connect(&endpoint).await?;
+        conn.send(message).await.map_err(|e| anyhow::anyhow!("Send failed: {:?}", e))?;
+        Ok(())
+    }
+
+    async fn receive(&self) -> Result<(NodeId, Vec<u8>)> {
+        // This would normally be implemented with proper message queue
+        // For now, return a placeholder
+        todo!("Implement proper message receiving")
+    }
+
+    fn get_stats(&self) -> HyperMeshTransportStats {
+        self.get_stats()
+    }
+}
+
+/// HyperMesh listener trait
+#[async_trait]
+pub trait HyperMeshListener: Send + Sync {
+    /// Accept an incoming connection
+    async fn accept(&self) -> Result<HyperMeshConnection>;
+
+    /// Get the local address
+    fn local_addr(&self) -> Result<SocketAddr>;
+}
+
+/// HyperMesh listener implementation
+struct HyperMeshListenerImpl {
+    stoq_listener: Box<dyn Listener>,
+    authenticator: Arc<NodeAuthenticator>,
+    pool: Arc<ConnectionPool>,
+    monitor: Arc<TransportMonitor>,
+}
+
+#[async_trait]
+impl HyperMeshListener for HyperMeshListenerImpl {
+    async fn accept(&self) -> Result<HyperMeshConnection> {
+        // Accept STOQ connection
+        let stoq_connection = self.stoq_listener.accept().await?;
+
+        // Create HyperMesh connection wrapper
+        let conn_id = uuid::Uuid::new_v4().to_string();
+        let endpoint = HyperMeshEndpoint::new(
+            "::1".parse().unwrap(), // TODO: Get actual remote address
+            0,
+        );
+
+        let hypermesh_conn = HyperMeshConnection::new(
+            conn_id,
+            endpoint,
+            Arc::new(stoq_connection),
+        );
+
+        // Note: Authentication happens after accept, initiated by client
+
+        // Update monitor
+        self.monitor.record_connection_accepted();
+
+        Ok(hypermesh_conn)
+    }
+
+    fn local_addr(&self) -> Result<SocketAddr> {
+        self.stoq_listener.local_addr()
+    }
+}
+
+// Re-export for compatibility
+pub use HyperMeshConnection as Connection;
+pub use HyperMeshEndpoint as Endpoint;
+pub use HyperMeshTransport as HyperTransport;
+pub use HyperMeshTransportStats as TransportStats;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_endpoint_conversion() {
+        let endpoint = HyperMeshEndpoint::new("::1".parse().unwrap(), 9292)
+            .with_server_name("test.hypermesh.local".to_string())
+            .with_node_id("node-123".to_string());
+
+        assert_eq!(endpoint.port, 9292);
+        assert_eq!(endpoint.server_name, Some("test.hypermesh.local".to_string()));
+        assert_eq!(endpoint.node_id, Some("node-123".to_string()));
+
+        let stoq_endpoint = endpoint.to_stoq_endpoint();
+        assert_eq!(stoq_endpoint.port, 9292);
+    }
+
+    #[tokio::test]
+    async fn test_transport_creation() {
+        let config = HyperMeshTransportConfig::default();
+        let transport = HyperMeshTransport::new(config).await;
+        assert!(transport.is_ok());
+    }
+}

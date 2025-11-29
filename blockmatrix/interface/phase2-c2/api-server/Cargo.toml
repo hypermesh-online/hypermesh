@@ -1,0 +1,73 @@
+[package]
+name = "nexus-api-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nexus Team"]
+license = "Apache-2.0"
+description = "Nexus API Server - REST and GraphQL APIs for cluster management"
+
+[[bin]]
+name = "nexus-api-server"
+path = "src/main.rs"
+
+[dependencies]
+# Nexus core integration
+nexus-shared = { path = "../../../core/shared" }
+nexus-transport = { path = "../../../core/transport" }
+nexus-runtime = { path = "../../../core/runtime" }
+nexus-state = { path = "../../../core/state" }
+nexus-networking = { path = "../../../core/networking" }
+nexus-scheduler = { path = "../../../core/scheduler" }
+
+# Web framework
+# axum = ... # REMOVED: STOQ-only transport
+# tower = ... # REMOVED: STOQ-only transport (HTTP middleware)
+# tower-http = ... # REMOVED: STOQ-only transport
+# hyper = ... # REMOVED: STOQ-only transport
+
+# GraphQL
+async-graphql = { version = "7.0", features = ["chrono", "uuid"] }
+async-graphql-axum = "7.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Authentication and security
+jsonwebtoken = "9.2"
+bcrypt = "0.15"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Database (for API server state)
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+
+# Configuration
+config = "0.13"
+clap = { version = "4.0", features = ["derive"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client
+# reqwest = ... # REMOVED: STOQ-only transport
+
+# OpenAPI documentation
+utoipa = { version = "4.2", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+
+[dev-dependencies]
+axum-test = "14.0"
+tempfile = "3.0"

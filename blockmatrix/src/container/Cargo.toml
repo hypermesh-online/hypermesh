@@ -1,0 +1,35 @@
+[package]
+name = "hypermesh-container"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "HyperMesh Container Runtime - Secure Isolation"
+
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+tokio = { version = "1.38", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+async-trait = "0.1"
+futures = "0.3"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Container runtime dependencies
+nix = "0.27"  # Unix system interface
+libc = "0.2"
+tar = "0.4"
+flate2 = "1.0"
+zstd = "0.13"
+
+# Simplified dependencies for MVP implementation
+# Note: In production, would use actual cgroup, capabilities, and networking libraries
+# TODO: Leverage CRIO and ebpf for security and implement fully
+
+# Performance monitoring

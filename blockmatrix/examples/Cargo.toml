@@ -1,0 +1,43 @@
+[package]
+name = "quic-examples"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "quic_basic"
+path = "quic_basic.rs"
+
+[[bin]]
+name = "quic_working"
+path = "quic_working.rs"
+
+[[bin]]
+name = "transport_integration"
+path = "transport_integration.rs"
+
+[[bin]]
+name = "connection_manager_integration"
+path = "connection_manager_integration.rs"
+
+[[bin]]
+name = "cluster_integration"
+path = "cluster_integration.rs"
+
+[[bin]]
+name = "comprehensive_test_runner"
+path = "comprehensive_test_runner.rs"
+
+[dependencies]
+quinn = "0.10"
+tokio = { version = "1", features = ["full"] }
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rcgen = "0.11"
+chrono = "0.4"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+rand = "0.8"
+
+# Core modules
+nexus-transport = { path = "../core/transport" }
+nexus-shared = { path = "../core/shared" }
+nexus-connection-manager = { path = "../core/connection-manager" }

@@ -1,0 +1,70 @@
+[package]
+name = "nexus-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nexus Team"]
+license = "Apache-2.0"
+description = "Nexus command-line interface for cluster management"
+
+[[bin]]
+name = "nexus"
+path = "src/main.rs"
+
+[dependencies]
+# Nexus core integration (disabled for now to focus on CLI)
+# nexus-shared = { path = "../../../core/shared" }
+# nexus-transport = { path = "../../../core/transport" }
+# nexus-runtime = { path = "../../../core/runtime" }
+# nexus-state = { path = "../../../core/state" }
+# nexus-networking = { path = "../../../core/networking" }
+# nexus-scheduler = { path = "../../../core/scheduler" }
+
+# CLI framework
+clap = { version = "4.0", features = ["derive", "color", "suggestions"] }
+clap_complete = "4.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7"
+
+# Serialization and config
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+eyre = "0.6"
+
+# Logging and output
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+colored = "2.0"
+indicatif = "0.17"
+
+# Terminal and formatting
+crossterm = "0.27"
+tabled = "0.14"
+console = "0.15"
+
+# HTTP client for API communication
+# reqwest = ... # REMOVED: STOQ-only transport
+url = "2.0"
+
+# File system and paths
+dirs = "5.0"
+tempfile = "3.0"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+humantime = "2.1"
+
+# TTY detection
+atty = "0.2"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = "3.0"

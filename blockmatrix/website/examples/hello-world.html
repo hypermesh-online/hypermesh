@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World Example - Hypermesh Nexus</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../docs/docs.css">
+    <link rel="stylesheet" href="examples.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="../logo.svg" alt="Hypermesh Nexus" class="logo">
+                <span>Hypermesh Nexus</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../docs/quick-start.html">Quick Start</a></li>
+                <li><a href="../docs/architecture.html">Architecture</a></li>
+                <li><a href="hello-world.html" class="active">Examples</a></li>
+                <li><a href="https://github.com/hypermesh/nexus" class="github-link">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="example-container">
+        <header class="example-header">
+            <div class="container">
+                <div class="example-breadcrumb">
+                    <a href="../index.html">Home</a> / 
+                    <a href="../examples/">Examples</a> / 
+                    <span>Hello World</span>
+                </div>
+                <h1 class="example-title">Hello World - Your First Nexus Deployment</h1>
+                <p class="example-subtitle">
+                    The simplest possible Hypermesh Nexus cluster to get you started.
+                    Deploy a 3-node Byzantine fault-tolerant cluster in 2 minutes.
+                </p>
+                <div class="example-meta">
+                    <span class="difficulty easy">Beginner</span>
+                    <span class="time">2 minutes</span>
+                    <span class="nodes">3 nodes</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="example-content">
+            <div class="container">
+                <div class="example-overview">
+                    <h2>🎯 What This Example Does</h2>
+                    <div class="overview-grid">
+                        <div class="overview-item">
+                            <div class="overview-icon">🚀</div>
+                            <h3>Deploys</h3>
+                            <p>3-node Nexus cluster locally</p>
+                        </div>
+                        <div class="overview-item">
+                            <div class="overview-icon">🔍</div>
+                            <h3>Validates</h3>
+                            <p>Comprehensive health checks</p>
+                        </div>
+                        <div class="overview-item">
+                            <div class="overview-icon">📊</div>
+                            <h3>Monitors</h3>
+                            <p>Real-time metrics for 30 seconds</p>
+                        </div>
+                        <div class="overview-item">
+                            <div class="overview-icon">🛡️</div>
+                            <h3>Demonstrates</h3>
+                            <p>Byzantine fault tolerance</p>
+                        </div>
+                        <div class="overview-item">
+                            <div class="overview-icon">⚡</div>
+                            <h3>Validates</h3>
+                            <p>QUIC transport layer</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="interactive-demo">
+                    <h2>⚡ Quick Start (2 minutes)</h2>
+                    
+                    <div class="demo-terminal-container">
+                        <div class="demo-controls">
+                            <button id="start-demo" class="btn btn-primary">Run Demo</button>
+                            <button id="step-mode" class="btn btn-secondary">Step by Step</button>
+                            <button id="reset-demo" class="btn btn-outline">Reset</button>
+                        </div>
+                        
+                        <div class="demo-terminal">
+                            <div class="terminal-header">
+                                <span class="terminal-button red"></span>
+                                <span class="terminal-button yellow"></span>
+                                <span class="terminal-button green"></span>
+                                <span class="terminal-title">Hypermesh Nexus - Hello World</span>
+                            </div>
+                            <div class="terminal-body" id="demo-output">
+                                <div class="terminal-line prompt-line">
+                                    <span class="prompt">$</span> ./deploy.sh
+                                </div>
+                                <div id="demo-cursor" class="terminal-cursor"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="manual-steps">
+                        <h3>Manual Steps</h3>
+                        <div class="step-instructions">
+                            <div class="step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Clone and Navigate</h4>
+                                    <div class="code-block">
+                                        <code>git clone https://github.com/hypermesh/nexus.git
+cd nexus/examples/hello-world</code>
+                                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Deploy Cluster</h4>
+                                    <div class="code-block">
+                                        <code>./deploy.sh</code>
+                                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                    </div>
+                                    <p class="step-description">This will automatically build, test, and deploy your cluster</p>
+                                </div>
+                            </div>
+
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Check Status</h4>
+                                    <div class="code-block">
+                                        <code>./status.sh --watch</code>
+                                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                    </div>
+                                    <p class="step-description">Watch real-time cluster status and metrics</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example-details">
+                    <h2>🔧 What Gets Deployed</h2>
+                    
+                    <div class="deployment-info">
+                        <div class="info-card">
+                            <h3>Node Configuration</h3>
+                            <ul>
+                                <li><strong>Cluster:</strong> hello-world-cluster</li>
+                                <li><strong>Nodes:</strong> 3 (local processes)</li>
+                                <li><strong>Environment:</strong> Development</li>
+                                <li><strong>Security:</strong> Basic TLS certificates</li>
+                                <li><strong>Monitoring:</strong> Built-in metrics enabled</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-card">
+                            <h3>Resource Requirements</h3>
+                            <div class="resource-grid">
+                                <div class="resource-item">
+                                    <strong>Per Node:</strong>
+                                    <ul>
+                                        <li>CPU: 1 core</li>
+                                        <li>RAM: 1GB</li>
+                                        <li>Storage: 10GB</li>
+                                        <li>Network: Local loopback</li>
+                                    </ul>
+                                </div>
+                                <div class="resource-item">
+                                    <strong>Total System:</strong>
+                                    <ul>
+                                        <li>CPU: 3 cores</li>
+                                        <li>RAM: 3GB</li>
+                                        <li>Storage: 30GB</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="available-scripts">
+                    <h2>📊 Available Scripts</h2>
+                    
+                    <div class="scripts-grid">
+                        <div class="script-card">
+                            <h3>./deploy.sh</h3>
+                            <p>Main deployment script</p>
+                            <div class="script-options">
+                                <div class="code-block">
+                                    <code># Default deployment
+./deploy.sh
+
+# With verbose output
+./deploy.sh --verbose
+
+# Interactive step-by-step
+./deploy.sh --step-by-step
+
+# Custom size
+./deploy.sh --size 5</code>
+                                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="script-card">
+                            <h3>./status.sh</h3>
+                            <p>Cluster status and monitoring</p>
+                            <div class="script-options">
+                                <div class="code-block">
+                                    <code># Quick status check
+./status.sh
+
+# Detailed status with metrics
+./status.sh --detailed
+
+# Watch real-time updates
+./status.sh --watch</code>
+                                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="script-card">
+                            <h3>./demo.sh</h3>
+                            <p>Interactive demonstrations</p>
+                            <div class="script-options">
+                                <div class="code-block">
+                                    <code># Run full demo with explanations
+./demo.sh
+
+# Quick silent demo
+./demo.sh --quiet
+
+# Demo specific component
+./demo.sh --component transport</code>
+                                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="script-card">
+                            <h3>./cleanup.sh</h3>
+                            <p>Stop cluster and cleanup</p>
+                            <div class="script-options">
+                                <div class="code-block">
+                                    <code># Stop cluster and clean up
+./cleanup.sh
+
+# Keep data for next run
+./cleanup.sh --keep-data
+
+# Force cleanup if processes stuck
+./cleanup.sh --force</code>
+                                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="learning-objectives">
+                    <h2>📖 Learning Objectives</h2>
+                    <p>After running this example, you'll understand:</p>
+                    
+                    <div class="objectives-grid">
+                        <div class="objective-card">
+                            <h3>✅ Core Concepts</h3>
+                            <ul>
+                                <li>How Nexus nodes discover each other</li>
+                                <li>Byzantine fault-tolerant consensus in action</li>
+                                <li>QUIC transport layer security</li>
+                                <li>Real-time metrics and monitoring</li>
+                            </ul>
+                        </div>
+
+                        <div class="objective-card">
+                            <h3>✅ Cluster Operations</h3>
+                            <ul>
+                                <li>Node bootstrapping process</li>
+                                <li>Health monitoring and status checks</li>
+                                <li>Graceful shutdown and cleanup</li>
+                                <li>Failure detection and recovery</li>
+                            </ul>
+                        </div>
+
+                        <div class="objective-card">
+                            <h3>✅ Performance Characteristics</h3>
+                            <ul>
+                                <li>Sub-second cluster formation</li>
+                                <li>&lt;10ms consensus latency</li>
+                                <li>Memory-safe, high-performance operation</li>
+                                <li>Built-in observability</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="next-steps-section">
+                    <h2>🎯 Next Steps</h2>
+                    
+                    <div class="next-examples-grid">
+                        <a href="production.html" class="next-example-card">
+                            <div class="example-icon">🏭</div>
+                            <h3>Production Cluster</h3>
+                            <p>5-node cluster with monitoring and security</p>
+                            <div class="example-meta">
+                                <span class="difficulty medium">Intermediate</span>
+                                <span class="time">10 mins</span>
+                            </div>
+                        </a>
+
+                        <a href="ha-cluster.html" class="next-example-card">
+                            <div class="example-icon">🔄</div>
+                            <h3>High Availability</h3>
+                            <p>Enterprise 7-node setup with failover</p>
+                            <div class="example-meta">
+                                <span class="difficulty hard">Advanced</span>
+                                <span class="time">15 mins</span>
+                            </div>
+                        </a>
+
+                        <a href="../docs/architecture.html" class="next-example-card">
+                            <div class="example-icon">🏗️</div>
+                            <h3>Architecture Guide</h3>
+                            <p>Understand how Nexus works</p>
+                            <div class="example-meta">
+                                <span class="difficulty easy">Reading</span>
+                                <span class="time">10 mins</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Hypermesh Nexus</h3>
+                    <p>The future of cloud infrastructure. Built with ❤️ in Rust.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Examples</h4>
+                    <ul>
+                        <li><a href="hello-world.html">Hello World</a></li>
+                        <li><a href="production.html">Production Cluster</a></li>
+                        <li><a href="ha-cluster.html">High Availability</a></li>
+                        <li><a href="../docs/quick-start.html">Quick Start</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../script.js"></script>
+    <script src="demo.js"></script>
+</body>
+</html>

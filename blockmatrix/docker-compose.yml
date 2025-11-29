@@ -1,0 +1,246 @@
+version: '3.8'
+
+services:
+  # Nexus Core Nodes
+  nexus-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: nexus-node-1
+    hostname: nexus-node-1
+    environment:
+      - NEXUS_NODE_ID=node-1
+      - NEXUS_NODE_NAME=nexus-node-1
+      - NEXUS_CLUSTER_BOOTSTRAP=nexus-node-1:7777,nexus-node-2:7777,nexus-node-3:7777
+      - NEXUS_LOG_LEVEL=info
+      - RUST_LOG=nexus=info
+    ports:
+      - "7777:7777/udp"
+      - "8080:8080"
+      - "9090:9090"
+    volumes:
+      - nexus-node-1-data:/var/lib/nexus
+      - nexus-node-1-logs:/var/log/nexus
+      - ./deploy/config:/etc/nexus:ro
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+
+  nexus-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: nexus-node-2
+    hostname: nexus-node-2
+    environment:
+      - NEXUS_NODE_ID=node-2
+      - NEXUS_NODE_NAME=nexus-node-2
+      - NEXUS_CLUSTER_BOOTSTRAP=nexus-node-1:7777,nexus-node-2:7777,nexus-node-3:7777
+      - NEXUS_LOG_LEVEL=info
+      - RUST_LOG=nexus=info
+    ports:
+      - "7778:7777/udp"
+      - "8081:8080"
+      - "9091:9090"
+    volumes:
+      - nexus-node-2-data:/var/lib/nexus
+      - nexus-node-2-logs:/var/log/nexus
+      - ./deploy/config:/etc/nexus:ro
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+
+  nexus-node-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: nexus-node-3
+    hostname: nexus-node-3
+    environment:
+      - NEXUS_NODE_ID=node-3
+      - NEXUS_NODE_NAME=nexus-node-3
+      - NEXUS_CLUSTER_BOOTSTRAP=nexus-node-1:7777,nexus-node-2:7777,nexus-node-3:7777
+      - NEXUS_LOG_LEVEL=info
+      - RUST_LOG=nexus=info
+    ports:
+      - "7779:7777/udp"
+      - "8082:8080"
+      - "9092:9090"
+    volumes:
+      - nexus-node-3-data:/var/lib/nexus
+      - nexus-node-3-logs:/var/log/nexus
+      - ./deploy/config:/etc/nexus:ro
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+
+  # Load Balancer
+  nexus-lb:
+    image: haproxy:2.8-alpine
+    container_name: nexus-lb
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./deploy/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./deploy/certs:/etc/ssl/certs:ro
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    depends_on:
+      - nexus-node-1
+      - nexus-node-2
+      - nexus-node-3
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: nexus-prometheus
+    ports:
+      - "9093:9090"
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: nexus-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=nexus123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Log Aggregation
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: nexus-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./deploy/monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: nexus-promtail
+    volumes:
+      - ./deploy/monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - nexus-node-1-logs:/var/log/nexus/node-1:ro
+      - nexus-node-2-logs:/var/log/nexus/node-2:ro
+      - nexus-node-3-logs:/var/log/nexus/node-3:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.48
+    container_name: nexus-jaeger
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - nexus-cluster
+    restart: unless-stopped
+
+  # Development Tools (optional)
+  nexus-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: nexus-dev
+    volumes:
+      - .:/usr/src/nexus
+      - cargo-cache:/usr/local/cargo/registry
+    environment:
+      - RUST_LOG=nexus=debug
+    networks:
+      - nexus-cluster
+    profiles:
+      - dev
+    stdin_open: true
+    tty: true
+
+networks:
+  nexus-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  nexus-node-1-data:
+  nexus-node-1-logs:
+  nexus-node-2-data:
+  nexus-node-2-logs:
+  nexus-node-3-data:
+  nexus-node-3-logs:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  cargo-cache:

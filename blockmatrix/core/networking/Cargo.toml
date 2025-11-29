@@ -1,0 +1,63 @@
+[package]
+name = "nexus-networking"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Service mesh and networking layer for Nexus with P2P discovery"
+
+[dependencies]
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+nexus-state = { path = "../state" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+tokio-stream = "0.1"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Networking
+futures = "0.3"
+socket2.workspace = true
+
+# Cryptography
+ring.workspace = true
+blake3.workspace = true
+
+# Time
+chrono.workspace = true
+rand.workspace = true
+
+# DNS and service discovery
+# hickory-resolver = ... # REMOVED: External DNS resolution NOT allowed (100% standalone)
+
+# Load balancing
+consistent_hash = "0.1"
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile = "3.8"
+tokio-test.workspace = true
+
+# Benchmarks would be defined here when implemented
+# [[bench]]
+# name = "service_discovery_bench"
+# harness = false

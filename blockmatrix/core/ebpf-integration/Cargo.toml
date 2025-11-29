@@ -1,0 +1,66 @@
+[package]
+name = "nexus-ebpf"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "eBPF integration for kernel-level networking and monitoring"
+
+[dependencies]
+# Nexus integration
+nexus-shared = { path = "../shared" }
+nexus-integration = { path = "../nexus-integration" }
+
+# eBPF libraries
+aya = "0.13"
+aya-log = "0.2"
+tokio = { workspace = true, features = ["full"] }
+
+# Networking
+libc = "0.2"
+nix = "0.27"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# System monitoring
+procfs = "0.16"
+sysinfo = "0.30"
+
+# Async utilities
+futures = "0.3"
+tokio-util.workspace = true
+
+# Random number generation
+rand.workspace = true
+
+# Async trait support
+async-trait = "0.1"
+
+# Build dependencies removed for compilation compatibility
+# [build-dependencies]
+# aya-build = "0.13"
+
+[features]
+default = ["network-monitor", "traffic-control"]
+network-monitor = []
+traffic-control = []
+load-balancing = []
+security-policies = []
+
+# Platform-specific features
+[target.'cfg(target_os = "linux")'.dependencies]
+caps = "0.5"
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio-test.workspace = true

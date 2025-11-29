@@ -1,0 +1,347 @@
+# MFN Benchmarking Framework Configuration
+# 
+# This configuration file defines all parameters for the MFN benchmarking framework
+# Modify these values to customize benchmark behavior, performance targets, and system parameters
+
+[general]
+# General benchmarking configuration
+version = "1.0.0"
+benchmark_name = "MFN Performance Validation"
+output_directory = "./benchmark-results"
+log_level = "info"
+enable_regression_detection = true
+performance_regression_threshold_percent = 5.0
+
+[execution]
+# Benchmark execution parameters
+default_flow_count = 10000
+default_duration_seconds = 60
+warmup_iterations = 100
+measurement_iterations = 1000
+statistical_confidence_level = 0.95
+concurrent_benchmark_limit = 4
+
+[targets]
+# Performance targets for validation
+
+[targets.layer1_ifr]
+# Layer 1 (Immediate Flow Registry) performance targets
+exact_matching_latency_ms = 0.1
+hash_table_lookup_ns = 50
+bloom_filter_lookup_ns = 10
+unix_socket_round_trip_us = 50
+cache_hit_rate_percent = 95.0
+target_improvement_percent = 88.6
+
+[targets.layer2_dsr]
+# Layer 2 (Data Similarity Registry) performance targets
+neural_similarity_latency_ms = 1.0
+lstm_training_batch_ms = 100
+pattern_recognition_us = 500
+adaptive_learning_ms = 10
+similarity_cache_lookup_us = 1
+
+[targets.layer3_alm]
+# Layer 3 (Adaptive Logic Manager) performance targets
+dijkstra_pathfinding_ms = 1.0
+multipath_routing_ms = 5.0
+load_balancing_us = 10
+topology_adaptation_ms = 100
+target_improvement_percent = 777
+
+[targets.layer4_cpe]
+# Layer 4 (Context Prediction Engine) performance targets
+lstm_prediction_ms = 2.0
+pattern_learning_ms = 50
+context_matching_ms = 1.0
+multi_scale_prediction_ms = 5.0
+attention_mechanism_ms = 10
+
+[targets.integration]
+# End-to-end integration performance targets
+end_to_end_latency_ms = 5.0
+throughput_gbps = 40.0
+concurrent_flows = 100000
+mfn_overhead_percent = 5.0
+memory_usage_mb_per_100k_flows = 1000
+
+[layer1]
+# Layer 1 specific configuration
+
+[layer1.hash_table]
+# Robin Hood hash table configuration
+default_table_size = 1048576
+load_factors = [0.25, 0.5, 0.75]
+hash_algorithm = "blake3"
+
+[layer1.bloom_filter]
+# Bloom filter bank configuration  
+filter_count = 16
+bits_per_filter = 131072
+hash_functions = 3
+
+[layer1.cache]
+# Flow cache configuration
+cache_size = 10000
+eviction_policy = "lru"
+cache_line_size = 64
+
+[layer1.ipc]
+# Unix socket IPC configuration
+socket_buffer_size = 65536
+socket_timeout_ms = 1000
+max_connections = 1000
+
+[layer2]
+# Layer 2 specific configuration
+
+[layer2.neural_network]
+# Neural network configuration
+input_dimension = 256
+hidden_size = 128
+sequence_length = 64
+batch_size = 32
+learning_rate = 0.01
+
+[layer2.similarity]
+# Similarity detection configuration
+similarity_threshold = 0.8
+cache_size = 10000
+clustering_algorithm = "kmeans"
+cluster_count = 20
+
+[layer2.pattern_recognition]
+# Pattern recognition system
+max_patterns = 5000
+feature_extraction_method = "pca"
+adaptation_frequency = 50
+
+[layer3]
+# Layer 3 specific configuration
+
+[layer3.routing]
+# Routing algorithm configuration
+default_topology_size = 1000
+edge_density = 0.25
+k_shortest_paths = 4
+routing_algorithm = "dijkstra"
+
+[layer3.load_balancing]
+# Load balancing configuration
+algorithm = "weighted_round_robin"
+server_count = 20
+health_check_interval_ms = 1000
+
+[layer3.topology]
+# Topology management
+adaptation_threshold = 0.1
+recomputation_interval_ms = 5000
+fault_tolerance_strategy = "fast_reroute"
+
+[layer3.caching]
+# Route caching configuration
+cache_size = 50000
+cache_algorithm = "lru"
+cache_ttl_seconds = 300
+
+[layer4]
+# Layer 4 specific configuration
+
+[layer4.prediction]
+# Context prediction configuration
+context_dimension = 256
+sequence_length = 64
+hidden_size = 128
+prediction_horizon = 5
+attention_heads = 8
+
+[layer4.learning]
+# Adaptive learning configuration
+learning_rate = 0.01
+adaptation_threshold = 0.1
+pattern_complexity = 100
+window_size = 100
+
+[layer4.compression]
+# Context compression
+compression_ratio = 0.5
+compression_algorithm = "autoencoder"
+
+[layer4.caching]
+# Context caching
+cache_size = 50000
+cache_strategy = "adaptive"
+similarity_threshold = 0.9
+
+[integration]
+# Integration testing configuration
+
+[integration.concurrency]
+# Concurrent processing configuration
+max_concurrent_flows = 100000
+flow_generation_rate = 10000  # flows per second
+test_duration_seconds = 300
+
+[integration.network]
+# Network simulation configuration
+simulate_network_latency_ms = 2.0
+simulate_packet_loss_percent = 0.1
+bandwidth_limit_gbps = 100.0
+jitter_ms = 0.5
+
+[integration.fault_injection]
+# Fault injection for resilience testing
+enable_fault_injection = false
+node_failure_rate = 0.01
+link_failure_rate = 0.05
+recovery_time_ms = 1000
+
+[baseline]
+# Baseline system configuration for comparison
+
+[baseline.simulation]
+# Baseline simulation parameters
+enable_network_calls = true
+simulate_database_lookups = true
+simulate_ml_inference = true
+network_latency_ms = 2.0
+database_latency_ms = 5.0
+ml_inference_latency_ms = 50.0
+error_rate_percent = 1.0
+
+[baseline.system]
+# Baseline system characteristics
+topology_nodes = 1000
+topology_density = 0.3
+routing_algorithm = "ospf"
+load_balancing = "round_robin"
+
+[memory]
+# Memory profiling configuration
+
+[memory.profiling]
+# Memory profiling settings
+enable_profiling = false
+sample_interval_ms = 100
+track_allocations = true
+detect_leaks = true
+memory_limit_mb = 8192
+
+[memory.limits]
+# Memory usage limits
+max_heap_size_mb = 4096
+max_rss_mb = 6144
+gc_pressure_threshold = 0.8
+
+[network]
+# Network benchmarking configuration
+
+[network.testing]
+# Network performance testing
+enable_network_tests = true
+tcp_buffer_size = 65536
+connection_pool_size = 1000
+keepalive_timeout_ms = 30000
+
+[network.protocols]
+# Protocol-specific settings
+enable_quic = true
+enable_tcp = true
+enable_udp = true
+preferred_protocol = "quic"
+
+[reporting]
+# Reporting and visualization configuration
+
+[reporting.output]
+# Output format configuration
+generate_html_report = true
+generate_json_report = true
+generate_csv_export = true
+generate_plots = true
+
+[reporting.visualization]
+# Chart and plot configuration
+chart_width = 800
+chart_height = 600
+color_scheme = "default"
+include_confidence_intervals = true
+
+[reporting.metrics]
+# Metrics collection
+collect_system_metrics = true
+collect_application_metrics = true
+metrics_retention_days = 30
+
+[dashboard]
+# Real-time dashboard configuration
+
+[dashboard.server]
+# Dashboard server settings
+port = 3030
+bind_address = "127.0.0.1"
+enable_cors = true
+static_files_path = "./dashboard/static"
+
+[dashboard.websocket]
+# WebSocket configuration for live updates
+update_interval_ms = 1000
+max_connections = 100
+buffer_size = 1024
+
+[dashboard.alerts]
+# Alert configuration
+enable_alerts = true
+performance_threshold_percent = 10.0
+memory_threshold_mb = 2048
+latency_threshold_ms = 100
+
+[statistical]
+# Statistical analysis configuration
+
+[statistical.analysis]
+# Statistical analysis parameters
+confidence_level = 0.95
+outlier_detection_method = "iqr"
+outlier_threshold = 1.5
+min_sample_size = 100
+
+[statistical.regression]
+# Performance regression detection
+regression_detection_algorithm = "t_test"
+significance_level = 0.05
+minimum_effect_size = 0.1
+historical_baseline_days = 30
+
+[ci_cd]
+# Continuous Integration/Deployment configuration
+
+[ci_cd.automation]
+# Automated testing configuration
+enable_automated_benchmarks = true
+benchmark_frequency_hours = 24
+regression_gate_enabled = true
+performance_budget_enabled = true
+
+[ci_cd.thresholds]
+# CI/CD performance thresholds
+build_failure_regression_percent = 10.0
+warning_regression_percent = 5.0
+benchmark_timeout_minutes = 60
+
+[development]
+# Development and debugging configuration
+
+[development.debugging]
+# Debug configuration
+enable_debug_logging = false
+verbose_output = false
+save_intermediate_results = false
+enable_profiling_hooks = false
+
+[development.testing]
+# Test configuration
+enable_unit_tests = true
+enable_integration_tests = true
+test_data_directory = "./test-data"
+mock_external_services = false

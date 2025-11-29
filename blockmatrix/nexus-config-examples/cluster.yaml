@@ -1,0 +1,315 @@
+# Nexus Cluster Configuration Example
+apiVersion: nexus.io/v1
+kind: Cluster
+metadata:
+  name: production-cluster
+  labels:
+    environment: production
+    team: platform
+  annotations:
+    nexus.io/description: "Production HyperMesh cluster"
+    nexus.io/managed-by: "nexus-cli"
+
+spec:
+  # Cluster version
+  version: v1.0.0
+  
+  # Cloud provider configuration
+  provider:
+    type: aws
+    region: us-west-2
+    zones:
+    - us-west-2a
+    - us-west-2b
+    - us-west-2c
+    credentials:
+      # Use IAM roles or environment variables - NEVER hardcode credentials
+      # accessKeyId: ${AWS_ACCESS_KEY_ID}
+      # secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+  
+  # Node configuration
+  nodes:
+    # Control plane nodes
+    controller:
+      count: 3
+      instanceType: m5.large
+      diskSize: 100Gi
+      diskType: gp3
+      labels:
+        node-role.nexus.io/controller: ""
+      taints:
+      - key: node-role.nexus.io/controller
+        value: ""
+        effect: NoSchedule
+      
+    # Worker nodes
+    worker:
+      count: 5
+      instanceType: m5.xlarge
+      diskSize: 200Gi
+      diskType: gp3
+      labels:
+        node-role.nexus.io/worker: ""
+      
+      # Auto-scaling configuration
+      autoScaling:
+        enabled: true
+        minNodes: 3
+        maxNodes: 20
+        scaleUpDelay: 300s
+        scaleDownDelay: 600s
+        targetCpuUtilization: 80
+        targetMemoryUtilization: 80
+  
+  # Networking configuration
+  networking:
+    # Network mode: p2p (peer-to-peer), hybrid, or traditional
+    mode: p2p
+    
+    # Network CIDR blocks
+    clusterCidr: 10.0.0.0/16
+    serviceCidr: 10.1.0.0/16
+    podCidr: 10.2.0.0/16
+    
+    # Service mesh configuration
+    mesh:
+      enabled: true
+      mtls:
+        mode: STRICT
+        allowPlaintext: false
+      policy:
+        defaultRule: DENY
+        egressPolicy: REGISTRY_ONLY
+      
+      # Traffic management
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+        connectionPool:
+          tcp:
+            maxConnections: 100
+            connectTimeout: 30s
+          http:
+            http1MaxPendingRequests: 10
+            maxRequestsPerConnection: 2
+        outlierDetection:
+          consecutiveErrors: 5
+          interval: 30s
+          baseEjectionTime: 30s
+          maxEjectionPercent: 50
+    
+    # Ingress configuration
+    ingress:
+      enabled: true
+      class: nexus
+      defaultBackend:
+        service: default-backend
+        port: 80
+      tls:
+        enabled: true
+        certManager: true
+  
+  # Storage configuration
+  storage:
+    defaultClass: fast-ssd
+    classes:
+    - name: fast-ssd
+      type: gp3
+      parameters:
+        type: gp3
+        iops: "3000"
+        throughput: "125"
+        fsType: ext4
+        encrypted: "true"
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+      allowVolumeExpansion: true
+    
+    - name: bulk-storage
+      type: gp2
+      parameters:
+        type: gp2
+        fsType: ext4
+        encrypted: "true"
+      reclaimPolicy: Retain
+      volumeBindingMode: Immediate
+      allowVolumeExpansion: true
+  
+  # Security configuration
+  security:
+    # Role-based access control
+    rbac:
+      enabled: true
+      defaultPolicies: true
+    
+    # Network policies
+    networkPolicy:
+      enabled: true
+      defaultDenyAll: true
+    
+    # Pod security
+    podSecurityPolicy:
+      enabled: true
+      defaultPolicy: restricted
+    
+    # Encryption
+    encryption:
+      # Encrypt data at rest
+      atRest:
+        enabled: true
+        provider: aws-kms
+        keyId: ${AWS_KMS_KEY_ARN}  # Set via environment variable
+      
+      # Encrypt data in transit
+      inTransit:
+        enabled: true
+        protocol: TLS
+        minVersion: "1.2"
+    
+    # Certificate management
+    certificates:
+      authority: nexus-ca
+      autoRotation: true
+      rotationInterval: 8760h # 1 year
+      
+    # Audit logging
+    audit:
+      enabled: true
+      level: Metadata
+      backend:
+        type: webhook
+        webhook:
+          url: https://audit.company.com/nexus
+          format: json
+  
+  # Monitoring configuration
+  monitoring:
+    enabled: true
+    
+    # Metrics collection
+    metrics:
+      enabled: true
+      interval: 30s
+      retention: 30d
+      storage:
+        size: 100Gi
+        class: fast-ssd
+    
+    # Logging
+    logging:
+      enabled: true
+      level: info
+      retention: 14d
+      storage:
+        size: 50Gi
+        class: bulk-storage
+      
+      # Log forwarding
+      forwarding:
+        enabled: true
+        destinations:
+        - type: elasticsearch
+          endpoint: https://elasticsearch.company.com:9200
+          index: nexus-logs
+        - type: webhook
+          endpoint: https://logs.company.com/webhook
+    
+    # Alerting
+    alerting:
+      enabled: true
+      rules:
+      - name: HighCpuUsage
+        condition: cpu_usage > 90
+        duration: 5m
+        severity: warning
+        message: "High CPU usage detected"
+      
+      - name: NodeDown
+        condition: node_status != "Ready"
+        duration: 1m
+        severity: critical
+        message: "Node is not ready"
+      
+      # Alert destinations
+      destinations:
+        slack:
+          webhook: https://hooks.slack.com/services/xxx/yyy/zzz
+          channel: "#alerts"
+        email:
+          smtp:
+            server: smtp.company.com:587
+            username: alerts@company.com
+            password: xxx
+          to:
+          - oncall@company.com
+          - platform-team@company.com
+  
+  # Backup configuration
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention: 30d
+    storage:
+      type: s3
+      bucket: nexus-cluster-backups
+      region: us-west-2
+      path: production-cluster/
+    
+    # What to backup
+    include:
+    - cluster-state
+    - certificates
+    - configurations
+    - persistent-volumes
+  
+  # Feature flags
+  features:
+    # Enable experimental features
+    experimental:
+      webassembly: false
+      quantumNetworking: false
+    
+    # ML-powered scheduling
+    mlScheduling:
+      enabled: true
+      modelVersion: v2.1
+      
+    # Advanced networking
+    advancedNetworking:
+      enabled: true
+      ebpfPrograms: true
+      networkPoliciesV2: true
+    
+    # Resource optimization
+    resourceOptimization:
+      enabled: true
+      autoTuning: true
+      predictiveScaling: true
+
+# Cluster-specific addons
+addons:
+- name: monitoring-stack
+  enabled: true
+  version: v1.2.0
+  config:
+    prometheus:
+      retention: 30d
+    grafana:
+      adminPassword: auto-generated
+      
+- name: logging-stack
+  enabled: true
+  version: v1.1.0
+  config:
+    elasticsearch:
+      replicas: 3
+      storage: 100Gi
+    kibana:
+      enabled: true
+      
+- name: service-mesh
+  enabled: true
+  version: v1.0.0
+  config:
+    mtls: strict
+    telemetry: v2

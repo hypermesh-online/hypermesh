@@ -1,0 +1,442 @@
+# Nexus Service Configuration Example
+apiVersion: nexus.io/v1
+kind: Service
+metadata:
+  name: web-application
+  namespace: production
+  labels:
+    app: web-app
+    version: v2.1.0
+    tier: frontend
+    environment: production
+  annotations:
+    nexus.io/description: "Main web application service"
+    nexus.io/team: "frontend-team"
+    nexus.io/contacts: "frontend-team@company.com"
+
+spec:
+  # Replica configuration
+  replicas: 5
+  
+  # Selector for pods
+  selector:
+    matchLabels:
+      app: web-app
+      version: v2.1.0
+  
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: web-app
+        version: v2.1.0
+        tier: frontend
+      annotations:
+        nexus.io/sidecar-inject: "true"
+        nexus.io/metrics-scrape: "true"
+        nexus.io/metrics-port: "9090"
+    
+    spec:
+      # Container specifications
+      containers:
+      - name: web-app
+        image: company/web-app:v2.1.0
+        
+        # Port configuration
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        # Environment variables
+        env:
+        - name: ENV
+          value: production
+        - name: LOG_LEVEL
+          value: info
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: cache-config
+              key: redis-url
+        
+        # Resource requirements
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            httpHeaders:
+            - name: X-Health-Check
+              value: liveness
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            httpHeaders:
+            - name: X-Health-Check
+              value: readiness
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        
+        # Startup probe (for slow-starting containers)
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        
+        # Volume mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        - name: temp-volume
+          mountPath: /tmp
+      
+      # Sidecar container
+      - name: log-shipper
+        image: fluent/fluent-bit:1.9.0
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: log-config
+          mountPath: /fluent-bit/etc
+          readOnly: true
+        - name: log-volume
+          mountPath: /var/log
+      
+      # Volume specifications
+      volumes:
+      - name: config-volume
+        configMap:
+          name: web-app-config
+          defaultMode: 0644
+      - name: log-config
+        configMap:
+          name: fluent-bit-config
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: web-app-data
+      - name: temp-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: log-volume
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Container security
+      containers[0].securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop:
+          - ALL
+          add:
+          - NET_BIND_SERVICE
+      
+      # Image pull secrets
+      imagePullSecrets:
+      - name: docker-registry-secret
+      
+      # Node selection
+      nodeSelector:
+        node-type: frontend
+        zone: us-west-2a
+      
+      # Pod affinity/anti-affinity
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: web-app
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - frontend
+                - general
+      
+      # Tolerations
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: frontend
+        effect: NoSchedule
+      
+      # Service account
+      serviceAccountName: web-app-sa
+      
+      # DNS configuration
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+      
+      # Restart policy
+      restartPolicy: Always
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+      
+      # Priority
+      priorityClassName: high-priority
+      
+      # Host network settings
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+  
+  # Deployment strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  
+  # History limit
+  revisionHistoryLimit: 10
+  
+  # Progress deadline
+  progressDeadlineSeconds: 600
+
+# Service networking
+---
+apiVersion: nexus.io/v1
+kind: ServiceNetwork
+metadata:
+  name: web-application-network
+  namespace: production
+spec:
+  # Service selection
+  selector:
+    matchLabels:
+      app: web-app
+  
+  # Port configuration
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+  
+  # Service type
+  type: ClusterIP
+  
+  # Load balancer configuration (if type is LoadBalancer)
+  loadBalancer:
+    class: nexus-lb
+    annotations:
+      nexus.io/load-balancer-type: application
+      nexus.io/health-check-path: /health
+  
+  # Session affinity
+  sessionAffinity: None
+  
+  # Traffic policies
+  trafficPolicy:
+    # Load balancing
+    loadBalancer:
+      simple: ROUND_ROBIN
+      consistentHash:
+        httpHeaderName: "x-session-id"
+    
+    # Connection pooling
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 64
+        http2MaxRequests: 1024
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        h2UpgradePolicy: UPGRADE
+    
+    # Outlier detection
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+    
+    # Circuit breaker
+    circuitBreaker:
+      thresholds:
+        maxConnections: 1000
+        maxPendingRequests: 100
+        maxRequests: 1000
+        maxRetries: 3
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    hosts:
+    - host: web-app.company.com
+      paths:
+      - path: /
+        pathType: Prefix
+        service:
+          name: web-application
+          port: 80
+    - host: api.company.com
+      paths:
+      - path: /v2
+        pathType: Prefix
+        service:
+          name: web-application
+          port: 80
+    
+    # TLS configuration
+    tls:
+    - secretName: web-app-tls
+      hosts:
+      - web-app.company.com
+      - api.company.com
+    
+    # Ingress class
+    ingressClassName: nexus
+    
+    # Annotations
+    annotations:
+      nexus.io/ssl-redirect: "true"
+      nexus.io/rate-limit: "100rpm"
+      nexus.io/timeout: "30s"
+      nexus.io/cors-enabled: "true"
+      nexus.io/cors-origins: "*"
+
+# Auto-scaling configuration
+---
+apiVersion: nexus.io/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-application-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: nexus.io/v1
+    kind: Service
+    name: web-application
+  
+  minReplicas: 3
+  maxReplicas: 20
+  
+  # Metrics for scaling decisions
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  - type: External
+    external:
+      metric:
+        name: queue_messages_ready
+        selector:
+          matchLabels:
+            queue: web-app-queue
+      target:
+        type: Value
+        value: "100"
+  
+  # Scaling behavior
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max

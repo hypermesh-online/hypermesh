@@ -1,0 +1,49 @@
+[package]
+name = "nexus-examples"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Nexus Core demonstration examples"
+
+[dependencies]
+# Nexus components
+nexus-transport = { path = "../transport" }
+nexus-runtime = { path = "../runtime" }
+nexus-state = { path = "../state" }
+nexus-networking = { path = "../networking" }
+nexus-scheduler = { path = "../scheduler" }
+nexus-shared = { path = "../shared" }
+
+# Async runtime
+tokio.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Testing utilities
+tempfile.workspace = true
+
+# File system
+toml.workspace = true
+
+[[bin]]
+name = "transport-demo"
+path = "src/transport-demo.rs"
+
+[[bin]]
+name = "state-demo"
+path = "src/state-demo.rs"
+
+[[bin]]
+name = "runtime-demo"
+path = "src/runtime-demo.rs"
+
+[[bin]]
+name = "scheduler-demo"
+path = "src/scheduler-demo.rs"
+
+[[bin]]
+name = "nexus-demo"
+path = "src/nexus-demo.rs"

@@ -1,0 +1,53 @@
+[package]
+name = "nexus-integration"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Integration layer connecting all Nexus core components"
+
+[dependencies]
+# All Nexus core components
+nexus-shared = { path = "../shared" }
+nexus-transport = { path = "../transport" }
+nexus-runtime = { path = "../runtime" }
+nexus-state = { path = "../state" }
+nexus-networking = { path = "../networking" }
+nexus-scheduler = { path = "../scheduler" }
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+
+# Time
+chrono.workspace = true
+
+# Configuration
+toml.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true
+tokio-test.workspace = true
+
+[features]
+default = ["integration-tests"]
+integration-tests = []
+benchmarks = []

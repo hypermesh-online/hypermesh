@@ -1,0 +1,54 @@
+[package]
+name = "mfn-integration-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Core testing
+tokio.workspace = true
+tokio-test.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+
+# Performance testing
+criterion.workspace = true
+histogram = "0.6"
+hdrhistogram = "7.5"
+
+# Network and IPC
+socket2.workspace = true
+mio = { version = "0.8", features = ["os-poll", "net"] }
+
+# Metrics and monitoring  
+lazy_static = "1.4"
+
+# Utilities
+tracing.workspace = true
+tracing-subscriber.workspace = true
+rand = "0.8"
+tempfile.workspace = true
+futures.workspace = true
+
+[[bench]]
+name = "full_stack_performance"
+harness = false
+
+[[bench]]
+name = "layer_integration"
+harness = false
+
+[[bench]]
+name = "end_to_end_latency"
+harness = false
+
+[[test]]
+name = "integration_comprehensive"
+path = "tests/comprehensive_test.rs"

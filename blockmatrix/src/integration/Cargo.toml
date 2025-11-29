@@ -1,0 +1,51 @@
+[package]
+name = "hypermesh-integration"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Core HyperMesh components
+hypermesh-transport = { path = "../transport" }
+hypermesh-consensus = { path = "../consensus" }
+hypermesh-container = { path = "../container" }
+hypermesh-security = { path = "../security" }
+hypermesh-orchestration = { path = "../orchestration" }
+# stoq = { path = "../../protocols/stoq" }  # Temporarily disabled due to compilation issues
+
+# Async runtime
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Configuration
+clap = { workspace = true }
+
+# Async utilities
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Metrics
+
+# Additional dependencies
+uuid = "1.0"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = { workspace = true }

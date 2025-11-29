@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-config
+  namespace: nexus-system
+  labels:
+    app.kubernetes.io/name: nexus
+data:
+  nexus.toml: |
+    [node]
+    name = "${NEXUS_NODE_NAME}"
+    data_dir = "/var/lib/nexus/data"
+    max_cpu_cores = 0
+    max_memory_mb = 0
+
+    [transport]
+    bind_address = "::"
+    port = 7777
+    max_connections = 10000
+    connection_timeout_ms = 30000
+    keep_alive_ms = 5000
+    max_packet_size = 1400
+    enable_migration = true
+
+    [security]
+    cert_path = "/var/lib/nexus/certs/tls.crt"
+    key_path = "/var/lib/nexus/certs/tls.key"
+    ca_bundle_path = "/var/lib/nexus/certs/ca.crt"
+    require_client_cert = true
+    cert_rotation_hours = 24
+    encrypt_at_rest = true
+    key_derivation_rounds = 100000
+
+    [storage]
+    backend = "RocksDB"
+    max_size_mb = 8192
+    compaction_threshold = 0.8
+    backup_interval_minutes = 60
+    backup_retention_count = 7
+    enable_wal = true
+    wal_sync_mode = "Normal"
+
+    [logging]
+    level = "info"
+    format = "json"
+    file_enabled = true
+    file_path = "/var/log/nexus/nexus.log"
+    max_file_size_mb = 100
+    max_files = 10
+    structured = true
+    metrics_enabled = true
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nexus-tls-certs
+  namespace: nexus-system
+  labels:
+    app.kubernetes.io/name: nexus
+type: kubernetes.io/tls
+data:
+  # These should be generated or provided via cert-manager
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCi4uLgotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0t
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCi4uLgotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0t
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCi4uLgotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0t
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-monitoring
+  namespace: nexus-system
+  labels:
+    app.kubernetes.io/name: nexus
+    app.kubernetes.io/component: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      - "nexus-rules.yml"
+
+    scrape_configs:
+    - job_name: 'nexus-cluster'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - nexus-system
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: ${1}:9090
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod_name
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+
+  nexus-rules.yml: |
+    groups:
+    - name: nexus.rules
+      rules:
+      - alert: NexusNodeDown
+        expr: up{job="nexus-cluster"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nexus node {{ $labels.pod_name }} is down"
+          description: "Nexus node {{ $labels.pod_name }} has been down for more than 1 minute."
+
+      - alert: NexusHighMemoryUsage
+        expr: (container_memory_usage_bytes{pod=~"nexus-cluster-.*"} / container_spec_memory_limit_bytes) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.pod }}"
+          description: "Memory usage is above 80% for {{ $labels.pod }}"
+
+      - alert: NexusHighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total{pod=~"nexus-cluster-.*"}[5m]) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.pod }}"
+          description: "CPU usage is above 80% for {{ $labels.pod }}"
+
+      - alert: NexusConsensusFailure
+        expr: increase(nexus_consensus_failed_operations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Consensus failures detected"
+          description: "{{ $value }} consensus failures in the last 5 minutes"
+
+      - alert: NexusByzantineFaultDetected
+        expr: increase(nexus_byzantine_faults_detected_total[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Byzantine fault detected"
+          description: "Byzantine fault detection triggered on {{ $labels.pod_name }}"
