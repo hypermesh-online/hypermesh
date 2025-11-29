@@ -46,6 +46,6 @@ This library is dependency-free of other HyperMesh components and serves as the 
 ```
 hypermesh-lib (this crate)
     ├── Proof of State ← Used by all components
-    ├── Asset System ← Used by satchel, blockmatrix
+    ├── Asset System ← Used by blockmatrix
     └── Common Types ← Used everywhere
 ```
