@@ -705,23 +705,23 @@ impl CrossChainValidationManager {
 #[derive(Debug, thiserror::Error)]
 pub enum CrossChainValidationError {
     /// Network validation failed
-    #[error("Network validation failed for {network}: {error}")]
+    #[error("Network validation failed for {network_usage}: {error}")]
     NetworkValidationFailed { network_usage: String, error: String },
-    
+
     /// Zero-knowledge proof validation failed
     #[error("ZK proof validation failed for statement {statement_id}: {error}")]
     ZKProofValidationFailed { statement_id: String, error: String },
-    
+
     /// Insufficient permissions
     #[error("Insufficient permissions for cross-chain validation")]
     InsufficientPermissions,
-    
+
     /// Invalid validation rule
     #[error("Invalid validation rule: {rule_id}")]
     InvalidValidationRule { rule_id: String },
-    
+
     /// Network not found
-    #[error("Network not found: {network}")]
+    #[error("Network not found: {network_usage}")]
     NetworkNotFound { network_usage: String },
     
     /// Asset not found

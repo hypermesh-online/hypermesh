@@ -349,7 +349,7 @@ pub struct ConsensusProofVM {
     /// Blockchain integration
     blockchain: Arc<dyn BlockchainIntegration>,
     /// P2P router
-    p2p_router: Arc<P2PRouter>,
+    p2p_router: Arc<dyn P2PRouter>,
 }
 
 impl ConsensusProofVM {

@@ -48,7 +48,7 @@ impl Default for ConsensusApiConfig {
 /// Create and configure the consensus API server
 #[instrument(skip(validation_service))]
 pub async fn create_consensus_api_server(
-    validation_service: Arc<ConsensusValidationService>,
+    validation_service: Arc<dyn ConsensusValidationService>,
     config: ConsensusApiConfig,
 ) -> Result<Arc<StoqApiServer>> {
     info!("Creating HyperMesh consensus API server on {}:{}",
@@ -99,7 +99,7 @@ pub async fn create_consensus_api_server(
 
 /// Create a minimal consensus API server for testing
 pub async fn create_test_consensus_server(
-    validation_service: Arc<ConsensusValidationService>,
+    validation_service: Arc<dyn ConsensusValidationService>,
 ) -> Result<Arc<StoqApiServer>> {
     let config = ConsensusApiConfig {
         bind_address: "[::1]".to_string(), // IPv6 localhost

@@ -211,7 +211,7 @@ impl HyperMeshBlockData {
 /// Asset blockchain manager for HyperMesh
 pub struct AssetBlockchainManager {
     /// Consensus system for blockchain operations
-    consensus: Arc<Consensus>,
+    consensus: Arc<dyn Consensus>,
     /// Current node authority for asset operations
     node_authority: String,
 }

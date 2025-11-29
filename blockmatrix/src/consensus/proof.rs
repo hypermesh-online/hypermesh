@@ -8,13 +8,7 @@ pub use super::{
     // Core consensus proof
     ConsensusProof,
 
-    // Individual proof types (new names)
-    StakeProof,
-    TimeProof,
-    SpaceProof,
-    WorkProof,
-
-    // Legacy aliases
+    // Individual proof types
     StakeProof,
     TimeProof,
     SpaceProof,

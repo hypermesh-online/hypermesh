@@ -6,7 +6,7 @@
 
 use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
-use super::{ServiceEndpoint, EndpointMetrics, ServiceHealth};
+use super::{ServiceEndpoint, EndpointMetrics};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

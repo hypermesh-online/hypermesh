@@ -394,68 +394,8 @@ impl ConsensusVMPrimitive {
     }
 }
 
-impl Default for SpaceProof {
-    fn default() -> Self {
-        use crate::consensus::proof::NetworkPosition;
-        
-        Self::new(
-            "/tmp/default".to_string(),
-            NetworkPosition {
-                address: "::1".to_string(),
-                zone: "local".to_string(),
-                distance_metric: 0,
-            },
-            1024, // 1KB minimal space
-        )
-    }
-}
-
-impl Default for StakeProof {
-    fn default() -> Self {
-        use crate::consensus::proof::{AccessPermissions, AccessLevel};
-        
-        Self::new(
-            "default".to_string(),
-            "local-node".to_string(),
-            1, // Minimal authority
-            AccessPermissions {
-                read_level: AccessLevel::Private,
-                write_level: AccessLevel::None,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec![],
-            },
-            vec![],
-        )
-    }
-}
-
-impl Default for WorkProof {
-    fn default() -> Self {
-        // Create minimal work proof for testing
-        Self::new(
-            b"default-challenge",
-            1, // Minimal difficulty
-            "default".to_string(),
-        ).unwrap_or_else(|_| {
-            use crate::consensus::ConsensusError;
-            use std::time::SystemTime;
-            
-            Self {
-                nonce: 0,
-                difficulty: 1,
-                resource_type: "default".to_string(),
-                computation_hash: [0; 32],
-                completed_at: SystemTime::now(),
-            }
-        })
-    }
-}
-
-impl Default for TimeProof {
-    fn default() -> Self {
-        Self::new(0, None, 0)
-    }
-}
+// Note: Default implementations for SpaceProof, StakeProof, WorkProof, and TimeProof
+// are provided by TrustChain crate. We do not re-implement them here to avoid orphan rule violations.
 
 #[cfg(test)]
 mod tests {
