@@ -11,6 +11,10 @@ struct HealthCheckHandler;
 
 #[async_trait::async_trait]
 impl ApiHandler for HealthCheckHandler {
+    fn path(&self) -> &str {
+        "/api/health"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         Ok(ApiResponse::Json(json!({
             "status": "healthy",
@@ -26,6 +30,10 @@ struct ListAssetsHandler;
 
 #[async_trait::async_trait]
 impl ApiHandler for ListAssetsHandler {
+    fn path(&self) -> &str {
+        "/api/assets"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         Ok(ApiResponse::Json(json!([
             {
@@ -58,6 +66,10 @@ struct ListNodesHandler;
 
 #[async_trait::async_trait]
 impl ApiHandler for ListNodesHandler {
+    fn path(&self) -> &str {
+        "/api/nodes"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         Ok(ApiResponse::Json(json!([
             {
@@ -90,6 +102,10 @@ struct HyperMeshStatusHandler;
 
 #[async_trait::async_trait]
 impl ApiHandler for HyperMeshStatusHandler {
+    fn path(&self) -> &str {
+        "/api/status"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         Ok(ApiResponse::Json(json!({
             "network_health": "operational",

@@ -45,6 +45,10 @@ struct ListExtensionsHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ListExtensionsHandler {
+    fn path(&self) -> &str {
+        "/api/extensions"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         debug!("Listing extensions");
 
@@ -98,6 +102,10 @@ struct GetExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for GetExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -127,6 +135,10 @@ struct LoadExtensionRequest {
 
 #[async_trait::async_trait]
 impl ApiHandler for LoadExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/load"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -148,6 +160,10 @@ struct UnloadExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for UnloadExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/unload"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -172,6 +188,10 @@ struct ReloadExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ReloadExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/reload"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -196,6 +216,10 @@ struct PauseExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for PauseExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/pause"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -220,6 +244,10 @@ struct ResumeExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ResumeExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/resume"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -244,6 +272,10 @@ struct HandleExtensionRequestHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for HandleExtensionRequestHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/request"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -271,6 +303,10 @@ struct ValidateExtensionHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ValidateExtensionHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/validate"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -306,6 +342,10 @@ struct ExtensionStatusHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ExtensionStatusHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/:id/status"
+    }
+
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let id = req.path_params.get("id")
             .ok_or_else(|| ApiError::BadRequest("Missing extension ID".to_string()))?;
@@ -339,6 +379,10 @@ struct ExtensionMetricsHandler {
 
 #[async_trait::async_trait]
 impl ApiHandler for ExtensionMetricsHandler {
+    fn path(&self) -> &str {
+        "/api/extensions/metrics"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let metrics = self.manager.get_metrics().await;
 
@@ -359,6 +403,10 @@ struct HealthCheckHandler;
 
 #[async_trait::async_trait]
 impl ApiHandler for HealthCheckHandler {
+    fn path(&self) -> &str {
+        "/api/health"
+    }
+
     async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
         Ok(ApiResponse::Json(json!({
             "status": "healthy",
