@@ -5,7 +5,8 @@
 //! accuracy for intelligent service placement.
 
 use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
-use crate::{ServiceId, NodeId, ServiceEndpoint};
+use crate::{ServiceId, NodeId};
+use super::{ServiceEndpoint, EndpointMetrics, ServiceHealth};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
