@@ -422,7 +422,7 @@ impl HyperMeshContainerOrchestrator {
         // Additional validation through consensus VM
         let vm_config = self.consensus_vm.config();
         if vm_config.consensus_requirements.require_proof_of_space {
-            if consensus_proof.space_proof.allocated_size == 0 {
+            if consensus_proof.space_proof.total_size == 0 {
                 return Err(anyhow!("Space proof required but not provided"));
             }
         }

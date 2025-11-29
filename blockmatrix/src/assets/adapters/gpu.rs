@@ -445,13 +445,13 @@ impl AssetAdapter for GpuAssetAdapter {
         }
         
         // PoWork: Validate computational work (GPU provides high compute power)
-        if proof.work_proof.difficulty < 20 { // Higher difficulty for GPU
+        if proof.work_proof.computational_power < 20 { // Higher difficulty for GPU
             return Ok(false);
         }
         
         // PoTime: Validate temporal constraints (GPUs need tight synchronization)
-        let time_valid = proof.time_proof.logical_timestamp > 0 &&
-                        proof.time_proof.sequence_number > 0;
+        let time_valid = proof.time_proof.time_verification_timestamp > 0 &&
+                        proof.time_proof.nonce > 0;
         
         Ok(time_valid)
     }

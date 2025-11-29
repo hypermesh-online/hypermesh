@@ -544,7 +544,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         // Validate all four proofs with container-specific requirements
         
         // PoSpace: Validate container space allocation
-        if proof.space_proof.allocated_size == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         

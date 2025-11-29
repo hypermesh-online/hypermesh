@@ -396,13 +396,13 @@ impl AssetAdapter for CpuAssetAdapter {
         }
         
         // PoWork: CRITICAL for CPU - validate computational difficulty
-        if proof.work_proof.difficulty < 16 { // Minimum 16-bit difficulty for CPU
+        if proof.work_proof.computational_power < 16 { // Minimum 16-bit difficulty for CPU
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for CPU scheduling
-        let time_valid = proof.time_proof.logical_timestamp > 0 &&
-                        proof.time_proof.sequence_number > 0;
+        let time_valid = proof.time_proof.time_verification_timestamp > 0 &&
+                        proof.time_proof.nonce > 0;
         
         Ok(time_valid)
     }

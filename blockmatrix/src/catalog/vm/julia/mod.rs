@@ -480,10 +480,10 @@ impl JuliaVM {
             },
             ConsensusProofType::Work => {
                 if let Some(min_difficulty) = requirement.minimum_values.get("difficulty") {
-                    if (consensus_proof.work_proof.difficulty as u64) < *min_difficulty {
+                    if (consensus_proof.work_proof.computational_power as u64) < *min_difficulty {
                         return Err(anyhow::anyhow!(
                             "Insufficient work difficulty: required {}, got {}",
-                            min_difficulty, consensus_proof.work_proof.difficulty
+                            min_difficulty, consensus_proof.work_proof.computational_power
                         ));
                     }
                 }

@@ -247,9 +247,9 @@ class BlockchainStorage:
         wrapper.push_str(&format!(
             "    proof = ConsensusProof({:?}, {:?}, {:?}, {:?})\n",
             consensus_proof.space_proof.total_size,
-            consensus_proof.stake_proof.authority_level,
-            consensus_proof.work_proof.difficulty,
-            consensus_proof.time_proof.sequence_number
+            consensus_proof.stake_proof.stake_amount,
+            consensus_proof.work_proof.computational_power,
+            consensus_proof.time_proof.nonce
         ));
         wrapper.push_str("    \n");
         wrapper.push_str("    if validate_consensus_proof(proof)\n");

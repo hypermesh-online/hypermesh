@@ -363,12 +363,12 @@ impl AssetAdapter for MemoryAssetAdapter {
         }
         
         // PoWork: Validate computational work for memory allocation
-        if proof.work_proof.difficulty < 12 { // Lower difficulty for memory allocation
+        if proof.work_proof.computational_power < 12 { // Lower difficulty for memory allocation
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for memory management
-        let time_valid = proof.time_proof.logical_timestamp > 0;
+        let time_valid = proof.time_proof.time_verification_timestamp > 0;
         
         Ok(time_valid)
     }

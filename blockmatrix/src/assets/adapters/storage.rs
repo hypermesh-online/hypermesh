@@ -601,12 +601,12 @@ impl AssetAdapter for StorageAssetAdapter {
         }
         
         // PoWork: Validate computational work for storage management
-        if proof.work_proof.difficulty < 14 { // Medium difficulty for storage
+        if proof.work_proof.computational_power < 14 { // Medium difficulty for storage
             return Ok(false);
         }
         
         // PoTime: Validate temporal ordering for storage operations
-        let time_valid = proof.time_proof.logical_timestamp > 0;
+        let time_valid = proof.time_proof.time_verification_timestamp > 0;
         
         Ok(time_valid)
     }

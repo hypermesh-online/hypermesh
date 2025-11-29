@@ -289,7 +289,7 @@ impl ConsensusOperation {
         let mut result = hasher.finalize().to_vec();
         
         // Additional computational work based on difficulty
-        for _ in 0..self.consensus_proof.work_proof.difficulty {
+        for _ in 0..self.consensus_proof.work_proof.computational_power {
             hasher = Sha256::new();
             hasher.update(&result);
             result = hasher.finalize().to_vec();
@@ -316,7 +316,7 @@ impl ConsensusOperation {
         match operation_type {
             "load" => 1000,
             "store" => 2000,
-            "compute" => (self.consensus_proof.work_proof.difficulty as u64) * 1000,
+            "compute" => (self.consensus_proof.work_proof.computational_power as u64) * 1000,
             "sync" => 500,
             _ => 1500,
         }

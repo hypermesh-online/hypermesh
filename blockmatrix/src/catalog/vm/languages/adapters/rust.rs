@@ -456,9 +456,9 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
         julia_code.push_str(&format!(
             "proof = ConsensusProof({}, {}, {}, {})\n",
             consensus_proof.space_proof.total_size,
-            consensus_proof.stake_proof.authority_level,
-            consensus_proof.work_proof.difficulty,
-            consensus_proof.time_proof.sequence_number
+            consensus_proof.stake_proof.stake_amount,
+            consensus_proof.work_proof.computational_power,
+            consensus_proof.time_proof.nonce
         ));
         
         julia_code.push_str("\n");

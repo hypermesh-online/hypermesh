@@ -484,7 +484,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         // Validate all four proofs with network-specific requirements
         
         // PoSpace: Validate network space allocation
-        if proof.space_proof.allocated_size == 0 {
+        if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
         

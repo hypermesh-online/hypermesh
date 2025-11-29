@@ -106,6 +106,33 @@ impl ConsensusProof {
         self.work_proof.validate()
     }
 
+    /// Comprehensive validation of all four proofs with detailed error reporting
+    /// This is the async version required by BlockMatrix for detailed validation
+    pub async fn validate_comprehensive(&self) -> Result<bool> {
+        // Validate stake proof
+        if !self.stake_proof.validate() {
+            return Err(anyhow!("Stake proof validation failed: invalid stake amount or signature"));
+        }
+
+        // Validate time proof
+        if !self.time_proof.validate() {
+            return Err(anyhow!("Time proof validation failed: invalid timestamp or nonce"));
+        }
+
+        // Validate space proof
+        if !self.space_proof.validate() {
+            return Err(anyhow!("Space proof validation failed: invalid storage commitment"));
+        }
+
+        // Validate work proof
+        if !self.work_proof.validate() {
+            return Err(anyhow!("Work proof validation failed: invalid computational work"));
+        }
+
+        // All proofs passed comprehensive validation
+        Ok(true)
+    }
+
     /// Validate with specific requirements
     pub fn validate_with_requirements(&self, requirements: &ConsensusRequirements) -> bool {
         // Validate stake requirements
