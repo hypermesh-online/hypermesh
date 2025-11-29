@@ -165,7 +165,7 @@ pub struct AssetSecurity {
     pub consensus_required: bool,
     /// Certificate pinning requirements
     pub certificate_pinning: bool,
-    /// Hash validation algorithm (sha256, blake3, etc.)
+    /// Hash validation algorithm (sha256, sha512)
     pub hash_validation: String,
     /// Sandbox security level
     pub sandbox_level: String,

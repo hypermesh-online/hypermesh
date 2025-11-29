@@ -24,7 +24,7 @@ pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
 pub use ca::{TrustChainCA, CAConfig, CertificateRequest, IssuedCertificate};
 pub use ca::security_integration::{SecurityIntegratedCA, SecurityIntegrationConfig};
 pub use security::{SecurityMonitor, SecurityValidationResult, SecurityDashboard};
-pub use config::TrustChainConfig;
+pub use config::{TrustChainConfig, DnsConfig};
 pub use errors::{TrustChainError, Result};
 pub use stoq_client::{TrustChainStoqClient, TrustChainStoqConfig, ServiceEndpoint, ServiceType};
 pub use crypto::{PostQuantumCrypto, FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm};

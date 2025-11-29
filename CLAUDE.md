@@ -197,3 +197,4 @@ STOQ → needs certificate validation → TrustChain
 
 **Current Phase**: Integration and optimization with 40-50% core implementation complete
 **Next Milestone**: End-to-end testing and production hardening
+- we shouldn't be using HTTP at all .. everything should be running through STOQ.

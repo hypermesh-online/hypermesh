@@ -423,7 +423,7 @@ spec:
   security:
     consensus_required: {{consensus_required}}
     certificate_pinning: false
-    hash_validation: "blake3"
+    hash_validation: "sha256"
     sandbox_level: "standard"
     allowed_syscalls: []
     network_access:

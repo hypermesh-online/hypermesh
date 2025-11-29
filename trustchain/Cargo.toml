@@ -124,15 +124,11 @@ path = "src/lib.rs"
 
 
 [[bin]]
-name = "trustchain-server"
-path = "src/bin/trustchain-server.rs"
+name = "trustchain-stoq-server"
+path = "src/bin/trustchain-stoq-server.rs"
 
 [[bin]]
-name = "trustchain-simple"
-path = "src/bin/simple-server.rs"
-
-[[bin]]
-name = "trustchain-standalone"
-path = "src/bin/standalone-server.rs"
+name = "validate-deployment"
+path = "src/bin/validate-deployment.rs"
 
 # Profiles are managed at workspace level

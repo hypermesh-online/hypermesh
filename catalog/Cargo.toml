@@ -28,9 +28,11 @@ toml = { workspace = true }
 
 # Cryptography and hashing
 sha2 = { workspace = true }
-blake3 = { workspace = true }
 ring = { workspace = true }
 ed25519-dalek = { workspace = true }
+# Post-quantum cryptography for FALCON signatures
+pqcrypto-falcon = { workspace = true }
+pqcrypto-traits = { workspace = true }
 
 # Data structures
 dashmap = { workspace = true }
