@@ -1,6 +1,6 @@
 //! Cross-Chain Validation System for HyperMesh Matrix Chains
 //!
-//! Privacy-preserving cross-chain validation following NKrypt patterns.
+//! Privacy-preserving cross-chain validation following Proof of State patterns.
 //! Enables multi-entity validation workflows without exposing sensitive data.
 //! Supports real-world business interactions like car purchasing across multiple
 //! blockchain networks (Honda→Dealer→Bank→Insurance→DMV).

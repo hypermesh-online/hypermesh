@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::AssetId;
 use super::status::AssetStatus;
 
-/// Privacy levels for asset sharing (from NKrypt patterns)
+/// Privacy levels for asset sharing (from Proof of State patterns)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrivacyLevel {
     /// Internal network only, no external access

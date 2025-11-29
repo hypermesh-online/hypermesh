@@ -11,9 +11,9 @@ use catalog::{
     CatalogExtension, CatalogConfig, AssetLibrary, Package, PackageVersion,
     DistributionConfig, P2PNode, SecurityConfig, ValidationReport,
 };
-use hypermesh::assets::core::{AssetManager, AssetType, PrivacyLevel, AssetId};
-use hypermesh::extensions::{Extension, ExtensionRequest, ExtensionResponse};
-use hypermesh::consensus::{ConsensusProof, ProofType};
+use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyLevel, AssetId};
+use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
+use blockmatrix::consensus::{ConsensusProof, ProofType};
 use stoq::transport::{QuicTransport, TransportConfig};
 use trustchain::{CertificateChain, TrustChainClient, VerificationResult};
 use std::collections::{HashMap, HashSet};

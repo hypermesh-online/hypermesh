@@ -4,7 +4,7 @@
 
 This deep technical analysis reveals **significant architectural claims vs. implementation gaps** across the HyperMesh/TrustChain ecosystem. While core components exist and compile, the implementation shows **incomplete abstractions**, **architectural inconsistencies**, and **substantial technical debt**.
 
-## 1. NKrypt Four-Proof Consensus System
+## 1. Proof of State Four-Proof Consensus System
 
 ### **CLAIMS**
 - Complete implementation of PoSpace, PoStake, PoWork, PoTime
@@ -12,7 +12,7 @@ This deep technical analysis reveals **significant architectural claims vs. impl
 - Byzantine fault tolerance with malicious node detection
 
 ### **REALITY**
-✅ **IMPLEMENTED**: Basic proof structures exist in `/hypermesh/src/consensus/nkrypt_integration.rs`
+✅ **IMPLEMENTED**: Basic proof structures exist in `/hypermesh/src/consensus/proof_of_state_integration.rs`
 - All four proof types (Space, Stake, Work, Time) are defined
 - Basic validation logic present
 - Cryptographic signatures using SHA256

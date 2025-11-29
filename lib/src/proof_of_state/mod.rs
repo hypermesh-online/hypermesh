@@ -1,12 +1,12 @@
 //! HyperMesh Consensus System
 //!
-//! This module provides the NKrypt four-proof consensus system implementation
+//! This module provides the Proof of State four-proof consensus system implementation
 //! for HyperMesh distributed computing.
 
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 
-pub mod nkrypt_integration;
+pub mod proof_of_state_integration;
 pub mod proof;
 pub mod engine;
 pub mod validation_service;
@@ -151,9 +151,9 @@ pub struct Vote {
 }
 
 // Re-export main types
-pub use nkrypt_integration::{
+pub use proof_of_state_integration::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    NKryptConsensus,
+    ProofOfStateConsensus,
 };
 
 // Legacy aliases for compatibility

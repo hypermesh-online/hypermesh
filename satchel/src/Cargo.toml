@@ -69,8 +69,8 @@ name = "cross_chain_validation_demo"
 path = "examples/cross_chain_validation_demo.rs"
 
 [[example]]
-name = "nkrypt_consensus_integration_demo"
-path = "examples/nkrypt_consensus_integration_demo.rs"
+name = "proof_of_state_consensus_integration_demo"
+path = "examples/proof_of_state_consensus_integration_demo.rs"
 
 [features]
 default = ["monitoring"]

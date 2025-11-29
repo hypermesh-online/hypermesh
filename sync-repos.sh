@@ -408,7 +408,7 @@ create_trustchain_readme() {
     cat > "$1" << 'EOF'
 # TrustChain Certificate Authority
 
-CA/CT/DNS bootstrap foundation with NKrypt consensus validation.
+CA/CT/DNS bootstrap foundation with Proof of State consensus validation.
 
 ## Overview
 
@@ -437,7 +437,7 @@ TrustChain provides the security foundation for the HyperMesh ecosystem:
 - **Certificate Transparency**: Merkle tree proofs and SCT generation
 - **DNS-over-QUIC**: IPv6-only DNS server with certificate validation
 - **API Layer**: REST endpoints for certificate lifecycle management
-- **Consensus Integration**: NKrypt four-proof validation system
+- **Consensus Integration**: Proof of State four-proof validation system
 
 ### Security Features
 - **IPv6-Only Networking**: Complete IPv4 elimination
@@ -491,7 +491,7 @@ copy_shared_docs() {
             [[ -f "$BASE_DIR/BOOTSTRAP_ROADMAP.md" ]] && cp "$BASE_DIR/BOOTSTRAP_ROADMAP.md" "$target_dir/"
             ;;
         "stoq"|"hypermesh"|"trustchain")
-            [[ -f "$BASE_DIR/NKRYPT_CONSENSUS_INTEGRATION.spec" ]] && cp "$BASE_DIR/NKRYPT_CONSENSUS_INTEGRATION.spec" "$target_dir/"
+            [[ -f "$BASE_DIR/PROOF_OF_STATE_CONSENSUS_INTEGRATION.spec" ]] && cp "$BASE_DIR/PROOF_OF_STATE_CONSENSUS_INTEGRATION.spec" "$target_dir/"
             ;;
     esac
     

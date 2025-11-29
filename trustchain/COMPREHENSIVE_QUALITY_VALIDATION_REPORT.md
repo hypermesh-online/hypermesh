@@ -23,7 +23,7 @@ Four specialized agents conducted independent analysis revealing **critical misa
 
 | Component | Claimed Status | Actual Status | Gap Severity |
 |-----------|----------------|---------------|--------------|
-| **NKrypt Consensus** | ✅ Implemented | 🚧 40% Complete | CRITICAL |
+| **Proof of State Consensus** | ✅ Implemented | 🚧 40% Complete | CRITICAL |
 | **HyperMesh Assets** | ✅ Core Complete | 🚧 25% Stub Functions | CRITICAL |
 | **STOQ Performance** | ✅ 40 Gbps | ❌ ~0.4 Gbps (100x gap) | CRITICAL |
 | **Remote Proxy/NAT** | 🚧 Highest Priority | ❌ 25% Implemented | CRITICAL |
@@ -44,7 +44,7 @@ Four specialized agents conducted independent analysis revealing **critical misa
   - Reality: Tests OpenSSL, not actual TrustChain implementation
 
 - **Consensus System Non-Functional**:
-  - Location: `/hypermesh/src/consensus/nkrypt_integration.rs:82-87`
+  - Location: `/hypermesh/src/consensus/proof_of_state_integration.rs:82-87`
   - Issue: Validation methods return hardcoded `true`
   - Missing: Blockchain integration, Byzantine fault tolerance
 

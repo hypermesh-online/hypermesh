@@ -31,7 +31,7 @@ The Web3 TrustChain ecosystem exhibits **systematic discrepancies** between docu
 | **QA Status** | "CONDITIONAL APPROVAL" | No real QA performed | **CRITICAL** |
 | **Implementation** | "Core systems operational" | Multiple compilation failures | **CRITICAL** |
 
-### 1.2 NKrypt Four-Proof Consensus System
+### 1.2 Proof of State Four-Proof Consensus System
 
 **Documentation Claims (Lines 57-66 CLAUDE.md):**
 - "✅ Implemented"
@@ -39,7 +39,7 @@ The Web3 TrustChain ecosystem exhibits **systematic discrepancies** between docu
 - Unified consensus answering WHERE/WHO/WHAT/WHEN
 
 **Actual Implementation:**
-- **FILE EXISTS**: `/hypermesh/src/consensus/nkrypt_integration.rs` ✅
+- **FILE EXISTS**: `/hypermesh/src/consensus/proof_of_state_integration.rs` ✅
 - **COMPLETENESS**: Basic structure only, ~30% implemented
 - **CRITICAL GAPS**:
   - No actual blockchain integration
@@ -47,7 +47,7 @@ The Web3 TrustChain ecosystem exhibits **systematic discrepancies** between docu
   - No network communication for consensus
   - Missing Byzantine fault tolerance
 
-**Evidence** (`nkrypt_integration.rs:82-87`):
+**Evidence** (`proof_of_state_integration.rs:82-87`):
 ```rust
 fn validate(&self) -> bool {
     // Validate space commitment and integrity
@@ -164,7 +164,7 @@ fn validate(&self) -> bool {
 | Asset Core | `/hypermesh/src/assets/core/mod.rs` | ✅ | Partial | 50% |
 | Asset Adapters | `/hypermesh/src/assets/adapters/` | ✅ | Stubbed | 70% |
 | Proxy/NAT | `/hypermesh/src/assets/proxy/` | ✅ | Minimal | 75% |
-| NKrypt Consensus | `/hypermesh/src/consensus/nkrypt_integration.rs` | ✅ | Basic | 70% |
+| Proof of State Consensus | `/hypermesh/src/consensus/proof_of_state_integration.rs` | ✅ | Basic | 70% |
 | STOQ Transport | `/stoq/src/transport/mod.rs` | ✅ | QUIC wrapper | 60% |
 
 ### 3.2 Missing Critical Components
@@ -184,7 +184,7 @@ fn validate(&self) -> bool {
 
 | Issue | Location | Severity | Impact |
 |-------|----------|----------|---------|
-| **Hardcoded validation** | `nkrypt_integration.rs` | **CRITICAL** | Consensus bypass possible |
+| **Hardcoded validation** | `proof_of_state_integration.rs` | **CRITICAL** | Consensus bypass possible |
 | **No authentication** | Asset allocation | **HIGH** | Unauthorized access |
 | **Missing encryption** | Proxy communication | **HIGH** | Data exposure |
 | **No rate limiting** | API endpoints | **MEDIUM** | DoS vulnerable |

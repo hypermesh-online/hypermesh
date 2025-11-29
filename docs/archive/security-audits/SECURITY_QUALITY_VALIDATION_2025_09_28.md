@@ -14,9 +14,9 @@ A comprehensive validation of the Web3 ecosystem reveals significant discrepanci
 
 ## 1. SECURITY ARCHITECTURE VALIDATION
 
-### 1.1 NKrypt Four-Proof Consensus System
+### 1.1 Proof of State Four-Proof Consensus System
 
-**Location**: `/hypermesh/src/consensus/nkrypt_integration.rs`
+**Location**: `/hypermesh/src/consensus/proof_of_state_integration.rs`
 
 #### Documentation Claims:
 - "Every asset requires ALL FOUR proofs (PoSpace, PoStake, PoWork, PoTime)"
@@ -205,7 +205,7 @@ stoq: ✅ Compiles with warnings
 
 | Component | Documentation Status | Implementation Status | Gap Severity |
 |-----------|---------------------|----------------------|--------------|
-| NKrypt Consensus | "✅ Implemented" | Partial mocks | CRITICAL |
+| Proof of State Consensus | "✅ Implemented" | Partial mocks | CRITICAL |
 | Remote Proxy/NAT | "CRITICAL priority" | Module stubs only | CRITICAL |
 | HyperMesh Assets | "✅ Core Complete" | Won't compile | CRITICAL |
 | Catalog | "✅ PROD READY" | 28 compile errors | CRITICAL |

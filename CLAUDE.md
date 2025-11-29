@@ -54,8 +54,8 @@
 
 ## 📋 **Core Architecture (Technical Reference)**
 
-### **NKrypt Four-Proof Consensus System (🚧 Design Only)**
-**Reference**: `/home/persist/repos/personal/NKrypt/src/` (original patterns)
+### **Proof of State Four-Proof Consensus System (🚧 Design Only)**
+**Reference**: `/home/persist/repos/personal/Proof of State/src/` (original patterns)
 
 **CRITICAL**: Every asset requires ALL FOUR proofs (not split by type):
 - **PoSpace (PoSp)**: WHERE - storage location and physical/network location
@@ -71,7 +71,7 @@
 **Universal Requirements**:
 - Everything in HyperMesh is an Asset (containers, CPU, GPU, RAM, storage, services)
 - Universal AssetId system with blockchain registration
-- AssetAdapter trait for specialized handling (from NKrypt patterns)
+- AssetAdapter trait for specialized handling (from Proof of State patterns)
 - Remote proxy addressing (NAT-like for memory) - **CRITICAL requirement**
 
 **Asset Adapter Pattern** (All Required):
@@ -87,7 +87,7 @@ pub struct StorageAssetAdapter; // Kyber encryption, content-aware segmentation
 ```
 
 ### **Privacy-Aware Resource Allocation (Required)**
-**Privacy Allocation Types** (from NKrypt):
+**Privacy Allocation Types** (from Proof of State):
 - **Private**: Internal network only, no external access
 - **Public**: Cross-network accessible, full discovery
 - **Anonymous**: No identity tracking, privacy-first sharing

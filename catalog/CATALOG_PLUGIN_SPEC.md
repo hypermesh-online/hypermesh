@@ -24,7 +24,7 @@ This document provides the complete implementation specification for the `Catalo
 │  │                                                  │          │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐     │          │
 │  │  │  Asset   │  │ Consensus│  │ Transport│     │          │
-│  │  │  Manager │  │  (NKrypt)│  │  (STOQ)  │     │          │
+│  │  │  Manager │  │  (Proof of State)│  │  (STOQ)  │     │          │
 │  │  └──────────┘  └──────────┘  └──────────┘     │          │
 │  └──────────────────────────────────────────────┘            │
 └─────────────────────────────────────────────────────────────────┘

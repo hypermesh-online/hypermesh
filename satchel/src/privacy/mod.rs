@@ -3,7 +3,7 @@
 //! User-configurable privacy levels and resource sharing controls with
 //! integration to consensus system, remote proxy addressing, and CAESAR rewards.
 //!
-//! Based on NKrypt patterns with privacy allocation types:
+//! Based on Proof of State patterns with privacy allocation types:
 //! - Private: Internal network only, no external access
 //! - Public: Cross-network accessible, full discovery
 //! - Anonymous: No identity tracking, privacy-first sharing
@@ -49,7 +49,7 @@ pub struct PrivacyAllocationResult {
     /// Asset being allocated
     pub asset_id: AssetId,
     
-    /// Privacy allocation type (from NKrypt patterns)
+    /// Privacy allocation type (from Proof of State patterns)
     pub allocation_type: PrivacyAllocationType,
     
     /// Privacy level assigned

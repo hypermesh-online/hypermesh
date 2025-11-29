@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation provides comprehensive multi-language support for the JuliaVM system with consensus validation, based on NKrypt patterns. The system enables execution of Python, R, JavaScript, C/C++, and Rust code through language-specific adapters while maintaining full ConsensusProof validation (PoSp+PoSt+PoWk+PoTm).
+This implementation provides comprehensive multi-language support for the JuliaVM system with consensus validation, based on Proof of State patterns. The system enables execution of Python, R, JavaScript, C/C++, and Rust code through language-specific adapters while maintaining full ConsensusProof validation (PoSp+PoSt+PoWk+PoTm).
 
 ## Architecture
 

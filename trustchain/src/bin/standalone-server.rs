@@ -100,7 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     info!("🚀 Starting TrustChain Standalone Server v0.1.0");
-    info!("🏗️  Architecture: NKrypt Four-Proof Consensus + STOQ Transport + IPv6-Only");
+    info!("🏗️  Architecture: Proof of State Four-Proof Consensus + STOQ Transport + IPv6-Only");
 
     let state = AppState {
         server_id: format!("trustchain-{}", generate_server_id()),
@@ -192,7 +192,7 @@ async fn system_status(State(state): State<AppState>) -> Json<serde_json::Value>
         "timestamp": timestamp,
         "architecture": {
             "consensus": {
-                "type": "NKrypt Four-Proof System",
+                "type": "Proof of State Four-Proof System",
                 "proofs": ["PoSpace (WHERE)", "PoStake (WHO)", "PoWork (WHAT)", "PoTime (WHEN)"],
                 "validation_target": "35ms certificate operations"
             },

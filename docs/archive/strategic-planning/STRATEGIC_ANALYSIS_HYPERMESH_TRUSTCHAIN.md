@@ -330,7 +330,7 @@ The Web3 ecosystem stands at a critical inflection point where honest capability
 | Component | Risk Level | Mitigation Strategy | Reward Potential |
 |-----------|------------|-------------------|------------------|
 | STOQ Performance | **HIGH** | Dedicated team, kernel optimization | Unlocks entire platform |
-| HyperMesh NAT | **MEDIUM** | Proven patterns from NKrypt | Unique differentiation |
+| HyperMesh NAT | **MEDIUM** | Proven patterns from Proof of State | Unique differentiation |
 | Multi-node Scale | **MEDIUM** | Incremental testing approach | Enterprise credibility |
 | Byzantine Tolerance | **LOW** | Four-proof system robust | Security leadership |
 | Quantum Resistance | **LOW** | Already implemented | Future-proof advantage |

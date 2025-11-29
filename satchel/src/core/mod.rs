@@ -87,13 +87,13 @@ pub enum AssetError {
     Internal(#[from] anyhow::Error),
 }
 
-// Import NKrypt Four-Proof Consensus System
-pub use crate::consensus::nkrypt_integration::{
+// Import Proof of State Four-Proof Consensus System
+pub use crate::consensus::proof_of_state_integration::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     WorkloadType, WorkState, ClientCredentials, Proof,
 };
 
-// All consensus proof types are now imported from NKrypt integration above
+// All consensus proof types are now imported from Proof of State integration above
 
 /// Core asset manager coordinating all asset operations
 pub struct AssetManager {
@@ -297,12 +297,12 @@ impl AssetManager {
         adapter.set_resource_limits(asset_id, limits).await
     }
     
-    /// Validate consensus proof according to requirements using NKrypt Four-Proof System
+    /// Validate consensus proof according to requirements using Proof of State Four-Proof System
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
-        // Use NKrypt comprehensive validation first
+        // Use Proof of State comprehensive validation first
         if let Err(e) = proof.validate_comprehensive().await {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: format!("NKrypt comprehensive validation failed: {}", e)
+                reason: format!("Proof of State comprehensive validation failed: {}", e)
             });
         }
         
@@ -315,7 +315,7 @@ impl AssetManager {
         
         // Check against HyperMesh asset requirements
         if self.consensus_requirements.require_all_proofs {
-            // All four proofs must be present and valid (enforced by NKrypt)
+            // All four proofs must be present and valid (enforced by Proof of State)
             if proof.stake_proof.stake_amount < self.consensus_requirements.minimum_stake {
                 return Err(AssetError::ConsensusValidationFailed {
                     reason: format!(
@@ -338,7 +338,7 @@ impl AssetManager {
                 });
             }
             
-            // Validate storage space commitment (from NKrypt SpaceProof)
+            // Validate storage space commitment (from Proof of State SpaceProof)
             if proof.space_proof.total_storage == 0 {
                 return Err(AssetError::ConsensusValidationFailed {
                     reason: "No storage space committed".to_string()
@@ -406,7 +406,7 @@ mod tests {
     
     #[test]
     fn test_consensus_proof_validation() {
-        // Test NKrypt Four-Proof Consensus System integration
+        // Test Proof of State Four-Proof Consensus System integration
         let stake_proof = StakeProof::new(
             "test-holder".to_string(),
             "test-holder-id".to_string(), 

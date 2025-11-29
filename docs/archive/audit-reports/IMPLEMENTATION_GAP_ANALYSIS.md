@@ -43,7 +43,7 @@
 ## 2. Critical Missing Implementations
 
 ### Consensus System (0% Complete)
-**Claimed**: NKrypt Four-Proof Consensus with PoSpace + PoStake + PoWork + PoTime
+**Claimed**: Proof of State Four-Proof Consensus with PoSpace + PoStake + PoWork + PoTime
 **Reality**: No consensus code exists
 
 **Missing Components**:

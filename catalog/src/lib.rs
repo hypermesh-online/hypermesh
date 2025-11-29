@@ -35,8 +35,8 @@ use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 
 // Re-export key types from HyperMesh
-pub use hypermesh::consensus::nkrypt_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
-pub use hypermesh::assets::core::{AssetId, AssetType};
+pub use blockmatrix::consensus::proof_of_state_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
+pub use blockmatrix::assets::core::{AssetId, AssetType};
 
 // Define ExecutionResult locally (Catalog-specific)
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -12,7 +12,7 @@
 ### Core Innovation: Four-Dimensional Consensus System
 The Web3 ecosystem introduces a **genuinely novel consensus mechanism** that fundamentally differs from existing blockchain approaches:
 
-**NKrypt Four-Proof System** (Not found in any existing blockchain):
+**Proof of State Four-Proof System** (Not found in any existing blockchain):
 - **PoSpace (WHERE)**: Physical/network location verification
 - **PoStake (WHO)**: Economic security and ownership
 - **PoWork (WHAT/HOW)**: Computational resource validation

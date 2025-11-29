@@ -2,7 +2,7 @@
 //!
 //! Tests the complete privacy management system including:
 //! - Privacy manager and allocation
-//! - NKrypt allocation types  
+//! - Proof of State allocation types  
 //! - CAESAR reward calculation
 //! - Privacy enforcement
 //! - User configuration
@@ -205,10 +205,10 @@ async fn test_privacy_allocation_workflow() {
     println!("Privacy allocation workflow test completed successfully");
 }
 
-/// Test NKrypt allocation types and transitions
+/// Test Proof of State allocation types and transitions
 #[tokio::test]
 async fn test_allocation_types_and_transitions() {
-    // Test all four NKrypt allocation types
+    // Test all four Proof of State allocation types
     let private = PrivacyAllocationType::Private;
     let public = PrivacyAllocationType::Public;
     let anonymous = PrivacyAllocationType::Anonymous;

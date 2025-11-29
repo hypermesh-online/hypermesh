@@ -24,7 +24,7 @@
 ### **INITIATIVE File Pairs (8 files → 4 files)**
 | Pair | File 1 | File 2 | Lines | Overlap | Consolidation Strategy |
 |------|--------|--------|-------|---------|----------------------|
-| **Cryptography** | `INITIATIVE_1_NKRYPT_INTEGRATION.spec` | `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec` | 400+ | 70% FALCON/Kyber | Merge into `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec` |
+| **Cryptography** | `INITIATIVE_1_PROOF_OF_STATE_INTEGRATION.spec` | `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec` | 400+ | 70% FALCON/Kyber | Merge into `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec` |
 | **Transport** | `INITIATIVE_2_STOQ_PROTOCOL.spec` | `INITIATIVE_2_STOQ_PURE_PROTOCOL.spec` | 600+ | 80% STOQ protocol | Merge into `INITIATIVE_2_STOQ_PROTOCOL.spec` |
 | **Assets** | `INITIATIVE_3_CATALOG_ASSETS.spec` | `INITIATIVE_3_CATALOG_ASSET_STANDARD.spec` | 700+ | 60% asset system | Merge into `INITIATIVE_3_CATALOG_ASSET_STANDARD.spec` |
 | **Hardware** | `INITIATIVE_4_HARDWARE_INTEGRATION.spec` | `INITIATIVE_4_HYPERMESH_HARDWARE_INTEGRATION.spec` | 800+ | 85% hardware integration | Merge into `INITIATIVE_4_HYPERMESH_HARDWARE_INTEGRATION.spec` |

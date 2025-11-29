@@ -128,7 +128,7 @@ async fn system_status(State(state): State<AppState>) -> Json<serde_json::Value>
         "server_id": state.server_id,
         "uptime_seconds": uptime,
         "architecture": {
-            "consensus": "NKrypt Four-Proof (PoSp+PoSt+PoWk+PoTm)",
+            "consensus": "Proof of State Four-Proof (PoSp+PoSt+PoWk+PoTm)",
             "transport": "STOQ Protocol",
             "networking": "IPv6-only",
             "ca": "TrustChain Certificate Authority",

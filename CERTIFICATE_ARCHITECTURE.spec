@@ -1,5 +1,5 @@
 # Certificate Architecture Specification
-# Web3 Ecosystem - TrustChain + STOQ + NKrypt Consensus
+# Web3 Ecosystem - TrustChain + STOQ + Proof of State Consensus
 # 
 # CRITICAL: This file must be maintained EXCLUSIVELY by @agent-scribe
 # Direct modifications are forbidden - use @agent-scribe for updates
@@ -17,7 +17,7 @@ This specification defines the certificate architecture for the entire Web3 ecos
 - **Trust Anchors**: HSM-protected root keys in production
 
 ### Certificate Transparency Integration
-- **Consensus Engine**: NKrypt ConsensusProof (PoSpace + PoStake + PoWork + PoTime)
+- **Consensus Engine**: Proof of State ConsensusProof (PoSpace + PoStake + PoWork + PoTime)
 - **Log Storage**: Block-matrix architecture with O(log n) complexity
 - **Validation Interval**: Sub-second real-time monitoring
 - **Byzantine Tolerance**: Multi-proof validation prevents tampering
@@ -40,14 +40,14 @@ pub struct StoqNodeCertificate {
     pub issued_at: SystemTime,
     pub expires_at: SystemTime,
     pub fingerprint_sha256: [u8; 32],
-    pub consensus_proof: ConsensusProof,  // NKrypt validation
+    pub consensus_proof: ConsensusProof,  // Proof of State validation
 }
 ```
 
 ### Real-time Validation Requirements
 - **Certificate Fingerprinting**: SHA-256 fingerprints for all certificates
 - **CT Log Verification**: Real-time validation against transparency logs
-- **Consensus Validation**: NKrypt ConsensusProof verification
+- **Consensus Validation**: Proof of State ConsensusProof verification
 - **Chain Validation**: Full certificate chain verification to root CA
 
 ## Network Requirements
@@ -64,7 +64,7 @@ pub struct StoqNodeCertificate {
 - **Perfect Forward Secrecy**: Required for all connections
 - **Certificate Pinning**: Mandatory for critical services
 
-## Consensus Requirements (NKrypt Integration)
+## Consensus Requirements (Proof of State Integration)
 
 ### Four-Proof Consensus Architecture
 ```rust
@@ -144,7 +144,7 @@ production_mode:
 ### Documentation Updates Required
 - Update all component documentation to reference TrustChain integration
 - Remove references to self-signed certificates for production use
-- Add NKrypt consensus requirements to all specifications
+- Add Proof of State consensus requirements to all specifications
 - Update testing procedures for localhost vs production modes
 
 This specification serves as the authoritative source for certificate architecture across the entire Web3 ecosystem.

@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     info!("🚀 TrustChain Independent Server v0.1.0");
-    info!("🏗️  Architecture: NKrypt Four-Proof + STOQ + IPv6");
+    info!("🏗️  Architecture: Proof of State Four-Proof + STOQ + IPv6");
 
     let state = AppState {
         server_id: "trustchain-001".to_string(),
@@ -105,7 +105,7 @@ async fn system_status(State(state): State<AppState>) -> Json<serde_json::Value>
         "server_id": state.server_id,
         "uptime_seconds": uptime,
         "architecture": {
-            "consensus": "NKrypt Four-Proof (PoSp+PoSt+PoWk+PoTm)",
+            "consensus": "Proof of State Four-Proof (PoSp+PoSt+PoWk+PoTm)",
             "transport": "STOQ Protocol",
             "networking": "IPv6-only"
         },

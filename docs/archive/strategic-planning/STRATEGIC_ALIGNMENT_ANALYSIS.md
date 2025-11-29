@@ -146,10 +146,10 @@ All components → STOQ → TrustChain (circular)
 
 ### Claimed Differentiators vs. Implementation
 
-#### Four-Proof Consensus System (NKrypt)
+#### Four-Proof Consensus System (Proof of State)
 **Status**: PARTIALLY IMPLEMENTED
 - **Strength**: Novel consensus mechanism design
-- **Reality**: Imported from external NKrypt patterns, not native
+- **Reality**: Imported from external Proof of State patterns, not native
 - **Risk**: Dependency on external consensus system
 - **Opportunity**: Strong if fully integrated
 

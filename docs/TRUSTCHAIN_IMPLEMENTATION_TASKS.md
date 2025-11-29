@@ -64,12 +64,12 @@ impl QuicDnsResolver {
 
 ### **Phase 2: Consensus Integration (Week 2)**
 
-#### **Task 2.1: NKrypt Four-Proof Validation**
+#### **Task 2.1: Proof of State Four-Proof Validation**
 ```rust
-// File: /trustchain/src/consensus/nkrypt_validator.rs
+// File: /trustchain/src/consensus/proof_of_state_validator.rs
 // IMPLEMENT: Complete four-proof consensus validation
 
-pub struct NKryptConsensusValidator {
+pub struct Proof of StateConsensusValidator {
     po_space_validator: Arc<PoSpaceValidator>,
     po_stake_validator: Arc<PoStakeValidator>, 
     po_work_validator: Arc<PoWorkValidator>,
@@ -77,7 +77,7 @@ pub struct NKryptConsensusValidator {
 }
 
 // CRITICAL: ALL four proofs required for every certificate operation
-impl NKryptConsensusValidator {
+impl Proof of StateConsensusValidator {
     pub async fn validate_certificate_request(&self, request: &CertificateRequest) -> Result<ConsensusResult>;
     pub async fn validate_four_proofs(&self, proofs: &FourProofSet) -> Result<ProofValidationResult>;
     pub async fn require_consensus_for_operation(&self, operation: CAOperation) -> Result<bool>;
@@ -287,7 +287,7 @@ enable_cert_validation = true
 trustchain_domains = ["hypermesh", "caesar", "trust", "assets"]
 
 [consensus]
-provider = "nkrypt_four_proof"
+provider = "proof_of_state_four_proof"
 minimum_stake = 1000
 minimum_work_difficulty = 20
 byzantine_tolerance = 0.33

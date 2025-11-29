@@ -9,15 +9,15 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::Result;
 
-use hypermesh::extensions::{
+use blockmatrix::extensions::{
     AssetExtensionHandler, ExtensionResult, ExtensionError,
     AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
     AssetOperation, OperationResult, DeploymentResult, ExecutionResult,
     TransferResult, SharingResult, ResourceUsageReport,
 };
 
-use hypermesh::assets::core::{AssetId, AssetType};
-use hypermesh::consensus::nkrypt_integration::ConsensusProof;
+use blockmatrix::assets::core::{AssetId, AssetType};
+use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
 
 /// Handler for Virtual Machine assets (Julia, Python, WASM, etc.)
 pub struct VirtualMachineHandler {

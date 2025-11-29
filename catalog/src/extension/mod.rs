@@ -18,7 +18,7 @@ pub use asset_handlers::{
 pub use config::{CatalogExtensionConfig, ExtensionSettings};
 
 // Re-export key types for convenience
-pub use hypermesh::extensions::{
+pub use blockmatrix::extensions::{
     HyperMeshExtension,
     AssetLibraryExtension,
     ExtensionMetadata,

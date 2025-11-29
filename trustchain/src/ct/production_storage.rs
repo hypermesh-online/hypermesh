@@ -584,9 +584,9 @@ mod tests {
 
     fn create_test_s3_config() -> S3BucketConfig {
         S3BucketConfig {
-            bucket_name: "trustchain-ct-test-bucket".to_string(),
-            region: "us-east-1".to_string(),
-            encryption_key_id: Some("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012".to_string()),
+            bucket_name: std::env::var("TEST_S3_BUCKET").unwrap_or_else(|_| "test-bucket".to_string()),
+            region: std::env::var("TEST_AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
+            encryption_key_id: std::env::var("TEST_KMS_KEY_ARN").ok(),
             prefix: "ct-logs/test/".to_string(),
         }
     }

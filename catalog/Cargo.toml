@@ -10,7 +10,7 @@ keywords = ["assets", "hypermesh", "package-manager", "trustchain", "distributed
 
 [dependencies]
 # HyperMesh integration for consensus and asset management
-hypermesh = { path = "../hypermesh" }
+blockmatrix = { path = "../blockmatrix" }
 
 # Core async runtime
 tokio = { workspace = true }

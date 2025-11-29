@@ -10,7 +10,7 @@ use catalog::{
     AssetDiscovery, AssetRegistry,
     registry::{SearchQuery, SortCriteria, AssetFilters},
 };
-use hypermesh::assets::core::{AssetManager, PrivacyLevel};
+use blockmatrix::assets::core::{AssetManager, PrivacyLevel};
 use std::sync::Arc;
 use anyhow::Result;
 

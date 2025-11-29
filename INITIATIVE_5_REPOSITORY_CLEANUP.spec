@@ -428,8 +428,8 @@ git ls-files | wc -l > post_cleanup_files.txt
 
 ## 🔗 **Integration with Other Initiatives**
 
-### **Initiative 1 (NKrypt Integration)**
-Clean repository structure simplifies NKrypt crypto integration across services.
+### **Initiative 1 (Proof of State Integration)**
+Clean repository structure simplifies Proof of State crypto integration across services.
 
 ### **Initiative 2 (STOQ Protocol)**
 Standardized service structure enables easier STOQ transport integration.

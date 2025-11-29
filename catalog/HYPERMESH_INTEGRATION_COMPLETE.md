@@ -119,7 +119,7 @@ Bulk (100 assets)   50,000ms         < 500ms              100x
 ### ✅ Consensus Validation
 - All assets require consensus proof
 - PoSpace + PoStake + PoWork + PoTime validation
-- Integrated with HyperMesh's NKrypt consensus
+- Integrated with HyperMesh's Proof of State consensus
 
 ### ✅ Resource Management
 - CPU, Memory, Storage requirements mapped to HyperMesh

@@ -34,8 +34,8 @@ The Web3 ecosystem exhibits **severe implementation gaps** between documented ar
 - Basic adapter trait definitions
 
 ❌ MISSING/BROKEN:
-- NKrypt consensus integration references non-existent module:
-  pub use crate::consensus::nkrypt_integration // Module doesn't exist
+- Proof of State consensus integration references non-existent module:
+  pub use crate::consensus::proof_of_state_integration // Module doesn't exist
 - ConsensusProof validation is stubbed - always returns true
 - Asset adapters are empty implementations
 - No actual resource allocation logic
@@ -43,7 +43,7 @@ The Web3 ecosystem exhibits **severe implementation gaps** between documented ar
 
 #### Four-Proof Consensus Implementation:
 ```rust
-// Location: /hypermesh/src/consensus/nkrypt_integration.rs
+// Location: /hypermesh/src/consensus/proof_of_state_integration.rs
 
 STATUS: File exists but imports fail
 - SpaceProof: Basic struct, validate() always returns true if storage > 0
@@ -222,7 +222,7 @@ pub enum PrivacyLevel {
 | Component | Documented Features | Implemented | Tested | Gap |
 |-----------|-------------------|--------------|---------|-----|
 | HyperMesh Assets | 20 | 3 | 0 | 85% |
-| NKrypt Consensus | 4 proofs | 0 real | 0 | 100% |
+| Proof of State Consensus | 4 proofs | 0 real | 0 | 100% |
 | Remote Proxy/NAT | Complete system | 0 | 0 | 100% |
 | STOQ Transport | 15 features | 2 | 0 | 87% |
 | TrustChain CA | 12 features | 3 | 1 | 75% |

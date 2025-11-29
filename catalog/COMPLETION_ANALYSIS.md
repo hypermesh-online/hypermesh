@@ -278,7 +278,7 @@ warnings: vec![], // TODO: Collect warnings during generation
 
 **Sample Errors**:
 ```
-error[E0432]: unresolved import `nkrypt_integration::NKryptConsensus`
+error[E0432]: unresolved import `proof_of_state_integration::Proof of StateConsensus`
 error[E0432]: unresolved imports `proof::ProofGenerator`, `proof::ProofValidator`
 error[E0432]: unresolved import `validation_service::ValidationService`
 error[E0432]: unresolved import `byzantine::ByzantineFaultTolerance`
@@ -376,7 +376,7 @@ pub struct AssetExecution {
 ### Critical Blockers (Must Fix for Compilation)
 
 1. **Missing HyperMesh Exports** (blocking 20+ imports)
-   - `nkrypt_integration::NKryptConsensus`
+   - `proof_of_state_integration::Proof of StateConsensus`
    - `proof::ProofGenerator`, `proof::ProofValidator`
    - `validation_service::ValidationService`
    - `byzantine::ByzantineFaultTolerance`

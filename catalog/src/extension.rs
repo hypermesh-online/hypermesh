@@ -4,7 +4,7 @@
 //! allowing it to be loaded as a first-class extension in the HyperMesh ecosystem.
 
 use async_trait::async_trait;
-use hypermesh::extensions::{
+use blockmatrix::extensions::{
     HyperMeshExtension, ExtensionMetadata, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionRequest, ExtensionResponse, ExtensionStatus,
     ExtensionResult, ExtensionError, ValidationReport, AssetExtensionHandler,
@@ -14,7 +14,7 @@ use hypermesh::extensions::{
     SearchOptions, AssetPackageSpec, PublishResult, VerificationResult,
     ExtensionHealth, ExtensionState, ResourceUsageReport,
 };
-use hypermesh::assets::core::{AssetManager, AssetId, PrivacyLevel};
+use blockmatrix::assets::core::{AssetManager, AssetId, PrivacyLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

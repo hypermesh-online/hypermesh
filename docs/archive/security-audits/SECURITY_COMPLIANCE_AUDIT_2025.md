@@ -23,7 +23,7 @@ This audit reveals a significant disconnect between claimed security implementat
 
 **VERDICT**: This is one of the few legitimate security implementations. The FALCON cryptography is real and properly integrated.
 
-### 1.2 NKrypt Four-Proof Consensus System
+### 1.2 Proof of State Four-Proof Consensus System
 
 #### CLAIM: "Every asset requires ALL FOUR proofs (PoSpace, PoStake, PoWork, PoTime)"
 **Location**: `/trustchain/src/consensus/mod.rs` and `/trustchain/src/consensus/proof.rs`

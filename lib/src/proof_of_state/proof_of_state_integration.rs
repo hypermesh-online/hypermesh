@@ -1,6 +1,6 @@
-//! NKrypt Four-Proof Consensus Integration for HyperMesh
+//! Proof of State Four-Proof Consensus Integration for HyperMesh
 //!
-//! This module integrates the complete NKrypt Four-Proof Consensus system into HyperMesh.
+//! This module integrates the complete Proof of State Four-Proof Consensus system into HyperMesh.
 //! Every asset operation requires validation through all four proofs:
 //! - PoSpace (PoSp): WHERE - storage location and physical/network location
 //! - PoStake (PoSt): WHO - ownership, access rights, and economic stake  
@@ -579,7 +579,7 @@ impl fmt::Debug for WorkProof {
     }
 }
 
-/// Distributed client structure supporting NKrypt consensus patterns
+/// Distributed client structure supporting Proof of State consensus patterns
 #[derive(Clone, Debug)]
 pub struct DistributedClient {
     /// Core client structure
@@ -809,4 +809,4 @@ mod tests {
         let capabilities = client.get_network_capabilities();
         assert_eq!(capabilities._client_id, "test-client");
     }
-}
+}pub type ProofOfStateConsensus = DistributedClient;

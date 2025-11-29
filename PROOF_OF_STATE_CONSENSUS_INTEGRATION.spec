@@ -1,19 +1,19 @@
-# NKrypt Consensus Integration Specification
+# Proof of State Consensus Integration Specification
 # Web3 Ecosystem - HyperMesh + TrustChain + STOQ + Catalog
 #
 # CRITICAL: This file must be maintained EXCLUSIVELY by @agent-scribe
 # Direct modifications are forbidden - use @agent-scribe for updates
 
 ## Overview
-This specification defines how to integrate NKrypt's four-proof consensus architecture into the Web3 ecosystem, providing O(log n) complexity Byzantine fault tolerance across all components.
+This specification defines how to integrate Proof of State's four-proof consensus architecture into the Web3 ecosystem, providing O(log n) complexity Byzantine fault tolerance across all components.
 
-## NKrypt Reference Implementation
+## Proof of State Reference Implementation
 
 ### Source Location
-- **Reference Path**: `/home/persist/repos/personal/NKrypt/src/mods/proof.rs`
+- **Reference Path**: `/home/persist/repos/personal/Proof of State/src/mods/proof.rs`
 - **Key Files**: `asset_record.rs`, `proof.rs`, consensus implementation
-- **Legacy Note**: NKrypt is the legacy alias for HyperMesh but contains more complete implementations
-- **Migration Strategy**: Extract patterns from NKrypt and adapt for current Web3 ecosystem
+- **Legacy Note**: The reference implementation uses the original "Proof of State" naming but contains complete Proof of State patterns
+- **Migration Strategy**: Extract patterns from reference and adapt for current Web3 ecosystem
 
 ## Four-Proof Consensus Architecture
 
@@ -119,7 +119,7 @@ pub struct WorkProof {
 - **Validation**: Efficient proof verification across distributed nodes
 - **Scalability**: Maintains performance as network grows
 
-### Implementation Pattern from NKrypt
+### Implementation Pattern from Proof of State
 ```rust
 pub trait AssetAdapter {
     fn validate_transaction(&self, record: &AssetRecord) -> bool;
@@ -145,13 +145,13 @@ pub trait AssetAdapter {
 ## Migration from Traditional Consensus
 
 ### Merkle Tree Replacement
-- **Replace Merkle Trees**: With NKrypt block-matrix architecture
+- **Replace Merkle Trees**: With Proof of State block-matrix architecture
 - **Performance Improvement**: O(log n) complexity with Byzantine tolerance
 - **Security Enhancement**: Four-proof validation vs single hash validation
 - **Operational Benefits**: Real-time validation with economic incentives
 
 ### Implementation Steps
-1. **Extract NKrypt Code**: Copy ConsensusProof structures and validation logic
+1. **Extract Proof of State Code**: Copy ConsensusProof structures and validation logic
 2. **Adapt Interfaces**: Modify for Web3 ecosystem component interfaces
 3. **Integrate Validation**: Add consensus validation to all critical operations
 4. **Testing**: Validate Byzantine fault tolerance and performance characteristics
@@ -190,4 +190,4 @@ pub trait AssetAdapter {
 - **Temporal Security**: Zero successful replay attacks
 - **Storage Security**: 100% content integrity validation
 
-This specification ensures consistent NKrypt consensus integration across all Web3 ecosystem components.
+This specification ensures consistent Proof of State consensus integration across all Web3 ecosystem components.

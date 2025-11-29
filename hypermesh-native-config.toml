@@ -113,7 +113,7 @@ consensus_validation_required = true
 privacy_levels_supported = ["Private", "PrivateNetwork", "P2P", "PublicNetwork", "FullPublic"]
 
 [asset_system.core_requirements]
-# NKrypt Four-Proof Consensus - ALL FOUR REQUIRED
+# Proof of State Four-Proof Consensus - ALL FOUR REQUIRED
 space_proof_required = true    # WHERE - storage location and physical/network location
 stake_proof_required = true    # WHO - ownership, access rights, and economic stake
 work_proof_required = true     # WHAT/HOW - computational resources and processing  
@@ -168,7 +168,7 @@ container_adapter = {
 }
 
 [asset_system.privacy_management]
-# Privacy-aware resource allocation from NKrypt patterns
+# Privacy-aware resource allocation from Proof of State patterns
 default_privacy_level = "P2P"
 user_configurable_privacy = true
 privacy_reward_system = true
@@ -212,8 +212,8 @@ FullPublic = {
 }
 
 [consensus_system]
-# NKrypt Four-Proof Consensus Integration
-consensus_model = "nkrypt_four_proof"
+# Proof of State Four-Proof Consensus Integration
+consensus_model = "proof_of_state_four_proof"
 blockchain_integration = true
 quantum_resistant_signatures = "falcon_1024"
 

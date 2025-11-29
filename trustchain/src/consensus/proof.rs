@@ -1,6 +1,6 @@
 //! Individual Proof Implementations
 //! 
-//! Based on NKrypt reference implementation from /home/persist/repos/personal/NKrypt/src/mods/proof.rs
+//! Based on Proof of State reference implementation from /home/persist/repos/personal/Proof of State/src/mods/proof.rs
 //! Adapted for TrustChain certificate operations with IPv6-only networking
 
 use serde::{Serialize, Deserialize};

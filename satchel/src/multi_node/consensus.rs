@@ -515,7 +515,7 @@ impl ConsensusManager {
     /// Generate consensus proof
     async fn generate_consensus_proof(&self, proposal: &ConsensusProposal) -> ConsensusProof {
         // Generate a proper consensus proof
-        // This would include the four-proof system from NKrypt
+        // This would include the four-proof system from Proof of State
         use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
 
         ConsensusProof::new(

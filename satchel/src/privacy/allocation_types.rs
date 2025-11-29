@@ -1,6 +1,6 @@
-//! Privacy Allocation Types - Based on NKrypt patterns
+//! Privacy Allocation Types - Based on Proof of State patterns
 //!
-//! Implements the four allocation types from NKrypt with enhanced
+//! Implements the four allocation types from Proof of State with enhanced
 //! constraints and transition validation.
 
 use std::time::{Duration, SystemTime};
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
 use crate::consensus::proof::ConsensusProof;
 
-/// Privacy allocation types from NKrypt patterns
+/// Privacy allocation types from Proof of State patterns
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrivacyAllocationType {
     /// Internal use only, no sharing, no external access

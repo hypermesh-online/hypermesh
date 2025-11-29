@@ -344,7 +344,7 @@ impl AssetAdapter for MemoryAssetAdapter {
     }
     
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
-        // Validate all four proofs as required by NKrypt patterns
+        // Validate all four proofs as required by Proof of State patterns
         let valid = proof.validate().await?;
         
         if !valid {

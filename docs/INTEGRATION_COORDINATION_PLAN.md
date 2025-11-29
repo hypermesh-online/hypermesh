@@ -565,7 +565,7 @@ services:
     environment:
       - HYPERMESH_TRUSTCHAIN_CA=https://[trustchain-ca]:8443
       - HYPERMESH_STOQ_TRANSPORT=quic://[stoq-transport]:8444
-      - HYPERMESH_CONSENSUS_MODE=nkrypt_four_proof
+      - HYPERMESH_CONSENSUS_MODE=proof_of_state_four_proof
     depends_on:
       - trustchain-ca
       - stoq-transport

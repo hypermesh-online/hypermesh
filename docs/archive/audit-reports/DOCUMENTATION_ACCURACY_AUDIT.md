@@ -36,7 +36,7 @@
 
 | Feature | Documentation Claims | Actual State | Files Analyzed | Accuracy |
 |---------|---------------------|--------------|----------------|----------|
-| **NKrypt Four-Proof Consensus** | "✅ Implemented" | Referenced but NOT implemented | No consensus code found | ❌ 0% |
+| **Proof of State Four-Proof Consensus** | "✅ Implemented" | Referenced but NOT implemented | No consensus code found | ❌ 0% |
 | **Asset Adapters** | "Core Implemented" | Trait definitions only | `/hypermesh/src/assets/adapters/` empty stubs | ⚠️ 20% |
 | **Remote Proxy/NAT** | "70% complete" | Basic files exist, no implementation | `/hypermesh/src/assets/proxy/` has structures only | ⚠️ 15% |
 | **Native Monitoring** | "✅ COMPLETE" | Partially implemented | STOQ/TrustChain have basic monitoring | ⚠️ 60% |
@@ -109,7 +109,7 @@
 
 ### Copy-Paste Indicators
 - Inconsistent documentation styles across modules
-- References to non-existent systems (NKrypt)
+- References to non-existent systems (Proof of State)
 - Duplicate documentation with different timestamps
 - Architecture descriptions that don't match code
 

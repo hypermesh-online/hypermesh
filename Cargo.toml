@@ -4,7 +4,7 @@ members = [
     "trustchain",
     "caesar",
     "catalog",
-    "hypermesh",
+    "blockmatrix",
 ]
 resolver = "2"
 
@@ -232,14 +232,14 @@ tempfile = { workspace = true }
 tokio-test = { workspace = true }
 
 [features]
-default = ["hypermesh-full", "high-performance"]
+default = ["blockmatrix-full", "high-performance"]
 
-# Complete HyperMesh stack
-hypermesh-full = ["stoq-transport", "hypermesh-assets", "trustchain-authority"]
+# Complete BlockMatrix stack
+blockmatrix-full = ["stoq-transport", "blockmatrix-assets", "trustchain-authority"]
 
 # Individual layers (for testing/development)
 stoq-transport = []
-hypermesh-assets = []
+blockmatrix-assets = []
 trustchain-authority = []
 
 # Performance optimizations
@@ -248,19 +248,19 @@ hardware-acceleration = []
 zero-copy = []
 
 # Deployment modes
-production = ["hypermesh-full", "high-performance", "consensus-mandatory"]
-development = ["hypermesh-full", "legacy-compatibility"]
+production = ["blockmatrix-full", "high-performance", "consensus-mandatory"]
+development = ["blockmatrix-full", "legacy-compatibility"]
 consensus-mandatory = []
 legacy-compatibility = []
 
-[[bin]]
-name = "hypermesh-server"
-path = "src/main.rs"
+# [[bin]]
+# name = "blockmatrix-server"
+# path = "src/main.rs"
 
 
-[[bench]]
-name = "protocol_stack"
-harness = false
+# [[bench]]
+# name = "protocol_stack"
+# harness = false
 
 [profile.release]
 opt-level = 3

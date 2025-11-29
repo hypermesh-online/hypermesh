@@ -67,12 +67,12 @@ This research report provides a comprehensive analysis of documentation accuracy
 
 ## 2. Architectural Claims Verification
 
-### 2.1 NKrypt Four-Proof Consensus System
+### 2.1 Proof of State Four-Proof Consensus System
 
 **Documentation Claims**:
 - "✅ Implemented"
 - Every asset requires ALL FOUR proofs (PoSpace, PoStake, PoWork, PoTime)
-- Reference: `/home/persist/repos/personal/NKrypt/src/`
+- Reference: `/home/persist/repos/personal/Proof of State/src/`
 
 **Implementation Reality**:
 - ✅ Proof structures defined in `/hypermesh/src/consensus/proof.rs`

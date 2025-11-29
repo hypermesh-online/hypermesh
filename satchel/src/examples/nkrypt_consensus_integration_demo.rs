@@ -1,6 +1,6 @@
-//! NKrypt Four-Proof Consensus Integration Demo
+//! Proof of State Four-Proof Consensus Integration Demo
 //!
-//! This example demonstrates how the complete NKrypt Four-Proof Consensus system
+//! This example demonstrates how the complete Proof of State Four-Proof Consensus system
 //! is integrated into HyperMesh for asset operations.
 //!
 //! Every asset operation requires validation through all four proofs:
@@ -19,7 +19,7 @@ use hypermesh_assets::core::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔧 NKrypt Four-Proof Consensus Integration Demo");
+    println!("🔧 Proof of State Four-Proof Consensus Integration Demo");
     println!("================================================");
     
     // Initialize asset manager
@@ -29,8 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n1. Registering CPU adapter...");
     // Note: In real implementation, we'd register actual adapters
     
-    // Create NKrypt Four-Proof Consensus for CPU asset allocation
-    println!("\n2. Creating NKrypt Four-Proof Consensus for CPU allocation...");
+    // Create Proof of State Four-Proof Consensus for CPU asset allocation
+    println!("\n2. Creating Proof of State Four-Proof Consensus for CPU allocation...");
     
     // PoStake: WHO - Define asset ownership and authority
     let stake_proof = StakeProof::new(
@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     
     // Validate the consensus proof
-    println!("\n3. Validating NKrypt Four-Proof Consensus...");
+    println!("\n3. Validating Proof of State Four-Proof Consensus...");
     
     // Basic validation check
     let basic_valid = consensus_proof.validate();
@@ -124,9 +124,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   🔒 CRITICAL: Every asset requires ALL FOUR proofs (not split by type)");
     println!("   🔒 WHERE/WHO/WHAT/WHEN must be validated for EVERY operation");
     
-    println!("\n6. NKrypt Integration Summary:");
-    println!("   ✓ Imported complete NKrypt Four-Proof Consensus system");
-    println!("   ✓ Replaced HyperMesh consensus with battle-tested NKrypt implementation");
+    println!("\n6. Proof of State Integration Summary:");
+    println!("   ✓ Imported complete Proof of State Four-Proof Consensus system");
+    println!("   ✓ Replaced HyperMesh consensus with battle-tested Proof of State implementation");
     println!("   ✓ Maintained backward compatibility with original proof system");
     println!("   ✓ Integrated comprehensive validation with detailed error reporting");
     println!("   ✓ Connected to HyperMesh asset management system");
@@ -165,8 +165,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    println!("\n🎉 NKrypt Four-Proof Consensus Integration Complete!");
-    println!("   HyperMesh now uses the complete NKrypt consensus system for all asset operations.");
+    println!("\n🎉 Proof of State Four-Proof Consensus Integration Complete!");
+    println!("   HyperMesh now uses the complete Proof of State consensus system for all asset operations.");
     println!("   Every asset operation requires WHERE/WHO/WHAT/WHEN validation.");
     
     Ok(())

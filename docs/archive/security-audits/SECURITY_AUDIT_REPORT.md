@@ -11,7 +11,7 @@ The Web3 ecosystem project claims "85% Complete, Production Ready" status with a
 
 ### 1.1 Four-Proof Consensus System Analysis
 
-**Location**: `/hypermesh/src/consensus/nkrypt_integration.rs`
+**Location**: `/hypermesh/src/consensus/proof_of_state_integration.rs`
 
 #### Claims vs Reality:
 - **CLAIM**: "Every asset requires ALL FOUR proofs (PoSpace, PoStake, PoWork, PoTime)"
@@ -283,7 +283,7 @@ STOQ needs TrustChain for certificates
 - **Line 318**: Enforce minimum stake requirements
 - **Line 334**: Add actual computational proof validation
 
-### `/hypermesh/src/consensus/nkrypt_integration.rs`
+### `/hypermesh/src/consensus/proof_of_state_integration.rs`
 - **Line 327**: Implement proper cryptographic verification
 - **Line 476**: Add Byzantine node detection
 - **Line 619**: Implement blockchain state verification

@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let asset_id = AssetId::new(AssetType::Cpu);
     info!("Created asset ID: {}", asset_id.to_hex_string());
     
-    // 2. Create all four consensus proofs following NKrypt patterns
+    // 2. Create all four consensus proofs following Proof of State patterns
     
     // PoSpace (WHERE): Storage location and network position
     let space_proof = ProofOfSpace::new(
@@ -118,9 +118,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    // 7. Create blockchain block data following NKrypt patterns
+    // 7. Create blockchain block data following Proof of State patterns
     let block_data = HyperMeshBlockData::AssetRecord(asset_record.clone());
-    info!("Created HyperMeshBlockData following NKrypt patterns");
+    info!("Created HyperMeshBlockData following Proof of State patterns");
     
     // Verify block data requires consensus
     if block_data.requires_consensus() {
@@ -155,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Key Integration Points Demonstrated:");
     info!("  ✅ All 4 proofs (PoSp+PoSt+PoWk+PoTm) generated and validated");
     info!("  ✅ Asset records properly integrate with ConsensusProof");
-    info!("  ✅ Block data follows NKrypt patterns (Genesis, AssetRecord, Raw)");
+    info!("  ✅ Block data follows Proof of State patterns (Genesis, AssetRecord, Raw)");
     info!("  ✅ Privacy levels correctly validated");
     info!("  ✅ Asset operations prepared for blockchain storage");
     info!("  ✅ Ready for integration with consensus engine");

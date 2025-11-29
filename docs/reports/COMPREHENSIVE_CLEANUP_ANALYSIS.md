@@ -61,7 +61,7 @@ hypermesh_simple_server.py    (128 lines) - Mock asset server
 ### **2. INITIATIVE File Duplicates (High Priority)**
 
 #### **Cryptography Duplication**
-- `INITIATIVE_1_NKRYPT_INTEGRATION.spec` vs `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec`
+- `INITIATIVE_1_PROOF_OF_STATE_INTEGRATION.spec` vs `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec`
 - **Overlap**: Both cover FALCON-1024 and Kyber integration
 - **Consolidation**: Merge into single `INITIATIVE_1_TRUSTCHAIN_CRYPTOGRAPHY.spec`
 

@@ -5,7 +5,7 @@
 ### 1. Verified Implementations (Documentation Accurate)
 
 #### Four-Proof Consensus System
-- **Source**: `/home/persist/repos/personal/NKrypt/src/mods/proof.rs`
+- **Source**: `/home/persist/repos/personal/Proof of State/src/mods/proof.rs`
 - **Evidence**:
   - SpaceProof: Lines 27-54
   - StakeProof: Lines 283-330

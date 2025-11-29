@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use semver::Version;
 use anyhow::Result;
 
-use hypermesh::extensions::{
+use blockmatrix::extensions::{
     HyperMeshExtension, AssetLibraryExtension, ExtensionMetadata, ExtensionCategory,
     ExtensionCapability, ExtensionConfig, ExtensionResult, ExtensionError,
     ExtensionRequest, ExtensionResponse, ExtensionStatus, ExtensionState as ExtState,
@@ -21,7 +21,7 @@ use hypermesh::extensions::{
     ResourceUsageReport,
 };
 
-use hypermesh::assets::core::{AssetManager, AssetId, AssetType};
+use blockmatrix::assets::core::{AssetManager, AssetId, AssetType};
 
 use crate::{
     Catalog, CatalogConfig, CatalogBuilder,
@@ -773,7 +773,7 @@ impl AssetLibraryExtension for CatalogExtension {
     }
 
     /// Publish a new package to the library
-    async fn publish_package(&self, package: AssetPackageSpec, proof: hypermesh::consensus::nkrypt_integration::ConsensusProof) -> ExtensionResult<PublishResult> {
+    async fn publish_package(&self, package: AssetPackageSpec, proof: hypermesh::consensus::proof_of_state_integration::ConsensusProof) -> ExtensionResult<PublishResult> {
         self.increment_requests().await;
         self.start_operation().await;
 

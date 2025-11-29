@@ -118,7 +118,7 @@ Catalog:
    - ⚠️  Validation logic incomplete
    - ❌ Block structure not implemented
    - ❌ Blockchain integration missing
-   - **Current location**: `/hypermesh/src/consensus/nkrypt_integration.rs` (design only)
+   - **Current location**: `/hypermesh/src/consensus/proof_of_state_integration.rs` (design only)
 
 2. **Auth/Access System - MISSING**
    - ❌ No authentication framework
@@ -1403,7 +1403,7 @@ cargo new --lib hypermesh/layer1-kernel/asset-system
 
 # 2. Proof of State (extract from consensus)
 cargo new --lib hypermesh/layer1-kernel/proof-of-state
-# Move: hypermesh/src/consensus/nkrypt_integration.rs → proof-of-state/src/
+# Move: hypermesh/src/consensus/proof_of_state_integration.rs → proof-of-state/src/
 
 # 3. Block Structure (NEW - implement)
 cargo new --lib hypermesh/layer1-kernel/block-structure
@@ -1613,7 +1613,7 @@ Total: 6 months (24 weeks)
 | **Security Monitoring** | `/trustchain/src/security/` | Layer 2 (TrustChain) | ✅ Trust-related monitoring |
 | **Asset System** | `/hypermesh/src/assets/` | Layer 1 (HyperMesh) | ✅ OS-level resource mgmt |
 | **Asset Adapters** | `/hypermesh/src/assets/adapters/` | Layer 1 (HyperMesh) | ✅ Device drivers for OS |
-| **Consensus Proofs** | `/hypermesh/src/consensus/nkrypt_integration.rs` | Layer 1 (HyperMesh) | ⚠️  Extract to `proof-of-state/` |
+| **Consensus Proofs** | `/hypermesh/src/consensus/proof_of_state_integration.rs` | Layer 1 (HyperMesh) | ⚠️  Extract to `proof-of-state/` |
 | **Consensus Engine** | `/hypermesh/src/consensus/engine.rs` | Layer 1 (HyperMesh) | ✅ OS-level coordination |
 | **Raft Consensus** | `/hypermesh/src/consensus/log.rs` | Layer 1 (HyperMesh) | ✅ OS-level state replication |
 | **Byzantine Detection** | `/hypermesh/src/consensus/byzantine.rs` | Layer 1 (HyperMesh) | ✅ OS-level fault tolerance |
@@ -1665,7 +1665,7 @@ Legend:
 
 **Status**: Design exists, validation incomplete
 
-**Current** (`/hypermesh/src/consensus/nkrypt_integration.rs`):
+**Current** (`/hypermesh/src/consensus/proof_of_state_integration.rs`):
 ```rust
 pub struct ConsensusProof {
     pub stake_proof: StakeProof,

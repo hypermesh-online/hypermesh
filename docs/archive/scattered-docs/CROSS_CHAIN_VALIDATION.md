@@ -2,7 +2,7 @@
 
 ## Overview
 
-The HyperMesh Cross-Chain Validation System enables privacy-preserving validation of assets across multiple blockchain networks following NKrypt patterns. This system allows entities to validate asset existence, properties, and business workflows without exposing sensitive data.
+The HyperMesh Cross-Chain Validation System enables privacy-preserving validation of assets across multiple blockchain networks following Proof of State patterns. This system allows entities to validate asset existence, properties, and business workflows without exposing sensitive data.
 
 ## Key Features
 
@@ -537,7 +537,7 @@ cargo run --example cross_chain_validation_demo
 
 When contributing to the cross-chain validation system:
 
-1. **Follow NKrypt Patterns**: Maintain privacy-preserving design principles
+1. **Follow Proof of State Patterns**: Maintain privacy-preserving design principles
 2. **Test Coverage**: Ensure comprehensive test coverage for new features
 3. **Documentation**: Update documentation for API changes
 4. **Security Review**: All changes require security review for cryptographic components

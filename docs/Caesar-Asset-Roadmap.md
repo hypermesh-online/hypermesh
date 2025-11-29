@@ -113,7 +113,7 @@ pub struct StorageAssetAdapter {
 **Location**: `/hypermesh/src/assets/proxy/`
 
 **Core Requirements**:
-- **NAT-like addressing for memory/resources** (primary requirement from NKrypt)
+- **NAT-like addressing for memory/resources** (primary requirement from Proof of State)
 - **Global proxy addresses**: IPv6-like addressing for HyperMesh ecosystem
 - **Port mapping with FALCON-1024 signatures**
 - **Trust-based proxy selection using PoSt validation**
@@ -321,7 +321,7 @@ pub struct QuantumEncryption {
 1. **Domain Control**: ✅ hypermesh.online ownership confirmed
 2. **Infrastructure Access**: ✅ AWS deployment capability confirmed
 3. **Complete Consensus**: ❌ All 4 proofs must be implemented
-4. **Remote Proxy/NAT**: ❌ Core requirement from NKrypt analysis
+4. **Remote Proxy/NAT**: ❌ Core requirement from Proof of State analysis
 5. **Quantum Security**: ❌ FALCON-1024/Kyber implementation required
 
 ### **Risk Mitigation**

@@ -72,7 +72,7 @@ pub enum AccessLevel {
     Administrative,
 }
 
-/// Individual entity blockchain following NKrypt patterns
+/// Individual entity blockchain following Proof of State patterns
 #[derive(Clone, Serialize, Deserialize)]
 pub struct EntityBlockchain {
     /// Entity configuration

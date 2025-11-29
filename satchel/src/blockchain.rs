@@ -1,6 +1,6 @@
 //! HyperMesh Blockchain Integration for Asset Management
 //!
-//! This module implements asset-based blockchain operations following NKrypt patterns.
+//! This module implements asset-based blockchain operations following Proof of State patterns.
 //! Assets are stored directly in blockchain blocks with ConsensusProof validation.
 
 use std::time::SystemTime;
@@ -174,12 +174,12 @@ impl AssetPrivacyLevel {
     }
 }
 
-/// HyperMesh blockchain data following NKrypt patterns
+/// HyperMesh blockchain data following Proof of State patterns
 #[derive(Clone, Serialize, Deserialize)]
 pub enum HyperMeshBlockData {
     /// Genesis block
     Genesis,
-    /// Asset management operation (following NKrypt AssetRecord pattern)
+    /// Asset management operation (following Proof of State AssetRecord pattern)
     AssetRecord(HyperMeshAssetRecord),
     /// Raw data block
     Raw(Vec<u8>),

@@ -201,7 +201,7 @@ certificates:
 
 ### Phase 1: Self-Contained
 ```yaml
-# TrustChain with NKrypt consensus integration
+# TrustChain with Proof of State consensus integration
 services:
   ca: "quic://[2001:db8::10]:8443/ca"
   ct: "quic://[2001:db8::10]:8443/ct" 
@@ -211,13 +211,13 @@ services:
 transport:
   protocol: "quic_over_ipv6_only"
   certificates: "trustchain_managed"
-  consensus_validation: "nkrypt_four_proof"
+  consensus_validation: "proof_of_state_four_proof"
   certificate_rotation: "24_hour_automatic"
   fingerprinting: "realtime_sha256"
   
 # Certificate Transparency with block-matrix
 ct_logs:
-  storage_architecture: "nkrypt_block_matrix"
+  storage_architecture: "proof_of_state_block_matrix"
   consensus_complexity: "O_log_n"
   validation_latency: "sub_second"
   byzantine_tolerance: "33_percent_malicious"
@@ -225,9 +225,9 @@ ct_logs:
 
 ### Phase 2: HyperMesh Integrated
 ```yaml
-# NKrypt consensus integration with HyperMesh
+# Proof of State consensus integration with HyperMesh
 consensus:
-  provider: "nkrypt_consensus_proof"
+  provider: "proof_of_state_consensus_proof"
   architecture: "block_matrix_o_log_n"
   ca_policy_consensus: true
   ct_log_consensus: true
@@ -236,7 +236,7 @@ consensus:
 # Asset management integration
 assets:
   complex_assets: "hypermesh_vm_with_consensus"
-  certificate_assets: "trustchain_with_nkrypt_proof"
+  certificate_assets: "trustchain_with_proof_of_state"
   validation_required: "four_proof_consensus"
   
 # Real-time certificate monitoring

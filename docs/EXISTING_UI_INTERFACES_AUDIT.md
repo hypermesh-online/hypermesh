@@ -218,7 +218,7 @@
 #### **Production-Grade Dashboard**
 - **Integration Testing**: 87.9% test success rate, production-ready status
 - **Real-time Updates**: Live system monitoring and health tracking
-- **Four-Proof Consensus**: Complete NKrypt consensus visualization
+- **Four-Proof Consensus**: Complete Proof of State consensus visualization
 - **Asset Portfolio Management**: Comprehensive asset tracking and trading
 - **Byzantine Fault Detection**: Real-time malicious node detection
 - **Performance Monitoring**: STOQ transport performance tracking (2.95/40 Gbps)

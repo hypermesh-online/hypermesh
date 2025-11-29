@@ -12,7 +12,7 @@ This document defines the complete abstraction layer architecture for transformi
 │                                                                     │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐          │
 │  │   Asset     │  │   Consensus  │  │   Transport    │          │
-│  │   Manager   │  │   (NKrypt)   │  │    (STOQ)      │          │
+│  │   Manager   │  │   (Proof of State)   │  │    (STOQ)      │          │
 │  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘          │
 │         │                 │                   │                     │
 │  ┌──────┴─────────────────┴───────────────────┴──────────┐        │
@@ -802,8 +802,8 @@ impl SecurityPipeline {
 ```rust
 /// Consensus validation for packages
 pub struct ConsensusValidator {
-    /// NKrypt consensus client
-    nkrypt: NKryptClient,
+    /// Proof of State consensus client
+    proof_of_state: Proof of StateClient,
 
     /// Proof generator
     proof_generator: ProofGenerator,

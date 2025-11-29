@@ -8,14 +8,14 @@ use catalog::extension::{
     VirtualMachineHandler, LibraryHandler, DatasetHandler, TemplateHandler,
 };
 
-use hypermesh::extensions::{
+use blockmatrix::extensions::{
     HyperMeshExtension, AssetLibraryExtension, ExtensionConfig,
     ExtensionCapability, ExtensionRequest, ExtensionState,
     AssetCreationSpec, AssetQuery, PackageFilter, InstallOptions,
     SearchOptions, ResourceLimits,
 };
 
-use hypermesh::assets::core::{AssetType, PrivacyLevel};
+use blockmatrix::assets::core::{AssetType, PrivacyLevel};
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -356,7 +356,7 @@ async fn test_template_handler_operations() {
 
     // Validate the asset (should exist)
     let valid = handler.validate_asset(&asset_id,
-        hypermesh::consensus::nkrypt_integration::ConsensusProof {
+        hypermesh::consensus::proof_of_state_integration::ConsensusProof {
             space_proof: None,
             stake_proof: None,
             work_proof: None,

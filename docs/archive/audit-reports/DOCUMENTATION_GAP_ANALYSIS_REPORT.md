@@ -17,13 +17,13 @@ This report presents a quantitative analysis of gaps between documented features
 ### 1.1 Four-Proof Consensus System
 
 **Documentation Claims**:
-- "NKrypt Four-Proof Consensus System (✅ Implemented)"
-- Reference: `/home/persist/repos/personal/NKrypt/src/` (original patterns)
+- "Proof of State Four-Proof Consensus System (✅ Implemented)"
+- Reference: `/home/persist/repos/personal/Proof of State/src/` (original patterns)
 - Every asset requires ALL FOUR proofs: PoSpace, PoStake, PoWork, PoTime
 
 **Implementation Reality**:
-- ✅ **VERIFIED**: NKrypt source exists at `/home/persist/repos/personal/NKrypt/src/`
-- ✅ **VERIFIED**: All four proof types implemented in `/home/persist/repos/personal/NKrypt/src/mods/proof.rs`:
+- ✅ **VERIFIED**: Proof of State source exists at `/home/persist/repos/personal/Proof of State/src/`
+- ✅ **VERIFIED**: All four proof types implemented in `/home/persist/repos/personal/Proof of State/src/mods/proof.rs`:
   - `SpaceProof` (lines 27-54)
   - `StakeProof` (lines 283-330)
   - `WorkProof` (lines 85-113)

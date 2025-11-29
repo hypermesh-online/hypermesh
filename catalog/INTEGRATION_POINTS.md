@@ -11,7 +11,7 @@ This document specifies exactly how the Catalog extension integrates with each H
 │                                                                       │
 │  ┌───────────────┐  ┌──────────────┐  ┌────────────────┐           │
 │  │ Asset Manager │  │   Consensus   │  │   Transport    │           │
-│  │               │  │   (NKrypt)    │  │    (STOQ)      │           │
+│  │               │  │   (Proof of State)    │  │    (STOQ)      │           │
 │  └───────┬───────┘  └──────┬────────┘  └───────┬────────┘           │
 │          │                  │                    │                    │
 │  ┌───────┴──────────────────┴────────────────────┴─────────┐        │
@@ -114,14 +114,14 @@ Delete:   Catalog → Check Dependencies → Asset Manager → Remove
 Query:    Catalog Index → Asset Manager → Return Metadata
 ```
 
-## 2. Consensus System Integration (NKrypt)
+## 2. Consensus System Integration (Proof of State)
 
 ### Integration Points
-All Catalog operations requiring validation integrate with HyperMesh's NKrypt consensus system.
+All Catalog operations requiring validation integrate with HyperMesh's Proof of State consensus system.
 
 ### Consensus Flow
 ```
-Package Operation → Generate Proofs → Validate via NKrypt → Execute if Valid
+Package Operation → Generate Proofs → Validate via Proof of State → Execute if Valid
                          ↓
                  PoSpace + PoStake + PoWork + PoTime
 ```

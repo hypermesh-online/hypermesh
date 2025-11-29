@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Import HyperMesh extension types
-use hypermesh::extensions::{
+use blockmatrix::extensions::{
     AssetExtensionHandler, AssetType, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
     ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStatus,

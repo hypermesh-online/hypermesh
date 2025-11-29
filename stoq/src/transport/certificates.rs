@@ -5,7 +5,7 @@
 //! - Self-signed certificates for localhost testing only
 //! - Automatic 24-hour certificate rotation
 //! - Real-time certificate fingerprinting and validation
-//! - NKrypt consensus proof validation
+//! - Proof of State consensus proof validation
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};

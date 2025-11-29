@@ -1,6 +1,6 @@
-//! NKrypt Consensus Integration for TrustChain
-//! 
-//! This module implements the four-proof consensus system extracted from NKrypt
+//! Proof of State Consensus Integration for TrustChain
+//!
+//! This module implements the four-proof consensus system extracted from Proof of State
 //! for use in TrustChain certificate operations and CT log validation.
 
 use serde::{Serialize, Deserialize};
@@ -21,8 +21,8 @@ pub use validator::*;
 pub use block_matrix::*;
 pub use hypermesh_client::*;
 
-/// NKrypt Four-Proof Consensus System
-/// Based on the reference implementation from /home/persist/repos/personal/NKrypt/src/mods/proof.rs
+/// Proof of State Four-Proof Consensus System
+/// Based on the reference implementation from /home/persist/repos/personal/Proof of State/src/mods/proof.rs
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConsensusProof {
     /// WHO owns/validates (economic security)

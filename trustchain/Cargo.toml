@@ -112,7 +112,7 @@ default = ["ca", "ct", "dns", "consensus"]
 ca = []           # Certificate Authority
 ct = []           # Certificate Transparency
 dns = []          # DNS resolution
-consensus = []    # NKrypt consensus integration
+consensus = []    # Proof of State consensus integration
 
 # Testing and development
 localhost-testing = []

@@ -47,7 +47,7 @@ Conclusion:    Core innovation exists only as interface
 **Claim**: "Every asset requires ALL FOUR proofs"
 
 **Code Evidence** (`hypermesh/src/assets/core/mod.rs`):
-- ✅ ConsensusProof struct imported from NKrypt
+- ✅ ConsensusProof struct imported from Proof of State
 - ✅ Basic validation logic present
 - ❌ No actual proof generation
 - ❌ No distributed consensus implementation

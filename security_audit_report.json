@@ -2539,7 +2539,7 @@
         "description": "Parse without error handling"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 226,
         "type": "UNWRAP_PANIC",
         "code": "hasher.update(&time_verification_timestamp.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros().to_le_bytes());",
@@ -2547,7 +2547,7 @@
         "description": "Unwrap() can cause panic in production"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 259,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
@@ -2555,7 +2555,7 @@
         "description": "Unwrap() can cause panic in production"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 315,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
@@ -2563,7 +2563,7 @@
         "description": "Unwrap() can cause panic in production"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 452,
         "type": "UNWRAP_PANIC",
         "code": "bincode::serialize(self).unwrap()",
@@ -2571,7 +2571,7 @@
         "description": "Unwrap() can cause panic in production"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 647,
         "type": "UNWRAP_PANIC",
         "code": "self.time_proof.as_ref().unwrap().network_time_offset < Duration::from_secs(60)",
@@ -14725,7 +14725,7 @@
         "description": "Unsafe deserialization of untrusted data"
       },
       {
-        "file": "hypermesh/src/consensus/nkrypt_integration.rs",
+        "file": "hypermesh/src/consensus/proof_of_state_integration.rs",
         "line": 456,
         "type": "UNSAFE_DESERIALIZATION",
         "code": "bincode::deserialize(data).map_err(|e|",

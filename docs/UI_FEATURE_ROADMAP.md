@@ -77,7 +77,7 @@ interface NATAddressingInterface {
 ```
 
 ### **2. Four-Proof Consensus Visualization (CRITICAL)**
-**Blocking Issue**: Users cannot understand or interact with NKrypt consensus system
+**Blocking Issue**: Users cannot understand or interact with Proof of State consensus system
 **Team Required**: UI/UX Specialist + Principal Software Engineer + QA Engineer
 
 **Missing Features (16 total)**:
@@ -257,7 +257,7 @@ interface NATAddressingInterface {
 
 ### **Critical Dependencies**
 - **Backend API Readiness**: Ensure all endpoints support UI requirements
-- **Consensus Integration**: NKrypt four-proof system must be stable
+- **Consensus Integration**: Proof of State four-proof system must be stable
 - **Certificate System**: TrustChain 24-hour rotation must be reliable
 - **IPv6 Networking**: Full IPv6-only infrastructure must be operational
 

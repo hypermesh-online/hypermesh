@@ -64,7 +64,7 @@
 
 ## 3. Architectural Claims vs Implementation
 
-### Consensus System (NKrypt Four-Proof)
+### Consensus System (Proof of State Four-Proof)
 
 **Claimed Architecture**:
 ```
@@ -81,7 +81,7 @@ $ find /home/persist/repos/projects/web3 -name "*consensus*" -o -name "*proof*"
 [No consensus implementation files found]
 ```
 
-**Reality**: Zero consensus code exists. NKrypt is referenced but never implemented.
+**Reality**: Zero consensus code exists. Proof of State is referenced but never implemented.
 
 ### Asset Management System
 

@@ -77,7 +77,7 @@ graph TB
 #### TrustChain Phase 0
 - [ ] Deploy trust.hypermesh.online with traditional DNS
 - [ ] Self-signed root CA for localhost testing ONLY
-- [ ] Basic CA/CT/DNS services with NKrypt consensus preparation
+- [ ] Basic CA/CT/DNS services with Proof of State consensus preparation
 - [ ] STOQ integration with TrustChain CA-issued certificates
 - [ ] Certificate fingerprinting and CT log foundation
 - [ ] IPv6-only networking implementation
@@ -91,17 +91,17 @@ graph TB
 - [ ] Real-time certificate fingerprinting
 
 #### HyperMesh Phase 0
-- [ ] Implement NKrypt ConsensusProof (PoSpace+PoStake+PoWork+PoTime)
+- [ ] Implement Proof of State ConsensusProof (PoSpace+PoStake+PoWork+PoTime)
 - [ ] Asset system with consensus proof validation
 - [ ] IPv6-only networking with TrustChain certificates
 - [ ] Block-matrix architecture for O(log n) consensus
-- [ ] Asset adapter pattern from NKrypt reference implementation
+- [ ] Asset adapter pattern from Proof of State reference implementation
 
 ### Phase 1: Self-Contained Services (Week 3-6)
 **Goal**: Each service fully functional independently
 
 #### TrustChain Phase 1
-- [ ] Full CA/CT/DNS with NKrypt consensus integration
+- [ ] Full CA/CT/DNS with Proof of State consensus integration
 - [ ] Automated certificate issuance with ConsensusProof validation
 - [ ] DNS-over-QUIC using IPv6-only STOQ transport
 - [ ] Certificate transparency logs with block-matrix architecture
@@ -116,10 +116,10 @@ graph TB
 - [ ] Complete TrustChain integration APIs with real-time validation
 
 #### HyperMesh Phase 1
-- [ ] Julia VM with NKrypt ConsensusProof validation for execution
+- [ ] Julia VM with Proof of State ConsensusProof validation for execution
 - [ ] Asset SDK with consensus proof requirements for all operations
 - [ ] Hardware resource adapters (CPU/GPU/RAM/Storage) with IPv6 addressing
-- [ ] Full NKrypt consensus implementation (O(log n) block-matrix)
+- [ ] Full Proof of State consensus implementation (O(log n) block-matrix)
 - [ ] Asset orchestration with TrustChain certificate integration
 
 ### Phase 2: Cross-Integration (Week 7-10)
