@@ -365,10 +365,18 @@ impl ConsensusRuntime {
             // Create allocation request
             let allocation_request = AssetAllocationRequest {
                 asset_type: asset_type.clone(),
-                required_capacity: *required_capacity,
-                priority: crate::assets::core::AssetPriority::High,
-                duration: Duration::from_secs(3600), // 1 hour default
+                requested_resources: ResourceRequirements {
+                    cpu: None,
+                    gpu_usage: None,
+                    memory_usage: None,
+                    storage_usage: Some(*required_capacity),
+                    network_usage: None,
+                },
+                privacy_level: PrivacyLevel::Private,
                 consensus_proof: self.create_allocation_consensus_proof().await?,
+                certificate_fingerprint: String::new(),
+                duration_limit: Some(Duration::from_secs(3600)), // 1 hour default
+                tags: HashMap::new(),
             };
             
             // Allocate through asset manager
@@ -411,9 +419,10 @@ impl ConsensusRuntime {
         let space_proof = SpaceProof {
             node_id: "hypermesh-runtime".to_string(),
             storage_path: "/tmp/hypermesh-runtime".to_string(),
-            allocated_size: 1024 * 1024 * 1024, // 1GB
-            proof_hash: vec![1, 2, 3, 4], // In production: real cryptographic proof
-            timestamp: SystemTime::now(),
+            total_size: 1024 * 1024 * 1024, // 1GB
+            total_storage: 10 * 1024 * 1024 * 1024, // 10GB total
+            file_hash: hex::encode(&[1, 2, 3, 4]), // In production: real cryptographic proof
+            proof_timestamp: SystemTime::now(),
         };
         
         let stake_proof = StakeProof {
@@ -424,12 +433,14 @@ impl ConsensusRuntime {
         };
         
         let work_proof = WorkProof {
-            worker_id: "hypermesh-runtime".to_string(),
+            owner_id: "hypermesh-runtime".to_string(),
             workload_id: Uuid::new_v4().to_string(),
-            process_id: std::process::id() as u64,
+            pid: std::process::id() as u64,
             computational_power: 1000,
             workload_type: WorkloadType::Compute,
             work_state: WorkState::Running,
+            work_challenges: vec![],
+            proof_timestamp: SystemTime::now(),
         };
         
         let time_proof = TimeProof {

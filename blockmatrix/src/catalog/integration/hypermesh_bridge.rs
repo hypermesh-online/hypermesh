@@ -835,12 +835,14 @@ impl CatalogHyperMeshBridge {
         match asset {
             CatalogAssetType::ContainerImage { image_name, image_tag, .. } => {
                 let container_spec = ContainerSpec {
+                    name: format!("{}-{}", image_name, image_tag),
                     image: format!("{}:{}", image_name, image_tag),
                     command: container_config.command.clone(),
                     args: container_config.args.clone(),
-                    environment: container_config.environment_variables.clone(),
+                    env: container_config.environment_variables.clone(),
                     resources: ResourceRequirements::default(),
-                    network_usage: Default::default(),
+                    limits: None,
+                    labels: HashMap::new(),
                 };
                 
                 let hypermesh_spec = HyperMeshContainerSpec {

@@ -341,8 +341,9 @@ impl RemoteMemoryTransport {
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                address: format!("{:?}", global_address),
-                reason: result.error.unwrap_or_else(|| "Read failed".to_string()),
+                reason: format!("Read failed at {:?}: {}",
+                    global_address,
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
             });
         }
 
@@ -379,8 +380,9 @@ impl RemoteMemoryTransport {
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                address: format!("{:?}", global_address),
-                reason: result.error.unwrap_or_else(|| "Write failed".to_string()),
+                reason: format!("Write failed at {:?}: {}",
+                    global_address,
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
             });
         }
 
@@ -417,8 +419,9 @@ impl RemoteMemoryTransport {
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                address: format!("{:?}", global_address),
-                reason: result.error.unwrap_or_else(|| "Atomic add failed".to_string()),
+                reason: format!("Atomic add failed at {:?}: {}",
+                    global_address,
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
             });
         }
 

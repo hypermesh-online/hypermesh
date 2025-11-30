@@ -334,23 +334,19 @@ impl EntityBlockchain {
             consensus_proof: ConsensusProof::new(
                 // TODO: Generate real consensus proofs
                 crate::consensus::proof::SpaceProof::new(
+                    "genesis-node".to_string(),
                     "/genesis".to_string(),
-                    crate::consensus::proof::NetworkPosition {
-                        address: config.network_domain.clone(),
-                        zone: "genesis".to_string(),
-                        distance_metric: 0,
-                    },
                     0,
                 ),
                 crate::consensus::proof::StakeProof::new(
                     config.network_domain.clone(),
                     "genesis-node".to_string(),
                     1000,
-                    crate::consensus::proof::AccessPermissions {
-                        read_level: crate::consensus::proof::AccessLevel::Public,
-                        write_level: crate::consensus::proof::AccessLevel::Public,
-                        admin_level: crate::consensus::proof::AccessLevel::Verified,
-                        allocation_rights: vec!["genesis".to_string()],
+                    crate::consensus::AccessPermissions {
+                        level: crate::consensus::AccessLevel::Public,
+                        required_roles: vec!["genesis".to_string()],
+                        allowed_networks: vec![],
+                        require_consensus: false,
                     },
                     vec!["genesis-allowance".to_string()],
                 ),

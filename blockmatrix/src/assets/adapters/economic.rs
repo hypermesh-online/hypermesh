@@ -117,19 +117,23 @@ impl EconomicAssetAdapter {
         Self {
             assets: Arc::new(RwLock::new(HashMap::new())),
             capabilities: AdapterCapabilities {
-                supports_allocation: true,
-                supports_deallocation: true,
-                supports_proxy_addressing: true,
-                supports_privacy_levels: true,
-                supports_resource_limits: true,
-                supports_hot_migration: false, // Economic assets are not migratable
-                max_concurrent_assets: Some(10000), // High limit for wallets
+                asset_type: AssetType::Economic,
                 supported_privacy_levels: vec![
                     PrivacyLevel::Private,
                     PrivacyLevel::PrivateNetwork,
                     PrivacyLevel::P2P,
                     PrivacyLevel::PublicNetwork,
                     PrivacyLevel::FullPublic,
+                ],
+                supports_proxy_addressing: true,
+                supports_resource_monitoring: true,
+                supports_dynamic_limits: true,
+                max_concurrent_allocations: Some(10000), // High limit for wallets
+                features: vec![
+                    "allocation".to_string(),
+                    "deallocation".to_string(),
+                    "privacy_levels".to_string(),
+                    "resource_limits".to_string(),
                 ],
             },
             consensus_requirements: ConsensusRequirements {
@@ -243,12 +247,12 @@ impl AssetAdapter for EconomicAssetAdapter {
             asset_id: request.asset_id.clone(),
             status: asset_state.status,
             resource_usage: ResourceUsage {
-                cpu: None,
+                cpu_usage: None,
                 gpu_usage: None,
                 memory_usage: None,
                 storage_usage: None,
                 network_usage: None,
-                economic: Some(usage),
+                measurement_timestamp: std::time::SystemTime::now(),
             },
             proxy_address: None,
             allocated_at: chrono::Utc::now(),
@@ -284,14 +288,14 @@ impl AssetAdapter for EconomicAssetAdapter {
     async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
         let assets = self.assets.read().await;
 
-        if let Some(asset_state) = assets.get(asset_id) {
+        if let Some(_asset_state) = assets.get(asset_id) {
             Ok(ResourceUsage {
-                cpu: None,
+                cpu_usage: None,
                 gpu_usage: None,
                 memory_usage: None,
                 storage_usage: None,
                 network_usage: None,
-                economic: Some(asset_state.usage.clone()),
+                measurement_timestamp: std::time::SystemTime::now(),
             })
         } else {
             Err(AssetError::AssetNotFound {
@@ -337,11 +341,10 @@ impl AssetAdapter for EconomicAssetAdapter {
         if let Some(asset_state) = assets.get_mut(asset_id) {
             // Generate proxy address for economic asset
             let proxy_address = ProxyAddress {
-                address: format!("economic://caesar.hypermesh.online/{}", asset_id.uuid),
-                proxy_type: crate::assets::core::ProxyType::Economic,
-                port: 8545, // Standard JSON-RPC port for economic operations
-                protocol: "https".to_string(),
-                metadata: HashMap::new(),
+                network_id: [0u8; 16], // Economic network ID
+                node_id: [0u8; 8], // Caesar node ID
+                asset_port: 8545, // Standard JSON-RPC port for economic operations
+                access_token: [0u8; 32], // Would be generated with proper credentials
             };
 
             asset_state.proxy_address = Some(proxy_address.clone());
@@ -358,12 +361,17 @@ impl AssetAdapter for EconomicAssetAdapter {
     async fn health_check(&self) -> AssetResult<AdapterHealth> {
         let assets = self.assets.read().await;
 
+        let mut metrics = HashMap::new();
+        metrics.insert("total_assets".to_string(), assets.len() as f64);
+        metrics.insert("active_assets".to_string(),
+            assets.values().filter(|a| a.status.state == AssetState::InUse).count() as f64);
+        metrics.insert("error_rate".to_string(), 0.0);
+
         Ok(AdapterHealth {
-            is_healthy: true,
-            total_assets: assets.len(),
-            active_assets: assets.values().filter(|a| a.status.state == AssetState::InUse).count(),
-            error_rate: 0.0, // Track actual error rates in production
-            last_health_check: chrono::Utc::now(),
+            healthy: true,
+            message: "Economic adapter operational".to_string(),
+            last_check: std::time::SystemTime::now(),
+            performance_metrics: metrics,
         })
     }
 

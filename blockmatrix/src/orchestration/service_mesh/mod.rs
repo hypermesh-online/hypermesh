@@ -12,7 +12,8 @@ pub use routing::{AlmRoutingEngine, RoutingPolicy, PathOptimization};
 pub use discovery::{CpeServiceDiscovery, ServiceRegistry, DiscoveryEvent, ServiceHealth};
 
 use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
-use crate::{ServiceMeshConfig, ServiceId, NodeId, LoadBalancingStrategy};
+use crate::{ServiceId, NodeId};
+use super::super::{ServiceMeshConfig, LoadBalancingConfig, LoadBalancingStrategy};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

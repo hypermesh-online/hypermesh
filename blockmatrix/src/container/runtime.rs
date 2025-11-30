@@ -129,9 +129,9 @@ impl ContainerRuntime {
     /// Create a new container runtime with default components
     pub async fn new(config: ContainerConfig) -> Result<Self> {
         let lifecycle = Arc::new(DefaultContainerLifecycle::new());
-        let image_manager = Arc::new(DefaultImageManager::new(&config.storage)?);
+        let image_manager = Arc::new(DefaultImageManager::new(&config.storage_usage)?);
         let network = Arc::new(DefaultContainerNetwork::new());
-        let filesystem = Arc::new(DefaultContainerFilesystem::new(&config.storage)?);
+        let filesystem = Arc::new(DefaultContainerFilesystem::new(&config.storage_usage)?);
         let resource_manager = Arc::new(CgroupResourceManager::new());
         let migration_manager = Arc::new(DefaultMigrationManager::new());
         let monitor = Arc::new(DefaultContainerMonitor::new());
@@ -140,7 +140,7 @@ impl ContainerRuntime {
             config,
             lifecycle,
             image_manager,
-            network,
+            network_usage: network,
             filesystem,
             resource_manager,
             migration_manager,
@@ -165,7 +165,7 @@ impl ContainerRuntime {
             config,
             lifecycle,
             image_manager,
-            network,
+            network_usage: network,
             filesystem,
             resource_manager,
             migration_manager,
@@ -253,8 +253,8 @@ impl ContainerRuntime {
         // Create container filesystem
         self.filesystem.create_container_filesystem(id, &spec).await?;
         
-        // Set up networking
-        self.network.create_network_namespace(id, &spec.network).await?;
+        // Set up networking - spec doesn't have network field, use defaults
+        self.network_usage.create_network_namespace(id, &NetworkConfig::default()).await?;
         
         // Configure resource limits
         self.resource_manager.set_quota(id, spec.resources.clone()).await?;
@@ -283,12 +283,10 @@ impl ContainerRuntime {
         }).await;
         
         info!("Created container {} in {:?}", id, creation_time);
-        
-        // Auto-start if requested
-        if options.auto_start {
-            handle.start().await?;
-        }
-        
+
+        // CreateOptions doesn't have auto_start field
+        // Containers need to be started manually after creation
+
         Ok(handle)
     }
     
@@ -385,7 +383,7 @@ impl ContainerRuntime {
         self.resource_manager.cleanup(id).await?;
         
         // Cleanup networking
-        self.network.delete_network_namespace(id).await?;
+        self.network_usage.delete_network_namespace(id).await?;
         
         // Cleanup filesystem
         self.filesystem.delete_container_filesystem(id).await?;
@@ -455,8 +453,8 @@ impl ContainerRuntime {
         
         for id in container_ids {
             if let Ok(status) = self.status(id).await {
-                match status.state {
-                    ContainerState::Running | ContainerState::Paused => {
+                match status {
+                    ContainerStatus::Running => {
                         warn!("Force stopping container {} during shutdown", id);
                         let _ = self.stop(id, Some(Duration::from_secs(5))).await;
                     },

@@ -352,9 +352,13 @@ impl HyperMeshContainerOrchestrator {
             &allocated_assets,
         ).await?;
         
+        // CreateOptions doesn't have auto_start field
+        // We'll start manually after asset binding
         let create_options = CreateOptions {
-            auto_start: false, // We'll start manually after asset binding
-            ..Default::default()
+            name: container_spec.name.clone(),
+            image: container_spec.image.clone(),
+            env: container_spec.env.clone(),
+            resources: container_spec.resources.clone(),
         };
         
         let container_handle = self.container_runtime.create(container_spec, create_options).await?;
@@ -447,10 +451,19 @@ impl HyperMeshContainerOrchestrator {
         for (asset_type, requirements) in required_assets {
             let allocation_request = AssetAllocationRequest {
                 asset_type: asset_type.clone(),
-                required_capacity: requirements.preferred_capacity,
-                priority: self.map_asset_priority(&requirements.priority),
-                duration: requirements.duration,
+                requested_resources: ResourceRequirements {
+                    cpu: None,
+                    gpu_usage: None,
+                    memory_usage: None,
+                    storage_usage: Some(requirements.preferred_capacity),
+                    network_usage: None,
+                    container: None,
+                },
+                privacy_level: PrivacyLevel::Private,
                 consensus_proof: consensus_proof.clone(),
+                certificate_fingerprint: String::new(),
+                duration_limit: Some(requirements.duration),
+                tags: HashMap::new(),
             };
             
             let allocation = self.asset_manager.allocate_asset(allocation_request).await?;

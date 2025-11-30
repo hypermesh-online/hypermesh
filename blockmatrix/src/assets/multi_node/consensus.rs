@@ -522,9 +522,10 @@ impl ConsensusManager {
             SpaceProof {
                 node_id: hex::encode(&self.local_node.id[..8]),
                 storage_path: "/consensus".to_string(),
-                allocated_size: 1024,
-                proof_hash: Sha256::digest(&proposal.signature).to_vec(),
-                timestamp: SystemTime::now(),
+                total_size: 1024,
+                total_storage: 10240,
+                file_hash: hex::encode(Sha256::digest(&proposal.signature)),
+                proof_timestamp: SystemTime::now(),
             },
             StakeProof {
                 stake_holder: hex::encode(&self.local_node.id[..8]),
@@ -533,12 +534,14 @@ impl ConsensusManager {
                 stake_timestamp: SystemTime::now(),
             },
             WorkProof {
-                worker_id: hex::encode(&self.local_node.id[..8]),
+                owner_id: hex::encode(&self.local_node.id[..8]),
                 workload_id: proposal.proposal_id.clone(),
-                process_id: std::process::id(),
+                pid: std::process::id() as u64,
                 computational_power: 100,
                 workload_type: WorkloadType::Consensus,
                 work_state: WorkState::Completed,
+                work_challenges: vec![],
+                proof_timestamp: SystemTime::now(),
             },
             TimeProof {
                 network_time_offset: Duration::from_secs(0),

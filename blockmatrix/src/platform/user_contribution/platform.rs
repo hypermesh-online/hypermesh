@@ -290,10 +290,19 @@ impl UserContributionPlatform {
 
         let allocation_request = crate::assets::core::AssetAllocationRequest {
             asset_type,
-            required_capacity: shared_capacity,
-            priority: crate::assets::core::AssetPriority::Normal,
-            duration: resource_settings.max_session_duration,
+            requested_resources: crate::assets::core::ResourceRequirements {
+                cpu: None,
+                gpu_usage: None,
+                memory_usage: None,
+                storage_usage: Some(shared_capacity),
+                network_usage: None,
+                container: None,
+            },
+            privacy_level: crate::assets::core::PrivacyLevel::Private,
             consensus_proof: consensus_proof.clone(),
+            certificate_fingerprint: String::new(),
+            duration_limit: Some(resource_settings.max_session_duration),
+            tags: HashMap::new(),
         };
 
         self.asset_manager.allocate_asset(allocation_request).await

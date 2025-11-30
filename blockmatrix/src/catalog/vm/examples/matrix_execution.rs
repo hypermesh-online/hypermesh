@@ -483,23 +483,19 @@ fn create_base_execution_context() -> Result<ExecutionContext> {
     Ok(ExecutionContext {
         consensus_proof: ConsensusProof::new(
             crate::consensus::proof::SpaceProof::new(
+                "matrix-vm-node".to_string(),
                 "/matrix-vm".to_string(),
-                crate::consensus::proof::NetworkPosition {
-                    address: "matrix-vm.hypermesh.online".to_string(),
-                    zone: "matrix".to_string(),
-                    distance_metric: 0,
-                },
                 0,
             ),
             crate::consensus::proof::StakeProof::new(
                 "matrix-vm.hypermesh.online".to_string(),
                 "matrix-vm-node".to_string(),
                 10000,
-                crate::consensus::proof::AccessPermissions {
-                    read_level: crate::consensus::proof::AccessLevel::Public,
-                    write_level: crate::consensus::proof::AccessLevel::Verified,
-                    admin_level: crate::consensus::proof::AccessLevel::Verified,
-                    allocation_rights: vec!["matrix-execution".to_string()],
+                crate::consensus::AccessPermissions {
+                    level: crate::consensus::AccessLevel::Public,
+                    required_roles: vec!["matrix-execution".to_string()],
+                    allowed_networks: vec![],
+                    require_consensus: true,
                 },
                 vec!["matrix-vm-allowance".to_string()],
             ),
