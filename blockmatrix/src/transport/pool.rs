@@ -130,7 +130,7 @@ impl ConnectionPool {
         if let Some(mut entries) = self.connections.get_mut(addr) {
             entries.retain(|entry| {
                 let conn = &entry.connection;
-                conn.is_active() && !entry.is_expired(
+                (**conn).is_active() && !entry.is_expired(
                     self.config.max_connection_age,
                     self.config.idle_timeout,
                 )
@@ -182,7 +182,7 @@ impl ConnectionPool {
     /// Remove a specific connection from the pool
     pub async fn remove_connection(&self, addr: &SocketAddr, conn_id: &str) {
         if let Some(mut entries) = self.connections.get_mut(addr) {
-            entries.retain(|entry| entry.connection.id() != conn_id);
+            entries.retain(|entry| (**entry.connection).id() != conn_id);
 
             // Update stats
             let mut stats = self.stats.write();
@@ -201,7 +201,7 @@ impl ConnectionPool {
             .collect();
 
         for entry in connections {
-            entry.connection.close();
+            (**entry.connection).close();
         }
 
         self.connections.clear();
@@ -243,7 +243,7 @@ impl ConnectionPool {
                 let initial_count = entry.value().len();
 
                 entry.value_mut().retain(|pool_entry| {
-                    let should_keep = pool_entry.connection.is_active() &&
+                    let should_keep = (**pool_entry.connection).is_active() &&
                         !pool_entry.is_expired(
                             self.config.max_connection_age,
                             self.config.idle_timeout,

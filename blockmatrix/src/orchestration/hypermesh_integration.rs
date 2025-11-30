@@ -15,12 +15,13 @@ use uuid::Uuid;
 use crate::container::{
     ContainerRuntime, ContainerHandle, ContainerSpec, CreateOptions,
     ContainerId, ContainerStatus, ContainerState,
-    ResourceRequirements, ResourceLimits, ResourceUsage as ContainerResourceUsage,
+    ResourceRequirements as ContainerResourceRequirements, ResourceLimits, ResourceUsage as ContainerResourceUsage,
 };
 use crate::assets::core::{
     AssetManager, AssetId, AssetType, AssetAllocationRequest, AssetAllocation,
     ConsensusProof, AssetResult, AssetStatus, AssetState,
     SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState,
+    ResourceRequirements,
 };
 use crate::catalog::vm::{
     ConsensusProofVM, VMConfig, ExecutionContext, ExecutionResult,
@@ -455,9 +456,8 @@ impl HyperMeshContainerOrchestrator {
                     cpu: None,
                     gpu_usage: None,
                     memory_usage: None,
-                    storage_usage: Some(requirements.preferred_capacity),
+                    storage_usage: None,
                     network_usage: None,
-                    container: None,
                 },
                 privacy_level: PrivacyLevel::Private,
                 consensus_proof: consensus_proof.clone(),

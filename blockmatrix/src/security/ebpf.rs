@@ -421,7 +421,7 @@ impl EBPFSecurityManager {
         }
         
         // Check against blocked IPs (simplified)
-        for blocked_range in &self.config.default_policies.network.blocked_ip_ranges {
+        for blocked_range in &self.config.default_policies.network_usage.blocked_ip_ranges {
             if packet.src_addr.starts_with(&blocked_range.split('/').next().unwrap_or("")) {
                 threat_level += 0.8;
                 indicators.push(format!("Traffic from blocked IP range: {}", blocked_range));

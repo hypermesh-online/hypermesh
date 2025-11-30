@@ -407,13 +407,13 @@ impl CpePlacementEngine {
         let context_history = self.prepare_context_history(spec, placement_context).await?;
         
         // Use CPE for prediction
-        let operation = MfnOperation::CpePrediction {
+        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::CpePrediction {
             context_history,
             prediction_horizon: 1, // Predict optimal placement
         };
         
         match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::CpeResult { predictions, confidence, accuracy, .. } => {
+            crate::orchestration::integration::mfn_bridge::LayerResponse::CpeResult { predictions, confidence, accuracy, .. } => {
                 // Interpret CPE predictions to select optimal node
                 let optimal_node = self.select_node_from_predictions(
                     &predictions,

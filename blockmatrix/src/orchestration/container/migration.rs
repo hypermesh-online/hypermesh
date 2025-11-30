@@ -680,7 +680,7 @@ impl ContainerMigrator {
             0.7, // Resource availability
         ]];
         
-        let operation = MfnOperation::CpePrediction {
+        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::CpePrediction {
             context_history,
             prediction_horizon: 1,
         };

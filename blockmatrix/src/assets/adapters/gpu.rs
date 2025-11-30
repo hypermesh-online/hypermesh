@@ -465,7 +465,7 @@ impl AssetAdapter for GpuAssetAdapter {
         }
         
         // Get GPU requirements
-        let gpu_req = request.requested_resources.gpu.as_ref()
+        let gpu_req = request.requested_resources.gpu_usage.as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
                 reason: "No GPU requirements specified".to_string()
             })?;

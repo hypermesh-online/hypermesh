@@ -424,7 +424,8 @@ impl ContainerRuntime {
     
     /// Migrate a container
     pub async fn migrate(&self, request: MigrationRequest) -> Result<()> {
-        let _result = self.migration_manager.migrate(request).await?;
+        let _result = self.migration_manager.migrate(request).await
+            .map_err(|e| ContainerError::MigrationFailed { reason: e.to_string() })?;
         Ok(())
     }
     

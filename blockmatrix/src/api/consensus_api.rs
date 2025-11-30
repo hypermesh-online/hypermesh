@@ -59,7 +59,7 @@ pub async fn create_consensus_api_server(
         bind_address: config.bind_address.parse()
             .map_err(|e| anyhow!("Invalid bind address: {}", e))?,
         port: config.port,
-        max_connections: Some(config.max_concurrent_validations),
+        max_connections: config.max_concurrent_validations,
         ..Default::default()
     };
 

@@ -641,13 +641,13 @@ impl PredictiveScaler {
         let context_history = self.prepare_workload_context_history(workload_context).await?;
         
         // Use CPE for workload prediction
-        let operation = MfnOperation::CpePrediction {
+        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::CpePrediction {
             context_history,
             prediction_horizon: scaling_policy.predictive_settings.prediction_horizon,
         };
-        
+
         match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::CpeResult { predictions, confidence, accuracy, .. } => {
+            crate::orchestration::integration::mfn_bridge::LayerResponse::CpeResult { predictions, confidence, accuracy, .. } => {
                 let predicted_metrics = self.interpret_predictions(&predictions).await;
                 let recommended_action = self.determine_recommended_action(
                     &predicted_metrics,

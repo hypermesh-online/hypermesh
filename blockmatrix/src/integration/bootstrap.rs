@@ -295,7 +295,7 @@ impl BootstrapManager {
             current_phase: Arc::new(AtomicU8::new(0)),
             components: Arc::new(DashMap::new()),
             discovery: Arc::new(RwLock::new(Box::new(TraditionalDNS::new(
-                config.network.traditional_dns.clone()
+                config.network_usage.traditional_dns.clone()
             )))),
             certificates: Arc::new(RwLock::new(Box::new(SelfSignedProvider::new()))),
             transport: Arc::new(RwLock::new(Box::new(BasicTransport::new()))),
@@ -412,13 +412,13 @@ impl BootstrapManager {
 
         // Transition to federated discovery (with fallback)
         *self.discovery.write().await = Box::new(FederatedDiscovery::new(
-            self.config.network.hypermesh_bind,
-            Some(self.config.network.traditional_dns.clone()),
+            self.config.network_usage.hypermesh_bind,
+            Some(self.config.network_usage.traditional_dns.clone()),
         ));
 
         // Enable mandatory consensus for critical operations
         *self.consensus.write().await = Box::new(RequiredConsensus::new(
-            self.config.network.hypermesh_bind,
+            self.config.network_usage.hypermesh_bind,
         ));
 
         // Update component phases
@@ -447,13 +447,13 @@ impl BootstrapManager {
 
         // Full federated discovery (no fallback)
         *self.discovery.write().await = Box::new(FederatedDiscovery::new(
-            self.config.network.hypermesh_bind,
+            self.config.network_usage.hypermesh_bind,
             None,
         ));
 
         // Full consensus validation
         *self.consensus.write().await = Box::new(FullConsensus::new(
-            self.config.network.hypermesh_bind,
+            self.config.network_usage.hypermesh_bind,
         ));
 
         // Update component phases

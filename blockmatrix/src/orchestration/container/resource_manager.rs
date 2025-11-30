@@ -279,13 +279,13 @@ impl IfrResourceManager {
         context.insert("network_bandwidth".to_string(), 
                       requirements.network_bandwidth.unwrap_or(0).to_string());
         
-        let operation = MfnOperation::IfkLookup {
+        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::IfkLookup {
             resource_id: "node_resources".to_string(),
             context,
         };
-        
+
         match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::IfkResult { found, resource_data, .. } => {
+            crate::orchestration::integration::mfn_bridge::LayerResponse::IfkResult { found, resource_data, .. } => {
                 if found && resource_data.is_some() {
                     // Parse resource data to extract suitable nodes
                     let data = resource_data.unwrap();

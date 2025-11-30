@@ -382,7 +382,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         }
         
         // Get memory requirements
-        let memory_req = request.requested_resources.memory.as_ref()
+        let memory_req = request.requested_resources.memory_usage.as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
                 reason: "No memory requirements specified".to_string()
             })?;

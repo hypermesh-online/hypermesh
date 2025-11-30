@@ -284,8 +284,12 @@ impl ProxyAddressResolver {
         let asset_port = self.allocate_port(&proxy_node.node_id).await?;
         
         // Create proxy address
+        // Convert network prefix and node_id to proper byte arrays
+        let mut network_id = [0u8; 16];
+        network_id[..8].copy_from_slice(&self.network_config.network_prefix);
+
         let proxy_addr = ProxyAddress::new(
-            self.network_config.hypermesh_network_id,
+            network_id,
             proxy_node.node_id,
             asset_port,
         );

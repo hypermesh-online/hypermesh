@@ -402,7 +402,8 @@ impl MatrixAwareVM {
             
             let validation_results = self.matrix_manager
                 .multi_entity_validation(validation.asset_id, vec![validation.entity_domain.clone()])
-                .await?;
+                .await
+                .map_err(|e| anyhow::anyhow!("Matrix validation failed: {}", e))?;
             
             if let Some(response) = validation_results.get(&validation.entity_domain) {
                 results.insert(validation.entity_domain.clone(), response.clone());

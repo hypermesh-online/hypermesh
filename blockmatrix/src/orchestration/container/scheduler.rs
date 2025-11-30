@@ -553,13 +553,13 @@ impl DsrScheduler {
         }
         
         // Use MFN DSR layer for similarity matching
-        let operation = MfnOperation::DsrSimilarity {
+        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::DsrSimilarity {
             input_data: pattern.to_vec(),
             threshold: 0.7,
         };
         
         match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::DsrResult { similarity_score, confidence, matches, .. } => {
+            crate::orchestration::integration::mfn_bridge::LayerResponse::DsrResult { similarity_score, confidence, matches, .. } => {
                 let pattern_match = if !matches.is_empty() && similarity_score > 0.7 {
                     Some(PatternMatch {
                         pattern_id: matches[0].clone(),

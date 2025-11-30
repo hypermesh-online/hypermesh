@@ -7,9 +7,9 @@
 //! - Economic consensus validation
 
 use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
+    AssetAdapter, AssetAllocationRequest, AssetAllocation, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
     ResourceUsage, ResourceLimits, ResourceRequirements, PrivacyLevel, ProxyAddress,
-    AdapterHealth, AdapterCapabilities, AssetType
+    AdapterHealth, AdapterCapabilities, AssetType, AllocationConfig, AccessConfig
 };
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -246,15 +246,18 @@ impl AssetAdapter for EconomicAssetAdapter {
         Ok(crate::assets::core::AssetAllocation {
             asset_id: request.asset_id.clone(),
             status: asset_state.status,
-            resource_usage: ResourceUsage {
-                cpu_usage: None,
-                gpu_usage: None,
-                memory_usage: None,
-                storage_usage: None,
-                network_usage: None,
-                measurement_timestamp: std::time::SystemTime::now(),
+            allocation_config: AllocationConfig {
+                percentage: 100,
+                max_concurrent_users: 1,
+                duration_limit: None,
+                rewards_enabled: request.rewards_enabled,
             },
-            proxy_address: None,
+            access_config: AccessConfig {
+                allowed_domains: vec![],
+                allowed_entities: vec![],
+                require_consensus: request.require_consensus,
+                minimum_trust_score: 0.5,
+            },
             allocated_at: std::time::SystemTime::now(),
         })
     }
