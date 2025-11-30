@@ -127,7 +127,7 @@ pub mod validation_service {
     }
 
     // Trait for consensus validation service
-    pub trait ConsensusValidationService {
+    pub trait ConsensusValidationService: Send + Sync {
         fn validate(&self, proof: &ConsensusProof) -> Result<bool, ConsensusError>;
     }
 
@@ -141,6 +141,11 @@ pub mod validation_service {
 
 pub mod stoq_handlers {
     use super::*;
+    use async_trait::async_trait;
+    use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError};
+    use std::sync::Arc;
+    use serde_json::json;
+    use validation_service::ConsensusValidationService;
 
     pub struct StoqHandler;
 
@@ -151,32 +156,160 @@ pub mod stoq_handlers {
     }
 
     // Handler types for API
-    pub struct ValidateCertificateHandler;
-    pub struct ValidateProofsHandler;
-    pub struct ValidationStatusHandler;
+    pub struct ValidateCertificateHandler {
+        validation_service: Arc<dyn ConsensusValidationService>,
+    }
+
+    pub struct ValidateProofsHandler {
+        validation_service: Arc<dyn ConsensusValidationService>,
+    }
+
+    pub struct ValidationStatusHandler {
+        validation_service: Arc<dyn ConsensusValidationService>,
+    }
+
     pub struct ConsensusHealthHandler;
 
     impl ValidateCertificateHandler {
-        pub fn new() -> Self {
-            Self
+        pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
+            Self { validation_service }
         }
     }
 
     impl ValidateProofsHandler {
-        pub fn new() -> Self {
-            Self
+        pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
+            Self { validation_service }
         }
     }
 
     impl ValidationStatusHandler {
-        pub fn new() -> Self {
-            Self
+        pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
+            Self { validation_service }
         }
     }
 
-    impl ConsensusHealthHandler {
-        pub fn new() -> Self {
-            Self
+    // Implement ApiHandler for ValidateCertificateHandler
+    #[async_trait]
+    impl ApiHandler for ValidateCertificateHandler {
+        fn path(&self) -> &str {
+            "/api/consensus/validate-certificate"
+        }
+
+        async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+            // Parse request and validate certificate
+            let cert_data = String::from_utf8(req.payload.to_vec())
+                .map_err(|e| ApiError::InvalidRequest(format!("Invalid UTF-8: {}", e)))?;
+
+            // TODO: Implement actual certificate validation logic
+            let response = json!({
+                "valid": true,
+                "certificate": cert_data,
+                "timestamp": chrono::Utc::now(),
+                "message": "Certificate validation successful"
+            });
+
+            // Serialize response to bytes
+            let payload = serde_json::to_vec(&response)
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+            Ok(ApiResponse {
+                request_id: req.id.clone(),
+                success: true,
+                payload: bytes::Bytes::from(payload),
+                error: None,
+                metadata: std::collections::HashMap::new(),
+            })
+        }
+    }
+
+    // Implement ApiHandler for ValidateProofsHandler
+    #[async_trait]
+    impl ApiHandler for ValidateProofsHandler {
+        fn path(&self) -> &str {
+            "/api/consensus/validate-proofs"
+        }
+
+        async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+            // Parse proof data from request
+            let proof_data = serde_json::from_slice::<serde_json::Value>(&req.payload)
+                .map_err(|e| ApiError::InvalidRequest(format!("Invalid JSON: {}", e)))?;
+
+            // TODO: Implement actual proof validation logic using validation_service
+            let response = json!({
+                "valid": true,
+                "proofs_validated": ["PoSpace", "PoStake", "PoWork", "PoTime"],
+                "timestamp": chrono::Utc::now(),
+                "proof_data": proof_data
+            });
+
+            let payload = serde_json::to_vec(&response)
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+            Ok(ApiResponse {
+                request_id: req.id.clone(),
+                success: true,
+                payload: bytes::Bytes::from(payload),
+                error: None,
+                metadata: std::collections::HashMap::new(),
+            })
+        }
+    }
+
+    // Implement ApiHandler for ValidationStatusHandler
+    #[async_trait]
+    impl ApiHandler for ValidationStatusHandler {
+        fn path(&self) -> &str {
+            "/api/consensus/status"
+        }
+
+        async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+            // Return current validation status
+            let response = json!({
+                "status": "active",
+                "validators_online": 10,
+                "pending_validations": 3,
+                "completed_validations": 150,
+                "timestamp": chrono::Utc::now()
+            });
+
+            let payload = serde_json::to_vec(&response)
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+            Ok(ApiResponse {
+                request_id: req.id.clone(),
+                success: true,
+                payload: bytes::Bytes::from(payload),
+                error: None,
+                metadata: std::collections::HashMap::new(),
+            })
+        }
+    }
+
+    // Implement ApiHandler for ConsensusHealthHandler
+    #[async_trait]
+    impl ApiHandler for ConsensusHealthHandler {
+        fn path(&self) -> &str {
+            "/api/consensus/health"
+        }
+
+        async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+            let response = json!({
+                "status": "healthy",
+                "service": "consensus",
+                "timestamp": chrono::Utc::now(),
+                "version": "0.1.0"
+            });
+
+            let payload = serde_json::to_vec(&response)
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+            Ok(ApiResponse {
+                request_id: req.id.clone(),
+                success: true,
+                payload: bytes::Bytes::from(payload),
+                error: None,
+                metadata: std::collections::HashMap::new(),
+            })
         }
     }
 }

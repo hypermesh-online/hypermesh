@@ -53,7 +53,11 @@ impl HyperMeshSystem {
         }
 
         // Initialize extension manager
-        let extension_manager = Arc::new(UnifiedExtensionManager::new());
+        let extension_config = extensions::manager::ExtensionManagerConfig::default();
+        let extension_manager = Arc::new(UnifiedExtensionManager::new(
+            asset_manager.clone(),
+            extension_config,
+        ));
 
         tracing::info!("HyperMesh Asset System initialized with all adapters");
 

@@ -15,13 +15,24 @@ impl ApiHandler for HealthCheckHandler {
         "/api/health"
     }
 
-    async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        Ok(ApiResponse::Json(json!({
+    async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+        let response = json!({
             "status": "healthy",
             "service": "hypermesh-assets",
             "timestamp": chrono::Utc::now(),
             "version": "0.1.0"
-        })))
+        });
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+        Ok(ApiResponse {
+            request_id: req.id.clone(),
+            success: true,
+            payload: bytes::Bytes::from(payload),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
     }
 }
 
@@ -34,8 +45,8 @@ impl ApiHandler for ListAssetsHandler {
         "/api/assets"
     }
 
-    async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        Ok(ApiResponse::Json(json!([
+    async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+        let response = json!([
             {
                 "id": "asset_001",
                 "type": "CPU",
@@ -57,7 +68,18 @@ impl ApiHandler for ListAssetsHandler {
                 "performance": "89.7%",
                 "location": "node_gamma"
             }
-        ])))
+        ]);
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+        Ok(ApiResponse {
+            request_id: req.id.clone(),
+            success: true,
+            payload: bytes::Bytes::from(payload),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
     }
 }
 
@@ -70,8 +92,8 @@ impl ApiHandler for ListNodesHandler {
         "/api/nodes"
     }
 
-    async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        Ok(ApiResponse::Json(json!([
+    async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+        let response = json!([
             {
                 "id": "node_alpha",
                 "status": "healthy",
@@ -93,7 +115,18 @@ impl ApiHandler for ListNodesHandler {
                 "memory_usage": 85.1,
                 "network_latency": 25
             }
-        ])))
+        ]);
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+        Ok(ApiResponse {
+            request_id: req.id.clone(),
+            success: true,
+            payload: bytes::Bytes::from(payload),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
     }
 }
 
@@ -106,8 +139,8 @@ impl ApiHandler for HyperMeshStatusHandler {
         "/api/status"
     }
 
-    async fn handle(&self, _req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        Ok(ApiResponse::Json(json!({
+    async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
+        let response = json!({
             "network_health": "operational",
             "total_nodes": 15,
             "active_nodes": 14,
@@ -115,7 +148,18 @@ impl ApiHandler for HyperMeshStatusHandler {
             "active_assets": 823,
             "consensus_status": "synced",
             "last_block": 1_234_567
-        })))
+        });
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+
+        Ok(ApiResponse {
+            request_id: req.id.clone(),
+            success: true,
+            payload: bytes::Bytes::from(payload),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
     }
 }
 
