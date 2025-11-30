@@ -74,52 +74,52 @@ impl DefaultMigrationManager {
 impl MigrationManager for DefaultMigrationManager {
     async fn migrate(&self, request: MigrationRequest) -> Result<MigrationResult> {
         let start_time = std::time::Instant::now();
-        let container_id = request.container_id;
-        
-        info!("Starting migration of container {} to {} using {:?}", 
+        let container_id = request.container_id.clone();
+
+        info!("Starting migration of container {} to {} using {:?}",
              container_id, request.destination_node, request.migration_type);
-        
+
         // Update status to preparing
         {
             let mut migrations = self.active_migrations.write().await;
-            migrations.insert(container_id, MigrationStatus::Preparing);
+            migrations.insert(container_id.clone(), MigrationStatus::Preparing);
         }
-        
+
         // Simulate migration process
         match request.migration_type {
             MigrationType::Cold => {
                 // Stop container
                 tokio::time::sleep(Duration::from_millis(50)).await;
-                
+
                 // Transfer state
-                self.update_status(container_id, MigrationStatus::Transferring).await;
+                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
                 tokio::time::sleep(Duration::from_millis(200)).await;
-                
+
                 // Start on destination
                 tokio::time::sleep(Duration::from_millis(50)).await;
             },
             MigrationType::Warm => {
                 // Pre-copy phase
-                self.update_status(container_id, MigrationStatus::Transferring).await;
+                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
                 tokio::time::sleep(Duration::from_millis(150)).await;
-                
+
                 // Stop and final transfer
-                self.update_status(container_id, MigrationStatus::Finalizing).await;
+                self.update_status(container_id.clone(), MigrationStatus::Finalizing).await;
                 tokio::time::sleep(Duration::from_millis(50)).await;
             },
             MigrationType::Hot => {
                 // Live migration with minimal downtime
-                self.update_status(container_id, MigrationStatus::Transferring).await;
+                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
                 tokio::time::sleep(Duration::from_millis(80)).await;
-                
-                self.update_status(container_id, MigrationStatus::Finalizing).await;
+
+                self.update_status(container_id.clone(), MigrationStatus::Finalizing).await;
                 tokio::time::sleep(Duration::from_millis(20)).await;
             },
         }
-        
+
         let downtime = start_time.elapsed();
         let result = MigrationResult {
-            container_id,
+            container_id: request.container_id,
             success: downtime <= request.downtime_budget,
             downtime,
             transferred_bytes: 1024 * 1024 * 100, // 100MB simulated
@@ -128,25 +128,25 @@ impl MigrationManager for DefaultMigrationManager {
         
         // Update final status
         if result.success {
-            self.update_status(container_id, MigrationStatus::Complete).await;
+            self.update_status(container_id.clone(), MigrationStatus::Complete).await;
             info!("Successfully migrated container {} in {:?}", container_id, downtime);
         } else {
-            self.update_status(container_id, MigrationStatus::Failed("Downtime budget exceeded".to_string())).await;
+            self.update_status(container_id.clone(), MigrationStatus::Failed("Downtime budget exceeded".to_string())).await;
         }
         
         Ok(result)
     }
     
     async fn prepare_migration(&self, container_id: ContainerId) -> Result<()> {
-        self.update_status(container_id, MigrationStatus::Preparing).await;
+        self.update_status(container_id.clone(), MigrationStatus::Preparing).await;
         debug!("Prepared migration for container {}", container_id);
         Ok(())
     }
     
     async fn cancel_migration(&self, container_id: ContainerId) -> Result<()> {
+        debug!("Cancelled migration for container {}", container_id);
         let mut migrations = self.active_migrations.write().await;
         migrations.remove(&container_id);
-        debug!("Cancelled migration for container {}", container_id);
         Ok(())
     }
     

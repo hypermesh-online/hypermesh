@@ -546,10 +546,10 @@ impl HyperMeshContainerOrchestrator {
             .collect();
         
         // Update mappings
-        container_assets.insert(container_id, asset_ids.clone());
-        
+        container_assets.insert(container_id.clone(), asset_ids.clone());
+
         for asset_id in asset_ids {
-            asset_containers.insert(asset_id, container_id);
+            asset_containers.insert(asset_id, container_id.clone());
         }
         
         Ok(())
@@ -605,24 +605,24 @@ impl HyperMeshContainerOrchestrator {
     /// Stop and deallocate container
     pub async fn stop_container(&self, container_id: ContainerId) -> Result<()> {
         // Stop the container
-        let container_handle = self.container_runtime.get_handle(container_id).await?;
+        let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
         container_handle.stop(Some(Duration::from_secs(30))).await?;
-        
+
         // Deallocate associated assets
         let asset_ids = {
             let container_assets = self.container_assets.read().await;
             container_assets.get(&container_id).cloned().unwrap_or_default()
         };
-        
+
         for asset_id in &asset_ids {
             self.asset_manager.deallocate_asset(asset_id).await?;
         }
-        
+
         // Clean up mappings
         {
             let mut container_assets = self.container_assets.write().await;
             let mut asset_containers = self.asset_containers.write().await;
-            
+
             container_assets.remove(&container_id);
             for asset_id in &asset_ids {
                 asset_containers.remove(asset_id);
@@ -661,18 +661,18 @@ impl HyperMeshContainerOrchestrator {
         
         // Allocate new assets with updated requirements
         let new_allocated_assets = self.allocate_container_assets(&new_requirements, &consensus_proof).await?;
-        
+
         // Update container specification
-        let container_handle = self.container_runtime.get_handle(container_id).await?;
+        let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
         let updated_spec = self.adapt_container_spec_for_assets(
             &container_handle.spec,
             &new_allocated_assets,
         ).await?;
-        
+
         // Apply new resource limits to container
         // This would require container runtime support for dynamic resource updates
         // For now, we'll just update our tracking
-        
+
         // Update asset bindings
         self.bind_assets_to_container(container_id, &new_allocated_assets).await?;
         
@@ -691,17 +691,17 @@ impl HyperMeshContainerOrchestrator {
         let mut managed_containers = Vec::new();
         
         for (container_id, asset_ids) in container_assets.iter() {
-            let container_handle = self.container_runtime.get_handle(*container_id).await?;
+            let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
             let status = container_handle.status().await?;
-            
+
             let mut asset_info = Vec::new();
             for asset_id in asset_ids {
                 let asset_status = self.asset_manager.get_asset_status(asset_id).await?;
                 asset_info.push(asset_status);
             }
-            
+
             managed_containers.push(ManagedContainer {
-                container_id: *container_id,
+                container_id: container_id.clone(),
                 container_status: status,
                 allocated_assets: asset_info,
                 deployment_time: container_handle.created_at,
@@ -720,7 +720,7 @@ impl HyperMeshContainerOrchestrator {
         };
         
         for container_id in container_ids {
-            if let Err(e) = self.stop_container(container_id).await {
+            if let Err(e) = self.stop_container(container_id.clone()).await {
                 tracing::warn!("Failed to stop container {} during shutdown: {}", container_id, e);
             }
         }
