@@ -778,7 +778,7 @@ impl PrivacyManager {
         
         // Validate consensus proof if required
         if let Some(proof) = &consensus_proof {
-            if !proof.validate().await? {
+            if !proof.validate() {
                 return Err(AssetError::AdapterError {
                     message: "Invalid consensus proof provided".to_string()
                 });

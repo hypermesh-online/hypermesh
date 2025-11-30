@@ -452,7 +452,7 @@ impl DsrScheduler {
         placement_pattern: &[f64],
     ) -> Result<NodeCandidate> {
         // Check cache first
-        let cache_key = format!("{}:{}", node_id.0, spec.id.0);
+        let cache_key = format!("{}:{}", node_id, spec.id);
         if let Some(cached_score) = self.check_node_scoring_cache(&cache_key).await {
             return Ok(NodeCandidate {
                 node_id: node_id.clone(),

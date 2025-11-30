@@ -509,8 +509,29 @@ fn create_base_execution_context() -> Result<ExecutionContext> {
         language: "julia".to_string(),
         asset_allocations: HashMap::new(),
         privacy_settings: crate::catalog::vm::PrivacyConfig::default(),
-        blockchain_context: serde_json::Value::Null,
-        p2p_context: serde_json::Value::Null,
+        blockchain_context: crate::catalog::vm::execution::context::BlockchainExecutionContext {
+            state_hash: None,
+            block_number: None,
+            gas_limit: 1_000_000,
+            gas_price: 1,
+            storage_quota: 1024 * 1024,
+            contract_addresses: HashMap::new(),
+        },
+        p2p_context: crate::catalog::vm::execution::context::P2PExecutionContext {
+            connected_peers: vec![],
+            peer_resources: HashMap::new(),
+            network_topology: crate::catalog::vm::execution::context::NetworkTopology {
+                total_peers: 0,
+                connected_peers: 0,
+                network_latency_ms: 0.0,
+            },
+            trust_scores: HashMap::new(),
+            routing_preferences: crate::catalog::vm::execution::context::RoutingPreferences {
+                prefer_low_latency: true,
+                prefer_high_bandwidth: false,
+                max_hops: 5,
+            },
+        },
     })
 }
 

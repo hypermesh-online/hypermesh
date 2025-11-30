@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::assets::core::{AssetResult, AssetError, ProxyNodeInfo};
+use crate::assets::core::{AssetResult, AssetError, ProxyNodeInfo, ProxyCapabilities};
 
 /// TrustChain integration handler
 pub struct TrustChainIntegration {
@@ -309,7 +309,7 @@ impl TrustChainIntegration {
         }
         
         tracing::info!(
-            "Node certificate validation for {}: {} (trust level: {})",
+            "Node certificate validation for {:?}: {} (trust level: {})",
             node_info.node_id,
             validation_result.is_valid,
             validation_result.trust_level
@@ -500,7 +500,15 @@ impl TrustChainIntegration {
         let mock_node_info = ProxyNodeInfo {
             node_id: "unknown".to_string(),
             network_address: "unknown".to_string(),
-            capabilities: Default::default(),
+            capabilities: ProxyCapabilities {
+                http_proxy: false,
+                socks5_proxy: false,
+                tcp_forwarding: false,
+                vpn_tunnel: false,
+                max_connections: 0,
+                bandwidth_mbps: 0,
+                protocols: vec![],
+            },
             trust_score: 0.0,
             last_heartbeat: SystemTime::now(),
             certificate_fingerprint: certificate_fingerprint.to_string(),

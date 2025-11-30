@@ -375,13 +375,13 @@ impl BootstrapManager {
 
         // Transition to hybrid discovery
         *self.discovery.write().await = Box::new(HybridDiscovery::new(
-            self.config.network.traditional_dns.clone(),
-            self.config.network.trustchain_bind,
+            self.config.network_usage.traditional_dns.clone(),
+            self.config.network_usage.trustchain_bind,
         ));
 
         // Replace self-signed certificates with TrustChain certificates
         *self.certificates.write().await = Box::new(TrustChainProvider::new(
-            self.config.network.trustchain_bind,
+            self.config.network_usage.trustchain_bind,
         ));
 
         // Update component phases
@@ -389,7 +389,7 @@ impl BootstrapManager {
 
         // Enable consensus validation (non-blocking)
         *self.consensus.write().await = Box::new(OptionalConsensus::new(
-            self.config.network.hypermesh_bind,
+            self.config.network_usage.hypermesh_bind,
         ));
 
         self.current_phase.store(1, Ordering::SeqCst);

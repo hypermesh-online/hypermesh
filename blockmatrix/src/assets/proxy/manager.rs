@@ -207,19 +207,22 @@ impl RemoteProxyManager {
             });
         }
         
+        // Convert node_id to hex string for use as HashMap key
+        let node_id_str = hex::encode(node_info.node_id);
+
         // Initialize port allocation tracking for this node
         {
             let mut allocations = self.port_allocations.write().await;
-            allocations.insert(node_info.node_id.clone(), Vec::new());
+            allocations.insert(node_id_str.clone(), Vec::new());
         }
-        
+
         // Register node in router
         self.router.add_proxy_node(&node_info).await?;
-        
+
         // Store node info
         {
             let mut nodes = self.proxy_nodes.write().await;
-            nodes.insert(node_info.node_id.clone(), node_info);
+            nodes.insert(node_id_str, node_info);
         }
         
         // Update statistics
@@ -228,7 +231,7 @@ impl RemoteProxyManager {
             stats.active_proxy_nodes += 1;
         }
         
-        tracing::info!("Registered new proxy node: {}", node_info.node_id);
+        tracing::info!("Registered new proxy node: {:?}", node_info.node_id);
         Ok(())
     }
     
@@ -242,32 +245,33 @@ impl RemoteProxyManager {
         
         // Select best proxy node based on trust, capabilities, and load
         let selected_node = self.select_best_proxy_node(capabilities_required).await?;
-        
+        let node_id_str = hex::encode(selected_node.node_id);
+
         // Allocate port for this asset type
         let asset_type_str = format!("{:?}", asset_id.asset_type).to_lowercase();
-        let port = self.allocate_port_for_node(&selected_node.node_id, &asset_type_str).await?;
-        
+        let port = self.allocate_port_for_node(&node_id_str, &asset_type_str).await?;
+
         // Generate global proxy address using NAT-like addressing
         let proxy_address = self.nat_translator.generate_global_address(
             &selected_node.node_id,
             asset_id,
             port,
         ).await?;
-        
+
         // Create quantum security tokens
         let quantum_tokens = self.quantum_security.generate_access_tokens(&proxy_address).await?;
-        
+
         // Create forwarding rules based on privacy level
         let forwarding_rules = self.create_forwarding_rules(&privacy_level, &asset_type_str).await?;
-        
+
         // Create access permissions
         let access_permissions = self.create_access_permissions(&privacy_level).await?;
-        
+
         // Create proxy mapping
         let mapping = ProxyMapping {
             proxy_address: proxy_address.clone(),
             target_asset_id: asset_id.clone(),
-            target_node_id: selected_node.node_id.clone(),
+            target_node_id: node_id_str,
             local_address: format!("local://{}:{}", selected_node.network_address, port),
             privacy_level,
             forwarding_rules,
@@ -297,7 +301,7 @@ impl RemoteProxyManager {
         }
         
         tracing::info!(
-            "Allocated proxy address {} for asset {} on node {}",
+            "Allocated proxy address {} for asset {} on node {:?}",
             proxy_address,
             asset_id,
             selected_node.node_id

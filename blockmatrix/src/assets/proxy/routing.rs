@@ -262,7 +262,7 @@ impl ProxyRouter {
         // Recalculate routes that might involve this node
         self.recalculate_routes().await?;
         
-        tracing::info!("Added proxy node to routing registry: {}", node_info.node_id);
+        tracing::info!("Added proxy node to routing registry: {:?}", node_info.node_id);
         Ok(())
     }
     

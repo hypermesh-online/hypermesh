@@ -377,7 +377,7 @@ impl GpuAssetAdapter {
         // - Time synchronization calculations for PoTime
         
         // For now, use standard validation but could be accelerated
-        proof.validate().await
+        Ok(proof.validate())
     }
     
     /// Update usage statistics

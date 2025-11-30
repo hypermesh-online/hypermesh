@@ -199,8 +199,8 @@ impl CpuAssetAdapter {
                             physical_id: core_id / 2, // Assume 2 logical per physical (SMT/HT)
                             is_logical: core_id % 2 == 1,
                             numa_node: core_id / 4, // Assume 4 cores per NUMA node
-                            current_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400),
-                            base_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400),
+                            current_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400) as u32,
+                            base_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400) as u32,
                             max_frequency_mhz: cpu_info.frequency_mhz.map(|f| (f as f32 * 1.5) as u32).unwrap_or(3600),
                             status: CoreStatus::Available,
                             allocated_to: None,

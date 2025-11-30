@@ -379,7 +379,7 @@ impl EntityBlockchain {
         consensus_proof: ConsensusProof,
     ) -> Result<u64, String> {
         // Validate consensus proof
-        if !consensus_proof.validate().await.map_err(|e| format!("Consensus validation failed: {:?}", e))? {
+        if !consensus_proof.validate() {
             return Err("Invalid consensus proof".to_string());
         }
 

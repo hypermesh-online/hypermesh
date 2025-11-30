@@ -631,7 +631,7 @@ impl PredictiveScaler {
         scaling_policy: &ServiceScalingPolicy,
     ) -> Result<WorkloadPrediction> {
         // Check prediction cache
-        let cache_key = format!("prediction:{}:{}", service_id.0, 
+        let cache_key = format!("prediction:{}:{}", service_id,
                                workload_context.temporal_context.hour_of_day);
         if let Some(cached) = self.check_prediction_cache(&cache_key).await {
             return Ok(cached);

@@ -16,7 +16,7 @@ use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
 use crate::catalog::vm::consensus::{ConsensusVM, ConsensusOperation, ConsensusExecutionResult};
-use crate::assets::core::{AssetManager, AssetId, AssetType, AssetAllocationRequest};
+use crate::assets::core::{AssetManager, AssetId, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
 use super::context::ExecutionContext;
 use super::scheduler::{ExecutionScheduler, ExecutionPlan};
 use super::{RuntimeExecutionResult, MemoryUsagePattern, StorageOperation};

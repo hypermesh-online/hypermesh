@@ -13,7 +13,7 @@ pub use discovery::{CpeServiceDiscovery, ServiceRegistry, DiscoveryEvent, Servic
 
 use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
-use super::super::{ServiceMeshConfig, LoadBalancingConfig, LoadBalancingStrategy};
+use super::{ServiceMeshConfig, LoadBalancingConfig, LoadBalancingStrategy};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

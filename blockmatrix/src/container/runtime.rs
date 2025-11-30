@@ -4,7 +4,7 @@ use super::{
     types::{ContainerId, ContainerSpec, ContainerStatus, ContainerState},
     lifecycle::{ContainerLifecycle, DefaultContainerLifecycle},
     image::{ImageManager, DefaultImageManager},
-    network::{ContainerNetwork, DefaultContainerNetwork},
+    network::{ContainerNetwork, DefaultContainerNetwork, NetworkConfig},
     filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
     resources::{ResourceManager, CgroupResourceManager, ResourceUsage},
     migration::{MigrationManager, DefaultMigrationManager, MigrationRequest},

@@ -348,7 +348,12 @@ impl ProxyAddressResolver {
             .collect();
         
         // Find first available port in range
-        for port in self.network_config.default_port_range.0..=self.network_config.default_port_range.1 {
+        let port_range = self.network_config.default_port_range.as_ref()
+            .ok_or_else(|| AssetError::AllocationFailed {
+                reason: "No default port range configured".to_string()
+            })?;
+
+        for port in port_range.start..=port_range.end {
             if !used_ports.contains(&port) {
                 return Ok(port);
             }

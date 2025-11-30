@@ -446,8 +446,11 @@ impl NATTranslator {
         );
         
         // Convert to ProxyAddress for compatibility
+        // Pad 8-byte network prefix to 16 bytes for IPv6-style addressing
+        let mut network_prefix_16 = [0u8; 16];
+        network_prefix_16[..8].copy_from_slice(&self.network_config.network_prefix);
         let proxy_addr = ProxyAddress::new(
-            self.network_config.network_prefix.try_into().unwrap_or([0u8; 16]),
+            network_prefix_16,
             node_bytes,
             service_port,
         );

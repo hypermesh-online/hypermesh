@@ -835,7 +835,7 @@ impl ContainerMigrator {
                     LoadBalancerUpdate {
                         lb_id: "lb-1".to_string(),
                         update_type: LoadBalancerUpdateType::AddEndpoint,
-                        endpoints: vec![target_node.0.clone()],
+                        endpoints: vec![target_node.clone()],
                     }
                 ],
                 firewall_changes: vec![],

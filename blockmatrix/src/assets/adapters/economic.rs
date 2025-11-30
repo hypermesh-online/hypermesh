@@ -9,7 +9,7 @@
 use crate::assets::core::{
     AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
     ResourceUsage, ResourceLimits, ResourceRequirements, PrivacyLevel, ProxyAddress,
-    AdapterHealth, AdapterCapabilities
+    AdapterHealth, AdapterCapabilities, AssetType
 };
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -233,7 +233,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             status: AssetStatus {
                 asset_id: request.asset_id.clone(),
                 state: AssetState::Available,
-                allocated_at: chrono::Utc::now(),
+                allocated_at: std::time::SystemTime::now(),
                 last_accessed: chrono::Utc::now(),
                 metadata: HashMap::new(),
             },
@@ -255,7 +255,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 measurement_timestamp: std::time::SystemTime::now(),
             },
             proxy_address: None,
-            allocated_at: chrono::Utc::now(),
+            allocated_at: std::time::SystemTime::now(),
         })
     }
 

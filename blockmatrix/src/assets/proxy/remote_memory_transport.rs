@@ -521,7 +521,7 @@ impl RemoteMemoryTransport {
                 message: format!("Failed to send message: {}", e),
             })?;
 
-        stream.finish().await
+        stream.finish()
             .map_err(|e| AssetError::NetworkError {
                 message: format!("Failed to finish stream: {}", e),
             })?;
