@@ -2,6 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use async_trait::async_trait;
+use crate::catalog::vm::execution::context::{
+    BlockchainExecutionContext, P2PExecutionContext, PeerInfo, PeerResourceInfo,
+    NetworkTopology, RoutingPreferences,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMIntegrationConfig {
@@ -74,5 +79,62 @@ impl HyperMeshBlockchain {
 
     pub async fn validate(&self, _data: &[u8]) -> anyhow::Result<bool> {
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl crate::integration::BlockchainIntegration for HyperMeshBlockchain {
+    fn name(&self) -> &str {
+        "HyperMesh"
+    }
+
+    fn is_connected(&self) -> bool {
+        self.config.enabled
+    }
+
+    async fn get_context(&self) -> anyhow::Result<BlockchainExecutionContext> {
+        Ok(BlockchainExecutionContext {
+            state_hash: None,  // Will be populated when blockchain is fully integrated
+            block_number: Some(0),  // Starting block
+            gas_limit: 1_000_000,  // Default gas limit
+            gas_price: 1,  // Default gas price
+            storage_quota: 1024 * 1024 * 100,  // 100MB storage quota
+            contract_addresses: HashMap::new(),  // Will be populated with deployed contracts
+        })
+    }
+}
+
+/// Default P2P Router implementation
+pub struct DefaultP2PRouter {
+    peers: HashMap<String, PeerInfo>,
+}
+
+impl DefaultP2PRouter {
+    pub fn new() -> Self {
+        Self {
+            peers: HashMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl crate::integration::P2PRouter for DefaultP2PRouter {
+    fn route(&self, _peer_id: &str, _message: &[u8]) -> anyhow::Result<()> {
+        // Placeholder implementation for routing
+        Ok(())
+    }
+
+    fn peer_count(&self) -> usize {
+        self.peers.len()
+    }
+
+    async fn get_routing_context(&self) -> anyhow::Result<P2PExecutionContext> {
+        Ok(P2PExecutionContext {
+            connected_peers: self.peers.values().cloned().collect(),
+            peer_resources: HashMap::new(),
+            network_topology: NetworkTopology::default(),
+            trust_scores: HashMap::new(),
+            routing_preferences: RoutingPreferences::default(),
+        })
     }
 }

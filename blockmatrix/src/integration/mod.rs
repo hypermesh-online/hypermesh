@@ -40,6 +40,7 @@ pub use bootstrap::{
     TransportProvider,
     ConsensusProvider,
 };
+use async_trait::async_trait;
 
 pub use config::{
     IntegrationConfig,
@@ -53,21 +54,29 @@ pub use self::coordinator::{
 pub use crate::assets::core::adapter::AssetAdapter;
 
 /// Blockchain integration trait
+#[async_trait]
 pub trait BlockchainIntegration: Send + Sync {
     /// Get blockchain name
     fn name(&self) -> &str;
 
     /// Check if blockchain is connected
     fn is_connected(&self) -> bool;
+
+    /// Get blockchain execution context
+    async fn get_context(&self) -> anyhow::Result<crate::catalog::vm::execution::context::BlockchainExecutionContext>;
 }
 
 /// P2P router trait
+#[async_trait]
 pub trait P2PRouter: Send + Sync {
     /// Route message to peer
     fn route(&self, peer_id: &str, message: &[u8]) -> anyhow::Result<()>;
 
     /// Get peer count
     fn peer_count(&self) -> usize;
+
+    /// Get P2P execution context
+    async fn get_routing_context(&self) -> anyhow::Result<crate::catalog::vm::execution::context::P2PExecutionContext>;
 }
 
 /// Integration manager

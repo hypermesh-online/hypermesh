@@ -386,11 +386,8 @@ impl ConsensusProofVM {
             config.blockchain_config.clone()
         ).await?);
         
-        // Initialize P2P router
-        let p2p_router = Arc::new(P2PRouter::new(
-            config.p2p_config.clone(),
-            Arc::clone(&blockchain),
-        ).await?);
+        // Initialize P2P router (using default implementation for now)
+        let p2p_router = Arc::new(integration::DefaultP2PRouter::new());
         
         Ok(Self {
             config,
