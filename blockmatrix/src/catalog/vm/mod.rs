@@ -89,6 +89,9 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
+pub mod execution;
+use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences};
+
 // Re-export core types
 pub use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 pub use consensus::{ConsensusVM, VMConsensusContext, ConsensusOperation};
@@ -697,7 +700,13 @@ mod tests {
             asset_allocations: std::collections::HashMap::new(),
             privacy_settings: PrivacyConfig::default(),
             blockchain_context: serde_json::Value::Null,
-            p2p_context: serde_json::Value::Null,
+            p2p_context: P2PExecutionContext {
+                connected_peers: Vec::new(),
+                peer_resources: std::collections::HashMap::new(),
+                network_topology: NetworkTopology::default(),
+                trust_scores: std::collections::HashMap::new(),
+                routing_preferences: RoutingPreferences::default(),
+            },
         };
         
         // Create matrix execution context

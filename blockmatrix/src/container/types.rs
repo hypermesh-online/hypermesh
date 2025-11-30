@@ -7,23 +7,28 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Container unique identifier
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ContainerId(pub String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ContainerId(pub uuid::Uuid);
 
 impl ContainerId {
     /// Create a new container ID
     pub fn new() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(Uuid::new_v4())
     }
 
     /// Create from existing string
     pub fn from_string(id: String) -> Self {
-        Self(id)
+        Self(id.parse().unwrap_or_else(|_| Uuid::new_v4()))
     }
 
-    /// Get the inner string
-    pub fn as_str(&self) -> &str {
-        &self.0
+    /// Get the inner string representation
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    /// Get the UUID directly
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
     }
 }
 
