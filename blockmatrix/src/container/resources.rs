@@ -136,25 +136,25 @@ pub enum ResourceEvent {
 #[async_trait]
 pub trait ResourceManager: Send + Sync {
     /// Set resource quota for container
-    async fn set_quota(&self, id: ContainerId, quota: ResourceQuota) -> Result<()>;
-    
+    async fn set_quota(&self, id: &ContainerId, quota: ResourceQuota) -> Result<()>;
+
     /// Get resource quota for container
-    async fn get_quota(&self, id: ContainerId) -> Result<ResourceQuota>;
-    
+    async fn get_quota(&self, id: &ContainerId) -> Result<ResourceQuota>;
+
     /// Get current resource usage
-    async fn get_usage(&self, id: ContainerId) -> Result<ResourceUsage>;
-    
+    async fn get_usage(&self, id: &ContainerId) -> Result<ResourceUsage>;
+
     /// Enforce resource limits
-    async fn enforce_limits(&self, id: ContainerId) -> Result<EnforcementAction>;
-    
+    async fn enforce_limits(&self, id: &ContainerId) -> Result<EnforcementAction>;
+
     /// Update resource limits dynamically
-    async fn update_limits(&self, id: ContainerId, quota: ResourceQuota) -> Result<()>;
-    
+    async fn update_limits(&self, id: &ContainerId, quota: ResourceQuota) -> Result<()>;
+
     /// Monitor resource usage
-    async fn monitor(&self, id: ContainerId) -> Result<Vec<ResourceEvent>>;
-    
+    async fn monitor(&self, id: &ContainerId) -> Result<Vec<ResourceEvent>>;
+
     /// Cleanup resources for container
-    async fn cleanup(&self, id: ContainerId) -> Result<()>;
+    async fn cleanup(&self, id: &ContainerId) -> Result<()>;
 }
 
 /// Cgroup-based resource manager implementation
@@ -198,9 +198,9 @@ impl CgroupResourceManager {
     }
     
     /// Check memory limits
-    async fn check_memory_limit(&self, id: ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
+    async fn check_memory_limit(&self, id: &ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
         let quotas = self.quotas.read().await;
-        if let Some(quota) = quotas.get(&id) {
+        if let Some(quota) = quotas.get(id) {
             if let Some(limit) = quota.memory_limit {
                 if usage.memory_usage > limit {
                     return Some(ResourceEvent::LimitExceeded {
@@ -224,9 +224,9 @@ impl CgroupResourceManager {
     }
     
     /// Check CPU limits
-    async fn check_cpu_limit(&self, id: ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
+    async fn check_cpu_limit(&self, id: &ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
         let quotas = self.quotas.read().await;
-        if let Some(quota) = quotas.get(&id) {
+        if let Some(quota) = quotas.get(id) {
             if let Some(cpu_limit) = quota.cpu_quota {
                 let cpu_limit_percent = cpu_limit * 100.0;
                 if usage.cpu_usage_percent > cpu_limit_percent {
@@ -243,7 +243,7 @@ impl CgroupResourceManager {
     }
     
     /// Simulate reading resource usage from cgroups
-    async fn read_cgroup_usage(&self, _id: ContainerId) -> ResourceUsage {
+    async fn read_cgroup_usage(&self, _id: &ContainerId) -> ResourceUsage {
         // In a real implementation, this would read from /sys/fs/cgroup/
         // For simulation, generate realistic usage data
         ResourceUsage {
@@ -270,32 +270,32 @@ impl CgroupResourceManager {
 
 #[async_trait]
 impl ResourceManager for CgroupResourceManager {
-    async fn set_quota(&self, id: ContainerId, quota: ResourceQuota) -> Result<()> {
+    async fn set_quota(&self, id: &ContainerId, quota: ResourceQuota) -> Result<()> {
         let mut quotas = self.quotas.write().await;
-        quotas.insert(id, quota.clone());
-        
+        quotas.insert(*id, quota.clone());
+
         // In a real implementation, this would write to cgroup files
         // For now, just log the operation
         info!("Set resource quota for container {}: {:?}", id, quota);
         Ok(())
     }
-    
-    async fn get_quota(&self, id: ContainerId) -> Result<ResourceQuota> {
+
+    async fn get_quota(&self, id: &ContainerId) -> Result<ResourceQuota> {
         let quotas = self.quotas.read().await;
-        quotas.get(&id)
+        quotas.get(id)
             .cloned()
-            .ok_or_else(|| ContainerError::NotFound { 
-                id: id.to_string() 
+            .ok_or_else(|| ContainerError::NotFound {
+                id: id.to_string()
             })
     }
-    
-    async fn get_usage(&self, id: ContainerId) -> Result<ResourceUsage> {
+
+    async fn get_usage(&self, id: &ContainerId) -> Result<ResourceUsage> {
         let usage = self.read_cgroup_usage(id).await;
-        
+
         // Store usage in history for trend analysis
         if self.monitoring_enabled {
             let mut history = self.usage_history.write().await;
-            let container_history = history.entry(id).or_insert_with(Vec::new);
+            let container_history = history.entry(*id).or_insert_with(Vec::new);
             container_history.push(usage.clone());
             
             // Keep only last 100 entries to prevent memory bloat
@@ -307,9 +307,9 @@ impl ResourceManager for CgroupResourceManager {
         Ok(usage)
     }
     
-    async fn enforce_limits(&self, id: ContainerId) -> Result<EnforcementAction> {
+    async fn enforce_limits(&self, id: &ContainerId) -> Result<EnforcementAction> {
         let usage = self.get_usage(id).await?;
-        
+
         // Check memory limits first (highest priority)
         if let Some(event) = self.check_memory_limit(id, &usage).await {
             if let ResourceEvent::LimitExceeded { action, .. } = event {
@@ -329,12 +329,12 @@ impl ResourceManager for CgroupResourceManager {
         Ok(EnforcementAction::Allow)
     }
     
-    async fn update_limits(&self, id: ContainerId, quota: ResourceQuota) -> Result<()> {
+    async fn update_limits(&self, id: &ContainerId, quota: ResourceQuota) -> Result<()> {
         let old_quota = {
             let quotas = self.quotas.read().await;
-            quotas.get(&id).cloned()
+            quotas.get(id).cloned()
         };
-        
+
         // Update the quota
         self.set_quota(id, quota.clone()).await?;
         
@@ -353,22 +353,22 @@ impl ResourceManager for CgroupResourceManager {
         Ok(())
     }
     
-    async fn monitor(&self, id: ContainerId) -> Result<Vec<ResourceEvent>> {
+    async fn monitor(&self, id: &ContainerId) -> Result<Vec<ResourceEvent>> {
         let mut events = Vec::new();
         let usage = self.get_usage(id).await?;
-        
+
         // Check all resource limits and generate events
         if let Some(event) = self.check_memory_limit(id, &usage).await {
             events.push(event);
         }
-        
+
         if let Some(event) = self.check_cpu_limit(id, &usage).await {
             events.push(event);
         }
-        
+
         // Check for trends in usage history
         let history = self.usage_history.read().await;
-        if let Some(container_history) = history.get(&id) {
+        if let Some(container_history) = history.get(id) {
             if container_history.len() >= 2 {
                 let current = container_history.last().unwrap();
                 let previous = &container_history[container_history.len() - 2];
@@ -389,14 +389,14 @@ impl ResourceManager for CgroupResourceManager {
         Ok(events)
     }
     
-    async fn cleanup(&self, id: ContainerId) -> Result<()> {
+    async fn cleanup(&self, id: &ContainerId) -> Result<()> {
         // Remove quota configuration
         let mut quotas = self.quotas.write().await;
-        quotas.remove(&id);
-        
+        quotas.remove(id);
+
         // Clear usage history
         let mut history = self.usage_history.write().await;
-        history.remove(&id);
+        history.remove(id);
         
         // In a real implementation, this would clean up cgroup directories
         info!("Cleaned up resources for container {}", id);

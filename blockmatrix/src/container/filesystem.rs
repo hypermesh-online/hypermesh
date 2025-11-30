@@ -30,11 +30,11 @@ pub enum FileModification {
 /// Container filesystem trait
 #[async_trait]
 pub trait ContainerFilesystem: Send + Sync {
-    async fn create_container_filesystem(&self, id: ContainerId, spec: &ContainerSpec) -> Result<PathBuf>;
-    async fn delete_container_filesystem(&self, id: ContainerId) -> Result<()>;
-    async fn get_rootfs_path(&self, id: ContainerId) -> Result<PathBuf>;
-    async fn create_layer(&self, id: ContainerId, parent: Option<String>) -> Result<CowLayer>;
-    async fn apply_layer(&self, id: ContainerId, layer: &CowLayer) -> Result<()>;
+    async fn create_container_filesystem(&self, id: &ContainerId, spec: &ContainerSpec) -> Result<PathBuf>;
+    async fn delete_container_filesystem(&self, id: &ContainerId) -> Result<()>;
+    async fn get_rootfs_path(&self, id: &ContainerId) -> Result<PathBuf>;
+    async fn create_layer(&self, id: &ContainerId, parent: Option<String>) -> Result<CowLayer>;
+    async fn apply_layer(&self, id: &ContainerId, layer: &CowLayer) -> Result<()>;
 }
 
 /// Default container filesystem implementation
@@ -56,19 +56,19 @@ impl DefaultContainerFilesystem {
         })
     }
     
-    fn container_path(&self, id: ContainerId) -> PathBuf {
+    fn container_path(&self, id: &ContainerId) -> PathBuf {
         self.storage_config.containers.join(id.to_string())
     }
 }
 
 #[async_trait]
 impl ContainerFilesystem for DefaultContainerFilesystem {
-    async fn create_container_filesystem(&self, id: ContainerId, spec: &ContainerSpec) -> Result<PathBuf> {
+    async fn create_container_filesystem(&self, id: &ContainerId, spec: &ContainerSpec) -> Result<PathBuf> {
         let container_path = self.container_path(id);
         let rootfs_path = container_path.join("rootfs");
         let work_path = container_path.join("work");
         let upper_path = container_path.join("upper");
-        
+
         // Create directory structure
         for path in [&container_path, &rootfs_path, &work_path, &upper_path] {
             std::fs::create_dir_all(path)
@@ -76,7 +76,7 @@ impl ContainerFilesystem for DefaultContainerFilesystem {
                     format!("Failed to create directory {:?}: {}", path, e)
                 ))?;
         }
-        
+
         // Create basic filesystem structure
         for dir in ["bin", "etc", "tmp", "var", "usr"] {
             std::fs::create_dir_all(rootfs_path.join(dir))
@@ -84,18 +84,18 @@ impl ContainerFilesystem for DefaultContainerFilesystem {
                     format!("Failed to create directory {}: {}", dir, e)
                 ))?;
         }
-        
+
         let mut containers = self.containers.write().await;
-        containers.insert(id, rootfs_path.clone());
+        containers.insert(*id, rootfs_path.clone());
         
         info!("Created container filesystem for {} at {:?}", id, rootfs_path);
         Ok(rootfs_path)
     }
     
-    async fn delete_container_filesystem(&self, id: ContainerId) -> Result<()> {
+    async fn delete_container_filesystem(&self, id: &ContainerId) -> Result<()> {
         let mut containers = self.containers.write().await;
-        containers.remove(&id);
-        
+        containers.remove(id);
+
         let container_path = self.container_path(id);
         if container_path.exists() {
             std::fs::remove_dir_all(&container_path)
@@ -108,13 +108,13 @@ impl ContainerFilesystem for DefaultContainerFilesystem {
         Ok(())
     }
     
-    async fn get_rootfs_path(&self, id: ContainerId) -> Result<PathBuf> {
+    async fn get_rootfs_path(&self, id: &ContainerId) -> Result<PathBuf> {
         let containers = self.containers.read().await;
-        containers.get(&id).cloned()
+        containers.get(id).cloned()
             .ok_or_else(|| ContainerError::filesystem("Container filesystem not found"))
     }
-    
-    async fn create_layer(&self, id: ContainerId, parent: Option<String>) -> Result<CowLayer> {
+
+    async fn create_layer(&self, id: &ContainerId, parent: Option<String>) -> Result<CowLayer> {
         let layer = CowLayer {
             id: format!("layer_{}", uuid::Uuid::new_v4()),
             parent,
@@ -122,12 +122,12 @@ impl ContainerFilesystem for DefaultContainerFilesystem {
             created: SystemTime::now(),
             modifications: BTreeMap::new(),
         };
-        
+
         debug!("Created COW layer {} for container {}", layer.id, id);
         Ok(layer)
     }
-    
-    async fn apply_layer(&self, id: ContainerId, layer: &CowLayer) -> Result<()> {
+
+    async fn apply_layer(&self, id: &ContainerId, layer: &CowLayer) -> Result<()> {
         let rootfs_path = self.get_rootfs_path(id).await?;
         
         for (path, modification) in &layer.modifications {

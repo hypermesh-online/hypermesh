@@ -48,10 +48,10 @@ pub struct NetworkNamespace {
 /// Container network trait
 #[async_trait]
 pub trait ContainerNetwork: Send + Sync {
-    async fn create_network_namespace(&self, id: ContainerId, config: &NetworkConfig) -> Result<NetworkNamespace>;
-    async fn delete_network_namespace(&self, id: ContainerId) -> Result<()>;
-    async fn get_namespace(&self, id: ContainerId) -> Result<NetworkNamespace>;
-    async fn configure_port_forwarding(&self, id: ContainerId, host_port: u16, container_port: u16) -> Result<()>;
+    async fn create_network_namespace(&self, id: &ContainerId, config: &NetworkConfig) -> Result<NetworkNamespace>;
+    async fn delete_network_namespace(&self, id: &ContainerId) -> Result<()>;
+    async fn get_namespace(&self, id: &ContainerId) -> Result<NetworkNamespace>;
+    async fn configure_port_forwarding(&self, id: &ContainerId, host_port: u16, container_port: u16) -> Result<()>;
 }
 
 /// Default container network implementation
@@ -71,42 +71,42 @@ impl DefaultContainerNetwork {
 
 #[async_trait]
 impl ContainerNetwork for DefaultContainerNetwork {
-    async fn create_network_namespace(&self, id: ContainerId, _config: &NetworkConfig) -> Result<NetworkNamespace> {
+    async fn create_network_namespace(&self, id: &ContainerId, _config: &NetworkConfig) -> Result<NetworkNamespace> {
         let mut ip_allocator = self.ip_allocator.lock().await;
         let ip_suffix = *ip_allocator;
         *ip_allocator += 1;
         drop(ip_allocator);
-        
+
         let namespace = NetworkNamespace {
-            id,
+            id: *id,
             ip_address: IpAddr::V4(Ipv4Addr::new(172, 17, 0, ip_suffix as u8)),
             gateway: IpAddr::V4(Ipv4Addr::new(172, 17, 0, 1)),
             netmask: 16,
             interface_name: format!("veth{}", id.as_uuid().simple()),
             bridge_name: "hypermesh0".to_string(),
         };
-        
+
         let mut namespaces = self.namespaces.write().await;
-        namespaces.insert(id, namespace.clone());
+        namespaces.insert(*id, namespace.clone());
         
         info!("Created network namespace for container {} with IP {}", id, namespace.ip_address);
         Ok(namespace)
     }
     
-    async fn delete_network_namespace(&self, id: ContainerId) -> Result<()> {
+    async fn delete_network_namespace(&self, id: &ContainerId) -> Result<()> {
         let mut namespaces = self.namespaces.write().await;
-        namespaces.remove(&id);
+        namespaces.remove(id);
         info!("Deleted network namespace for container {}", id);
         Ok(())
     }
     
-    async fn get_namespace(&self, id: ContainerId) -> Result<NetworkNamespace> {
+    async fn get_namespace(&self, id: &ContainerId) -> Result<NetworkNamespace> {
         let namespaces = self.namespaces.read().await;
-        namespaces.get(&id).cloned()
+        namespaces.get(id).cloned()
             .ok_or_else(|| ContainerError::network("Network namespace not found"))
     }
-    
-    async fn configure_port_forwarding(&self, id: ContainerId, host_port: u16, container_port: u16) -> Result<()> {
+
+    async fn configure_port_forwarding(&self, id: &ContainerId, host_port: u16, container_port: u16) -> Result<()> {
         debug!("Configuring port forwarding for container {}: {}:{}", id, host_port, container_port);
         Ok(())
     }

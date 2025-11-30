@@ -603,15 +603,15 @@ impl HyperMeshContainerOrchestrator {
     }
     
     /// Stop and deallocate container
-    pub async fn stop_container(&self, container_id: ContainerId) -> Result<()> {
+    pub async fn stop_container(&self, container_id: &ContainerId) -> Result<()> {
         // Stop the container
-        let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
+        let container_handle = self.container_runtime.get_handle(container_id).await?;
         container_handle.stop(Some(Duration::from_secs(30))).await?;
 
         // Deallocate associated assets
         let asset_ids = {
             let container_assets = self.container_assets.read().await;
-            container_assets.get(&container_id).cloned().unwrap_or_default()
+            container_assets.get(container_id).cloned().unwrap_or_default()
         };
 
         for asset_id in &asset_ids {
@@ -651,7 +651,7 @@ impl HyperMeshContainerOrchestrator {
         // Get current asset allocations
         let current_asset_ids = {
             let container_assets = self.container_assets.read().await;
-            container_assets.get(&container_id).cloned().unwrap_or_default()
+            container_assets.get(container_id).cloned().unwrap_or_default()
         };
         
         // Deallocate current assets
@@ -663,7 +663,7 @@ impl HyperMeshContainerOrchestrator {
         let new_allocated_assets = self.allocate_container_assets(&new_requirements, &consensus_proof).await?;
 
         // Update container specification
-        let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
+        let container_handle = self.container_runtime.get_handle(container_id).await?;
         let updated_spec = self.adapt_container_spec_for_assets(
             &container_handle.spec,
             &new_allocated_assets,
@@ -691,7 +691,7 @@ impl HyperMeshContainerOrchestrator {
         let mut managed_containers = Vec::new();
         
         for (container_id, asset_ids) in container_assets.iter() {
-            let container_handle = self.container_runtime.get_handle(container_id.clone()).await?;
+            let container_handle = self.container_runtime.get_handle(container_id).await?;
             let status = container_handle.status().await?;
 
             let mut asset_info = Vec::new();

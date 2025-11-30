@@ -39,12 +39,12 @@ pub struct PerformanceCounters {
 /// Container monitor trait
 #[async_trait]
 pub trait ContainerMonitor: Send + Sync {
-    async fn start_monitoring(&self, id: ContainerId) -> Result<()>;
-    async fn stop_monitoring(&self, id: ContainerId) -> Result<()>;
-    async fn get_metrics(&self, id: ContainerId) -> Result<ContainerMetrics>;
-    async fn get_metrics_history(&self, id: ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>>;
-    async fn get_performance_counters(&self, id: ContainerId) -> Result<PerformanceCounters>;
-    async fn set_alert_threshold(&self, id: ContainerId, metric: String, threshold: f64) -> Result<()>;
+    async fn start_monitoring(&self, id: &ContainerId) -> Result<()>;
+    async fn stop_monitoring(&self, id: &ContainerId) -> Result<()>;
+    async fn get_metrics(&self, id: &ContainerId) -> Result<ContainerMetrics>;
+    async fn get_metrics_history(&self, id: &ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>>;
+    async fn get_performance_counters(&self, id: &ContainerId) -> Result<PerformanceCounters>;
+    async fn set_alert_threshold(&self, id: &ContainerId, metric: String, threshold: f64) -> Result<()>;
 }
 
 /// Default container monitor implementation
@@ -71,15 +71,15 @@ impl DefaultContainerMonitor {
     }
     
     /// Simulate collecting metrics from cgroups/proc filesystem
-    async fn collect_metrics(&self, id: ContainerId) -> ContainerMetrics {
+    async fn collect_metrics(&self, id: &ContainerId) -> ContainerMetrics {
         let monitoring = self.monitoring.read().await;
-        let uptime = monitoring.get(&id)
+        let uptime = monitoring.get(id)
             .map(|session| session.started_at.elapsed().as_secs())
             .unwrap_or(0);
-        
+
         // Simulate realistic metrics
         ContainerMetrics {
-            container_id: id,
+            container_id: *id,
             timestamp: SystemTime::now(),
             cpu_usage_percent: 25.0 + ((rand::random::<u64>() % 100) as f64 / 10.0),
             memory_usage_bytes: 100 * 1024 * 1024 + (rand::random::<u64>() % (50 * 1024 * 1024)),
@@ -110,60 +110,61 @@ impl DefaultContainerMonitor {
 
 #[async_trait]
 impl ContainerMonitor for DefaultContainerMonitor {
-    async fn start_monitoring(&self, id: ContainerId) -> Result<()> {
+    async fn start_monitoring(&self, id: &ContainerId) -> Result<()> {
         let session = MonitoringSession {
-            container_id: id,
+            container_id: *id,
             started_at: Instant::now(),
             collection_interval: Duration::from_secs(10),
             alert_thresholds: HashMap::new(),
         };
-        
+
         let mut monitoring = self.monitoring.write().await;
-        monitoring.insert(id, session);
-        
+        monitoring.insert(*id, session);
+
         // Start background metrics collection task
         let monitor = self.clone();
+        let container_id = *id;
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(10));
             loop {
                 interval.tick().await;
-                
+
                 // Check if still monitoring
                 let still_monitoring = {
                     let monitoring = monitor.monitoring.read().await;
-                    monitoring.contains_key(&id)
+                    monitoring.contains_key(&container_id)
                 };
-                
+
                 if !still_monitoring {
                     break;
                 }
-                
+
                 // Collect and store metrics
-                let metrics = monitor.collect_metrics(id).await;
+                let metrics = monitor.collect_metrics(&container_id).await;
                 monitor.store_metrics(metrics).await;
             }
         });
-        
+
         info!("Started monitoring container {}", id);
         Ok(())
     }
-    
-    async fn stop_monitoring(&self, id: ContainerId) -> Result<()> {
+
+    async fn stop_monitoring(&self, id: &ContainerId) -> Result<()> {
         let mut monitoring = self.monitoring.write().await;
-        monitoring.remove(&id);
-        
+        monitoring.remove(id);
+
         info!("Stopped monitoring container {}", id);
         Ok(())
     }
-    
-    async fn get_metrics(&self, id: ContainerId) -> Result<ContainerMetrics> {
+
+    async fn get_metrics(&self, id: &ContainerId) -> Result<ContainerMetrics> {
         // Return latest metrics
         Ok(self.collect_metrics(id).await)
     }
-    
-    async fn get_metrics_history(&self, id: ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>> {
+
+    async fn get_metrics_history(&self, id: &ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>> {
         let history = self.metrics_history.read().await;
-        if let Some(container_history) = history.get(&id) {
+        if let Some(container_history) = history.get(id) {
             let cutoff_time = SystemTime::now() - duration;
             let filtered: Vec<_> = container_history.iter()
                 .filter(|metrics| metrics.timestamp >= cutoff_time)
@@ -175,7 +176,7 @@ impl ContainerMonitor for DefaultContainerMonitor {
         }
     }
     
-    async fn get_performance_counters(&self, _id: ContainerId) -> Result<PerformanceCounters> {
+    async fn get_performance_counters(&self, _id: &ContainerId) -> Result<PerformanceCounters> {
         // Simulate performance counter data
         Ok(PerformanceCounters {
             context_switches: 10000 + (rand::random::<u64>() % 5000),
@@ -184,10 +185,10 @@ impl ContainerMonitor for DefaultContainerMonitor {
             interrupts: 5000 + (rand::random::<u64>() % 1000),
         })
     }
-    
-    async fn set_alert_threshold(&self, id: ContainerId, metric: String, threshold: f64) -> Result<()> {
+
+    async fn set_alert_threshold(&self, id: &ContainerId, metric: String, threshold: f64) -> Result<()> {
         let mut monitoring = self.monitoring.write().await;
-        if let Some(session) = monitoring.get_mut(&id) {
+        if let Some(session) = monitoring.get_mut(id) {
             session.alert_thresholds.insert(metric.clone(), threshold);
             debug!("Set alert threshold for container {} metric {}: {}", id, metric, threshold);
         }

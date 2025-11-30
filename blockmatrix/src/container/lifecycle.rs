@@ -119,40 +119,40 @@ pub struct ContainerStats {
 #[async_trait]
 pub trait ContainerLifecycle: Send + Sync {
     /// Create a new container
-    async fn create(&self, id: ContainerId, spec: ContainerSpec) -> Result<()>;
-    
+    async fn create(&self, id: &ContainerId, spec: ContainerSpec) -> Result<()>;
+
     /// Start a container
-    async fn start(&self, id: ContainerId) -> Result<()>;
-    
+    async fn start(&self, id: &ContainerId) -> Result<()>;
+
     /// Stop a container
-    async fn stop(&self, id: ContainerId, timeout: Option<Duration>) -> Result<()>;
-    
+    async fn stop(&self, id: &ContainerId, timeout: Option<Duration>) -> Result<()>;
+
     /// Pause a container
-    async fn pause(&self, id: ContainerId) -> Result<()>;
-    
+    async fn pause(&self, id: &ContainerId) -> Result<()>;
+
     /// Resume a paused container
-    async fn resume(&self, id: ContainerId) -> Result<()>;
-    
+    async fn resume(&self, id: &ContainerId) -> Result<()>;
+
     /// Kill a container
-    async fn kill(&self, id: ContainerId, signal: Option<i32>) -> Result<()>;
-    
+    async fn kill(&self, id: &ContainerId, signal: Option<i32>) -> Result<()>;
+
     /// Delete a container
-    async fn delete(&self, id: ContainerId) -> Result<()>;
-    
+    async fn delete(&self, id: &ContainerId) -> Result<()>;
+
     /// Get container status
-    async fn status(&self, id: ContainerId) -> Result<ContainerStatus>;
-    
+    async fn status(&self, id: &ContainerId) -> Result<ContainerStatus>;
+
     /// List all containers
     async fn list(&self) -> Result<Vec<ContainerId>>;
-    
+
     /// Create a checkpoint
-    async fn checkpoint(&self, id: ContainerId, path: &str) -> Result<()>;
-    
+    async fn checkpoint(&self, id: &ContainerId, path: &str) -> Result<()>;
+
     /// Restore from checkpoint
-    async fn restore(&self, id: ContainerId, path: &str) -> Result<()>;
-    
+    async fn restore(&self, id: &ContainerId, path: &str) -> Result<()>;
+
     /// Wait for container to change state
-    async fn wait(&self, id: ContainerId) -> Result<ContainerEvent>;
+    async fn wait(&self, id: &ContainerId) -> Result<ContainerEvent>;
 }
 
 /// Default container lifecycle implementation
@@ -192,9 +192,9 @@ impl DefaultContainerLifecycle {
     }
     
     /// Transition container to new state
-    async fn transition_state(&self, id: ContainerId, new_state: ContainerState) -> Result<()> {
+    async fn transition_state(&self, id: &ContainerId, new_state: ContainerState) -> Result<()> {
         let mut containers = self.containers.write().await;
-        if let Some(status) = containers.get_mut(&id) {
+        if let Some(status) = containers.get_mut(id) {
             if !self.can_transition(&status.state, &new_state) {
                 return Err(ContainerError::InvalidState {
                     expected: format!("valid transition from {}", status.state),
@@ -242,15 +242,15 @@ impl DefaultContainerLifecycle {
 
 #[async_trait]
 impl ContainerLifecycle for DefaultContainerLifecycle {
-    async fn create(&self, id: ContainerId, _spec: ContainerSpec) -> Result<()> {
+    async fn create(&self, id: &ContainerId, _spec: ContainerSpec) -> Result<()> {
         let mut containers = self.containers.write().await;
-        
-        if containers.contains_key(&id) {
+
+        if containers.contains_key(id) {
             return Err(ContainerError::AlreadyExists { id: id.to_string() });
         }
-        
+
         let status = ContainerStatus {
-            id,
+            id: *id,
             state: ContainerState::Created,
             created_at: SystemTime::now(),
             started_at: None,
@@ -260,69 +260,69 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
             stats: None,
             events: vec![ContainerEvent::Created { timestamp: SystemTime::now() }],
         };
-        
-        containers.insert(id, status);
+
+        containers.insert(*id, status);
         info!("Created container {}", id);
         Ok(())
     }
-    
-    async fn start(&self, id: ContainerId) -> Result<()> {
+
+    async fn start(&self, id: &ContainerId) -> Result<()> {
         self.transition_state(id, ContainerState::Starting).await?;
-        
+
         // Simulate container startup process
         tokio::time::sleep(Duration::from_millis(50)).await;
-        
+
         self.transition_state(id, ContainerState::Running).await?;
         info!("Started container {}", id);
         Ok(())
     }
-    
-    async fn stop(&self, id: ContainerId, timeout: Option<Duration>) -> Result<()> {
+
+    async fn stop(&self, id: &ContainerId, timeout: Option<Duration>) -> Result<()> {
         let timeout = timeout.unwrap_or(Duration::from_secs(5));
-        
+
         self.transition_state(id, ContainerState::Stopping).await?;
-        
+
         // Simulate graceful shutdown
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         self.transition_state(id, ContainerState::Stopped).await?;
         info!("Stopped container {} with timeout {:?}", id, timeout);
         Ok(())
     }
-    
-    async fn pause(&self, id: ContainerId) -> Result<()> {
+
+    async fn pause(&self, id: &ContainerId) -> Result<()> {
         self.transition_state(id, ContainerState::Pausing).await?;
-        
+
         // Simulate pause operation
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         self.transition_state(id, ContainerState::Paused).await?;
         info!("Paused container {}", id);
         Ok(())
     }
-    
-    async fn resume(&self, id: ContainerId) -> Result<()> {
+
+    async fn resume(&self, id: &ContainerId) -> Result<()> {
         self.transition_state(id, ContainerState::Resuming).await?;
-        
+
         // Simulate resume operation
         tokio::time::sleep(Duration::from_millis(50)).await;
-        
+
         self.transition_state(id, ContainerState::Running).await?;
         info!("Resumed container {}", id);
         Ok(())
     }
-    
-    async fn kill(&self, id: ContainerId, signal: Option<i32>) -> Result<()> {
+
+    async fn kill(&self, id: &ContainerId, signal: Option<i32>) -> Result<()> {
         let signal = signal.unwrap_or(9); // SIGKILL
         self.transition_state(id, ContainerState::Stopped).await?;
         info!("Killed container {} with signal {}", id, signal);
         Ok(())
     }
-    
-    async fn delete(&self, id: ContainerId) -> Result<()> {
+
+    async fn delete(&self, id: &ContainerId) -> Result<()> {
         let mut containers = self.containers.write().await;
-        
-        if let Some(status) = containers.get(&id) {
+
+        if let Some(status) = containers.get(id) {
             match status.state {
                 ContainerState::Running | ContainerState::Starting => {
                     return Err(ContainerError::InvalidState {
@@ -335,30 +335,30 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
         } else {
             return Err(ContainerError::NotFound { id: id.to_string() });
         }
-        
-        containers.remove(&id);
+
+        containers.remove(id);
         info!("Deleted container {}", id);
         Ok(())
     }
-    
-    async fn status(&self, id: ContainerId) -> Result<ContainerStatus> {
+
+    async fn status(&self, id: &ContainerId) -> Result<ContainerStatus> {
         let containers = self.containers.read().await;
-        containers.get(&id)
+        containers.get(id)
             .cloned()
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
     }
-    
+
     async fn list(&self) -> Result<Vec<ContainerId>> {
         let containers = self.containers.read().await;
         Ok(containers.keys().copied().collect())
     }
-    
-    async fn checkpoint(&self, id: ContainerId, path: &str) -> Result<()> {
+
+    async fn checkpoint(&self, id: &ContainerId, path: &str) -> Result<()> {
         // Simulate checkpoint creation
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         let mut containers = self.containers.write().await;
-        if let Some(status) = containers.get_mut(&id) {
+        if let Some(status) = containers.get_mut(id) {
             let event = ContainerEvent::CheckpointCreated {
                 timestamp: SystemTime::now(),
                 path: path.to_string(),
@@ -370,12 +370,12 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
         Ok(())
     }
     
-    async fn restore(&self, id: ContainerId, path: &str) -> Result<()> {
+    async fn restore(&self, id: &ContainerId, path: &str) -> Result<()> {
         // Simulate restore from checkpoint
         tokio::time::sleep(Duration::from_millis(200)).await;
-        
+
         let mut containers = self.containers.write().await;
-        if let Some(status) = containers.get_mut(&id) {
+        if let Some(status) = containers.get_mut(id) {
             let event = ContainerEvent::Restored {
                 timestamp: SystemTime::now(),
                 path: path.to_string(),
@@ -384,17 +384,17 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
             status.state = ContainerState::Running;
             info!("Restored container {} from checkpoint at {}", id, path);
         }
-        
+
         Ok(())
     }
-    
-    async fn wait(&self, id: ContainerId) -> Result<ContainerEvent> {
+
+    async fn wait(&self, id: &ContainerId) -> Result<ContainerEvent> {
         // Simulate waiting for state change
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            
+
             let containers = self.containers.read().await;
-            if let Some(status) = containers.get(&id) {
+            if let Some(status) = containers.get(id) {
                 if let Some(event) = status.events.last() {
                     return Ok(event.clone());
                 }

@@ -292,12 +292,12 @@ impl ContainerRuntime {
     
     /// Start a container
     #[instrument(skip(self))]
-    pub async fn start(&self, id: ContainerId) -> Result<()> {
+    pub async fn start(&self, id: &ContainerId) -> Result<()> {
         let start_time = Instant::now();
-        
+
         // Start container lifecycle
         self.lifecycle.start(id).await?;
-        
+
         // Start monitoring
         self.monitor.start_monitoring(id).await?;
         
@@ -319,12 +319,12 @@ impl ContainerRuntime {
     
     /// Stop a container
     #[instrument(skip(self))]
-    pub async fn stop(&self, id: ContainerId, timeout: Option<Duration>) -> Result<()> {
+    pub async fn stop(&self, id: &ContainerId, timeout: Option<Duration>) -> Result<()> {
         let start_time = Instant::now();
-        
+
         // Stop container lifecycle
         self.lifecycle.stop(id, timeout).await?;
-        
+
         // Stop monitoring
         self.monitor.stop_monitoring(id).await?;
         
@@ -346,15 +346,15 @@ impl ContainerRuntime {
     
     /// Pause a container
     #[instrument(skip(self))]
-    pub async fn pause(&self, id: ContainerId) -> Result<()> {
+    pub async fn pause(&self, id: &ContainerId) -> Result<()> {
         self.lifecycle.pause(id).await?;
         info!("Paused container {}", id);
         Ok(())
     }
-    
+
     /// Resume a container
     #[instrument(skip(self))]
-    pub async fn resume(&self, id: ContainerId) -> Result<()> {
+    pub async fn resume(&self, id: &ContainerId) -> Result<()> {
         self.lifecycle.resume(id).await?;
         info!("Resumed container {}", id);
         Ok(())
@@ -362,29 +362,29 @@ impl ContainerRuntime {
     
     /// Delete a container
     #[instrument(skip(self))]
-    pub async fn delete(&self, id: ContainerId) -> Result<()> {
+    pub async fn delete(&self, id: &ContainerId) -> Result<()> {
         // Remove from container registry
         let mut containers = self.containers.write().await;
-        let handle = containers.remove(&id)
+        let handle = containers.remove(id)
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
         drop(containers);
-        
+
         // Ensure container is stopped
         if let Ok(status) = self.lifecycle.status(id).await {
             if status.state == ContainerState::Running {
                 self.stop(id, None).await?;
             }
         }
-        
+
         // Delete container lifecycle
         self.lifecycle.delete(id).await?;
-        
+
         // Cleanup resources
         self.resource_manager.cleanup(id).await?;
-        
+
         // Cleanup networking
         self.network_usage.delete_network_namespace(id).await?;
-        
+
         // Cleanup filesystem
         self.filesystem.delete_container_filesystem(id).await?;
         
@@ -394,31 +394,31 @@ impl ContainerRuntime {
     }
     
     /// Get container status
-    pub async fn status(&self, id: ContainerId) -> Result<ContainerStatus> {
+    pub async fn status(&self, id: &ContainerId) -> Result<ContainerStatus> {
         self.lifecycle.status(id).await
     }
-    
+
     /// List all containers
     pub async fn list(&self) -> Result<Vec<ContainerId>> {
         let containers = self.containers.read().await;
         Ok(containers.keys().copied().collect())
     }
-    
+
     /// Get container handle by ID
-    pub async fn get_handle(&self, id: ContainerId) -> Result<ContainerHandle> {
+    pub async fn get_handle(&self, id: &ContainerId) -> Result<ContainerHandle> {
         let containers = self.containers.read().await;
-        containers.get(&id)
+        containers.get(id)
             .cloned()
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
     }
-    
+
     /// Get resource usage for container
-    pub async fn get_usage(&self, id: ContainerId) -> Result<ResourceUsage> {
+    pub async fn get_usage(&self, id: &ContainerId) -> Result<ResourceUsage> {
         self.resource_manager.get_usage(id).await
     }
-    
+
     /// Get metrics for container
-    pub async fn get_metrics(&self, id: ContainerId) -> Result<ContainerMetrics> {
+    pub async fn get_metrics(&self, id: &ContainerId) -> Result<ContainerMetrics> {
         self.monitor.get_metrics(id).await
     }
     
@@ -429,14 +429,14 @@ impl ContainerRuntime {
     }
     
     /// Checkpoint a container
-    pub async fn checkpoint(&self, id: ContainerId, path: &str) -> Result<()> {
+    pub async fn checkpoint(&self, id: &ContainerId, path: &str) -> Result<()> {
         self.lifecycle.checkpoint(id, path).await?;
         info!("Created checkpoint for container {} at {}", id, path);
         Ok(())
     }
-    
+
     /// Restore a container from checkpoint
-    pub async fn restore(&self, id: ContainerId, path: &str) -> Result<()> {
+    pub async fn restore(&self, id: &ContainerId, path: &str) -> Result<()> {
         self.lifecycle.restore(id, path).await?;
         info!("Restored container {} from checkpoint at {}", id, path);
         Ok(())
