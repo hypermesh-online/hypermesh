@@ -149,11 +149,12 @@ impl EconomicAssetAdapter {
         // Validate that economic operations meet consensus requirements
         if self.consensus_requirements.require_full_consensus {
             // Check stake proof for economic validation rights
-            if proof.stake_proof.stake_amount < self.consensus_requirements.min_validation_stake {
+            let stake_amount = Decimal::from(proof.stake_proof.stake_amount);
+            if stake_amount < self.consensus_requirements.min_validation_stake {
                 return Err(AssetError::ConsensusValidationFailed {
                     reason: format!(
                         "Insufficient economic validation stake: {} < required {}",
-                        proof.stake_proof.stake_amount,
+                        stake_amount,
                         self.consensus_requirements.min_validation_stake
                     )
                 });
@@ -202,7 +203,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         self.validate_economic_consensus(&request.consensus_proof).await?;
 
         // Extract economic requirements
-        let requirements = request.requirements.economic
+        let requirements = request.requested_resources.economic
             .as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
                 reason: "Economic requirements not specified".to_string()

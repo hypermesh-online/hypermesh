@@ -65,6 +65,13 @@ pub struct HyperMeshConnection {
     pub active: Arc<parking_lot::RwLock<bool>>,
 }
 
+impl HyperMeshConnection {
+    /// Check if the connection is still active
+    pub fn is_active(&self) -> bool {
+        *self.active.read()
+    }
+}
+
 /// HyperMesh transport statistics
 #[derive(Debug, Clone)]
 pub struct HyperMeshTransportStats {

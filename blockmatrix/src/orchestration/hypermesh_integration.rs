@@ -163,7 +163,7 @@ pub struct QoSRequirements {
 }
 
 /// Privacy requirements for container deployment
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PrivacyRequirements {
     /// Privacy level for container execution
     pub execution_privacy: PrivacyLevel,
@@ -178,7 +178,7 @@ pub struct PrivacyRequirements {
 }
 
 /// Encryption requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EncryptionRequirements {
     /// Require data-at-rest encryption
     pub data_at_rest: bool,
@@ -191,7 +191,7 @@ pub struct EncryptionRequirements {
 }
 
 /// Access control requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccessControlRequirements {
     /// Required authentication methods
     pub authentication_methods: Vec<String>,
@@ -202,8 +202,9 @@ pub struct AccessControlRequirements {
 }
 
 /// Audit levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum AuditLevel {
+    #[default]
     None,
     Basic,
     Detailed,
@@ -211,7 +212,7 @@ pub enum AuditLevel {
 }
 
 /// Performance requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PerformanceRequirements {
     /// Startup time requirements
     pub max_startup_time: Option<Duration>,

@@ -344,16 +344,19 @@ impl ComponentLifecycleManager {
     /// Stop all components
     pub async fn stop_all(&self) -> IntegrationResult<()> {
         info!("Stopping all registered components");
-        
+
         // Stop in reverse order of registration
-        for (name, component) in self.components.iter().rev() {
+        let mut components: Vec<_> = self.components.iter().collect();
+        components.reverse();
+
+        for (name, component) in components {
             info!("Stopping component: {}", name);
             if let Err(e) = component.stop().await {
                 warn!("Failed to stop component {}: {}", name, e);
                 // Continue stopping other components
             }
         }
-        
+
         info!("All components stop sequence completed");
         Ok(())
     }
@@ -361,16 +364,19 @@ impl ComponentLifecycleManager {
     /// Shutdown all components
     pub async fn shutdown_all(&self) -> IntegrationResult<()> {
         info!("Shutting down all registered components");
-        
+
         // Shutdown in reverse order of registration
-        for (name, component) in self.components.iter().rev() {
+        let mut components: Vec<_> = self.components.iter().collect();
+        components.reverse();
+
+        for (name, component) in components {
             info!("Shutting down component: {}", name);
             if let Err(e) = component.shutdown().await {
                 warn!("Failed to shutdown component {}: {}", name, e);
                 // Continue shutting down other components
             }
         }
-        
+
         info!("All components shutdown sequence completed");
         Ok(())
     }

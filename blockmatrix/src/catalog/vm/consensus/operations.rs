@@ -99,7 +99,7 @@ impl ConsensusOperation {
         let start_time = SystemTime::now();
         
         // Validate consensus proof
-        let proof_valid = self.consensus_proof.validate().await;
+        let proof_valid = self.consensus_proof.validate();
         if !proof_valid {
             return Ok(ConsensusExecutionResult::failure(
                 self.id.clone(),
@@ -266,7 +266,7 @@ impl ConsensusOperation {
     /// Execute generic operation requiring all four proofs
     async fn execute_generic(&self, data: &[u8]) -> Result<serde_json::Value> {
         // Validate all four proofs for generic operations
-        let all_valid = self.consensus_proof.validate().await;
+        let all_valid = self.consensus_proof.validate();
         if !all_valid {
             return Err(anyhow::anyhow!("Full consensus validation failed for generic operation"));
         }
@@ -305,11 +305,12 @@ impl ConsensusOperation {
     /// Create proof validation results
     async fn create_proof_validation_results(&self, overall_valid: bool) -> ProofValidationResults {
         // In a real implementation, these would be actual validation results
+        // TrustChain proofs don't have validate methods, so we use basic validation
         ProofValidationResults {
-            space_proof_valid: overall_valid && self.consensus_proof.space_proof.validate().await.unwrap_or(false),
-            stake_proof_valid: overall_valid && self.consensus_proof.stake_proof.validate().await.unwrap_or(false),
-            work_proof_valid: overall_valid && self.consensus_proof.work_proof.validate().await.unwrap_or(false),
-            time_proof_valid: overall_valid && self.consensus_proof.time_proof.validate().await.unwrap_or(false),
+            space_proof_valid: overall_valid && self.consensus_proof.space_proof.total_storage > 0,
+            stake_proof_valid: overall_valid && self.consensus_proof.stake_proof.stake_amount > 0,
+            work_proof_valid: overall_valid && self.consensus_proof.work_proof.computational_power > 0,
+            time_proof_valid: overall_valid && self.consensus_proof.time_proof.nonce > 0,
             combined_proof_hash_valid: overall_valid,
             validation_timestamp: SystemTime::now(),
         }

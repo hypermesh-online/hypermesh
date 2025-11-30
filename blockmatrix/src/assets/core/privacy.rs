@@ -11,9 +11,10 @@ use super::AssetId;
 use super::status::AssetStatus;
 
 /// Privacy levels for asset sharing (from Proof of State patterns)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PrivacyLevel {
     /// Internal network only, no external access
+    #[default]
     Private,
     /// Specific networks/groups only
     PrivateNetwork,

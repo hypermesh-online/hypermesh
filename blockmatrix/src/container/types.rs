@@ -112,7 +112,7 @@ pub enum ContainerState {
 }
 
 /// Resource requirements for a container
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResourceRequirements {
     /// CPU requirements in millicores
     pub cpu_millicores: u64,

@@ -290,7 +290,7 @@ pub struct PublicValidationResponse {
     pub validated_at: SystemTime,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ValidationResult {
     /// Validation successful
     Valid,

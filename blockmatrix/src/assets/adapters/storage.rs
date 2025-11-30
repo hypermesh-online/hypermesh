@@ -620,7 +620,7 @@ impl AssetAdapter for StorageAssetAdapter {
         }
         
         // Get storage requirements
-        let storage_req = request.requested_resources.storage.as_ref()
+        let storage_req = request.requested_resources.storage_usage.as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
                 reason: "No storage requirements specified".to_string()
             })?;

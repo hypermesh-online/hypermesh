@@ -105,8 +105,8 @@ impl ConsensusVM {
         } else { true };
         
         // Combined validation from HyperMesh consensus system
-        let consensus_valid = proof.validate().await;
-        
+        let consensus_valid = proof.validate();
+
         Ok(space_valid && stake_valid && work_valid && time_valid && consensus_valid)
     }
     

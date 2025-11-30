@@ -515,7 +515,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         }
         
         // Get network requirements
-        let network_req = request.requested_resources.network.as_ref()
+        let network_req = request.requested_resources.network_usage.as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
                 reason: "No network requirements specified".to_string()
             })?;
