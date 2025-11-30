@@ -295,18 +295,18 @@ mod tests {
     use crate::consensus::ConsensusProof;
     use std::time::SystemTime;
 
-    fn create_test_entry(seq_num: u64) -> LogEntry {
-        LogEntry {
+    async fn create_test_entry(seq_num: u64) -> anyhow::Result<LogEntry> {
+        Ok(LogEntry {
             sequence_number: seq_num,
             certificate_der: format!("cert_{}", seq_num).into_bytes(),
             fingerprint: [seq_num as u8; 32],
             timestamp: SystemTime::now(),
             common_name: format!("test{}.example.com", seq_num),
             issuer_ca_id: "test-ca".to_string(),
-            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
+            consensus_proof: ConsensusProof::generate_from_network("test-node").await?,
             entry_id: [seq_num as u8; 32],
             leaf_hash: [0u8; 32], // Will be calculated
-        }
+        })
     }
 
     #[tokio::test]
@@ -320,7 +320,7 @@ mod tests {
     async fn test_entry_addition() {
         let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
         
-        let entry = create_test_entry(0);
+        let entry = create_test_entry(0).await.unwrap();
         let added_entry = log.add_entry(entry).await.unwrap();
         
         assert_eq!(added_entry.sequence_number, 0);
@@ -334,7 +334,7 @@ mod tests {
         
         // Add entries
         for i in 0..5 {
-            let entry = create_test_entry(i);
+            let entry = create_test_entry(i).await.unwrap();
             log.add_entry(entry).await.unwrap();
         }
         
@@ -353,7 +353,7 @@ mod tests {
         // Add entries
         let mut test_entries = Vec::new();
         for i in 0..5 {
-            let entry = create_test_entry(i);
+            let entry = create_test_entry(i).await.unwrap();
             let added_entry = log.add_entry(entry).await.unwrap();
             test_entries.push(added_entry);
         }
@@ -376,13 +376,13 @@ mod tests {
         
         // Add entries in two batches
         for i in 0..3 {
-            let entry = create_test_entry(i);
+            let entry = create_test_entry(i).await.unwrap();
             log.add_entry(entry).await.unwrap();
         }
         log.update_merkle_tree().await.unwrap();
         
         for i in 3..5 {
-            let entry = create_test_entry(i);
+            let entry = create_test_entry(i).await.unwrap();
             log.add_entry(entry).await.unwrap();
         }
         log.update_merkle_tree().await.unwrap();
@@ -397,13 +397,13 @@ mod tests {
         let mut log = MerkleLog::new("test-log".to_string(), 2).await.unwrap();
         
         // Add entries up to capacity
-        log.add_entry(create_test_entry(0)).await.unwrap();
-        log.add_entry(create_test_entry(1)).await.unwrap();
+        log.add_entry(create_test_entry(0).await.unwrap()).await.unwrap();
+        log.add_entry(create_test_entry(1).await.unwrap()).await.unwrap();
         
         assert!(log.is_full());
         
         // Adding beyond capacity should fail
-        let result = log.add_entry(create_test_entry(2)).await;
+        let result = log.add_entry(create_test_entry(2).await.unwrap()).await;
         assert!(result.is_err());
     }
 
@@ -413,7 +413,7 @@ mod tests {
         
         // Add entries
         for i in 0..5 {
-            let entry = create_test_entry(i);
+            let entry = create_test_entry(i).await.unwrap();
             log.add_entry(entry).await.unwrap();
         }
         

@@ -423,7 +423,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_secure_certificate_issuance() {
+    async fn test_secure_certificate_issuance() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
         let request = CertificateRequest {
@@ -431,13 +431,14 @@ mod tests {
             san_entries: vec!["test.secure.com".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
+            consensus_proof: ConsensusProof::generate_from_network("test_node_001").await?,
             timestamp: std::time::SystemTime::now(),
         };
         
         let cert = trustchain.issue_certificate_secure(request).await.unwrap();
         assert_eq!(cert.common_name, "test.secure.com");
         assert!(!cert.serial_number.is_empty());
+        Ok(())
     }
 
     #[tokio::test]
@@ -452,14 +453,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_consensus_validation() {
+    async fn test_consensus_validation() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
-        let consensus_proof = ConsensusProof::generate_from_network(&node_id).await?;
+        let consensus_proof = ConsensusProof::generate_from_network("test_node_001").await?;
         let result = trustchain.validate_consensus_proof(&consensus_proof, "test_operation").await.unwrap();
-        
+
         // Should complete validation (result depends on proof validity)
         assert!(result.validated_at <= std::time::SystemTime::now());
+        Ok(())
     }
 
     #[tokio::test]

@@ -549,10 +549,11 @@ pub struct PQCInfo {
 mod tests {
     use super::*;
     use crate::consensus::ConsensusProof;
+    use crate::ca::CAConfig;
 
     #[tokio::test]
     async fn test_security_integrated_ca_creation() {
-        let ca_config = CAConfiguration::default();
+        let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
         
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
@@ -562,7 +563,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_secure_certificate_issuance() {
-        let ca_config = CAConfiguration::default();
+        let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
         
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
@@ -586,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_security_dashboard_integration() {
-        let ca_config = CAConfiguration::default();
+        let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
         
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
@@ -600,7 +601,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mandatory_consensus_disabled() {
-        let ca_config = CAConfiguration::default();
+        let ca_config = CAConfig::default();
         let mut security_config = SecurityIntegrationConfig::default();
         security_config.mandatory_consensus = false;
         

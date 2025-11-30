@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_certificate_issuance() {
+    async fn test_certificate_issuance() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::default();
         let ca = TrustChainCA::new(config).await.unwrap();
         
@@ -626,17 +626,18 @@ mod tests {
             san_entries: vec!["test.localhost".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
+            consensus_proof: ConsensusProof::generate_from_network("test_node_001").await?,
             timestamp: SystemTime::now(),
         };
         
         let issued_cert = ca.issue_certificate(request).await.unwrap();
         assert_eq!(issued_cert.common_name, "test.localhost");
         assert!(matches!(issued_cert.status, CertificateStatus::Valid));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_certificate_validation() {
+    async fn test_certificate_validation() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::default();
         let ca = TrustChainCA::new(config).await.unwrap();
         
@@ -645,12 +646,13 @@ mod tests {
             san_entries: vec!["test.localhost".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network(&node_id).await?,
+            consensus_proof: ConsensusProof::generate_from_network("test_node_001").await?,
             timestamp: SystemTime::now(),
         };
         
         let issued_cert = ca.issue_certificate(request).await.unwrap();
         let is_valid = ca.validate_certificate_chain(&issued_cert.certificate_der).await.unwrap();
         assert!(is_valid);
+        Ok(())
     }
 }

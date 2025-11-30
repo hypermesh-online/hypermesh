@@ -569,9 +569,9 @@ mod tests {
         let result = detector.detect_byzantine_behavior(&consensus_proof, "test_operation").await.unwrap();
         
         match result {
-            ByzantineDetectionResult::Detected { violations, .. } => {
+            ByzantineDetectionResult::Detected { reasons, .. } => {
                 // Should detect invalid stake
-                assert!(!violations.is_empty());
+                assert!(!reasons.is_empty());
             }
             ByzantineDetectionResult::NotDetected => {
                 // May not detect with current implementation
@@ -590,8 +590,8 @@ mod tests {
         let result = detector.detect_byzantine_behavior(&consensus_proof, "test_operation").await.unwrap();
         
         match result {
-            ByzantineDetectionResult::Detected { violations, .. } => {
-                assert!(violations.iter().any(|v| matches!(v, ByzantineViolation::TimeManipulation { .. })));
+            ByzantineDetectionResult::Detected { reasons, .. } => {
+                assert!(reasons.iter().any(|v| matches!(v, ByzantineViolation::TimeManipulation { .. })));
             }
             ByzantineDetectionResult::NotDetected => {
                 panic!("Time manipulation should be detected");
@@ -611,8 +611,8 @@ mod tests {
         let result = detector.detect_byzantine_behavior(&consensus_proof, "test_operation").await.unwrap();
         
         match result {
-            ByzantineDetectionResult::Detected { violations, .. } => {
-                assert!(violations.iter().any(|v| matches!(v, ByzantineViolation::StorageFalsification { .. })));
+            ByzantineDetectionResult::Detected { reasons, .. } => {
+                assert!(reasons.iter().any(|v| matches!(v, ByzantineViolation::StorageFalsification { .. })));
             }
             ByzantineDetectionResult::NotDetected => {
                 panic!("Storage falsification should be detected");

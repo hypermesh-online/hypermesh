@@ -296,35 +296,43 @@ impl ConsensusContext {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_consensus_proof_creation() {
-        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+    #[tokio::test]
+    async fn test_consensus_proof_creation() -> anyhow::Result<()> {
+        let node_id = "test-node-01";
+        let proof = ConsensusProof::generate_from_network(node_id).await?;
         assert!(proof.validate());
+        Ok(())
     }
 
-    #[test]
-    fn test_consensus_proof_serialization() {
-        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+    #[tokio::test]
+    async fn test_consensus_proof_serialization() -> anyhow::Result<()> {
+        let node_id = "test-node-01";
+        let proof = ConsensusProof::generate_from_network(node_id).await?;
         let bytes = proof.to_bytes()?;
         let deserialized = ConsensusProof::from_bytes(&bytes)?;
-        
+
         assert_eq!(proof.stake_proof.stake_amount, deserialized.stake_proof.stake_amount);
+        Ok(())
     }
 
-    #[test]
-    fn test_consensus_requirements_validation() {
-        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+    #[tokio::test]
+    async fn test_consensus_requirements_validation() -> anyhow::Result<()> {
+        let node_id = "test-node-01";
+        let proof = ConsensusProof::generate_from_network(node_id).await?;
         let requirements = ConsensusRequirements::localhost_testing();
-        
+
         assert!(proof.validate_with_requirements(&requirements));
+        Ok(())
     }
 
-    #[test]
-    fn test_consensus_proof_hash() {
-        let proof = ConsensusProof::generate_from_network(&node_id).await?;
+    #[tokio::test]
+    async fn test_consensus_proof_hash() -> anyhow::Result<()> {
+        let node_id = "test-node-01";
+        let proof = ConsensusProof::generate_from_network(node_id).await?;
         let hash1 = proof.hash()?;
         let hash2 = proof.hash()?;
-        
+
         assert_eq!(hash1, hash2); // Same proof should have same hash
+        Ok(())
     }
 }

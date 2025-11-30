@@ -442,7 +442,7 @@ mod tests {
         let hybrid = HybridCrypto::new().unwrap();
         
         // Generate keys
-        let falcon_keypair = hybrid.falcon.generate_keypair(super::KeyUsage::CertificateAuthority).await.unwrap();
+        let falcon_keypair = hybrid.falcon.generate_keypair(crate::crypto::KeyUsage::CertificateAuthority).await.unwrap();
         let ed25519_key = SigningKey::from_bytes(&rand::random::<[u8; 32]>());
         let ed25519_pubkey = ed25519_key.verifying_key();
         
@@ -488,7 +488,7 @@ mod tests {
         
         let ed25519_key = SigningKey::from_bytes(&rand::random::<[u8; 32]>());
         let ed25519_pubkey = ed25519_key.verifying_key();
-        let falcon_keypair = hybrid.falcon.generate_keypair(super::KeyUsage::CertificateAuthority).await.unwrap();
+        let falcon_keypair = hybrid.falcon.generate_keypair(crate::crypto::KeyUsage::CertificateAuthority).await.unwrap();
         
         let test_data = b"Migration signature test";
         

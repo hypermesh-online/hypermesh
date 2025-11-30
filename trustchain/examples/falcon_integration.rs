@@ -3,13 +3,13 @@
 //! Demonstrates how to use FALCON-1024 post-quantum signatures with TrustChain
 //! certificate authority for quantum-resistant certificate operations.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use tracing::{info, Level};
 use tracing_subscriber;
 
 use trustchain::{
-    PostQuantumCrypto, SecurityIntegratedCA, SecurityIntegrationConfig, 
-    CAConfig, CertificateRequest, ConsensusProof, FalconKeyPair, PQCAlgorithm
+    PostQuantumCrypto, SecurityIntegratedCA, SecurityIntegrationConfig,
+    CAConfig, CertificateRequest, ConsensusProof, PQCAlgorithm
 };
 
 #[tokio::main]

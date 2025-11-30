@@ -561,7 +561,19 @@ mod tests {
         let mut validator = RealConsensusValidator::new();
 
         // Create test consensus proof
-        let proof = ConsensusProof::default();
+        let proof = match ConsensusProof::generate_from_network("test-node").await {
+            Ok(p) => p,
+            Err(_) => {
+                // In test environment, create a minimal proof
+                use crate::consensus::proof::{StakeProof, TimeProof, SpaceProof, WorkProof};
+                ConsensusProof::new(
+                    StakeProof::default(),
+                    TimeProof::default(),
+                    SpaceProof::default(),
+                    WorkProof::default(),
+                )
+            }
+        };
 
         // Validate with minimum stake of 1000
         let result = validator.validate_consensus(&proof, 1000).await.unwrap();

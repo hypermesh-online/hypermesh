@@ -470,7 +470,7 @@ mod tests {
     // AWS CloudHSM dependencies REMOVED - test_hsm_integration test removed
 
     #[tokio::test]
-    async fn test_certificate_issuance_with_consensus() {
+    async fn test_certificate_issuance_with_consensus() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfiguration::default();
         let ca = TrustChainCA::new(config).await.unwrap();
 
@@ -479,7 +479,7 @@ mod tests {
             san_entries: vec!["test.production.com".to_string()],
             node_id: "prod_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id).await
+            consensus_proof: ConsensusProof::generate_from_network("test-ca-01").await
                 .map_err(|e| TrustChainError::ConsensusValidationFailed {
                     reason: format!("Failed to generate consensus proof: {}", e)
                 })?,
@@ -493,5 +493,7 @@ mod tests {
         // Verify metrics updated
         let metrics = ca.get_metrics().await;
         assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 1);
+
+        Ok(())
     }
 }

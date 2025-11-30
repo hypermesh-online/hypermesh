@@ -759,8 +759,9 @@ impl ConsistencyChecker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ca::{IssuedCertificate, CertificateMetadata};
-    use std::time::SystemTime;
+    use crate::ca::{IssuedCertificate, CertificateMetadata, CertificateStatus};
+    use crate::consensus::ConsensusProof;
+    use std::time::{SystemTime, Duration};
 
     #[tokio::test]
     async fn test_ct_log_creation() {
@@ -774,11 +775,27 @@ mod tests {
         
         let certificate = IssuedCertificate {
             certificate_der: vec![0x30, 0x82, 0x01, 0x00], // Minimal DER certificate
+            certificate_pem: String::new(),
+            chain_pem: String::new(),
             serial_number: "test-cert-001".to_string(),
+            fingerprint: [0u8; 32],
             common_name: "test.example.com".to_string(),
+            issued_at: SystemTime::now(),
+            expires_at: SystemTime::now() + Duration::from_secs(86400 * 365),
             issuer_ca_id: "test-ca".to_string(),
-            validity_start: SystemTime::now(),
-            validity_end: SystemTime::now() + Duration::from_secs(86400 * 365),
+            consensus_proof: match ConsensusProof::generate_from_network("test-node").await {
+                Ok(p) => p,
+                Err(_) => {
+                    use crate::consensus::proof::{StakeProof, TimeProof, SpaceProof, WorkProof};
+                    ConsensusProof::new(
+                        StakeProof::default(),
+                        TimeProof::default(),
+                        SpaceProof::default(),
+                        WorkProof::default(),
+                    )
+                }
+            },
+            status: CertificateStatus::Valid,
             metadata: CertificateMetadata::default(),
         };
 

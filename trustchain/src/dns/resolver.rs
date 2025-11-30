@@ -361,7 +361,8 @@ mod tests {
 
         let name = Name::from_utf8("test.example.com").unwrap();
         let ipv6_addr = Ipv6Addr::LOCALHOST;
-        let trust_dns_record = Record::from_rdata(name, 300, RData::AAAA(ipv6_addr));
+        use trust_dns_proto::rr::rdata::AAAA;
+        let trust_dns_record = Record::from_rdata(name, 300, RData::AAAA(AAAA::from(ipv6_addr)));
 
         let dns_record = resolver.convert_record(&trust_dns_record);
         assert!(dns_record.is_some());
@@ -387,7 +388,8 @@ mod tests {
 
         let name = Name::from_utf8("alias.example.com").unwrap();
         let target = Name::from_utf8("target.example.com").unwrap();
-        let trust_dns_record = Record::from_rdata(name, 300, RData::CNAME(target));
+        use trust_dns_proto::rr::rdata::CNAME;
+        let trust_dns_record = Record::from_rdata(name, 300, RData::CNAME(CNAME(target)));
 
         let dns_record = resolver.convert_record(&trust_dns_record);
         assert!(dns_record.is_some());

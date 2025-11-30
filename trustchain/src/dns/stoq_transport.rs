@@ -362,15 +362,18 @@ impl DNSConnection {
 mod tests {
     use super::*;
 
-    fn create_test_dns_config() -> super::DNSConfig {
-        super::DNSConfig {
+    fn create_test_dns_config() -> crate::config::DnsConfig {
+        crate::config::DnsConfig {
+            server_id: "test-dns-server".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
-            port: 853,
-            upstream_servers: vec![Ipv6Addr::LOCALHOST],
-            cache_config: super::CacheConfig::default(),
-            performance_targets: super::PerformanceTargets::default(),
-            security_config: super::SecurityConfig::default(),
-            enable_consensus_validation: false,
+            quic_port: 853,
+            port: 53,
+            dns_port: None,
+            upstream_resolvers: vec![Ipv6Addr::LOCALHOST],
+            cache_ttl: Duration::from_secs(300),
+            enable_cert_validation: false,
+            trustchain_domains: vec![],
+            consensus_requirements: crate::consensus::ConsensusRequirements::localhost_testing(),
         }
     }
 
