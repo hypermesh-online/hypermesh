@@ -245,7 +245,7 @@ impl ResourceSharing {
             // Find matching request
             let matching_request = requests.iter()
                 .position(|req| {
-                    req.workload_type == offer.workload_type &&
+                    req.resource_type == offer.resource_type &&
                     req.max_price_per_hour >= offer.price_per_hour &&
                     req.expires_at > SystemTime::now() &&
                     offer.expires_at > SystemTime::now()
@@ -259,7 +259,7 @@ impl ResourceSharing {
                     agreement_id: format!("agr_{}", uuid::Uuid::new_v4()),
                     provider: offer.provider.clone(),
                     consumer: request.consumer.clone(),
-                    resource_type: offer.workload_type,
+                    resource_type: offer.resource_type,
                     amount: request.requested_amount.clone(),
                     price_per_hour: offer.price_per_hour,
                     sla: offer.sla.clone(),

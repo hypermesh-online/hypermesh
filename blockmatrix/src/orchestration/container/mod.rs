@@ -63,6 +63,14 @@ pub struct ContainerOrchestrator {
     performance_metrics: Arc<RwLock<ContainerMetrics>>,
     /// Node registry
     node_registry: Arc<RwLock<HashMap<NodeId, NodeState>>>,
+    /// DSR scheduling enabled (default configuration)
+    dsr_scheduling_enabled: bool,
+    /// IFR resource lookup enabled (default configuration)
+    ifr_resource_lookup_enabled: bool,
+    /// Maximum scheduling candidates (default configuration)
+    max_scheduling_candidates: usize,
+    /// Scheduling timeout in milliseconds (default configuration)
+    scheduling_timeout_ms: u64,
 }
 
 /// Container specification for orchestration
@@ -474,9 +482,10 @@ impl ContainerOrchestrator {
     /// Create a new container orchestrator with MFN integration
     pub async fn new(config: ContainerConfig, mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
         // Initialize DSR-powered scheduler
+        // Use default values since these fields don't exist in ContainerConfig yet
         let scheduler = Arc::new(DsrScheduler::new(
-            config.dsr_scheduling_enabled,
-            config.max_scheduling_candidates,
+            true,  // Enable DSR scheduling by default
+            10,    // Max 10 scheduling candidates by default
             mfn_bridge.clone(),
         ).await?);
         
@@ -491,8 +500,9 @@ impl ContainerOrchestrator {
         ).await?);
         
         // Initialize IFR resource manager
+        // Use default value since field doesn't exist in ContainerConfig yet
         let resource_manager = Arc::new(IfrResourceManager::new(
-            config.ifr_resource_lookup_enabled,
+            true,  // Enable IFR resource lookup by default
             mfn_bridge.clone(),
         ).await?);
         
@@ -519,10 +529,10 @@ impl ContainerOrchestrator {
         }));
         
         info!("Container orchestrator initialized with MFN integration");
-        info!("  - DSR scheduling enabled: {}", config.dsr_scheduling_enabled);
-        info!("  - IFR resource lookup enabled: {}", config.ifr_resource_lookup_enabled);
-        info!("  - Max scheduling candidates: {}", config.max_scheduling_candidates);
-        info!("  - Scheduling timeout: {}ms", config.scheduling_timeout_ms);
+        info!("  - DSR scheduling enabled: true (default)");
+        info!("  - IFR resource lookup enabled: true (default)");
+        info!("  - Max scheduling candidates: 10 (default)");
+        info!("  - Scheduling timeout: 100ms (default)");
         
         Ok(Self {
             config,
@@ -536,6 +546,10 @@ impl ContainerOrchestrator {
             scheduling_decisions: Arc::new(RwLock::new(HashMap::new())),
             performance_metrics,
             node_registry: Arc::new(RwLock::new(HashMap::new())),
+            dsr_scheduling_enabled: true,
+            ifr_resource_lookup_enabled: true,
+            max_scheduling_candidates: 10,
+            scheduling_timeout_ms: 100,
         })
     }
     
@@ -547,7 +561,7 @@ impl ContainerOrchestrator {
         info!("Scheduling container {:?} for service {:?}", spec.id, spec.service_id);
         
         // Step 1: Use IFR for ultra-fast resource discovery
-        let available_nodes = if self.config.ifr_resource_lookup_enabled {
+        let available_nodes = if self.ifr_resource_lookup_enabled {
             self.resource_manager.find_suitable_nodes(&spec.resources).await?
         } else {
             self.get_all_available_nodes().await
@@ -614,10 +628,10 @@ impl ContainerOrchestrator {
             node_candidates,
             decision_latency_ms,
             confidence: placement_decision.confidence,
-            dsr_enhanced: self.config.dsr_scheduling_enabled,
+            dsr_enhanced: self.dsr_scheduling_enabled,
             cpe_enhanced: true,
-            ifr_enhanced: self.config.ifr_resource_lookup_enabled,
-            improvement_factor: if self.config.dsr_scheduling_enabled { 25.0 } else { 1.0 },
+            ifr_enhanced: self.ifr_resource_lookup_enabled,
+            improvement_factor: if self.dsr_scheduling_enabled { 25.0 } else { 1.0 },
             timestamp: SystemTime::now(),
         };
         
@@ -841,13 +855,13 @@ impl ContainerOrchestrator {
         metrics.scheduling_decisions += 1;
         
         // Update DSR enhancement percentage
-        if self.config.dsr_scheduling_enabled {
+        if self.dsr_scheduling_enabled {
             let dsr_decisions = (metrics.dsr_scheduling_percentage / 100.0 * (metrics.scheduling_decisions - 1) as f64) + 1.0;
             metrics.dsr_scheduling_percentage = (dsr_decisions / metrics.scheduling_decisions as f64) * 100.0;
         }
         
         // Update IFR lookup percentage
-        if self.config.ifr_resource_lookup_enabled {
+        if self.ifr_resource_lookup_enabled {
             let ifr_decisions = (metrics.ifr_lookup_percentage / 100.0 * (metrics.scheduling_decisions - 1) as f64) + 1.0;
             metrics.ifr_lookup_percentage = (ifr_decisions / metrics.scheduling_decisions as f64) * 100.0;
         }
@@ -863,7 +877,7 @@ impl ContainerOrchestrator {
         }
         
         // Update improvement factor
-        if self.config.dsr_scheduling_enabled {
+        if self.dsr_scheduling_enabled {
             metrics.traditional_vs_mfn_factor = 25.0; // 25x improvement with MFN
         }
     }
@@ -892,11 +906,11 @@ impl ContainerOrchestrator {
     async fn calculate_mfn_utilization(&self) -> f64 {
         let mut utilization_factors = Vec::new();
         
-        if self.config.dsr_scheduling_enabled {
+        if self.dsr_scheduling_enabled {
             utilization_factors.push(1.0);
         }
         
-        if self.config.ifr_resource_lookup_enabled {
+        if self.ifr_resource_lookup_enabled {
             utilization_factors.push(1.0);
         }
         

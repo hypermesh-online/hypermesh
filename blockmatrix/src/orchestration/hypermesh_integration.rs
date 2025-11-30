@@ -480,21 +480,35 @@ impl HyperMeshContainerOrchestrator {
         let mut adapted_spec = container_spec.clone();
         
         // Update resource limits based on allocated assets
+        // Since AssetAllocation doesn't have allocated_capacity, we use allocation percentages
+        // and apply them to the base requirements
         for (asset_type, allocation) in allocated_assets {
+            let alloc_config = &allocation.allocation_config.resource_allocation;
+
             match asset_type {
                 AssetType::Cpu => {
-                    adapted_spec.resources.cpu_quota = Some(allocation.allocated_capacity);
+                    // Apply CPU allocation percentage to current CPU requirements
+                    let cpu_factor = alloc_config.cpu_allocation;
+                    adapted_spec.resources.cpu_millicores =
+                        (adapted_spec.resources.cpu_millicores as f32 * cpu_factor.max(0.1)) as u64;
                 },
                 AssetType::Memory => {
-                    adapted_spec.resources.memory_limit = Some(allocation.allocated_capacity);
+                    // Apply memory allocation percentage
+                    let memory_factor = alloc_config.memory_allocation;
+                    adapted_spec.resources.memory_bytes =
+                        (adapted_spec.resources.memory_bytes as f32 * memory_factor.max(0.1)) as u64;
                 },
                 AssetType::Storage => {
-                    // Configure storage mounts based on allocated storage assets
-                    // This would be more complex in production
+                    // Apply storage allocation percentage
+                    let storage_factor = alloc_config.storage_allocation;
+                    adapted_spec.resources.storage_bytes =
+                        (adapted_spec.resources.storage_bytes as f32 * storage_factor.max(0.1)) as u64;
                 },
                 AssetType::Network => {
-                    // Configure network bandwidth limits
-                    adapted_spec.resources.network_bandwidth = Some(allocation.allocated_capacity);
+                    // Network bandwidth is not directly in ResourceRequirements
+                    // Log for now
+                    tracing::debug!("Network allocation: {}%",
+                        alloc_config.network_allocation * 100.0);
                 },
                 _ => {
                     // Handle other asset types as needed
@@ -547,9 +561,22 @@ impl HyperMeshContainerOrchestrator {
                 AssetType::Network => usage.network_usage_bytes,
                 _ => 0,
             };
-            
-            if allocation.allocated_capacity > 0 {
-                let efficiency = actual_usage as f64 / allocation.allocated_capacity as f64;
+
+            // Use allocation percentages to determine expected capacity
+            // Since we don't have absolute capacity, use percentage as efficiency metric
+            let alloc_config = &allocation.allocation_config.resource_allocation;
+            let allocation_percentage = match asset_type {
+                AssetType::Cpu => alloc_config.cpu_allocation,
+                AssetType::Memory => alloc_config.memory_allocation,
+                AssetType::Storage => alloc_config.storage_allocation,
+                AssetType::Network => alloc_config.network_allocation,
+                _ => 0.0,
+            };
+
+            if allocation_percentage > 0.0 && actual_usage > 0 {
+                // Calculate efficiency as ratio of actual usage to allocated percentage
+                // This is a simplified metric - in production would need absolute values
+                let efficiency = (actual_usage as f64 / 100.0) / allocation_percentage as f64;
                 efficiency_scores.push(efficiency.min(1.0)); // Cap at 100%
             }
         }
