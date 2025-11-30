@@ -133,9 +133,9 @@ impl UserPrivacyConfig {
     pub fn apply_template(&mut self, template_name: &str) -> AssetResult<()> {
         let template = self.templates.iter()
             .find(|t| t.name == template_name)
-            .ok_or_else(|| AssetError::NotFound(
-                format!("Privacy template '{}' not found", template_name)
-            ))?;
+            .ok_or_else(|| AssetError::NotFound {
+                resource: format!("Privacy template '{}'", template_name)
+            })?;
 
         template.apply_to_config(self)?;
         Ok(())
@@ -145,9 +145,9 @@ impl UserPrivacyConfig {
     pub fn apply_preset(&mut self, preset_name: &str) -> AssetResult<()> {
         let preset = self.presets.iter()
             .find(|p| p.name == preset_name)
-            .ok_or_else(|| AssetError::NotFound(
-                format!("Privacy preset '{}' not found", preset_name)
-            ))?;
+            .ok_or_else(|| AssetError::NotFound {
+                resource: format!("Privacy preset '{}'", preset_name)
+            })?;
 
         preset.apply_to_config(self)?;
         Ok(())

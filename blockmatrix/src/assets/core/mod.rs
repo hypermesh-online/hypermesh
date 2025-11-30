@@ -96,16 +96,16 @@ pub enum AssetError {
     ResourceUnavailable(String),
 
     /// Memory mapping failed
-    #[error("Memory mapping failed: {reason}")]
-    MemoryMappingFailed { reason: String },
+    #[error("Memory mapping failed at {address}: {reason}")]
+    MemoryMappingFailed { address: String, reason: String },
 
     /// Memory not mapped
     #[error("Memory not mapped: {address}")]
     MemoryNotMapped { address: String },
 
     /// Permission denied
-    #[error("Permission denied: {reason}")]
-    PermissionDenied { reason: String },
+    #[error("Permission denied for {operation} on {resource}: {reason}")]
+    PermissionDenied { operation: String, resource: String, reason: String },
 
     /// Memory access failed
     #[error("Memory access failed: {reason}")]
@@ -114,6 +114,18 @@ pub enum AssetError {
     /// Operation timeout
     #[error("Operation timeout: {operation}")]
     OperationTimeout { operation: String },
+
+    /// Resource not found
+    #[error("Resource not found: {resource}")]
+    NotFound { resource: String },
+
+    /// Serialization error
+    #[error("Serialization error: {message}")]
+    SerializationError { message: String },
+
+    /// Deserialization error
+    #[error("Deserialization error: {message}")]
+    DeserializationError { message: String },
 
     /// Internal error
     #[error("Internal error: {0}")]

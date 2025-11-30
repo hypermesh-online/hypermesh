@@ -538,7 +538,7 @@ impl ConsensusManager {
                 workload_id: proposal.proposal_id.clone(),
                 pid: std::process::id() as u64,
                 computational_power: 100,
-                workload_type: WorkloadType::Consensus,
+                workload_type: WorkloadType::Compute,
                 work_state: WorkState::Completed,
                 work_challenges: vec![],
                 proof_timestamp: SystemTime::now(),

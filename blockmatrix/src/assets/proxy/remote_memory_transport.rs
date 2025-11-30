@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{RwLock, Mutex, Semaphore};
+use tokio::io::AsyncReadExt;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use quinn::{Endpoint, Connection, SendStream, RecvStream};
@@ -333,6 +334,7 @@ impl RemoteMemoryTransport {
             return Err(AssetError::PermissionDenied {
                 operation: "read".to_string(),
                 resource: format!("{:?}", global_address),
+                reason: "Read permission not granted for this memory region".to_string(),
             });
         }
 
@@ -368,6 +370,7 @@ impl RemoteMemoryTransport {
             return Err(AssetError::PermissionDenied {
                 operation: "write".to_string(),
                 resource: format!("{:?}", global_address),
+                reason: "Write permission not granted for this memory region".to_string(),
             });
         }
 
