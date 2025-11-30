@@ -189,6 +189,7 @@ impl RemoteProxyManager {
                 total_mappings: 0,
                 forwarded_requests: 0,
                 nat_translations: 0,
+                total_bytes_transferred: 0,
                 average_response_time_ms: 0.0,
                 quantum_validations: 0,
                 trust_validations: 0,

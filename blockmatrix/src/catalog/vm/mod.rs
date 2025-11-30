@@ -418,12 +418,16 @@ impl ConsensusProofVM {
         
         // Create execution context with asset awareness
         let context = ExecutionContext {
+            execution_id: uuid::Uuid::new_v4().to_string(),
             consensus_proof,
             language: language.to_string(),
             asset_allocations: self.calculate_asset_allocations().await?,
             privacy_settings: self.config.privacy_config.clone(),
             blockchain_context: self.blockchain.get_context().await?,
             p2p_context: self.p2p_router.get_routing_context().await?,
+            permissions: ExecutionPermissions::default(),
+            resource_limits: ResourceLimits::default(),
+            scheduling_info: SchedulingInfo::default(),
         };
         
         // Execute through consensus VM

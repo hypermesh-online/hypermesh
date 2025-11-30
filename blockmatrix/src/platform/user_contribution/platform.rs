@@ -297,6 +297,7 @@ impl UserContributionPlatform {
                 storage_usage: Some(shared_capacity),
                 network_usage: None,
                 container: None,
+                economic: None,
             },
             privacy_level: crate::assets::core::PrivacyLevel::Private,
             consensus_proof: consensus_proof.clone(),

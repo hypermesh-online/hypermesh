@@ -459,6 +459,8 @@ impl HyperMeshContainerOrchestrator {
                     memory_usage: None,
                     storage_usage: None,
                     network_usage: None,
+                    container: None,
+                    economic: None,
                 },
                 privacy_level: PrivacyLevel::Private,
                 consensus_proof: consensus_proof.clone(),
