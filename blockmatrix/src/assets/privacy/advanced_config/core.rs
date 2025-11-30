@@ -105,16 +105,16 @@ impl UserPrivacyConfig {
     pub fn validate(&self) -> AssetResult<()> {
         // Validate user ID
         if self.user_id.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "User ID cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError {
+                message: "User ID cannot be empty".to_string()
+            });
         }
 
         // Validate configuration version
         if self.config_version.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Configuration version cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError {
+                message: "Configuration version cannot be empty".to_string()
+            });
         }
 
         // Validate privacy settings

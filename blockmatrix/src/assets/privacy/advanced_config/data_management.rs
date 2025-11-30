@@ -442,9 +442,9 @@ impl DataMinimizationSettings {
 impl RetentionPreferences {
     pub fn validate(&self) -> AssetResult<()> {
         if self.default_retention_period.as_secs() == 0 {
-            return Err(AssetError::ValidationError(
-                "Default retention period cannot be zero".to_string()
-            ));
+            return Err(AssetError::ValidationError {
+                message: "Default retention period cannot be zero".to_string()
+            });
         }
         
         self.auto_deletion.validate()?;
@@ -456,9 +456,9 @@ impl RetentionPreferences {
 impl AutoDeletionSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.criteria.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Auto-deletion enabled but no criteria specified".to_string()
-            ));
+            return Err(AssetError::ValidationError {
+                message: "Auto-deletion enabled but no criteria specified".to_string()
+            });
         }
         
         for criterion in &self.criteria {
@@ -472,15 +472,11 @@ impl AutoDeletionSettings {
 impl DeletionCriterion {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Deletion criterion name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Deletion criterion name cannot be empty".to_string() });
         }
         
         if self.thresholds.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Deletion criterion must have at least one threshold".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Deletion criterion must have at least one threshold".to_string() });
         }
         
         Ok(())
@@ -501,9 +497,7 @@ impl ArchiveEncryptionSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled {
             if self.algorithm.trim().is_empty() {
-                return Err(AssetError::ValidationError(
-                    "Encryption algorithm must be specified when encryption is enabled".to_string()
-                ));
+                return Err(AssetError::ValidationError { message: "Encryption algorithm must be specified when encryption is enabled".to_string() });
             }
             self.key_management.validate()?;
         }
@@ -522,9 +516,7 @@ impl KeyManagementSettings {
 impl KeyRotationSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.frequency.as_secs() == 0 {
-            return Err(AssetError::ValidationError(
-                "Key rotation frequency cannot be zero when enabled".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Key rotation frequency cannot be zero when enabled".to_string() });
         }
         Ok(())
     }
@@ -533,9 +525,7 @@ impl KeyRotationSettings {
 impl KeyRecoverySettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.recovery_methods.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Key recovery enabled but no recovery methods specified".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Key recovery enabled but no recovery methods specified".to_string() });
         }
         Ok(())
     }

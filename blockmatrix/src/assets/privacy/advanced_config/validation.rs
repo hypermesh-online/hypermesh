@@ -411,15 +411,11 @@ impl PrivacyConstraints {
 impl GlobalPrivacyConstraints {
     pub fn validate(&self) -> AssetResult<()> {
         if self.max_retention_period.as_secs() == 0 {
-            return Err(AssetError::ValidationError(
-                "Maximum retention period cannot be zero".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Maximum retention period cannot be zero".to_string() });
         }
         
         if self.min_privacy_level.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Minimum privacy level cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Minimum privacy level cannot be empty".to_string() });
         }
         
         Ok(())
@@ -429,15 +425,11 @@ impl GlobalPrivacyConstraints {
 impl UserDefinedConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Constraint name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Constraint name cannot be empty".to_string() });
         }
         
         if self.rules.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Constraint must have at least one rule".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Constraint must have at least one rule".to_string() });
         }
         
         for rule in &self.rules {
@@ -458,15 +450,11 @@ impl ConstraintRule {
 impl RegulatoryConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.regulation.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Regulation name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Regulation name cannot be empty".to_string() });
         }
         
         if self.jurisdiction.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Jurisdiction cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Jurisdiction cannot be empty".to_string() });
         }
         
         Ok(())
@@ -476,15 +464,11 @@ impl RegulatoryConstraint {
 impl OrganizationalConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.policy_name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Policy name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Policy name cannot be empty".to_string() });
         }
         
         if self.rules.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Organizational constraint must have at least one rule".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Organizational constraint must have at least one rule".to_string() });
         }
         
         Ok(())
@@ -516,15 +500,11 @@ impl PrivacyValidationRules {
 impl InputValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.field_name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Field name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Field name cannot be empty".to_string() });
         }
         
         if self.error_message.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Error message cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Error message cannot be empty".to_string() });
         }
         
         Ok(())
@@ -534,9 +514,7 @@ impl InputValidationRule {
 impl ConfigValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.section.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Configuration section cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Configuration section cannot be empty".to_string() });
         }
         
         Ok(())
@@ -546,15 +524,11 @@ impl ConfigValidationRule {
 impl CrossFieldValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Cross-field validation rule name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Cross-field validation rule name cannot be empty".to_string() });
         }
         
         if self.fields.len() < 2 {
-            return Err(AssetError::ValidationError(
-                "Cross-field validation requires at least two fields".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Cross-field validation requires at least two fields".to_string() });
         }
         
         Ok(())
@@ -564,15 +538,11 @@ impl CrossFieldValidationRule {
 impl BusinessLogicValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Business logic validation rule name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Business logic validation rule name cannot be empty".to_string() });
         }
         
         if self.implementation.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Business logic implementation cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Business logic implementation cannot be empty".to_string() });
         }
         
         Ok(())

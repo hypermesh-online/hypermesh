@@ -270,9 +270,7 @@ impl ConsentManagementSettings {
 impl GranularConsentSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.categories.is_empty() {
-            return Err(AssetError::ValidationError(
-                "Granular consent enabled but no categories specified".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Granular consent enabled but no categories specified".to_string() });
         }
         
         for category in &self.categories {
@@ -286,15 +284,11 @@ impl GranularConsentSettings {
 impl ConsentCategory {
     pub fn validate(&self) -> AssetResult<()> {
         if self.id.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Consent category ID cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Consent category ID cannot be empty".to_string() });
         }
         
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Consent category name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Consent category name cannot be empty".to_string() });
         }
         
         for sub_category in &self.sub_categories {
@@ -308,9 +302,7 @@ impl ConsentCategory {
 impl ConsentWithdrawalSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.withdrawal_methods.is_empty() {
-            return Err(AssetError::ValidationError(
-                "At least one withdrawal method must be specified".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "At least one withdrawal method must be specified".to_string() });
         }
         Ok(())
     }
@@ -319,9 +311,7 @@ impl ConsentWithdrawalSettings {
 impl ConsentVerificationSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.verification_frequency.as_secs() == 0 {
-            return Err(AssetError::ValidationError(
-                "Verification frequency cannot be zero".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Verification frequency cannot be zero".to_string() });
         }
         Ok(())
     }

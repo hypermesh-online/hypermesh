@@ -406,9 +406,7 @@ pub enum DebugFeature {
 impl CustomPrivacyAlgorithm {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Custom algorithm name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Custom algorithm name cannot be empty".to_string() });
         }
         
         self.implementation.validate()?;
@@ -420,15 +418,11 @@ impl CustomPrivacyAlgorithm {
 impl AlgorithmImplementation {
     pub fn validate(&self) -> AssetResult<()> {
         if self.language.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Implementation language cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Implementation language cannot be empty".to_string() });
         }
         
         if self.source.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Implementation source cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Implementation source cannot be empty".to_string() });
         }
         
         Ok(())
@@ -438,9 +432,7 @@ impl AlgorithmImplementation {
 impl IntegrationSetting {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Integration name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Integration name cannot be empty".to_string() });
         }
         
         self.data_mapping.validate()?;
@@ -470,15 +462,11 @@ impl DataMapping {
 impl FieldMapping {
     pub fn validate(&self) -> AssetResult<()> {
         if self.source_field.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Source field cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Source field cannot be empty".to_string() });
         }
         
         if self.target_field.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Target field cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Target field cannot be empty".to_string() });
         }
         
         Ok(())
@@ -488,15 +476,11 @@ impl FieldMapping {
 impl TypeConversion {
     pub fn validate(&self) -> AssetResult<()> {
         if self.source_type.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Source type cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Source type cannot be empty".to_string() });
         }
         
         if self.target_type.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Target type cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Target type cannot be empty".to_string() });
         }
         
         Ok(())
@@ -506,15 +490,11 @@ impl TypeConversion {
 impl DataValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Data validation rule name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Data validation rule name cannot be empty".to_string() });
         }
         
         if self.expression.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Validation expression cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Validation expression cannot be empty".to_string() });
         }
         
         Ok(())
@@ -524,9 +504,7 @@ impl DataValidationRule {
 impl ExperimentalFeature {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Experimental feature name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Experimental feature name cannot be empty".to_string() });
         }
         
         Ok(())

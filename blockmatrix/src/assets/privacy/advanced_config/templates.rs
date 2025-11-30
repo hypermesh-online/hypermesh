@@ -200,15 +200,11 @@ impl PrivacyTemplate {
     /// Validate template
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Template name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Template name cannot be empty".to_string() });
         }
         
         if self.version.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Template version cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Template version cannot be empty".to_string() });
         }
         
         for variable in &self.variables {
@@ -226,9 +222,7 @@ impl PrivacyTemplate {
 impl TemplateVariable {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Template variable name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Template variable name cannot be empty".to_string() });
         }
         
         self.constraints.validate()?;
@@ -251,15 +245,11 @@ impl VariableConstraints {
 impl TemplateConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Template constraint name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Template constraint name cannot be empty".to_string() });
         }
         
         if self.expression.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Template constraint expression cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Template constraint expression cannot be empty".to_string() });
         }
         
         Ok(())
@@ -292,15 +282,11 @@ impl PrivacyPreset {
     /// Validate preset
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Preset name cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Preset name cannot be empty".to_string() });
         }
         
         if self.version.trim().is_empty() {
-            return Err(AssetError::ValidationError(
-                "Preset version cannot be empty".to_string()
-            ));
+            return Err(AssetError::ValidationError { message: "Preset version cannot be empty".to_string() });
         }
         
         Ok(())
