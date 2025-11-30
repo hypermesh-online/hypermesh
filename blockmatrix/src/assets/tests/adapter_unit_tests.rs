@@ -231,20 +231,22 @@ async fn test_storage_adapter_features() {
 /// Test that adapters properly implement the AssetAdapter trait
 #[tokio::test]
 async fn test_adapter_trait_implementation() {
+    use std::sync::Arc;
+
     // Test CPU adapter
-    let cpu_adapter: Box<dyn AssetAdapter> = Box::new(CpuAssetAdapter::new().await);
+    let cpu_adapter: Arc<dyn AssetAdapter> = Arc::new(CpuAssetAdapter::new().await);
     assert_eq!(cpu_adapter.asset_type(), AssetType::Cpu);
-    
-    // Test GPU adapter  
-    let gpu_adapter: Box<dyn AssetAdapter> = Box::new(GpuAssetAdapter::new().await);
+
+    // Test GPU adapter
+    let gpu_adapter: Arc<dyn AssetAdapter> = Arc::new(GpuAssetAdapter::new().await);
     assert_eq!(gpu_adapter.asset_type(), AssetType::Gpu);
-    
+
     // Test Memory adapter (CRITICAL - NAT addressing)
-    let memory_adapter: Box<dyn AssetAdapter> = Box::new(MemoryAssetAdapter::new().await);
+    let memory_adapter: Arc<dyn AssetAdapter> = Arc::new(MemoryAssetAdapter::new().await);
     assert_eq!(memory_adapter.asset_type(), AssetType::Memory);
-    
+
     // Test Storage adapter (CRITICAL - PoSpace validation)
-    let storage_adapter: Box<dyn AssetAdapter> = Box::new(StorageAssetAdapter::new().await);
+    let storage_adapter: Arc<dyn AssetAdapter> = Arc::new(StorageAssetAdapter::new().await);
     assert_eq!(storage_adapter.asset_type(), AssetType::Storage);
 }
 

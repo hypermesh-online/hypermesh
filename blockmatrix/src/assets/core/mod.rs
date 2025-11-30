@@ -145,7 +145,7 @@ pub struct AssetManager {
     /// Registry of all assets by ID
     assets: Arc<RwLock<HashMap<AssetId, AssetStatus>>>,
     /// Registry of asset adapters by type
-    adapters: Arc<RwLock<HashMap<AssetType, Box<dyn AssetAdapter>>>>,
+    adapters: Arc<RwLock<HashMap<AssetType, Arc<dyn AssetAdapter>>>>,
     /// Proxy address resolver
     proxy_resolver: Arc<ProxyAddressResolver>,
     /// Consensus validation requirements
@@ -191,7 +191,7 @@ impl AssetManager {
     pub async fn register_adapter(
         &self,
         asset_type: AssetType,
-        adapter: Box<dyn AssetAdapter>,
+        adapter: Arc<dyn AssetAdapter>,
     ) -> AssetResult<()> {
         let mut adapters = self.adapters.write().await;
         adapters.insert(asset_type.clone(), adapter);

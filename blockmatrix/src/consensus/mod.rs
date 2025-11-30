@@ -8,9 +8,16 @@
 // Submodule for nested import compatibility
 pub mod proof;
 pub mod validation;
+pub mod consensus_impl;
 
 // Re-export all consensus types from TrustChain
 pub use trustchain::consensus::*;
+
+// Re-export our concrete implementation types
+pub use consensus_impl::{
+    AsyncConsensus, ConsensusResult, ConsensusState,
+    DefaultConsensus, ConsensusAdapter
+};
 
 // BlockMatrix-specific consensus types that extend TrustChain
 use serde::{Serialize, Deserialize};

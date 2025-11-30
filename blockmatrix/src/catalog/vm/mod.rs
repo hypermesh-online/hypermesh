@@ -435,33 +435,25 @@ impl ConsensusProofVM {
         
         if config.asset_config.manage_cpu {
             adapters.insert("cpu".to_string(), Arc::new(
-                crate::assets::CpuAssetAdapter::new(
-                    config.consensus_requirements.clone()
-                ).await?
+                crate::assets::CpuAssetAdapter::new().await
             ));
         }
-        
+
         if config.asset_config.manage_gpu {
             adapters.insert("gpu".to_string(), Arc::new(
-                crate::assets::GpuAssetAdapter::new(
-                    config.consensus_requirements.clone()
-                ).await?
+                crate::assets::GpuAssetAdapter::new().await
             ));
         }
-        
+
         if config.asset_config.manage_memory {
             adapters.insert("memory".to_string(), Arc::new(
-                crate::assets::MemoryAssetAdapter::new(
-                    config.consensus_requirements.clone()
-                ).await?
+                crate::assets::MemoryAssetAdapter::new().await
             ));
         }
-        
+
         if config.asset_config.manage_storage {
             adapters.insert("storage".to_string(), Arc::new(
-                crate::assets::StorageAssetAdapter::new(
-                    config.consensus_requirements.clone()
-                ).await?
+                crate::assets::StorageAssetAdapter::new().await
             ));
         }
         
@@ -472,17 +464,19 @@ impl ConsensusProofVM {
     async fn calculate_asset_allocations(&self) -> Result<HashMap<String, AssetAllocation>> {
         let mut allocations = HashMap::new();
         
-        for (asset_type, adapter) in &self.asset_adapters {
-            let availability = adapter.get_availability().await?;
+        for (asset_type, _adapter) in &self.asset_adapters {
+            // TODO: Implement get_availability in AssetAdapter trait
+            // let availability = adapter.get_availability().await?;
             let sharing_config = self.config.privacy_config.resource_sharing
                 .get(asset_type)
                 .cloned()
                 .unwrap_or_default();
-            
+
+            // Using placeholder values until get_availability is implemented
             allocations.insert(asset_type.clone(), AssetAllocation {
-                total_capacity: availability.total_capacity,
-                available_capacity: availability.available_capacity,
-                shared_capacity: (availability.total_capacity as f64 * 
+                total_capacity: 1000, // placeholder
+                available_capacity: 800, // placeholder
+                shared_capacity: (1000_f64 *
                     sharing_config.share_percentage / 100.0) as u64,
                 privacy_level: sharing_config.privacy_level,
                 max_concurrent_usage: sharing_config.max_concurrent_usage,

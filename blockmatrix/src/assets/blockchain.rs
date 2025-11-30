@@ -6,7 +6,10 @@
 use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
-use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof, Consensus, ConsensusResult, LogIndex};
+use crate::consensus::{
+    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+    AsyncConsensus, ConsensusResult, LogIndex, DefaultConsensus, ConsensusConfig
+};
 
 /// Asset record types for blockchain operations
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -209,7 +212,7 @@ impl HyperMeshBlockData {
 /// Asset blockchain manager for HyperMesh
 pub struct AssetBlockchainManager {
     /// Consensus system for blockchain operations
-    consensus: Arc<dyn Consensus>,
+    consensus: Arc<DefaultConsensus>,
     /// Current node authority for asset operations
     node_authority: String,
 }
@@ -218,7 +221,17 @@ use std::sync::Arc;
 
 impl AssetBlockchainManager {
     /// Create new asset blockchain manager
-    pub fn new(consensus: Arc<Consensus>, node_authority: String) -> Self {
+    pub fn new(node_authority: String) -> Self {
+        let config = ConsensusConfig::default();
+        let consensus = Arc::new(DefaultConsensus::new(config, node_authority.clone()));
+        Self {
+            consensus,
+            node_authority,
+        }
+    }
+
+    /// Create with custom consensus implementation
+    pub fn with_consensus(consensus: Arc<DefaultConsensus>, node_authority: String) -> Self {
         Self {
             consensus,
             node_authority,
