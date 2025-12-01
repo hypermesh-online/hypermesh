@@ -106,22 +106,7 @@ pub struct PerformanceConfig {
     pub batch_size: usize,
 }
 
-impl HyperMeshTransportConfig {
-    /// Validate configuration
-    pub fn validate(&self) -> Result<(), String> {
-        // Validate performance settings
-        if self.performance.send_buffer_size == 0 {
-            return Err("send_buffer_size cannot be zero".to_string());
-        }
-        if self.performance.receive_buffer_size == 0 {
-            return Err("receive_buffer_size cannot be zero".to_string());
-        }
-        if self.pool.max_pool_size == 0 {
-            return Err("max_pool_size cannot be zero".to_string());
-        }
-        Ok(())
-    }
-}
+// NOTE: validate() implementation moved below to main HyperMeshTransportConfig impl
 
 impl Default for HyperMeshTransportConfig {
     fn default() -> Self {

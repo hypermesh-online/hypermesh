@@ -331,12 +331,7 @@ impl ConsensusOperation {
             _ => 1500,
         }
     }
-    
-    /// Get operation ID
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-    
+
     /// Get operation type
     pub fn operation_type(&self) -> &str {
         &self.operation_type

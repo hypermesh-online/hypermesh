@@ -664,61 +664,7 @@ impl Default for ConsensusRequirements {
     }
 }
 
-impl ConsensusBridge {
-    /// Create new consensus bridge
-    pub async fn new() -> Result<Self> {
-        let construct_mappings = Self::initialize_construct_mappings();
-        let translators = Self::initialize_translators();
-        
-        Ok(Self {
-            construct_mappings,
-            translators,
-        })
-    }
-    
-    /// Initialize construct mappings for all languages
-    fn initialize_construct_mappings() -> HashMap<String, ConsensusMapping> {
-        let mut mappings = HashMap::new();
-        
-        // Julia mappings (native)
-        mappings.insert("julia_consensus".to_string(), ConsensusMapping {
-            language: "julia".to_string(),
-            source_pattern: "@consensus".to_string(),
-            target_operation: "consensus_validate".to_string(),
-            transformations: vec!["native".to_string()],
-        });
-        
-        // Python mappings
-        mappings.insert("python_consensus".to_string(), ConsensusMapping {
-            language: "python".to_string(),
-            source_pattern: "consensus_required".to_string(),
-            target_operation: "consensus_validate".to_string(),
-            transformations: vec!["python_to_julia".to_string()],
-        });
-        
-        // R mappings
-        mappings.insert("r_consensus".to_string(), ConsensusMapping {
-            language: "r".to_string(),
-            source_pattern: "consensus.required".to_string(),
-            target_operation: "consensus_validate".to_string(),
-            transformations: vec!["r_to_julia".to_string()],
-        });
-        
-        // Additional mappings for other languages would be added here
-        
-        mappings
-    }
-    
-    /// Initialize translators for each language
-    fn initialize_translators() -> HashMap<String, Box<dyn ConsensusTranslator>> {
-        let mut translators: HashMap<String, Box<dyn ConsensusTranslator>> = HashMap::new();
-        
-        // Each language would have its specific translator implementation
-        // This is where the actual PyCall, RCall, etc. integration would happen
-        
-        translators
-    }
-}
+// NOTE: ConsensusBridge impl moved to consensus_bridge.rs to avoid duplication
 
 impl ExecutionContext {
     /// Get available CPU cores for validation
