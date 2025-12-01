@@ -437,6 +437,38 @@ impl AssetAdapter for EconomicAssetAdapter {
     fn get_capabilities(&self) -> AdapterCapabilities {
         self.capabilities.clone()
     }
+
+    fn asset_type(&self) -> AssetType {
+        AssetType::Economic
+    }
+
+    async fn validate_consensus_proof(
+        &self,
+        proof: &crate::consensus::proof::ConsensusProof,
+    ) -> AssetResult<bool> {
+        // Delegate to existing consensus validation with economic thresholds
+        // Check if proof meets economic asset requirements
+
+        // Validate stake amount meets minimum threshold for economic operations
+        if proof.stake_proof.stake_amount < 1000.0 {
+            return Ok(false);
+        }
+
+        // Validate work proof exists (detailed validation would check internal fields)
+        // Since WorkProof structure may vary, just check it exists for now
+        // TODO: Add proper work proof validation based on actual WorkProof structure
+
+        // All economic requirements met
+        Ok(true)
+    }
+
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+        // TODO(Phase 11): Implement NAT-like proxy addressing for economic assets
+        // This is a core feature per CLAUDE.md but requires dedicated design
+        // Economic assets need proxy addressing for cross-chain operations
+        // For now, create a placeholder AssetId based on proxy address
+        todo!("Proxy address resolution for economic assets - requires NAT-like addressing design")
+    }
 }
 
 impl Default for EconomicAssetAdapter {

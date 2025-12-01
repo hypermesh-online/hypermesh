@@ -110,7 +110,7 @@ pub struct HealthCheck {
 }
 
 /// Component metrics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ComponentMetrics {
     /// CPU usage percentage
     pub cpu_usage: f64,

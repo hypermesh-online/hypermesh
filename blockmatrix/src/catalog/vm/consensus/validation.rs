@@ -8,6 +8,7 @@ use std::time::{SystemTime, Duration};
 use anyhow::Result;
 use async_trait::async_trait;
 
+use trustchain::consensus::Proof;
 use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, AccessLevel};
 use super::{ProofValidator, ProofRequirement, VMConsensusContext};
 
