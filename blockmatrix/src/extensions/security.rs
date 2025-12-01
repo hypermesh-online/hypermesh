@@ -873,16 +873,17 @@ impl AnomalyRule for MemoryAnomalyRule {
         }
 
         let growth_rate = (current.memory_bytes as f64 / prev as f64) - 1.0;
+        let threshold_f64 = self.threshold as f64;
 
-        if growth_rate > self.threshold {
+        if growth_rate > threshold_f64 {
             return Some(Anomaly {
                 anomaly_type: "Memory Leak".to_string(),
-                severity: (growth_rate / self.threshold).min(1.0) as f32,
+                severity: (growth_rate / threshold_f64).min(1.0) as f32,
                 description: format!(
                     "Memory usage grew by {:.1}% (from {} to {})",
                     growth_rate * 100.0, prev, current.memory_bytes
                 ),
-                action: if growth_rate > self.threshold * 2.0 {
+                action: if growth_rate > threshold_f64 * 2.0 {
                     AnomalyAction::Throttle
                 } else {
                     AnomalyAction::Alert

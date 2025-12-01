@@ -184,7 +184,7 @@ pub struct EntityInfo {
 }
 
 /// Privacy policy configuration for cross-chain interactions
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyPolicyConfig {
     /// Fields that can be publicly validated
     pub public_fields: Vec<String>,
@@ -278,7 +278,7 @@ pub enum ProofRequirement {
 }
 
 /// Response to cross-chain validation (public only)
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicValidationResponse {
     /// Validation result
     pub validation_result: ValidationResult,
@@ -333,11 +333,7 @@ impl EntityBlockchain {
             data: genesis_data,
             consensus_proof: ConsensusProof::new(
                 // TODO: Generate real consensus proofs
-                crate::consensus::proof::SpaceProof::new(
-                    "genesis-node".to_string(),
-                    "/genesis".to_string(),
-                    0,
-                ),
+                // Order: StakeProof, TimeProof, SpaceProof, WorkProof
                 crate::consensus::proof::StakeProof::new(
                     config.network_domain.clone(),
                     "genesis-node".to_string(),
@@ -350,12 +346,17 @@ impl EntityBlockchain {
                     },
                     vec!["genesis-allowance".to_string()],
                 ),
+                crate::consensus::proof::TimeProof::new(0, None, 0),
+                crate::consensus::proof::SpaceProof::new(
+                    "genesis-node".to_string(),
+                    "/genesis".to_string(),
+                    0,
+                ),
                 crate::consensus::proof::WorkProof::new(
                     b"genesis-challenge",
                     4,
                     "genesis".to_string(),
                 ).unwrap(),
-                crate::consensus::proof::TimeProof::new(0, None, 0),
             ),
             hash: [0u8; 32], // Would be calculated
             entity_signature: vec![],

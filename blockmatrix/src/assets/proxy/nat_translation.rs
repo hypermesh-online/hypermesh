@@ -116,25 +116,38 @@ pub enum TranslationState {
 }
 
 /// Usage statistics for address translations
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddressUsageStats {
     /// Total access count
     pub total_accesses: u64,
-    
+
     /// Total bytes read
     pub total_bytes_read: u64,
-    
+
     /// Total bytes written
     pub total_bytes_written: u64,
-    
+
     /// Cache hit rate
     pub cache_hit_rate: f32,
-    
+
     /// Average access latency in microseconds
     pub average_latency_us: u64,
-    
+
     /// Last performance measurement
     pub last_measured: SystemTime,
+}
+
+impl Default for AddressUsageStats {
+    fn default() -> Self {
+        Self {
+            total_accesses: 0,
+            total_bytes_read: 0,
+            total_bytes_written: 0,
+            cache_hit_rate: 0.0,
+            average_latency_us: 0,
+            last_measured: SystemTime::now(),
+        }
+    }
 }
 
 /// The main NAT translator for memory addressing

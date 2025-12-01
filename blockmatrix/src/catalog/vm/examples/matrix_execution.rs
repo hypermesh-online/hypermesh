@@ -482,11 +482,7 @@ async fn setup_entity_vm_configs(mut matrix_vm: MatrixAwareVM) -> Result<MatrixA
 fn create_base_execution_context() -> Result<ExecutionContext> {
     Ok(ExecutionContext {
         consensus_proof: ConsensusProof::new(
-            crate::consensus::proof::SpaceProof::new(
-                "matrix-vm-node".to_string(),
-                "/matrix-vm".to_string(),
-                0,
-            ),
+            // Order: StakeProof, TimeProof, SpaceProof, WorkProof
             crate::consensus::proof::StakeProof::new(
                 "matrix-vm.hypermesh.online".to_string(),
                 "matrix-vm-node".to_string(),
@@ -499,12 +495,17 @@ fn create_base_execution_context() -> Result<ExecutionContext> {
                 },
                 vec!["matrix-vm-allowance".to_string()],
             ),
+            crate::consensus::proof::TimeProof::new(0, None, 0),
+            crate::consensus::proof::SpaceProof::new(
+                "matrix-vm-node".to_string(),
+                "/matrix-vm".to_string(),
+                0,
+            ),
             crate::consensus::proof::WorkProof::new(
                 b"matrix-vm-challenge",
                 16,
                 "matrix-vm".to_string(),
             )?,
-            crate::consensus::proof::TimeProof::new(0, None, 0),
         ),
         language: "julia".to_string(),
         asset_allocations: HashMap::new(),

@@ -108,8 +108,8 @@ pub enum LoadingMethod {
 
 /// Loaded extension container
 pub struct LoadedExtension {
-    /// Extension instance
-    pub extension: Box<dyn HyperMeshExtension>,
+    /// Extension instance (Arc for sharing across threads)
+    pub extension: Arc<dyn HyperMeshExtension>,
 
     /// Loading context
     pub context: LoadContext,
@@ -280,7 +280,7 @@ impl ExtensionLoader {
             });
         }
 
-        let mut extension = unsafe { Box::from_raw(extension_ptr) };
+        let mut extension_box = unsafe { Box::from_raw(extension_ptr) };
 
         // Initialize the extension
         let config = ExtensionConfig {
@@ -291,7 +291,10 @@ impl ExtensionLoader {
             debug_mode: false,
         };
 
-        extension.initialize(config).await?;
+        extension_box.initialize(config).await?;
+
+        // Convert Box to Arc for shared ownership
+        let extension: Arc<dyn HyperMeshExtension> = Arc::from(extension_box);
 
         Ok(LoadedExtension {
             extension,
@@ -343,7 +346,7 @@ impl ExtensionLoader {
     /// Get loaded extension
     pub async fn get_extension(&self, extension_id: &str) -> Option<Arc<dyn HyperMeshExtension>> {
         let loaded = self.loaded.read().await;
-        loaded.get(extension_id).map(|le| Arc::from(le.extension.as_ref()))
+        loaded.get(extension_id).map(|le| Arc::clone(&le.extension))
     }
 
     /// List loaded extensions

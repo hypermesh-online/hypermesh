@@ -29,19 +29,39 @@ struct CpuSample {
 }
 
 /// Network interface statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct NetworkStats {
     bytes_received: u64,
     bytes_sent: u64,
     timestamp: Instant,
 }
 
+impl Default for NetworkStats {
+    fn default() -> Self {
+        Self {
+            bytes_received: 0,
+            bytes_sent: 0,
+            timestamp: Instant::now(),
+        }
+    }
+}
+
 /// Disk I/O statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct DiskStats {
     bytes_read: u64,
     bytes_written: u64,
     timestamp: Instant,
+}
+
+impl Default for DiskStats {
+    fn default() -> Self {
+        Self {
+            bytes_read: 0,
+            bytes_written: 0,
+            timestamp: Instant::now(),
+        }
+    }
 }
 
 /// Windows OS Abstraction with Performance Counter support

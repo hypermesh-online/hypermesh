@@ -34,6 +34,18 @@ pub struct ContainerHandle {
     runtime: Arc<ContainerRuntime>,
 }
 
+impl std::fmt::Debug for ContainerHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContainerHandle")
+            .field("id", &self.id)
+            .field("spec", &self.spec)
+            .field("options", &self.options)
+            .field("created_at", &self.created_at)
+            .field("runtime", &"Arc<ContainerRuntime>")
+            .finish()
+    }
+}
+
 impl ContainerHandle {
     /// Get container status
     pub async fn status(&self) -> Result<ContainerStatus> {
