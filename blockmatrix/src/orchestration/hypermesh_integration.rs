@@ -96,7 +96,7 @@ pub enum ResourceAllocationStrategy {
 }
 
 /// Custom allocation algorithm parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AllocationAlgorithm {
     pub cpu_weight: f64,
     pub memory_weight: f64,

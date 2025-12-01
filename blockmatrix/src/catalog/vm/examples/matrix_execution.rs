@@ -521,15 +521,18 @@ fn create_base_execution_context() -> Result<ExecutionContext> {
             connected_peers: vec![],
             peer_resources: HashMap::new(),
             network_topology: crate::catalog::vm::execution::context::NetworkTopology {
-                total_peers: 0,
-                connected_peers: 0,
-                network_latency_ms: 0.0,
+                network_diameter: 0,
+                local_cluster: vec![],
+                regional_nodes: HashMap::new(),
+                backbone_nodes: vec![],
             },
             trust_scores: HashMap::new(),
             routing_preferences: crate::catalog::vm::execution::context::RoutingPreferences {
                 prefer_low_latency: true,
                 prefer_high_bandwidth: false,
-                max_hops: 5,
+                max_latency_micros: 1000000, // 1 second
+                min_bandwidth_bytes_per_sec: 1024 * 1024, // 1 MB/s
+                geographic_preferences: vec![],
             },
         },
         permissions: Default::default(),

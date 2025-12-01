@@ -11,7 +11,11 @@ use crate::assets::core::{
     ResourceUsage, ResourceLimits, ResourceRequirements, PrivacyLevel, ProxyAddress,
     AdapterHealth, AdapterCapabilities, AssetType,
 };
-use crate::assets::core::privacy::{AllocationConfig, AccessConfig};
+use crate::assets::core::privacy::{
+    AllocationConfig, AccessConfig, ResourceAllocationConfig, ConcurrencyLimits,
+    DurationConfig, AccessPermissions, RateLimits, AuthRequirements,
+};
+use crate::assets::core::privacy::ConsensusRequirements as PrivacyConsensusRequirements;
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -259,16 +263,57 @@ impl AssetAdapter for EconomicAssetAdapter {
             asset_id: asset_id.clone(),
             status: asset_state.status,
             allocation_config: AllocationConfig {
-                percentage: 100,
-                max_concurrent_users: 1,
-                duration_limit: None,
-                rewards_enabled: true, // Default to enabled
+                privacy_level: PrivacyLevel::Private,
+                resource_allocation: ResourceAllocationConfig {
+                    cpu_allocation: 1.0,
+                    gpu_allocation: 0.0,
+                    memory_allocation: 1.0,
+                    storage_allocation: 1.0,
+                    network_allocation: 1.0,
+                },
+                concurrency_limits: ConcurrencyLimits {
+                    max_users: 1,
+                    max_processes: 100,
+                    max_connections: 1000,
+                    max_queue_length: 100,
+                },
+                duration_config: DurationConfig {
+                    max_duration: None,
+                    min_duration: None,
+                    auto_renewal: true,
+                    grace_period: std::time::Duration::from_secs(300),
+                },
+                consensus_requirements: PrivacyConsensusRequirements {
+                    require_space_proof: true,
+                    require_stake_proof: true,
+                    require_work_proof: true,
+                    require_time_proof: true,
+                    minimum_stake: 0,
+                    max_time_offset: std::time::Duration::from_secs(60),
+                },
             },
             access_config: AccessConfig {
-                allowed_domains: vec![],
-                allowed_entities: vec![],
-                require_consensus: true, // Economic operations require consensus
-                minimum_trust_score: 0.5,
+                allowed_certificates: vec![],
+                allowed_networks: vec![],
+                permissions: AccessPermissions {
+                    can_read: true,
+                    can_execute: true,
+                    can_configure: false,
+                    can_monitor: true,
+                    can_share: false,
+                },
+                rate_limits: RateLimits {
+                    requests_per_second: 1000,
+                    bandwidth_mbps: 100,
+                    cpu_usage_limit: 1.0,
+                    memory_usage_limit: 1024 * 1024 * 1024, // 1GB
+                },
+                auth_requirements: AuthRequirements {
+                    require_certificate: true,
+                    require_mfa: false,
+                    require_consensus_proof: true,
+                    session_timeout: 3600,
+                },
             },
             allocated_at: std::time::SystemTime::now(),
             expires_at: None,

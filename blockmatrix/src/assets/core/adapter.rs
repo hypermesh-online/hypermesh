@@ -233,6 +233,19 @@ pub struct ResourceUsage {
     pub measurement_timestamp: std::time::SystemTime,
 }
 
+impl Default for ResourceUsage {
+    fn default() -> Self {
+        Self {
+            cpu_usage: None,
+            gpu_usage: None,
+            memory_usage: None,
+            storage_usage: None,
+            network_usage: None,
+            measurement_timestamp: std::time::SystemTime::now(),
+        }
+    }
+}
+
 /// CPU usage metrics
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CpuUsage {
