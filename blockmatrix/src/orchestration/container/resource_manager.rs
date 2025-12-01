@@ -3,7 +3,7 @@
 //! Ultra-fast resource discovery and management using Layer 1 (IFR) for <52µs
 //! resource lookups, achieving 88.6% latency improvement over traditional systems.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::NodeId;
 use super::{ResourceRequirements, NodeState, NodeHealth};
 use anyhow::Result;

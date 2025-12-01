@@ -11,7 +11,7 @@ pub mod discovery;
 pub use routing::{AlmRoutingEngine, RoutingPolicy, PathOptimization};
 pub use discovery::{CpeServiceDiscovery, ServiceRegistry, DiscoveryEvent, ServiceHealth};
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
 use super::{ServiceMeshConfig, LoadBalancingConfig, LoadBalancingStrategy};
 use anyhow::Result;

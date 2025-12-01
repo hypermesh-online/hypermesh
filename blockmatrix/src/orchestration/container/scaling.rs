@@ -3,7 +3,7 @@
 //! Advanced auto-scaling using CPE Layer 4 predictions for proactive scaling decisions,
 //! achieving <1.2ms scaling decisions with 96.8% accuracy.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, ContainerId};
 use super::{ContainerInstance, ContainerState, ResourceUsage, ScalingAction};
 use anyhow::Result;

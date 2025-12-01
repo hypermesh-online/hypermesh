@@ -3,7 +3,7 @@
 //! Revolutionary container scheduling that uses Layer 2 (DSR) neural pattern recognition
 //! for optimal container placement decisions, achieving <100ms scheduling with 96%+ accuracy.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{NodeId, ContainerId, ServiceId};
 use super::{ContainerSpec, NodeState, ResourceRequirements, PlacementConstraint, NodeHealth};
 use anyhow::Result;

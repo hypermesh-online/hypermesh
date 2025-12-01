@@ -3,7 +3,7 @@
 //! Advanced container placement optimization using Layer 4 (CPE) for <1.2ms ML-driven
 //! placement decisions with 96.8% accuracy, enabling proactive placement optimization.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{NodeId, ContainerId, ServiceId};
 use super::{ContainerSpec, NodeCandidate, ResourceRequirements};
 use anyhow::Result;

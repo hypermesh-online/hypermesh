@@ -1,8 +1,8 @@
 //! Core container runtime implementation
 
 use super::{
-    types::{ContainerId, ContainerSpec, CreateOptions},
-    lifecycle::{ContainerLifecycle, DefaultContainerLifecycle, ContainerStatus, ContainerState},
+    types::{ContainerId, ContainerSpec, CreateOptions, ContainerStatus},
+    lifecycle::{ContainerLifecycle, DefaultContainerLifecycle, ContainerState},
     image::{ImageManager, DefaultImageManager},
     network::{ContainerNetwork, DefaultContainerNetwork, NetworkConfig},
     filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
@@ -441,7 +441,7 @@ impl ContainerRuntime {
     /// Migrate a container
     pub async fn migrate(&self, request: MigrationRequest) -> Result<()> {
         let _result = self.migration_manager.migrate(request).await
-            .map_err(|e| ContainerError::MigrationFailed { reason: e.to_string() })?;
+            .map_err(|e| ContainerError::migration(e.to_string()))?;
         Ok(())
     }
     

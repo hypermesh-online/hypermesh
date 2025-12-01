@@ -3,7 +3,7 @@
 //! Advanced container migration using MFN intelligence for optimal migration decisions,
 //! supporting live migration with minimal downtime.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{NodeId, ContainerId, ServiceId};
 use super::{ContainerInstance, NodeState, ResourceRequirements};
 use anyhow::Result;

@@ -511,7 +511,7 @@ impl RemoteProxyManager {
                 rules.push(ForwardingRule {
                     source_pattern: "local".to_string(),
                     destination: "direct".to_string(),
-                    mode: super::forwarding::ForwardingMode::Direct,
+                    mode: super::forwarding::ForwardingMode::DirectMemory,
                     rule_type: ForwardingRuleType::DirectMemory,
                     priority: 100,
                     auth_required: true,
@@ -522,7 +522,7 @@ impl RemoteProxyManager {
                 rules.push(ForwardingRule {
                     source_pattern: "private_network".to_string(),
                     destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::Proxied,
+                    mode: super::forwarding::ForwardingMode::TcpTunnel,
                     rule_type: ForwardingRuleType::Tcp,
                     priority: 80,
                     auth_required: true,
@@ -533,7 +533,7 @@ impl RemoteProxyManager {
                 rules.push(ForwardingRule {
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::Proxied,
+                    mode: super::forwarding::ForwardingMode::HttpProxy,
                     rule_type: ForwardingRuleType::Http,
                     priority: 60,
                     auth_required: false,
@@ -542,7 +542,7 @@ impl RemoteProxyManager {
                 rules.push(ForwardingRule {
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::Proxied,
+                    mode: super::forwarding::ForwardingMode::Socks5Proxy,
                     rule_type: ForwardingRuleType::Socks5,
                     priority: 70,
                     auth_required: false,
@@ -552,7 +552,7 @@ impl RemoteProxyManager {
                     rules.push(ForwardingRule {
                         source_pattern: "*".to_string(),
                         destination: "forwarded".to_string(),
-                        mode: super::forwarding::ForwardingMode::Tunneled,
+                        mode: super::forwarding::ForwardingMode::VpnTunnel,
                         rule_type: ForwardingRuleType::Vpn,
                         priority: 90,
                         auth_required: false,
@@ -619,12 +619,11 @@ impl RemoteProxyManager {
         let permissions = self.create_access_permissions(privacy_level).await?;
         
         Ok(match request_type {
-            ForwardingRuleType::HTTP | ForwardingRuleType::HTTPS => permissions.http_proxy,
-            ForwardingRuleType::SOCKS5 => permissions.socks5_proxy,
-            ForwardingRuleType::TCP | ForwardingRuleType::UDP => permissions.tcp_forwarding,
-            ForwardingRuleType::VPN => permissions.vpn_tunnel,
+            ForwardingRuleType::Http => permissions.http_proxy,
+            ForwardingRuleType::Socks5 => permissions.socks5_proxy,
+            ForwardingRuleType::Tcp | ForwardingRuleType::Udp => permissions.tcp_forwarding,
+            ForwardingRuleType::Vpn => permissions.vpn_tunnel,
             ForwardingRuleType::DirectMemory => permissions.memory_access,
-            ForwardingRuleType::ShardedData => permissions.sharded_access,
         })
     }
     
