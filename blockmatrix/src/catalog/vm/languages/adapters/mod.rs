@@ -119,7 +119,7 @@ impl BaseAdapter {
     }
     
     /// Get consensus VM
-    pub fn consensus_vm(&self) -> Arc<ConsensusVM> {
+    pub fn consensus_vm(&self) -> Arc<RwLock<ConsensusVM>> {
         Arc::clone(&self.consensus_vm)
     }
     
@@ -134,7 +134,7 @@ impl BaseAdapter {
         proof: &ConsensusProof,
     ) -> Result<bool> {
         // First validate against global VM requirements
-        if !self.consensus_vm.validate_consensus_proof(proof).await? {
+        if !self.consensus_vm.read().await.validate_consensus_proof(proof).await? {
             return Ok(false);
         }
         

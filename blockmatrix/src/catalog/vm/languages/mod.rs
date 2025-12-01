@@ -28,8 +28,8 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
-use async_trait::async_trait;
 use tokio::sync::RwLock;
+use async_trait::async_trait;
 
 use crate::consensus::proof::ConsensusProof;
 use super::consensus::ConsensusVM;
@@ -432,7 +432,7 @@ impl MultiLanguageSupport {
             .ok_or_else(|| anyhow::anyhow!("Unsupported language: {}", language))?;
         
         // Validate consensus proof meets global requirements
-        if !self.consensus_vm.validate_consensus_proof(&consensus_proof).await? {
+        if !self.consensus_vm.read().await.validate_consensus_proof(&consensus_proof).await? {
             return Err(anyhow::anyhow!("Global consensus proof validation failed"));
         }
         
@@ -469,7 +469,7 @@ impl MultiLanguageSupport {
     async fn create_language_adapter(
         lang_id: &str,
         adapter_type: &str,
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         consensus_bridge: Arc<ConsensusBridge>,
         config: Option<&LanguageSpecificConfig>,
     ) -> Result<Arc<dyn LanguageRuntime>> {

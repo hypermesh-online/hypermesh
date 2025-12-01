@@ -354,6 +354,8 @@ impl MatrixAwareVM {
                 let consensus_proof = &context.base_context.consensus_proof;
                 
                 if !self.base_vm.consensus_vm()
+                    .read()
+                    .await
                     .validate_consensus_proof(consensus_proof)
                     .await? {
                     return Err(anyhow::anyhow!(

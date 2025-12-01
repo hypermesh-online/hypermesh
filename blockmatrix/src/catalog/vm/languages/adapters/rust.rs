@@ -16,6 +16,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::super::super::consensus::ConsensusVM;
@@ -71,7 +72,7 @@ pub struct RustAdapterConfig {
 impl RustAdapter {
     /// Create new Rust adapter with RustCall integration
     pub async fn new(
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         consensus_bridge: Arc<ConsensusBridge>,
         config: Option<&LanguageSpecificConfig>,
     ) -> Result<Self> {

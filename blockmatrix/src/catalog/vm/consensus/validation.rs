@@ -312,7 +312,7 @@ impl ProofValidator<WorkProof> for WorkProofValidator {
         }
 
         // 4. Validate proof integrity
-        proof.validate()
+        Ok(proof.validate())
     }
     
     async fn get_requirements(&self, operation_type: &str) -> Result<ProofRequirement> {

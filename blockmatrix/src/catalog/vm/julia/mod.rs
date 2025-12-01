@@ -439,7 +439,7 @@ impl JuliaVM {
             },
             JuliaExpression::FunctionCall { consensus_proof, .. } => {
                 if let Some(proof) = consensus_proof {
-                    if !self.consensus_vm.validate_consensus_proof(proof).await? {
+                    if !self.consensus_vm.read().await.validate_consensus_proof(proof).await? {
                         return Err(anyhow::anyhow!("Invalid consensus proof in function call"));
                     }
                 }
@@ -495,7 +495,7 @@ impl JuliaVM {
             },
             ConsensusProofType::All => {
                 // Validate all four proofs
-                if !self.consensus_vm.validate_consensus_proof(consensus_proof).await? {
+                if !self.consensus_vm.read().await.validate_consensus_proof(consensus_proof).await? {
                     return Err(anyhow::anyhow!("Full consensus proof validation failed"));
                 }
             },

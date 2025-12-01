@@ -416,7 +416,7 @@ impl ConsensusProofVM {
         consensus_proof: ConsensusProof,
     ) -> Result<ExecutionResult> {
         // Validate consensus proof meets requirements
-        if !self.consensus_vm.validate_consensus_proof(&consensus_proof).await? {
+        if !self.consensus_vm.read().await.validate_consensus_proof(&consensus_proof).await? {
             return Err(anyhow::anyhow!("Invalid consensus proof"));
         }
         
@@ -503,7 +503,7 @@ impl ConsensusProofVM {
     }
     
     /// Get consensus VM instance
-    pub fn consensus_vm(&self) -> Arc<ConsensusVM> {
+    pub fn consensus_vm(&self) -> Arc<RwLock<ConsensusVM>> {
         Arc::clone(&self.consensus_vm)
     }
     

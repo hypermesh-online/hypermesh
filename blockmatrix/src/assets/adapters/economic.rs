@@ -245,7 +245,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 allocated_at: std::time::SystemTime::now(),
                 last_accessed: std::time::SystemTime::now(),
                 resource_usage: Default::default(),
-                privacy_level: Self::map_privacy_level(request.privacy_level.clone()),
+                privacy_level: request.privacy_level.clone(),
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: String::new(),

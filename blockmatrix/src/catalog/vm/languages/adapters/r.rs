@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::super::super::execution::{ExecutionContext, ExecutionResult};
@@ -19,7 +20,7 @@ pub struct RAdapter {
 
 impl RAdapter {
     pub async fn new(
-        consensus_vm: Arc<super::super::super::consensus::ConsensusVM>,
+        consensus_vm: Arc<RwLock<super::super::super::consensus::ConsensusVM>>,
         consensus_bridge: Arc<ConsensusBridge>,
         config: Option<&LanguageSpecificConfig>,
     ) -> Result<Self> {
