@@ -102,7 +102,7 @@ socket2 = { workspace = true }
 
 # Missing dependencies now added
 # warp = ... # REMOVED: STOQ-only transport
-semver = { workspace = true }
+semver = { workspace = true, features = ["serde"] }
 config = { workspace = true }
 rust_decimal = { workspace = true }
 fastrand = { workspace = true }

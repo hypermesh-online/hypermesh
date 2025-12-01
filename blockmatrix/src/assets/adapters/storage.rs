@@ -606,7 +606,7 @@ impl AssetAdapter for StorageAssetAdapter {
         }
         
         // PoTime: Validate temporal ordering for storage operations
-        let time_valid = proof.time_proof.time_verification_timestamp > 0;
+        let time_valid = proof.time_proof.time_verification_timestamp.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() > 0).unwrap_or(false);
         
         Ok(time_valid)
     }

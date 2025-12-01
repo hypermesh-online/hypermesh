@@ -450,7 +450,7 @@ impl AssetAdapter for GpuAssetAdapter {
         }
         
         // PoTime: Validate temporal constraints (GPUs need tight synchronization)
-        let time_valid = proof.time_proof.time_verification_timestamp > 0 &&
+        let time_valid = proof.time_proof.time_verification_timestamp.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() > 0).unwrap_or(false) &&
                         proof.time_proof.nonce > 0;
         
         Ok(time_valid)
