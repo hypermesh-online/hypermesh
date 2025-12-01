@@ -294,7 +294,13 @@ impl UserContributionPlatform {
                 cpu: None,
                 gpu_usage: None,
                 memory_usage: None,
-                storage_usage: Some(shared_capacity),
+                storage_usage: Some(crate::assets::core::StorageRequirements {
+                    size_bytes: shared_capacity,
+                    storage_type: crate::assets::core::StorageType::Any,
+                    min_iops: None,
+                    min_bandwidth_mbps: None,
+                    durability_replicas: 1,
+                }),
                 network_usage: None,
                 container: None,
                 economic: None,
@@ -307,6 +313,7 @@ impl UserContributionPlatform {
         };
 
         self.asset_manager.allocate_asset(allocation_request).await
+            .map_err(|e| anyhow!("Asset allocation failed: {:?}", e))
     }
 
     fn get_total_capacity_for_asset_type(

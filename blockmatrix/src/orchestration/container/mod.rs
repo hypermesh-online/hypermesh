@@ -28,7 +28,7 @@ pub use scaling::{PredictiveScaler, ScalingTrigger, WorkloadPrediction, ScalingD
 pub use resource_manager::{IfrResourceManager, ResourceAllocation, ResourceConstraint, NodeResources};
 pub use migration::{ContainerMigrator, MigrationDecision, MigrationReason, MigrationPlan};
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ContainerConfig, ServiceId, NodeId, ContainerId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -574,10 +574,11 @@ impl ContainerOrchestrator {
         debug!("Found {} candidate nodes for scheduling", available_nodes.len());
         
         // Step 2: Use DSR pattern-based scheduling for intelligent node selection
+        let node_registry = self.node_registry.read().await;
         let node_candidates = self.scheduler.evaluate_node_candidates(
             &spec,
             available_nodes,
-            &self.node_registry.read().await,
+            &*node_registry,
         ).await?;
         
         if node_candidates.is_empty() {
