@@ -21,6 +21,7 @@ use std::pin::Pin;
 use std::future::Future;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::consensus::ConsensusVM;
@@ -29,7 +30,7 @@ use super::execution::{ExecutionContext, ExecutionResult};
 /// Julia VM with consensus-native execution
 pub struct JuliaVM {
     /// Consensus VM for proof validation
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Julia runtime environment
     runtime: Arc<JuliaConsensusRuntime>,
     /// Native consensus types registry
@@ -354,7 +355,7 @@ pub struct ExecutionMetrics {
 
 impl JuliaVM {
     /// Create new Julia VM with consensus integration
-    pub async fn new(consensus_vm: Arc<ConsensusVM>) -> Result<Self> {
+    pub async fn new(consensus_vm: Arc<RwLock<ConsensusVM>>) -> Result<Self> {
         let runtime = Arc::new(JuliaConsensusRuntime::new().await?);
         let consensus_types = Arc::new(ConsensusTypeRegistry::new()?);
         let stdlib = Arc::new(ConsensusStandardLibrary::new().await?);

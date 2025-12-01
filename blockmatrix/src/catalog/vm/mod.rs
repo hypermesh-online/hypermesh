@@ -87,6 +87,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences, ExecutionPermissions, ResourceLimits, SchedulingInfo};
@@ -339,7 +340,7 @@ pub struct ConsensusProofVM {
     /// VM configuration
     config: Arc<VMConfig>,
     /// Consensus VM core
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Execution engine
     executor: Arc<VMExecutor>,
     /// Julia runtime
@@ -360,10 +361,10 @@ impl ConsensusProofVM {
         let config = Arc::new(config);
         
         // Initialize consensus VM with 4-proof requirements
-        let consensus_vm = Arc::new(ConsensusVM::new(
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(
             config.consensus_requirements.clone()
-        )?);
-        
+        )?));
+
         // Initialize execution engine
         let executor = Arc::new(VMExecutor::new(
             Arc::clone(&consensus_vm),

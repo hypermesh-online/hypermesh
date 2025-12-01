@@ -450,7 +450,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         // Check if proof meets economic asset requirements
 
         // Validate stake amount meets minimum threshold for economic operations
-        if proof.stake_proof.stake_amount < 1000.0 {
+        if proof.stake_proof.stake_amount < 1000 {
             return Ok(false);
         }
 

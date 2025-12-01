@@ -36,6 +36,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::super::consensus::ConsensusVM;
@@ -52,7 +53,7 @@ pub struct BaseAdapter {
     /// Adapter type (PyCall, RCall, etc.)
     adapter_type: String,
     /// Consensus VM for validation
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Language-specific configuration
     config: AdapterConfig,
     /// Consensus bridge for translation
@@ -92,7 +93,7 @@ impl BaseAdapter {
     pub fn new(
         language_id: String,
         adapter_type: String,
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         consensus_bridge: Arc<ConsensusBridge>,
         config: Option<&LanguageSpecificConfig>,
     ) -> Self {

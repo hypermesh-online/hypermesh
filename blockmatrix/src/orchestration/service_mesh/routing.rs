@@ -542,7 +542,8 @@ impl AlmRoutingEngine {
         
         // Rebuild service mappings
         topology.service_mappings.clear();
-        for (node_id, node) in &topology.nodes {
+        let nodes_clone = topology.nodes.clone();
+        for (node_id, node) in &nodes_clone {
             for service_id in &node.services {
                 topology.service_mappings
                     .entry(service_id.clone())
@@ -590,11 +591,18 @@ impl AlmRoutingEngine {
         // Limit cache size
         if cache.len() > 1000 {
             // Remove oldest entries
-            let mut entries: Vec<_> = cache.iter().collect();
-            entries.sort_by_key(|(_, cached)| cached.cached_at);
-            
-            for (key, _) in entries.into_iter().take(100) {
-                cache.remove(key);
+            let mut entries: Vec<_> = cache.iter()
+                .map(|(k, v)| (k.clone(), v.cached_at))
+                .collect();
+            entries.sort_by_key(|(_, cached_at)| *cached_at);
+
+            let keys_to_remove: Vec<_> = entries.into_iter()
+                .take(100)
+                .map(|(key, _)| key)
+                .collect();
+
+            for key in keys_to_remove {
+                cache.remove(&key);
             }
         }
     }

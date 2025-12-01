@@ -149,29 +149,35 @@ impl PlatformCoordinator {
         let mut phases = self.phases.write().await;
         let mut coord_state = self.coordination_state.write().await;
         
-        if let Some(phase) = phases.get_mut(phase_name) {
-            // Check dependencies
-            for dep in &phase.dependencies {
-                if let Some(dep_phase) = phases.get(dep) {
-                    if dep_phase.status != PhaseStatus::Completed {
-                        return Err(IntegrationError::Lifecycle {
-                            phase: phase_name.to_string(),
-                            message: format!("Dependency '{}' not completed", dep),
-                        });
-                    }
-                }
-            }
-            
-            phase.status = PhaseStatus::InProgress;
-            phase.start_time = Some(SystemTime::now());
-            coord_state.current_phase = Some(phase_name.to_string());
-            
-            info!("Phase '{}' started successfully", phase_name);
+        // Check if phase exists and get dependencies
+        let phase_deps = if let Some(phase) = phases.get(phase_name) {
+            phase.dependencies.clone()
         } else {
             return Err(IntegrationError::Lifecycle {
                 phase: phase_name.to_string(),
                 message: "Phase not found".to_string(),
             });
+        };
+
+        // Check dependencies
+        for dep in &phase_deps {
+            if let Some(dep_phase) = phases.get(dep) {
+                if dep_phase.status != PhaseStatus::Completed {
+                    return Err(IntegrationError::Lifecycle {
+                        phase: phase_name.to_string(),
+                        message: format!("Dependency '{}' not completed", dep),
+                    });
+                }
+            }
+        }
+
+        // Now update the phase
+        if let Some(phase) = phases.get_mut(phase_name) {
+            phase.status = PhaseStatus::InProgress;
+            phase.start_time = Some(SystemTime::now());
+            coord_state.current_phase = Some(phase_name.to_string());
+
+            info!("Phase '{}' started successfully", phase_name);
         }
         
         Ok(())

@@ -15,6 +15,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::super::super::consensus::ConsensusVM;
@@ -64,7 +65,7 @@ pub struct JuliaAdapterConfig {
 impl JuliaAdapter {
     /// Create new Julia adapter with native VM integration
     pub async fn new(
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         config: Option<&LanguageSpecificConfig>,
     ) -> Result<Self> {
         // Create consensus bridge for Julia (though we use native integration)

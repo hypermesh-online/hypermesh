@@ -89,7 +89,7 @@ impl ProofValidator<SpaceProof> for SpaceProofValidator {
         }
 
         // 5. Validate proof hash integrity
-        proof.validate()
+        Ok(proof.validate())
     }
     
     async fn get_requirements(&self, operation_type: &str) -> Result<ProofRequirement> {
@@ -207,7 +207,7 @@ impl ProofValidator<StakeProof> for StakeProofValidator {
         }
 
         // 5. Validate proof hash integrity
-        proof.validate()
+        Ok(proof.validate())
     }
     
     async fn get_requirements(&self, operation_type: &str) -> Result<ProofRequirement> {
@@ -437,7 +437,7 @@ impl ProofValidator<TimeProof> for TimeProofValidator {
         }
         
         // 5. Validate proof hash integrity
-        proof.validate()
+        Ok(proof.validate())
     }
     
     async fn get_requirements(&self, _operation_type: &str) -> Result<ProofRequirement> {

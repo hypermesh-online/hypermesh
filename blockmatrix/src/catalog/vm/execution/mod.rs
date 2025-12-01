@@ -324,7 +324,7 @@ impl VMExecutor {
         // TODO: Make this function async in the future
         let requirements = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                self.consensus_vm.read().await.requirements()
+                self.consensus_vm.read().await.requirements().clone()
             })
         });
         let mut hasher = Sha256::new();

@@ -648,7 +648,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
     }
 
     async fn allocate_asset(&self, asset_id: AssetId) -> AssetResult<AllocationDecision> {
-        let target_node = self.select_allocation_node(asset_id.asset_type).await?;
+        let target_node = self.select_allocation_node(asset_id.asset_type.clone()).await?;
 
         let decision = AllocationDecision {
             asset_id: asset_id.clone(),
@@ -703,7 +703,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
 
         // Migrate affected assets
         for asset_id in affected_assets {
-            let new_node = self.select_allocation_node(asset_id.asset_type).await?;
+            let new_node = self.select_allocation_node(asset_id.asset_type.clone()).await?;
             self.migrate_asset(asset_id, new_node).await?;
         }
 

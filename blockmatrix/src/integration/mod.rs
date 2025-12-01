@@ -58,8 +58,8 @@ pub enum IntegrationError {
     ComponentInit { component: String, message: String },
 
     /// Component communication failure
-    #[error("Communication failure between {source} and {target}: {message}")]
-    ComponentCommunication { source: String, target: String, message: String },
+    #[error("Communication failure between {source_component} and {target}: {message}")]
+    ComponentCommunication { source_component: String, target: String, message: String },
 
     /// Configuration validation error
     #[error("Configuration validation failed: {message}")]

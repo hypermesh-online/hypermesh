@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::consensus::ConsensusVM;
@@ -50,7 +51,7 @@ const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
 /// Multi-language support coordinator
 pub struct MultiLanguageSupport {
     /// Consensus VM for proof validation
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Language runtime adapters
     language_adapters: HashMap<String, Arc<dyn LanguageRuntime>>,
     /// Consensus bridge for translation
@@ -389,7 +390,7 @@ pub trait ConsensusTranslator: Send + Sync {
 
 impl MultiLanguageSupport {
     /// Create new multi-language support system
-    pub async fn new(consensus_vm: Arc<ConsensusVM>) -> Result<Self> {
+    pub async fn new(consensus_vm: Arc<RwLock<ConsensusVM>>) -> Result<Self> {
         let config = LanguageConfig::default();
         let consensus_bridge = Arc::new(ConsensusBridge::new().await?);
         
