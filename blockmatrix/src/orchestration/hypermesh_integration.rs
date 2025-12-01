@@ -48,7 +48,7 @@ pub struct HyperMeshContainerOrchestrator {
 }
 
 /// Configuration for HyperMesh integration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HyperMeshIntegrationConfig {
     /// Enable automatic asset allocation for containers
     pub auto_asset_allocation: bool,

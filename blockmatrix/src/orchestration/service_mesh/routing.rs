@@ -421,7 +421,7 @@ impl AlmRoutingEngine {
         while !unvisited.is_empty() {
             // Find unvisited node with minimum distance
             let current = unvisited.iter()
-                .min_by_key(|node| distances.get(node).unwrap_or(&u64::MAX))
+                .min_by_key(|&node| distances.get(node).unwrap_or(&u64::MAX))
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("No path found"))?;
             

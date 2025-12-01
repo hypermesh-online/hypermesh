@@ -35,6 +35,12 @@ pub enum Currency {
     Custom(String),
 }
 
+impl Default for Currency {
+    fn default() -> Self {
+        Currency::CaesarTokens
+    }
+}
+
 /// Volume discount tier
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VolumeTier {

@@ -518,15 +518,15 @@ impl MatrixBlockchainManager {
     }
 
     /// Register new entity in the matrix
-    pub fn register_entity(&mut self, config: EntityConfig) -> Result<(), String> {
+    pub fn register_entity(&mut self, config: EntityConfig) -> anyhow::Result<()> {
         let domain = config.network_domain.clone();
         let coordinate = config.matrix_coordinate.clone();
-        
+
         let blockchain = EntityBlockchain::new(config);
-        
+
         self.entity_chains.insert(domain.clone(), blockchain);
         self.routing_table.insert(domain, coordinate);
-        
+
         Ok(())
     }
 
