@@ -204,22 +204,19 @@ impl ContainerRuntime {
         }
         
         // Validate resource limits
-        if let Some(memory) = spec.resources.memory_limit {
-            if memory > self.config.limits.max_memory_per_container {
-                return Err(ContainerError::config(
-                    format!("Memory limit {} exceeds maximum {}", 
-                           memory, self.config.limits.max_memory_per_container)
-                ));
-            }
+        if spec.resources.memory_bytes > self.config.limits.max_memory_per_container {
+            return Err(ContainerError::config(
+                format!("Memory limit {} exceeds maximum {}",
+                       spec.resources.memory_bytes, self.config.limits.max_memory_per_container)
+            ));
         }
-        
-        if let Some(cpu) = spec.resources.cpu_quota {
-            if cpu > self.config.limits.max_cpu_per_container {
-                return Err(ContainerError::config(
-                    format!("CPU quota {} exceeds maximum {}", 
-                           cpu, self.config.limits.max_cpu_per_container)
-                ));
-            }
+
+        let cpu_cores = (spec.resources.cpu_millicores as f64) / 1000.0;
+        if cpu_cores > self.config.limits.max_cpu_per_container {
+            return Err(ContainerError::config(
+                format!("CPU quota {} exceeds maximum {}",
+                       cpu_cores, self.config.limits.max_cpu_per_container)
+            ));
         }
         
         Ok(())

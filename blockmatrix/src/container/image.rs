@@ -1,6 +1,7 @@
 //! Container image management
 
-use crate::{ContainerId, config::StorageConfig};
+use crate::ContainerId;
+use super::config::StorageConfig;
 use super::error::{Result, ContainerError};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};

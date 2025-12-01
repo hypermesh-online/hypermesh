@@ -1,6 +1,7 @@
 //! Container filesystem implementation
 
-use crate::{ContainerId, ContainerSpec, config::StorageConfig};
+use crate::{ContainerId, ContainerSpec};
+use super::config::StorageConfig;
 use super::error::{Result, ContainerError};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};

@@ -340,16 +340,11 @@ impl LinuxAbstraction {
         let load_average = self.get_load_average()?;
 
         Ok(ResourceUsage {
-            cpu_percent,
-            cpu_per_core: None, // TODO: Parse per-core stats
-            memory_used_bytes: memory_info.used_bytes,
-            memory_percent: memory_info.usage_percent,
-            network_rx_bytes_per_sec: 0, // TODO: Parse /proc/net/dev
-            network_tx_bytes_per_sec: 0,
-            disk_read_bytes_per_sec: 0, // TODO: Parse /proc/diskstats
-            disk_write_bytes_per_sec: 0,
-            process_count: self.get_process_count(),
+            cpu_usage_percent: cpu_percent,
+            memory_usage_percent: memory_info.usage_percent,
             load_average: Some(load_average),
+            network_rx_bytes_per_sec: Some(0), // TODO: Parse /proc/net/dev
+            network_tx_bytes_per_sec: Some(0),
         })
     }
 

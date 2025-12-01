@@ -201,20 +201,20 @@ impl Default for PerformanceConfig {
 impl HyperMeshTransportConfig {
     /// Create a basic network configuration for internal use
     pub fn to_network_config(&self) -> NetworkConfig {
-        self.network.clone()
+        self.network_usage.clone()
     }
 
     /// Convert to STOQ transport configuration
     pub fn to_stoq_transport_config(&self) -> stoq::transport::TransportConfig {
         stoq::transport::TransportConfig {
-            bind_address: self.network.bind_address,
-            port: self.network.port,
-            max_connections: self.network.max_connections,
-            connection_timeout: self.network.connection_timeout,
-            enable_migration: self.network.enable_migration,
-            enable_0rtt: self.network.enable_0rtt,
-            max_idle_timeout: self.network.max_idle_timeout,
-            max_concurrent_streams: self.network.max_concurrent_streams,
+            bind_address: self.network_usage.bind_address,
+            port: self.network_usage.port,
+            max_connections: self.network_usage.max_connections,
+            connection_timeout: self.network_usage.connection_timeout,
+            enable_migration: self.network_usage.enable_migration,
+            enable_0rtt: self.network_usage.enable_0rtt,
+            max_idle_timeout: self.network_usage.max_idle_timeout,
+            max_concurrent_streams: self.network_usage.max_concurrent_streams,
             send_buffer_size: self.performance.send_buffer_size,
             receive_buffer_size: self.performance.receive_buffer_size,
             cert_rotation_interval: std::time::Duration::from_secs(24 * 60 * 60), // 24 hours
@@ -243,11 +243,11 @@ impl HyperMeshTransportConfig {
     /// Validate configuration
     pub fn validate(&self) -> anyhow::Result<()> {
         // Validate network settings
-        if self.network.port == 0 {
+        if self.network_usage.port == 0 {
             return Err(anyhow::anyhow!("Port cannot be 0"));
         }
         
-        if self.network.max_concurrent_streams == 0 {
+        if self.network_usage.max_concurrent_streams == 0 {
             return Err(anyhow::anyhow!("Max concurrent streams cannot be 0"));
         }
         
@@ -280,9 +280,9 @@ mod tests {
         let config = HyperMeshTransportConfig::default();
         let network_config = config.to_network_config();
         
-        assert_eq!(network_config.bind_address, config.network.bind_address);
-        assert_eq!(network_config.port, config.network.port);
-        assert_eq!(network_config.enable_migration, config.network.enable_migration);
+        assert_eq!(network_config.bind_address, config.network_usage.bind_address);
+        assert_eq!(network_config.port, config.network_usage.port);
+        assert_eq!(network_config.enable_migration, config.network_usage.enable_migration);
     }
     
     #[test]
@@ -291,6 +291,6 @@ mod tests {
         let yaml = serde_yaml::to_string(&config).unwrap();
         let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).unwrap();
         
-        assert_eq!(config.network.port, deserialized.network.port);
+        assert_eq!(config.network_usage.port, deserialized.network_usage.port);
     }
 }
