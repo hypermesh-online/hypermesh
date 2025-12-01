@@ -210,8 +210,8 @@ impl ContainerRuntime {
         if spec.image.is_empty() {
             return Err(ContainerError::config("Container image cannot be empty"));
         }
-        
-        if spec.command.is_empty() {
+
+        if spec.command.as_ref().map_or(true, |c| c.is_empty()) {
             return Err(ContainerError::config("Container command cannot be empty"));
         }
         
@@ -509,7 +509,7 @@ impl Clone for ContainerRuntime {
             config: self.config.clone(),
             lifecycle: Arc::clone(&self.lifecycle),
             image_manager: Arc::clone(&self.image_manager),
-            network_usage: Arc::clone(&self.network),
+            network_usage: Arc::clone(&self.network_usage),
             filesystem: Arc::clone(&self.filesystem),
             resource_manager: Arc::clone(&self.resource_manager),
             migration_manager: Arc::clone(&self.migration_manager),

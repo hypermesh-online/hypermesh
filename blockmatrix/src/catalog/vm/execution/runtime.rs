@@ -377,8 +377,6 @@ impl ConsensusRuntime {
                         min_iops: None,
                         min_bandwidth_mbps: None,
                         durability_replicas: 1,
-                        encryption_required: false,
-                        read_only: false,
                     }),
                     network_usage: None,
                     container: None,

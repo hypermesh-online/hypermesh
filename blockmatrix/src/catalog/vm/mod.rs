@@ -89,7 +89,6 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-pub mod execution;
 use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences, ExecutionPermissions, ResourceLimits, SchedulingInfo};
 
 // Re-export core types

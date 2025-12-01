@@ -224,7 +224,7 @@ pub struct RewardDistributionConfig {
 }
 
 /// Payout frequency options
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PayoutFrequency {
     Immediate,
     Hourly,
@@ -253,7 +253,7 @@ pub struct ProxyConfiguration {
 }
 
 /// NAT-like addressing preferences
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NatAddressingPreferences {
     /// Preferred network address ranges
     pub preferred_networks: Vec<String>,
@@ -272,7 +272,7 @@ pub struct NatAddressingPreferences {
 }
 
 /// Port allocation preferences
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PortAllocationPreferences {
     /// Preferred port ranges
     pub preferred_ranges: Vec<PortRange>,
@@ -288,7 +288,7 @@ pub struct PortAllocationPreferences {
 }
 
 /// Port range specification
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PortRange {
     /// Start port (inclusive)
     pub start: u16,
@@ -297,7 +297,7 @@ pub struct PortRange {
 }
 
 /// Connection persistence configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ConnectionPersistenceConfig {
     /// Keep connections alive
     pub keep_alive: bool,
@@ -313,7 +313,7 @@ pub struct ConnectionPersistenceConfig {
 }
 
 /// Proxy node selection criteria
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProxyNodeSelection {
     /// Minimum trust score required
     pub min_trust_score: f32,
@@ -335,7 +335,7 @@ pub struct ProxyNodeSelection {
 }
 
 /// Load balancing preferences
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct LoadBalancingPreferences {
     /// Preferred load balancing strategy
     pub strategy: LoadBalancingStrategy,
@@ -351,8 +351,9 @@ pub struct LoadBalancingPreferences {
 }
 
 /// Load balancing strategies
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub enum LoadBalancingStrategy {
+    #[default]
     RoundRobin,
     LeastConnections,
     WeightedRandom,
@@ -361,7 +362,7 @@ pub enum LoadBalancingStrategy {
 }
 
 /// Quantum security configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct QuantumSecurityConfig {
     /// Enable quantum-resistant encryption
     pub enabled: bool,
@@ -380,15 +381,16 @@ pub struct QuantumSecurityConfig {
 }
 
 /// Quantum security levels
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub enum QuantumSecurityLevel {
+    #[default]
     Basic,      // Standard quantum resistance
     Enhanced,   // Higher security parameters
     Maximum,    // Highest available security
 }
 
 /// Trust requirements for proxy selection
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TrustRequirements {
     /// Minimum trust score
     pub min_trust_score: f32,
@@ -407,7 +409,7 @@ pub struct TrustRequirements {
 }
 
 /// Trust decay configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TrustDecayConfig {
     /// Enable trust decay over time
     pub enabled: bool,
@@ -423,7 +425,7 @@ pub struct TrustDecayConfig {
 }
 
 /// Trust refresh requirements
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TrustRefreshRequirements {
     /// Frequency of required refresh
     pub refresh_frequency: Duration,
@@ -439,7 +441,7 @@ pub struct TrustRefreshRequirements {
 }
 
 /// Reputation requirements
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ReputationRequirements {
     /// Minimum reputation score
     pub min_reputation_score: f32,

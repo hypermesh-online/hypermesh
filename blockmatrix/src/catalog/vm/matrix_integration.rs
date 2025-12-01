@@ -391,18 +391,18 @@ impl MatrixAwareVM {
                     continue;
                 }
             }
-            
+
             // Perform validation through matrix manager
             let validation_request = ValidationRequest {
-                asset_id: validation.asset_id,
+                asset_id: validation.asset_id.clone(),
                 requested_fields: validation.validation_fields.clone(),
                 validation_type: self.convert_validation_type(&validation.validation_type),
                 requester: self.create_entity_identifier(&context.base_context)?,
                 proof_requirements: vec![], // Would be populated based on requirements
             };
-            
+
             let validation_results = self.matrix_manager
-                .multi_entity_validation(validation.asset_id, vec![validation.entity_domain.clone()])
+                .multi_entity_validation(validation.asset_id.clone(), vec![validation.entity_domain.clone()])
                 .await
                 .map_err(|e| anyhow::anyhow!("Matrix validation failed: {}", e))?;
             

@@ -527,7 +527,7 @@ impl AlmRoutingEngine {
     
     /// Check if service matches pattern
     fn matches_pattern(&self, pattern: &str, service: &ServiceId) -> bool {
-        pattern == "*" || pattern == service.0
+        pattern == "*" || pattern == service
     }
     
     /// Update network topology

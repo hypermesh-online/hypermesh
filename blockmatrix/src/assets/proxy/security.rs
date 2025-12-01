@@ -156,14 +156,15 @@ impl QuantumSecurity {
             expires_at: SystemTime::now() + self.config.token_lifetime,
             validation_status: TokenValidationStatus::Valid,
         };
-        
-        // Store active token
+
+        // Store active token and keep a clone for return
+        let token_clone = token.clone();
         self.store_active_token(token_id, token).await;
-        
+
         // Return combined signature + encrypted payload
         let mut access_tokens = Vec::new();
-        access_tokens.extend_from_slice(&token.signature);
-        access_tokens.extend_from_slice(&token.encrypted_payload);
+        access_tokens.extend_from_slice(&token_clone.signature);
+        access_tokens.extend_from_slice(&token_clone.encrypted_payload);
         
         tracing::debug!("Generated quantum security tokens for proxy address: {}", proxy_addr);
         Ok(access_tokens)

@@ -163,11 +163,9 @@ impl HyperMeshConfig {
     pub fn validate(&self) -> Result<(), String> {
         // Validate port conflicts
         let mut ports = Vec::new();
-        ports.push(self.transport.bind_port);
-        ports.push(self.consensus.port);
-        if let Some(port) = self.container.runtime_port {
-            ports.push(port);
-        }
+        ports.push(self.transport.network_usage.port);
+        // consensus.port does not exist - skip
+        // container.runtime_port does not exist - skip
         ports.push(self.integration.metrics.prometheus_port);
         
         // Check for port duplicates

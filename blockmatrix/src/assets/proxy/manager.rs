@@ -203,18 +203,19 @@ impl RemoteProxyManager {
         self.router.add_proxy_node(&node_info).await?;
 
         // Store node info
+        let node_id_for_log = node_info.node_id.clone();
         {
             let mut nodes = self.proxy_nodes.write().await;
             nodes.insert(node_id_str, node_info);
         }
-        
+
         // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.active_proxy_nodes += 1;
         }
-        
-        tracing::info!("Registered new proxy node: {:?}", node_info.node_id);
+
+        tracing::info!("Registered new proxy node: {:?}", node_id_for_log);
         Ok(())
     }
     

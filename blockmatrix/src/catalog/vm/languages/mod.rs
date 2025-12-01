@@ -347,7 +347,7 @@ pub struct TranslatedError {
 }
 
 /// Error categories
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ErrorCategory {
     /// Syntax error in language
     SyntaxError,

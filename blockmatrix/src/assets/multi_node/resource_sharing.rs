@@ -259,7 +259,7 @@ impl ResourceSharing {
                     agreement_id: format!("agr_{}", uuid::Uuid::new_v4()),
                     provider: offer.provider.clone(),
                     consumer: request.consumer.clone(),
-                    resource_type: offer.resource_type,
+                    resource_type: offer.resource_type.clone(),
                     amount: request.requested_amount.clone(),
                     price_per_hour: offer.price_per_hour,
                     sla: offer.sla.clone(),

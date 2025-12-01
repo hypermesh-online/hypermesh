@@ -141,7 +141,7 @@ pub struct RoutingPreferences {
 }
 
 /// Execution permissions
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionPermissions {
     /// Can read from blockchain
     pub blockchain_read: bool,
@@ -162,7 +162,7 @@ pub struct ExecutionPermissions {
 }
 
 /// Resource limits for execution
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLimits {
     /// Maximum CPU time (microseconds)
     pub max_cpu_time_micros: u64,
@@ -179,7 +179,7 @@ pub struct ResourceLimits {
 }
 
 /// Scheduling information
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchedulingInfo {
     /// Execution priority (0-100, higher = more priority)
     pub priority: u8,

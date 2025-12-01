@@ -1040,17 +1040,18 @@ impl HealthMonitor {
 
     async fn start_monitoring(&self, component: String) {
         let health_states = self.health_states.clone();
+        let component_clone = component.clone();
         let task = tokio::spawn(async move {
             loop {
                 // Simulate health check
                 let state = HealthState {
-                    component: component.clone(),
+                    component: component_clone.clone(),
                     healthy: true,
                     last_check: SystemTime::now(),
                     error_message: None,
                     consecutive_failures: 0,
                 };
-                health_states.insert(component.clone(), state);
+                health_states.insert(component_clone.clone(), state);
                 tokio::time::sleep(Duration::from_secs(10)).await;
             }
         });

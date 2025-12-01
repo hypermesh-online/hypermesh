@@ -285,7 +285,7 @@ impl SharingPreferences {
                 constraints: ResourceConstraints {
                     cpu_constraints: None,
                     gpu_constraints: Some(GpuConstraints {
-                        max_memory_per_user: hardware_config.gpu_info[0].memory / 2,
+                        max_memory_per_user: hardware_config.gpu_info[0].memory_usage / 2,
                         allowed_compute_types: vec![ComputeType::GeneralPurpose, ComputeType::MachineLearning],
                         max_concurrent_kernels: 10,
                         power_limit: Some(300),

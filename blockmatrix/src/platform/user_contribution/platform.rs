@@ -296,7 +296,7 @@ impl UserContributionPlatform {
                 memory_usage: None,
                 storage_usage: Some(crate::assets::core::StorageRequirements {
                     size_bytes: shared_capacity,
-                    storage_type: crate::assets::core::StorageType::Any,
+                    storage_type: crate::assets::core::StorageType::Distributed,
                     min_iops: None,
                     min_bandwidth_mbps: None,
                     durability_replicas: 1,

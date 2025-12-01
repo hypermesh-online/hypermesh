@@ -81,7 +81,7 @@ impl Default for HyperMeshIntegrationConfig {
 }
 
 /// Resource allocation strategies
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ResourceAllocationStrategy {
     /// Balance resource usage across all assets
     Balanced,

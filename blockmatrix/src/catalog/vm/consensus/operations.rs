@@ -293,7 +293,7 @@ impl ConsensusOperation {
         // based on work proof difficulty
         let mut hasher = Sha256::new();
         hasher.update(data);
-        hasher.update(&self.consensus_proof.work_proof.nonce.to_le_bytes());
+        hasher.update(&self.consensus_proof.work_proof.pid.to_le_bytes());
         
         let mut result = hasher.finalize().to_vec();
         

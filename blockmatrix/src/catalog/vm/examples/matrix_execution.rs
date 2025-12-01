@@ -370,7 +370,7 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
             public_fields: vec!["registration_status".to_string(), "inspection_status".to_string()],
             federated_fields: HashMap::new(),
             zk_proof_fields: vec![],
-            default_privacy_level: AssetPrivacyLevel::Public,
+            default_privacy_level: AssetPrivacyLevel::FullPublic,
         },
         trusted_partners: vec!["dealer.hypermesh.online".to_string()],
     };

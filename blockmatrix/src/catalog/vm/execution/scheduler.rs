@@ -133,7 +133,7 @@ pub struct ResourceReservation {
 }
 
 /// Execution priority levels
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ExecutionPriority {
     Low = 1,
     Normal = 2,
@@ -499,6 +499,7 @@ impl ExecutionScheduler {
                 AssetType::Storage => resource_tracker.available_storage,
                 AssetType::Network => resource_tracker.available_bandwidth,
                 AssetType::Container => 100, // Assume containers are lightweight
+                AssetType::Economic => 1000, // Economic assets (tokens, etc.)
             };
             
             if available_amount > 0 {
