@@ -9,8 +9,9 @@
 use crate::assets::core::{
     AssetAdapter, AssetAllocationRequest, AssetAllocation, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
     ResourceUsage, ResourceLimits, ResourceRequirements, PrivacyLevel, ProxyAddress,
-    AdapterHealth, AdapterCapabilities, AssetType, AllocationConfig, AccessConfig
+    AdapterHealth, AdapterCapabilities, AssetType,
 };
+use crate::assets::core::privacy::{AllocationConfig, AccessConfig};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};

@@ -335,7 +335,7 @@ impl MultiNodeCoordinator {
 
                 // Simple partition detection: nodes that can't reach each other
                 // In production, this would use actual network probing
-                let mut detected_partitions = Vec::new();
+                let mut detected_partitions: Vec<NetworkPartition> = Vec::new();
 
                 // Check for healed partitions
                 let mut partitions_write = partitions.write().await;

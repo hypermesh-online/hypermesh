@@ -32,6 +32,8 @@ pub struct ForwardingRule {
 pub enum ForwardingRuleType {
     /// HTTP proxy
     Http,
+    /// HTTPS proxy
+    Https,
     /// SOCKS5 proxy
     Socks5,
     /// TCP forwarding
@@ -42,6 +44,8 @@ pub enum ForwardingRuleType {
     Vpn,
     /// Direct memory access
     DirectMemory,
+    /// Sharded data access
+    ShardedData,
 }
 
 /// Proxy traffic forwarder
@@ -238,19 +242,19 @@ impl ProxyForwarder {
         
         // Forward based on rule type
         let response = match request_type {
-            super::ForwardingRuleType::HTTP | super::ForwardingRuleType::HTTPS => {
+            super::ForwardingRuleType::Http | super::ForwardingRuleType::Https => {
                 self.forward_http_request(&connection_id, destination, request_data).await?
             },
-            super::ForwardingRuleType::SOCKS5 => {
+            super::ForwardingRuleType::Socks5 => {
                 self.forward_socks5_request(&connection_id, destination, request_data).await?
             },
-            super::ForwardingRuleType::TCP => {
+            super::ForwardingRuleType::Tcp => {
                 self.forward_tcp_request(&connection_id, destination, request_data).await?
             },
-            super::ForwardingRuleType::UDP => {
+            super::ForwardingRuleType::Udp => {
                 self.forward_udp_request(&connection_id, destination, request_data).await?
             },
-            super::ForwardingRuleType::VPN => {
+            super::ForwardingRuleType::Vpn => {
                 self.forward_vpn_request(&connection_id, destination, request_data).await?
             },
             super::ForwardingRuleType::DirectMemory => {
@@ -276,12 +280,12 @@ impl ProxyForwarder {
         request_type: &super::ForwardingRuleType,
     ) {
         let connection_type = match request_type {
-            super::ForwardingRuleType::HTTP => ConnectionType::HTTP,
-            super::ForwardingRuleType::HTTPS => ConnectionType::HTTPS,
-            super::ForwardingRuleType::SOCKS5 => ConnectionType::SOCKS5,
-            super::ForwardingRuleType::TCP => ConnectionType::TCP,
-            super::ForwardingRuleType::UDP => ConnectionType::UDP,
-            super::ForwardingRuleType::VPN => ConnectionType::VPN,
+            super::ForwardingRuleType::Http => ConnectionType::HTTP,
+            super::ForwardingRuleType::Https => ConnectionType::HTTPS,
+            super::ForwardingRuleType::Socks5 => ConnectionType::SOCKS5,
+            super::ForwardingRuleType::Tcp => ConnectionType::TCP,
+            super::ForwardingRuleType::Udp => ConnectionType::UDP,
+            super::ForwardingRuleType::Vpn => ConnectionType::VPN,
             super::ForwardingRuleType::DirectMemory => ConnectionType::DirectMemory,
             super::ForwardingRuleType::ShardedData => ConnectionType::TCP, // Treat as TCP for tracking
         };
@@ -333,12 +337,12 @@ impl ProxyForwarder {
     /// Check if forwarding rule matches request type
     fn rule_matches(&self, rule: &ForwardingRule, request_type: &super::ForwardingRuleType) -> bool {
         match (&rule.rule_type, request_type) {
-            (super::ForwardingRuleType::HTTP, super::ForwardingRuleType::HTTP) => true,
-            (super::ForwardingRuleType::HTTPS, super::ForwardingRuleType::HTTPS) => true,
-            (super::ForwardingRuleType::SOCKS5, super::ForwardingRuleType::SOCKS5) => true,
-            (super::ForwardingRuleType::TCP, super::ForwardingRuleType::TCP) => true,
-            (super::ForwardingRuleType::UDP, super::ForwardingRuleType::UDP) => true,
-            (super::ForwardingRuleType::VPN, super::ForwardingRuleType::VPN) => true,
+            (super::ForwardingRuleType::Http, super::ForwardingRuleType::Http) => true,
+            (super::ForwardingRuleType::Https, super::ForwardingRuleType::Https) => true,
+            (super::ForwardingRuleType::Socks5, super::ForwardingRuleType::Socks5) => true,
+            (super::ForwardingRuleType::Tcp, super::ForwardingRuleType::Tcp) => true,
+            (super::ForwardingRuleType::Udp, super::ForwardingRuleType::Udp) => true,
+            (super::ForwardingRuleType::Vpn, super::ForwardingRuleType::Vpn) => true,
             (super::ForwardingRuleType::DirectMemory, super::ForwardingRuleType::DirectMemory) => true,
             (super::ForwardingRuleType::ShardedData, super::ForwardingRuleType::ShardedData) => true,
             _ => false,
@@ -521,7 +525,7 @@ mod tests {
         let proxy_addr = ProxyAddress::new([1u8; 16], [2u8; 8], 8080);
         
         let rule = ForwardingRule {
-            rule_type: super::super::ForwardingRuleType::HTTP,
+            rule_type: super::super::ForwardingRuleType::Http,
             source_pattern: "*".to_string(),
             destination: "forwarded".to_string(),
             port_mapping: None,

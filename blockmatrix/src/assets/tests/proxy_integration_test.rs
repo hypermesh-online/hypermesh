@@ -252,7 +252,7 @@ async fn test_proxy_forwarding_system() {
     let proxy_addr = ProxyAddress::new([1u8; 16], [2u8; 8], 8080);
     
     let forwarding_rule = ForwardingRule {
-        rule_type: ForwardingRuleType::HTTP,
+        rule_type: ForwardingRuleType::Http,
         source_pattern: "*".to_string(),
         destination: "forwarded".to_string(),
         port_mapping: None,
@@ -269,7 +269,7 @@ async fn test_proxy_forwarding_system() {
         &proxy_addr,
         "example.com:80",
         test_request.to_vec(),
-        ForwardingRuleType::HTTP,
+        ForwardingRuleType::Http,
     ).await.expect("Failed to forward request");
     
     assert!(!response.is_empty(), "Response should not be empty");
@@ -338,7 +338,7 @@ async fn test_complete_proxy_manager_workflow() {
     let response = proxy_manager.forward_request(
         &allocated_address,
         test_request.to_vec(),
-        ForwardingRuleType::HTTP,
+        ForwardingRuleType::Http,
     ).await.expect("Failed to forward request through proxy manager");
     
     assert!(!response.is_empty());

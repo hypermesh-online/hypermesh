@@ -620,11 +620,12 @@ impl RemoteProxyManager {
         let permissions = self.create_access_permissions(privacy_level).await?;
         
         Ok(match request_type {
-            ForwardingRuleType::Http => permissions.http_proxy,
+            ForwardingRuleType::Http | ForwardingRuleType::Https => permissions.http_proxy,
             ForwardingRuleType::Socks5 => permissions.socks5_proxy,
             ForwardingRuleType::Tcp | ForwardingRuleType::Udp => permissions.tcp_forwarding,
             ForwardingRuleType::Vpn => permissions.vpn_tunnel,
             ForwardingRuleType::DirectMemory => permissions.memory_access,
+            ForwardingRuleType::ShardedData => permissions.memory_access, // Treat sharded as memory access
         })
     }
     

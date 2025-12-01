@@ -128,12 +128,14 @@ impl ServiceRegistry {
             health_status: ServiceHealthStatus::Unknown,
         };
         
+        let service_type = registered_service.endpoint.service_type.clone();
+
         let mut services = self.services.write().await;
         services.insert(service_id.clone(), registered_service);
-        
+
         // Invalidate discovery cache for this service type
         let mut cache = self.discovery_cache.write().await;
-        cache.remove(&registered_service.endpoint.service_type);
+        cache.remove(&service_type);
         
         info!("Service {} registered successfully", service_id);
         Ok(())

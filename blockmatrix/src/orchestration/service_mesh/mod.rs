@@ -13,7 +13,6 @@ pub use discovery::{CpeServiceDiscovery, ServiceRegistry, DiscoveryEvent, Servic
 
 use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
-use super::{ServiceMeshConfig, LoadBalancingConfig, LoadBalancingStrategy};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -23,6 +22,56 @@ use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+/// Service mesh configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceMeshConfig {
+    /// Enable ALM-powered routing
+    pub alm_routing_enabled: bool,
+    /// Enable CPE-enhanced service discovery
+    pub cpe_discovery_enabled: bool,
+    /// Circuit breaker settings
+    pub circuit_breaker: CircuitBreakerConfig,
+    /// Load balancing strategy
+    pub load_balancing: LoadBalancingConfig,
+}
+
+/// Load balancing configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadBalancingConfig {
+    /// Load balancing strategy
+    pub strategy: LoadBalancingStrategy,
+    /// Health check interval
+    pub health_check_interval_ms: u64,
+    /// Health check timeout
+    pub health_check_timeout_ms: u64,
+}
+
+/// Load balancing strategies
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LoadBalancingStrategy {
+    /// Round robin distribution
+    RoundRobin,
+    /// Least connections
+    LeastConnections,
+    /// Neural network optimal (using MFN)
+    NeuralOptimal,
+    /// Weighted round robin
+    WeightedRoundRobin,
+}
+
+/// Circuit breaker configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircuitBreakerConfig {
+    /// Failure threshold
+    pub failure_threshold: u32,
+    /// Success threshold
+    pub success_threshold: u32,
+    /// Timeout duration
+    pub timeout_ms: u64,
+    /// Recovery timeout duration
+    pub recovery_timeout_ms: u64,
+}
 
 /// Service mesh (alias for ServiceMeshController)
 pub type ServiceMesh = ServiceMeshController;
@@ -420,9 +469,9 @@ impl ServiceMeshController {
             }
         });
         
-        let failure_threshold = self.config.circuit_breaker.failure_threshold;
+        let failure_threshold = self.config.circuit_breaker.failure_threshold as f64;
         let recovery_timeout = Duration::from_millis(self.config.circuit_breaker.recovery_timeout_ms);
-        
+
         // Update breaker state based on metrics
         match breaker.state {
             CircuitState::Closed => {

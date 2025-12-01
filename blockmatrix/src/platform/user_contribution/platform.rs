@@ -138,7 +138,7 @@ impl UserContributionPlatform {
         for asset_type in resource_types {
             let allocation = self.allocate_user_resource(
                 &user_profile,
-                asset_type,
+                asset_type.clone(),
                 &consensus_proof,
             ).await?;
             asset_allocations.insert(asset_type, allocation);

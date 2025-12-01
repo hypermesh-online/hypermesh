@@ -280,7 +280,7 @@ impl ExtensionLoader {
             });
         }
 
-        let mut extension_box = unsafe { Box::from_raw(extension_ptr) };
+        let mut extension_box: Box<dyn HyperMeshExtension> = unsafe { Box::from_raw(extension_ptr) };
 
         // Initialize the extension
         let config = ExtensionConfig {

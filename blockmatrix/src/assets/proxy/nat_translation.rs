@@ -502,11 +502,13 @@ impl NATTranslator {
             global_to_local.insert(global_addr.clone(), mapping.clone());
         }
         
+        let global_addr_str = global_addr.to_string();
+
         {
             let mut local_to_global = self.local_to_global.write().await;
             local_to_global.insert(local_address, global_addr);
         }
-        
+
         // Update statistics
         {
             let mut stats = self.translation_stats.write().await;
@@ -514,16 +516,16 @@ impl NATTranslator {
             stats.active_translations += 1;
             stats.successful_translations += 1;
             stats.total_memory_mapped += region_size;
-            
+
             if let Ok(duration) = start_time.elapsed() {
-                stats.average_translation_time_us = 
+                stats.average_translation_time_us =
                     (stats.average_translation_time_us + duration.as_micros() as u64) / 2;
             }
         }
-        
+
         tracing::info!(
             "Created NAT translation: {} -> 0x{:x} ({} bytes)",
-            global_addr.to_string(),
+            global_addr_str,
             local_address,
             region_size
         );

@@ -108,7 +108,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
             // Validate vehicle exists with Honda
             CrossEntityValidation {
                 entity_domain: "honda.hypermesh.online".to_string(),
-                asset_id: vehicle_vin,
+                asset_id: vehicle_vin.clone(),
                 validation_fields: vec![
                     "vin".to_string(),
                     "model".to_string(),
@@ -124,7 +124,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
             // Validate registration with DMV
             CrossEntityValidation {
                 entity_domain: "dmv.hypermesh.online".to_string(),
-                asset_id: vehicle_vin,
+                asset_id: vehicle_vin.clone(),
                 validation_fields: vec![
                     "registration_status".to_string(),
                     "title_status".to_string(),

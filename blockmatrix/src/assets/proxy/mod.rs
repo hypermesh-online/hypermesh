@@ -14,9 +14,9 @@ pub mod sharding;
 pub mod nat_translation;
 pub mod remote_memory_transport;
 
-pub use manager::{RemoteProxyManager, ForwardingRuleType};
+pub use manager::{RemoteProxyManager};
 pub use routing::{ProxyRouter, ProxyRoute, RouteTable};
-pub use forwarding::{ProxyForwarder, ForwardingRule, ForwardingMode};
+pub use forwarding::{ProxyForwarder, ForwardingRule, ForwardingMode, ForwardingRuleType};
 pub use trust_integration::{TrustChainIntegration, CertificateValidator};
 pub use security::{QuantumSecurity, FalconSigner, KyberEncryption};
 pub use sharding::{ShardedDataAccess, ShardManager, EncryptedShard};

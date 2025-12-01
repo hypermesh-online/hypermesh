@@ -415,27 +415,27 @@ impl MfnBridge {
         self.update_cache_stats(false).await;
         
         // Execute operation based on type
-        let result = match operation {
+        let result = match &operation {
             MfnOperation::IfkLookup { resource_id, context } => {
-                self.execute_ifr_lookup(resource_id, context).await?
+                self.execute_ifr_lookup(resource_id.clone(), context.clone()).await?
             },
             MfnOperation::DsrSimilarity { input_data, threshold } => {
-                self.execute_dsr_similarity(input_data, threshold).await?
+                self.execute_dsr_similarity(input_data.clone(), *threshold).await?
             },
             MfnOperation::AlmRouting { source, destination, constraints } => {
-                self.execute_alm_routing(source, destination, constraints).await?
+                self.execute_alm_routing(source.clone(), destination.clone(), constraints.clone()).await?
             },
             MfnOperation::CpePrediction { context_history, prediction_horizon } => {
-                self.execute_cpe_prediction(context_history, prediction_horizon).await?
+                self.execute_cpe_prediction(context_history.clone(), *prediction_horizon).await?
             },
             MfnOperation::Coordinated { operations, dependencies } => {
-                self.execute_coordinated_operation(operations, dependencies).await?
+                self.execute_coordinated_operation(operations.clone(), dependencies.clone()).await?
             },
         };
-        
+
         // Cache the result
         self.cache_result(cache_key, result.clone(), Duration::from_secs(60)).await;
-        
+
         // Update statistics
         let operation_latency_us = start_time.elapsed().as_micros() as u64;
         self.update_operation_stats(&operation, operation_latency_us).await;
