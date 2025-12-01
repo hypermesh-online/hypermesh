@@ -412,10 +412,8 @@ impl ContainerRuntime {
         // Convert lifecycle status to runtime status
         Ok(match lifecycle_status.state {
             ContainerState::Running => ContainerStatus::Running,
-            ContainerState::Stopped | ContainerState::Exited => ContainerStatus::Stopped,
-            ContainerState::Failed => ContainerStatus::Failed(
-                lifecycle_status.exit_code.map(|c| format!("Exit code: {}", c)).unwrap_or_else(|| "Unknown error".to_string())
-            ),
+            ContainerState::Stopped => ContainerStatus::Stopped,
+            ContainerState::Failed { reason } => ContainerStatus::Failed(reason),
             _ => ContainerStatus::Unknown,
         })
     }

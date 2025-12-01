@@ -16,7 +16,7 @@ use dashmap::DashMap;
 use async_trait::async_trait;
 
 /// Bootstrap phase enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum BootstrapPhase {
     /// Phase 0: Traditional bootstrap with self-signed certs
