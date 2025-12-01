@@ -615,7 +615,7 @@ impl ServiceMeshController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::integration::{MfnBridge, IntegrationConfig};
+    use crate::orchestration::integration::{MfnBridge, IntegrationConfig};
     use std::net::{IpAddr, Ipv4Addr};
     
     #[tokio::test]

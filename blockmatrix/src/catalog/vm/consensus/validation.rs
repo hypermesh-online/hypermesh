@@ -193,8 +193,8 @@ impl ProofValidator<StakeProof> for StakeProofValidator {
         }
 
         // 3. Validate access permissions for context operation
-        let operation_type = context.current_operation_type().unwrap_or("generic");
-        if !self.validate_access_permissions(proof, operation_type).await? {
+        let operation_type = context.current_operation_type().unwrap_or("generic".to_string());
+        if !self.validate_access_permissions(proof, &operation_type).await? {
             return Ok(false);
         }
 

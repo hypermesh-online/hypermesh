@@ -192,9 +192,9 @@ pub mod error {
     pub use anyhow::{Result, Error};
 }
 
-// Integration types
-pub type IntegrationResult<T> = anyhow::Result<T>;
-pub type IntegrationError = anyhow::Error;
+// Integration types - re-export from integration module
+pub use integration::IntegrationError;
+pub type IntegrationResult<T> = Result<T, IntegrationError>;
 // Export config module
 pub mod config {
     pub use super::container::config::ContainerConfig;

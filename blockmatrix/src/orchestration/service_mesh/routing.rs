@@ -4,7 +4,7 @@
 //! over traditional systems, achieving <74µs routing decisions through graph-based
 //! optimization and neural enhancement.
 
-use crate::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -642,7 +642,7 @@ impl AlmRoutingEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::integration::{MfnBridge, IntegrationConfig};
+    use crate::orchestration::integration::{MfnBridge, IntegrationConfig};
     
     #[tokio::test]
     async fn test_alm_routing_engine_creation() {

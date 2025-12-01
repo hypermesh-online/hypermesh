@@ -21,6 +21,7 @@ pub use super::core::{
     AnonymizationPreferences,
 };
 
+// Import from retention module
 pub use super::retention::{
     AutoDeletionSettings, DeletionCriterion, DeletionCriterionType,
     DeletionConfirmationSettings, SecureDeletionMethod, ArchivePreferences,

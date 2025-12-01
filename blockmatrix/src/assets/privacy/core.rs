@@ -11,6 +11,12 @@ use super::{
     ProxyConfiguration
 };
 
+// Import from retention module (these were stub definitions here)
+use super::retention::{
+    AutoDeletionSettings as RetentionAutoDelete,
+    ArchivePreferences as RetentionArchive,
+};
+
 /// Complete user privacy configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserPrivacyConfig {
@@ -98,15 +104,15 @@ pub struct DataMinimizationSettings {
 pub struct RetentionPreferences {
     /// Default retention period
     pub default_retention_period: Duration,
-    
+
     /// Resource-specific retention periods
     pub resource_specific_retention: std::collections::HashMap<String, Duration>,
-    
+
     /// Auto-deletion settings
-    pub auto_deletion: AutoDeletionSettings,
-    
+    pub auto_deletion: RetentionAutoDelete,
+
     /// Archive preferences
-    pub archive_preferences: ArchivePreferences,
+    pub archive_preferences: RetentionArchive,
 }
 
 // Stub structures to be moved to appropriate modules
@@ -160,12 +166,13 @@ pub struct AnonymizationPreferences {
     // TODO: Move to anonymization.rs
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AutoDeletionSettings {
-    // TODO: Move to deletion.rs
-}
+// REMOVED: Stub definitions - now using retention module types
+// #[derive(Clone, Debug, Serialize, Deserialize)]
+// pub struct AutoDeletionSettings {
+//     // Moved to retention.rs
+// }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ArchivePreferences {
-    // TODO: Move to archive.rs
-}
+// #[derive(Clone, Debug, Serialize, Deserialize)]
+// pub struct ArchivePreferences {
+//     // Moved to retention.rs
+// }

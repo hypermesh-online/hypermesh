@@ -352,7 +352,7 @@ impl VMExecutor {
         ExecutionStats {
             active_executions: active.len() as u32,
             total_executions_handled: 0, // Would be tracked
-            average_execution_time_micros: 0, // Would be calculated
+            average_execution_time_micros: 0.0, // Would be calculated
             success_rate: 0.0, // Would be calculated
             resource_utilization_percentage: 0.0, // Would be calculated
         }

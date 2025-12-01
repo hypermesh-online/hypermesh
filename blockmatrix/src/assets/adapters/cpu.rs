@@ -379,11 +379,12 @@ impl AssetAdapter for CpuAssetAdapter {
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
         // Validate all four proofs with CPU-specific requirements
         use crate::consensus::Consensus;
-        let valid = proof.validate()
-            .map_err(|e| AssetError::ValidationFailed(format!("Consensus validation failed: {}", e)))?;
-        
+        let valid = proof.validate();
+
         if !valid {
-            return Ok(false);
+            return Err(AssetError::ConsensusValidationFailed {
+                reason: "CPU consensus proof validation failed".to_string()
+            });
         }
         
         // CPU-specific validation

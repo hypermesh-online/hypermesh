@@ -50,6 +50,34 @@ pub use self::coordinator::{
     IntegrationCoordinator,
 };
 
+// Error types for integration layer
+#[derive(Debug, thiserror::Error)]
+pub enum IntegrationError {
+    /// Component initialization failed
+    #[error("Component {component} initialization failed: {message}")]
+    ComponentInit { component: String, message: String },
+
+    /// Component communication failure
+    #[error("Communication failure between {source} and {target}: {message}")]
+    ComponentCommunication { source: String, target: String, message: String },
+
+    /// Configuration validation error
+    #[error("Configuration validation failed: {message}")]
+    ConfigValidation { message: String },
+
+    /// Platform lifecycle error
+    #[error("Platform lifecycle error in {phase}: {message}")]
+    Lifecycle { phase: String, message: String },
+
+    /// Service registry error
+    #[error("Service registry operation failed: {message}")]
+    ServiceRegistry { message: String },
+
+    /// Underlying component error
+    #[error("Component error: {0}")]
+    Component(#[from] anyhow::Error),
+}
+
 // Additional types for integration
 pub use crate::assets::core::adapter::AssetAdapter;
 

@@ -396,7 +396,7 @@ impl JuliaVM {
             Ok(JuliaExpression::ConsensusOperation {
                 operation: "example_operation".to_string(),
                 operands: vec![
-                    JuliaExpression::Literal(JuliaValue::String(code.to_string()))
+                    JuliaExpression::Literal(Box::new(JuliaValue::String(code.to_string())))
                 ],
                 required_proofs: vec![
                     ConsensusRequirement {
@@ -412,7 +412,7 @@ impl JuliaVM {
             })
         } else {
             // Regular Julia expression
-            Ok(JuliaExpression::Literal(JuliaValue::String(code.to_string())))
+            Ok(JuliaExpression::Literal(Box::new(JuliaValue::String(code.to_string()))))
         }
     }
     

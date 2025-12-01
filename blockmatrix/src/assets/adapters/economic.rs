@@ -238,7 +238,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 asset_id: asset_id.clone(),
                 state: AssetState::Available,
                 allocated_at: std::time::SystemTime::now(),
-                last_accessed: chrono::Utc::now(),
+                last_accessed: std::time::SystemTime::now(),
                 metadata: HashMap::new(),
             },
         };
