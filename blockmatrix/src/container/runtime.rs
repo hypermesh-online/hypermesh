@@ -251,16 +251,16 @@ impl ContainerRuntime {
         }
         
         // Create container filesystem
-        self.filesystem.create_container_filesystem(id, &spec).await?;
-        
+        self.filesystem.create_container_filesystem(&id, &spec).await?;
+
         // Set up networking - spec doesn't have network field, use defaults
-        self.network_usage.create_network_namespace(id, &NetworkConfig::default()).await?;
-        
+        self.network_usage.create_network_namespace(&id, &NetworkConfig::default()).await?;
+
         // Configure resource limits
-        self.resource_manager.set_quota(id, spec.resources.clone()).await?;
-        
+        self.resource_manager.set_quota(&id, spec.resources.clone()).await?;
+
         // Initialize container lifecycle
-        self.lifecycle.create(id, spec.clone()).await?;
+        self.lifecycle.create(&id, spec.clone()).await?;
         
         // Create container handle
         let handle = ContainerHandle {
@@ -453,11 +453,11 @@ impl ContainerRuntime {
         drop(containers);
         
         for id in container_ids {
-            if let Ok(status) = self.status(id).await {
+            if let Ok(status) = self.status(&id).await {
                 match status {
                     ContainerStatus::Running => {
                         warn!("Force stopping container {} during shutdown", id);
-                        let _ = self.stop(id, Some(Duration::from_secs(5))).await;
+                        let _ = self.stop(&id, Some(Duration::from_secs(5))).await;
                     },
                     _ => {},
                 }
