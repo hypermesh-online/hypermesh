@@ -104,28 +104,42 @@ pub enum RouteStatus {
 }
 
 /// Route performance metrics
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RouteMetrics {
     /// Average latency in milliseconds
     pub avg_latency_ms: f64,
-    
+
     /// Success rate (0.0 - 1.0)
     pub success_rate: f64,
-    
+
     /// Throughput in Mbps
     pub throughput_mbps: f64,
-    
+
     /// Current load (0.0 - 1.0)
     pub current_load: f64,
-    
+
     /// Total requests routed
     pub total_requests: u64,
-    
+
     /// Failed requests
     pub failed_requests: u64,
-    
+
     /// Last measurement timestamp
     pub last_measured: SystemTime,
+}
+
+impl Default for RouteMetrics {
+    fn default() -> Self {
+        Self {
+            avg_latency_ms: 0.0,
+            success_rate: 1.0,
+            throughput_mbps: 0.0,
+            current_load: 0.0,
+            total_requests: 0,
+            failed_requests: 0,
+            last_measured: SystemTime::now(),
+        }
+    }
 }
 
 /// Routing configuration

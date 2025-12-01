@@ -15,6 +15,7 @@ use super::{
     QuantumSecurity, ShardedDataAccess, NATTranslator,
     PortRange
 };
+use super::forwarding::{ForwardingRule, ForwardingRuleType};
 
 use crate::assets::core::{
     ProxyAddress, AssetId, AssetResult, AssetError, PrivacyLevel,
@@ -117,52 +118,33 @@ struct AccessPermissions {
 }
 
 /// Usage statistics for individual mappings
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct MappingUsageStats {
     /// Total requests forwarded
     total_requests: u64,
-    
+
     /// Total bytes transferred
     total_bytes_transferred: u64,
-    
+
     /// Last access timestamp
     last_accessed: SystemTime,
-    
+
     /// Average response time
     average_response_time_ms: f64,
 }
 
-/// Forwarding rule for proxy traffic
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ForwardingRule {
-    /// Rule type (HTTP, SOCKS5, TCP, etc.)
-    rule_type: ForwardingRuleType,
-    
-    /// Source address pattern
-    source_pattern: String,
-    
-    /// Destination mapping
-    destination: String,
-    
-    /// Port mapping
-    port_mapping: Option<(u16, u16)>, // (source_port, dest_port)
-    
-    /// Protocol specific settings
-    protocol_settings: HashMap<String, String>,
+impl Default for MappingUsageStats {
+    fn default() -> Self {
+        Self {
+            total_requests: 0,
+            total_bytes_transferred: 0,
+            last_accessed: SystemTime::now(),
+            average_response_time_ms: 0.0,
+        }
+    }
 }
 
-/// Types of forwarding rules
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ForwardingRuleType {
-    HTTP,
-    HTTPS,
-    SOCKS5,
-    TCP,
-    UDP,
-    VPN,
-    DirectMemory,
-    ShardedData,
-}
+// ForwardingRule and ForwardingRuleType imported from forwarding module
 
 impl RemoteProxyManager {
     /// Create new remote proxy manager
@@ -527,48 +509,53 @@ impl RemoteProxyManager {
             PrivacyLevel::Private => {
                 // Only direct memory access for private assets
                 rules.push(ForwardingRule {
-                    rule_type: ForwardingRuleType::DirectMemory,
                     source_pattern: "local".to_string(),
                     destination: "direct".to_string(),
-                    port_mapping: None,
-                    protocol_settings: HashMap::new(),
+                    mode: super::forwarding::ForwardingMode::Direct,
+                    rule_type: ForwardingRuleType::DirectMemory,
+                    priority: 100,
+                    auth_required: true,
                 });
             },
             PrivacyLevel::PrivateNetwork => {
                 // Limited network access
                 rules.push(ForwardingRule {
-                    rule_type: ForwardingRuleType::TCP,
                     source_pattern: "private_network".to_string(),
                     destination: "forwarded".to_string(),
-                    port_mapping: None,
-                    protocol_settings: HashMap::new(),
+                    mode: super::forwarding::ForwardingMode::Proxied,
+                    rule_type: ForwardingRuleType::Tcp,
+                    priority: 80,
+                    auth_required: true,
                 });
             },
             PrivacyLevel::P2P | PrivacyLevel::PublicNetwork | PrivacyLevel::FullPublic => {
                 // Full proxy capabilities
                 rules.push(ForwardingRule {
-                    rule_type: ForwardingRuleType::HTTP,
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
-                    port_mapping: None,
-                    protocol_settings: HashMap::new(),
+                    mode: super::forwarding::ForwardingMode::Proxied,
+                    rule_type: ForwardingRuleType::Http,
+                    priority: 60,
+                    auth_required: false,
                 });
-                
+
                 rules.push(ForwardingRule {
-                    rule_type: ForwardingRuleType::SOCKS5,
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
-                    port_mapping: None,
-                    protocol_settings: HashMap::new(),
+                    mode: super::forwarding::ForwardingMode::Proxied,
+                    rule_type: ForwardingRuleType::Socks5,
+                    priority: 70,
+                    auth_required: false,
                 });
-                
+
                 if matches!(privacy_level, PrivacyLevel::FullPublic) {
                     rules.push(ForwardingRule {
-                        rule_type: ForwardingRuleType::VPN,
                         source_pattern: "*".to_string(),
                         destination: "forwarded".to_string(),
-                        port_mapping: None,
-                        protocol_settings: HashMap::new(),
+                        mode: super::forwarding::ForwardingMode::Tunneled,
+                        rule_type: ForwardingRuleType::Vpn,
+                        priority: 90,
+                        auth_required: false,
                     });
                 }
             },

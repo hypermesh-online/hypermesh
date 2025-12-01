@@ -1,8 +1,8 @@
 //! Core container runtime implementation
 
 use super::{
-    types::{ContainerId, ContainerSpec, ContainerStatus, ContainerState},
-    lifecycle::{ContainerLifecycle, DefaultContainerLifecycle},
+    types::{ContainerId, ContainerSpec, CreateOptions},
+    lifecycle::{ContainerLifecycle, DefaultContainerLifecycle, ContainerStatus, ContainerState},
     image::{ImageManager, DefaultImageManager},
     network::{ContainerNetwork, DefaultContainerNetwork, NetworkConfig},
     filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
@@ -11,7 +11,6 @@ use super::{
     monitoring::{ContainerMonitor, DefaultContainerMonitor, ContainerMetrics},
     config::ContainerConfig,
     error::{Result, ContainerError},
-    types::CreateOptions,
 };
 
 use std::collections::HashMap;
@@ -254,10 +253,27 @@ impl ContainerRuntime {
         self.filesystem.create_container_filesystem(&id, &spec).await?;
 
         // Set up networking - spec doesn't have network field, use defaults
-        self.network_usage.create_network_namespace(&id, &NetworkConfig::default()).await?;
+        let default_network_config = NetworkConfig {
+            enabled: true,
+            mode: "bridge".to_string(),
+            port_mappings: Vec::new(),
+            dns_servers: Vec::new(),
+            hostname: id.to_string(),
+        };
+        self.network_usage.create_network_namespace(&id, &default_network_config).await?;
 
-        // Configure resource limits
-        self.resource_manager.set_quota(&id, spec.resources.clone()).await?;
+        // Configure resource limits - convert ResourceRequirements to ResourceQuota
+        let quota = super::resources::ResourceQuota {
+            memory_limit: Some(spec.resources.memory_bytes),
+            cpu_quota: Some(spec.resources.cpu_millicores as f64 / 1000.0),
+            cpu_period: Duration::from_millis(100),
+            io_bandwidth_limit: None,
+            network_bandwidth_limit: None,
+            max_file_descriptors: Some(1024),
+            max_processes: Some(100),
+            disk_space_limit: Some(spec.resources.storage_bytes),
+        };
+        self.resource_manager.set_quota(&id, quota).await?;
 
         // Initialize container lifecycle
         self.lifecycle.create(&id, spec.clone()).await?;

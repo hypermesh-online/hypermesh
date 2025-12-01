@@ -775,9 +775,10 @@ impl CatalogHyperMeshBridge {
         match asset {
             CatalogAssetType::JuliaScript { code, .. } => {
                 let execution_context = ExecutionContext::new(
-                    "julia".to_string(),
                     consensus_proof.clone(),
+                    "julia".to_string(),
                     HashMap::new(), // Asset allocations would be populated
+                    crate::catalog::vm::execution::context::PrivacyConfig::default(),
                 );
                 
                 let result = self.vm_runtime.execute_with_consensus(

@@ -23,6 +23,7 @@ use crate::assets::matrix_blockchain::{
     MatrixCoordinate, PrivacyPolicyConfig, AssetPrivacyLevel
 };
 use crate::assets::blockchain::HyperMeshAssetRecord;
+use crate::assets::core::AssetId as CoreAssetId;
 use crate::consensus::ConsensusProof;
 use super::{
     ConsensusProofVM, VMConfig, ExecutionResult, ExecutionContext,
@@ -55,7 +56,7 @@ pub struct CrossEntityValidation {
     /// Entity domain to validate against
     pub entity_domain: String,
     /// Asset ID to validate
-    pub asset_id: AssetId,
+    pub asset_id: CoreAssetId,
     /// Fields to validate
     pub validation_fields: Vec<String>,
     /// Required validation type

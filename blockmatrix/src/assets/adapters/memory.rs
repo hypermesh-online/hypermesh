@@ -345,7 +345,9 @@ impl AssetAdapter for MemoryAssetAdapter {
     
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
         // Validate all four proofs as required by Proof of State patterns
-        let valid = proof.validate().await?;
+        use crate::consensus::Consensus;
+        let valid = proof.validate()
+            .map_err(|e| AssetError::ValidationFailed(format!("Consensus validation failed: {}", e)))?;
         
         if !valid {
             return Ok(false);

@@ -378,7 +378,9 @@ impl AssetAdapter for CpuAssetAdapter {
     
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
         // Validate all four proofs with CPU-specific requirements
-        let valid = proof.validate().await?;
+        use crate::consensus::Consensus;
+        let valid = proof.validate()
+            .map_err(|e| AssetError::ValidationFailed(format!("Consensus validation failed: {}", e)))?;
         
         if !valid {
             return Ok(false);

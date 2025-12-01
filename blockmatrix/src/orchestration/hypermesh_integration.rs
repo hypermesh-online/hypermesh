@@ -13,19 +13,20 @@ use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
 use crate::container::{
-    ContainerRuntime, ContainerHandle, ContainerSpec, CreateOptions,
+    ContainerRuntime, ContainerSpec, CreateOptions,
     ContainerId, ContainerStatus, ContainerState,
     ResourceRequirements as ContainerResourceRequirements, ResourceLimits, ResourceUsage as ContainerResourceUsage,
 };
+use crate::container::runtime::ContainerHandle;
 use crate::assets::core::{
     AssetManager, AssetId, AssetType, AssetAllocationRequest, AssetAllocation,
     ConsensusProof, AssetResult, AssetStatus, AssetState,
     SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState,
-    ResourceRequirements,
+    ResourceRequirements, PrivacyLevel,
 };
 use crate::catalog::vm::{
     ConsensusProofVM, VMConfig, ExecutionContext, ExecutionResult,
-    PrivacyLevel, AssetManagementConfig,
+    AssetManagementConfig,
 };
 
 /// HyperMesh-integrated container orchestrator
@@ -571,10 +572,10 @@ impl HyperMeshContainerOrchestrator {
         
         for (asset_type, allocation) in allocated_assets {
             let actual_usage = match asset_type {
-                AssetType::Cpu => usage.cpu_usage_percentage as u64,
-                AssetType::Memory => usage.memory_usage_bytes,
-                AssetType::Storage => usage.storage_usage_bytes,
-                AssetType::Network => usage.network_usage_bytes,
+                AssetType::Cpu => usage.cpu_usage_percent as u64,
+                AssetType::Memory => usage.memory_usage,
+                AssetType::Storage => usage.io_bytes_written + usage.io_bytes_read,
+                AssetType::Network => usage.network_bytes_rx + usage.network_bytes_tx,
                 _ => 0,
             };
 
@@ -666,7 +667,7 @@ impl HyperMeshContainerOrchestrator {
         let new_allocated_assets = self.allocate_container_assets(&new_requirements, &consensus_proof).await?;
 
         // Update container specification
-        let container_handle = self.container_runtime.get_handle(container_id).await?;
+        let container_handle = self.container_runtime.get_handle(&container_id).await?;
         let updated_spec = self.adapt_container_spec_for_assets(
             &container_handle.spec,
             &new_allocated_assets,

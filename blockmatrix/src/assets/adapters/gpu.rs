@@ -427,7 +427,9 @@ impl AssetAdapter for GpuAssetAdapter {
         }
         
         // Fallback to standard validation with GPU-specific requirements
-        let valid = proof.validate().await?;
+        use crate::consensus::Consensus;
+        let valid = proof.validate()
+            .map_err(|e| AssetError::ValidationFailed(format!("Consensus validation failed: {}", e)))?;
         
         if !valid {
             return Ok(false);
