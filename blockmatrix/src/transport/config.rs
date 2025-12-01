@@ -191,19 +191,19 @@ impl HyperMeshTransportConfig {
 
     /// Convert to STOQ transport configuration
     pub fn to_stoq_transport_config(&self) -> stoq::transport::TransportConfig {
-        stoq::transport::TransportConfig {
-            bind_address: self.network_usage.bind_address,
-            port: self.network_usage.port,
-            max_connections: self.network_usage.max_connections,
-            connection_timeout: self.network_usage.connection_timeout,
-            enable_migration: self.network_usage.enable_migration,
-            enable_0rtt: self.network_usage.enable_0rtt,
-            max_idle_timeout: self.network_usage.max_idle_timeout,
-            max_concurrent_streams: self.network_usage.max_concurrent_streams,
-            send_buffer_size: self.performance.send_buffer_size,
-            receive_buffer_size: self.performance.receive_buffer_size,
-            cert_rotation_interval: std::time::Duration::from_secs(24 * 60 * 60), // 24 hours
-        }
+        let mut config = stoq::transport::TransportConfig::default();
+        config.bind_address = self.network_usage.bind_address;
+        config.port = self.network_usage.port;
+        config.max_connections = self.network_usage.max_connections;
+        config.connection_timeout = self.network_usage.connection_timeout;
+        config.enable_migration = self.network_usage.enable_migration;
+        config.enable_0rtt = self.network_usage.enable_0rtt;
+        config.max_idle_timeout = self.network_usage.max_idle_timeout;
+        config.max_concurrent_streams = self.network_usage.max_concurrent_streams;
+        config.send_buffer_size = self.performance.send_buffer_size;
+        config.receive_buffer_size = self.performance.receive_buffer_size;
+        config.cert_rotation_interval = std::time::Duration::from_secs(24 * 60 * 60); // 24 hours
+        config
     }
 
     // REMOVED: STOQ routing, chunking, and edge configurations

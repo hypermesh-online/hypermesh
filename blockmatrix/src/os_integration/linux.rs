@@ -345,6 +345,9 @@ impl LinuxAbstraction {
             load_average: Some(load_average),
             network_rx_bytes_per_sec: Some(0), // TODO: Parse /proc/net/dev
             network_tx_bytes_per_sec: Some(0),
+            disk_read_bytes_per_sec: Some(0), // TODO: Parse /proc/diskstats
+            disk_write_bytes_per_sec: Some(0),
+            process_count: None, // TODO: Count processes
         })
     }
 

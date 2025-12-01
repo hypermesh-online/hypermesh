@@ -210,7 +210,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             })?;
 
         // Generate asset ID
-        let asset_id = AssetId::new();
+        let asset_id = AssetId::new(AssetType::Economic);
 
         // Create economic asset state
         let usage = EconomicUsage {
@@ -239,7 +239,14 @@ impl AssetAdapter for EconomicAssetAdapter {
                 state: AssetState::Available,
                 allocated_at: std::time::SystemTime::now(),
                 last_accessed: std::time::SystemTime::now(),
+                resource_usage: Default::default(),
+                privacy_level: Self::map_privacy_level(request.privacy_level.clone()),
+                proxy_address: None,
+                consensus_proofs: Vec::new(),
+                owner_certificate_fingerprint: String::new(),
                 metadata: HashMap::new(),
+                health_status: Default::default(),
+                performance_metrics: Default::default(),
             },
         };
 
@@ -263,6 +270,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 minimum_trust_score: 0.5,
             },
             allocated_at: std::time::SystemTime::now(),
+            expires_at: None,
         })
     }
 

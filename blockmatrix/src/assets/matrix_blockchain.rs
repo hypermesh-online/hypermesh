@@ -5,7 +5,7 @@
 //! their own blockchain while enabling privacy-preserving cross-chain validation.
 
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
 pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel};
@@ -338,25 +338,21 @@ impl EntityBlockchain {
                     config.network_domain.clone(),
                     "genesis-node".to_string(),
                     1000,
-                    crate::consensus::AccessPermissions {
-                        level: crate::consensus::AccessLevel::Public,
-                        required_roles: vec!["genesis".to_string()],
-                        allowed_networks: vec![],
-                        require_consensus: false,
-                    },
-                    vec!["genesis-allowance".to_string()],
                 ),
-                crate::consensus::proof::TimeProof::new(0, None, 0),
+                crate::consensus::proof::TimeProof::new(Duration::from_secs(0)),
                 crate::consensus::proof::SpaceProof::new(
                     "genesis-node".to_string(),
                     "/genesis".to_string(),
                     0,
                 ),
                 crate::consensus::proof::WorkProof::new(
-                    b"genesis-challenge",
-                    4,
-                    "genesis".to_string(),
-                ).unwrap(),
+                    "genesis-owner".to_string(),
+                    "genesis-workload".to_string(),
+                    0,
+                    1000,
+                    crate::consensus::proof::WorkloadType::Compute,
+                    crate::consensus::proof::WorkState::Completed,
+                ),
             ),
             hash: [0u8; 32], // Would be calculated
             entity_signature: vec![],

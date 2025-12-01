@@ -281,6 +281,7 @@ impl ContainerRuntime {
             max_file_descriptors: Some(1024),
             max_processes: Some(100),
             disk_space_limit: Some(spec.resources.storage_bytes),
+            pid_limit: Some(100),
         };
         self.resource_manager.set_quota(&id, quota).await?;
 

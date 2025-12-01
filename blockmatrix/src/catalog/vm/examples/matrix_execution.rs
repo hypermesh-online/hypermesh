@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::time::Duration;
 use anyhow::Result;
 use uuid::Uuid;
 
@@ -16,6 +17,7 @@ use crate::catalog::vm::{
     ValidationConstraint
 };
 use crate::catalog::vm::execution::ExecutionContext;
+use crate::assets::core::{AssetId, AssetType};
 use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityBlockchain, EntityConfig,
     EntityType, MatrixCoordinate, GeographicDimension,
@@ -481,31 +483,28 @@ async fn setup_entity_vm_configs(mut matrix_vm: MatrixAwareVM) -> Result<MatrixA
 
 fn create_base_execution_context() -> Result<ExecutionContext> {
     Ok(ExecutionContext {
+        execution_id: format!("matrix-exec-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
         consensus_proof: ConsensusProof::new(
             // Order: StakeProof, TimeProof, SpaceProof, WorkProof
             crate::consensus::proof::StakeProof::new(
                 "matrix-vm.hypermesh.online".to_string(),
                 "matrix-vm-node".to_string(),
                 10000,
-                crate::consensus::AccessPermissions {
-                    level: crate::consensus::AccessLevel::Public,
-                    required_roles: vec!["matrix-execution".to_string()],
-                    allowed_networks: vec![],
-                    require_consensus: true,
-                },
-                vec!["matrix-vm-allowance".to_string()],
             ),
-            crate::consensus::proof::TimeProof::new(0, None, 0),
+            crate::consensus::proof::TimeProof::new(Duration::from_secs(0)),
             crate::consensus::proof::SpaceProof::new(
                 "matrix-vm-node".to_string(),
                 "/matrix-vm".to_string(),
                 0,
             ),
             crate::consensus::proof::WorkProof::new(
-                b"matrix-vm-challenge",
-                16,
-                "matrix-vm".to_string(),
-            )?,
+                "matrix-vm-owner".to_string(),
+                "matrix-vm-workload".to_string(),
+                0,
+                1000,
+                crate::consensus::proof::WorkloadType::Compute,
+                crate::consensus::proof::WorkState::Running,
+            ),
         ),
         language: "julia".to_string(),
         asset_allocations: HashMap::new(),
@@ -533,6 +532,9 @@ fn create_base_execution_context() -> Result<ExecutionContext> {
                 max_hops: 5,
             },
         },
+        permissions: Default::default(),
+        resource_limits: Default::default(),
+        scheduling_info: Default::default(),
     })
 }
 

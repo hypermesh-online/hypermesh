@@ -411,6 +411,7 @@ impl Default for ResourceRequirements {
             storage_usage: None,
             network_usage: None,
             container: None,
+            economic: None,
         }
     }
 }

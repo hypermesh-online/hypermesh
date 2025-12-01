@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::catalog::vm::consensus::{ConsensusVM, ConsensusOperation, ConsensusExecutionResult};
 use crate::assets::core::{AssetManager, AssetId, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
+use crate::assets::core::adapter::{StorageType, StorageRequirements};
 use super::context::ExecutionContext;
 use super::scheduler::{ExecutionScheduler, ExecutionPlan};
 use super::{RuntimeExecutionResult, MemoryUsagePattern, StorageOperation};
@@ -257,7 +258,8 @@ impl ConsensusRuntime {
         
         // Execute consensus operation
         let consensus_result = self.consensus_vm.execute_consensus_operation(
-            &execution_plan.consensus_operation
+            &execution_plan.consensus_operation,
+            &[], // Empty execution data for now
         ).await?;
         
         // Get language runtime
@@ -371,7 +373,7 @@ impl ConsensusRuntime {
                     memory_usage: None,
                     storage_usage: Some(StorageRequirements {
                         size_bytes: *required_capacity,
-                        storage_type: StorageType::SSD,
+                        storage_type: StorageType::Ssd,
                         min_iops: None,
                         min_bandwidth_mbps: None,
                         durability_replicas: 1,

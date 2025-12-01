@@ -90,7 +90,7 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 pub mod execution;
-use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences};
+use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences, ExecutionPermissions, ResourceLimits, SchedulingInfo};
 
 // Re-export core types
 pub use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
