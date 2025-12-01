@@ -158,7 +158,10 @@ impl VMConsensusContext {
             }
 
             // Update temporal hash using proof hash
-            temporal.last_temporal_hash = Some(format!("{:x}", time_proof.proof_hash.iter().take(32).fold(0u64, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u64))));
+            use sha2::{Sha256, Digest};
+            let mut hasher = Sha256::new();
+            hasher.update(&time_proof.proof_hash);
+            temporal.last_temporal_hash = Some(hasher.finalize().into());
 
             // Increment sequence number
             temporal.sequence_number += 1;

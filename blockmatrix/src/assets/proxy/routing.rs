@@ -257,7 +257,8 @@ impl ProxyRouter {
     /// Add proxy node to routing registry
     pub async fn add_proxy_node(&self, node_info: &ProxyNodeInfo) -> AssetResult<()> {
         let mut registry = self.node_registry.write().await;
-        registry.insert(node_info.node_id.clone(), node_info.clone());
+        let node_id_str = hex::encode(node_info.node_id);
+        registry.insert(node_id_str, node_info.clone());
         
         // Recalculate routes that might involve this node
         self.recalculate_routes().await?;

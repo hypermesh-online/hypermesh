@@ -498,7 +498,7 @@ impl TrustChainIntegration {
         
         // If not cached, perform validation to get trust level
         let mock_node_info = ProxyNodeInfo {
-            node_id: "unknown".to_string(),
+            node_id: [0u8; 8], // Unknown node ID
             network_address: "unknown".to_string(),
             capabilities: ProxyCapabilities {
                 http_proxy: false,
