@@ -3,6 +3,8 @@
 //! This module provides the infrastructure for dynamically loading extensions
 //! at runtime, supporting both shared libraries (.so) and WebAssembly (.wasm).
 
+#![allow(unsafe_code)]
+
 use anyhow::{Context, Result as AnyhowResult};
 use async_trait::async_trait;
 use std::collections::HashMap;

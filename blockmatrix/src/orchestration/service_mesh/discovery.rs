@@ -543,29 +543,32 @@ impl CpeServiceDiscovery {
     /// Register a new service endpoint
     pub async fn register_endpoint(&self, endpoint: ServiceEndpoint) -> Result<()> {
         info!("Registering endpoint {} for service {:?}", endpoint.id, endpoint.service_id);
-        
+
         let mut registry = self.registry.write().await;
-        
-        // Add or update service entry
-        let service_entry = registry.services.entry(endpoint.service_id.clone()).or_insert_with(|| {
-            ServiceEntry {
-                service_id: endpoint.service_id.clone(),
-                endpoints: Vec::new(),
-                metadata: HashMap::new(),
-                health: ServiceHealth::Unknown,
-                events: Vec::new(),
-                last_updated: SystemTime::now(),
-            }
-        });
-        
-        // Remove existing endpoint with same ID if present
-        service_entry.endpoints.retain(|ep| ep.id != endpoint.id);
-        
-        // Add new endpoint
-        service_entry.endpoints.push(endpoint.clone());
-        service_entry.last_updated = SystemTime::now();
-        
-        // Update node mappings
+
+        // Update service entry in a scoped block to release the borrow
+        {
+            // Add or update service entry
+            let service_entry = registry.services.entry(endpoint.service_id.clone()).or_insert_with(|| {
+                ServiceEntry {
+                    service_id: endpoint.service_id.clone(),
+                    endpoints: Vec::new(),
+                    metadata: HashMap::new(),
+                    health: ServiceHealth::Unknown,
+                    events: Vec::new(),
+                    last_updated: SystemTime::now(),
+                }
+            });
+
+            // Remove existing endpoint with same ID if present
+            service_entry.endpoints.retain(|ep| ep.id != endpoint.id);
+
+            // Add new endpoint
+            service_entry.endpoints.push(endpoint.clone());
+            service_entry.last_updated = SystemTime::now();
+        }
+
+        // Update node mappings - now registry is available for mutable borrow
         if let Some(node_id) = self.extract_node_id(&endpoint) {
             registry.node_mappings
                 .entry(node_id)
@@ -587,8 +590,11 @@ impl CpeServiceDiscovery {
             },
             cpe_predicted: false,
         };
-        
-        service_entry.events.push(event);
+
+        // Push event to the service entry
+        if let Some(service_entry) = registry.services.get_mut(&endpoint.service_id) {
+            service_entry.events.push(event);
+        }
         
         // Update metadata
         registry.metadata.total_services = registry.services.len();

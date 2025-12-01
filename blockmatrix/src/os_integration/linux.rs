@@ -1,5 +1,7 @@
 // Linux OS Abstraction - Implementation using /proc, /sys, libbpf, XDP, TC
 
+#![allow(unsafe_code)]
+
 use super::types::*;
 use super::OsAbstraction;
 use anyhow::{Context, Result};

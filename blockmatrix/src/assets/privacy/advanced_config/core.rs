@@ -131,8 +131,10 @@ impl UserPrivacyConfig {
 
     /// Apply privacy template
     pub fn apply_template(&mut self, template_name: &str) -> AssetResult<()> {
+        // Clone the template to avoid borrow checker issues
         let template = self.templates.iter()
             .find(|t| t.name == template_name)
+            .cloned()
             .ok_or_else(|| AssetError::NotFound {
                 resource: format!("Privacy template '{}'", template_name)
             })?;
@@ -143,8 +145,10 @@ impl UserPrivacyConfig {
 
     /// Apply privacy preset
     pub fn apply_preset(&mut self, preset_name: &str) -> AssetResult<()> {
+        // Clone the preset to avoid borrow checker issues
         let preset = self.presets.iter()
             .find(|p| p.name == preset_name)
+            .cloned()
             .ok_or_else(|| AssetError::NotFound {
                 resource: format!("Privacy preset '{}'", preset_name)
             })?;
