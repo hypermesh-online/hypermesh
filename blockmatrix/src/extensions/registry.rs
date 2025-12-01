@@ -501,7 +501,7 @@ impl ExtensionRegistry {
         {
             let mut handler_map = self.handlers.write().await;
             for (asset_type, handler) in handlers {
-                handler_map.insert(asset_type, handler);
+                handler_map.insert(asset_type, Arc::from(handler));
             }
         }
 

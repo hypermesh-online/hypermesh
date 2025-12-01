@@ -655,7 +655,7 @@ impl HyperMeshContainerOrchestrator {
         // Get current asset allocations
         let current_asset_ids = {
             let container_assets = self.container_assets.read().await;
-            container_assets.get(container_id).cloned().unwrap_or_default()
+            container_assets.get(&container_id).cloned().unwrap_or_default()
         };
         
         // Deallocate current assets
@@ -724,7 +724,7 @@ impl HyperMeshContainerOrchestrator {
         };
         
         for container_id in container_ids {
-            if let Err(e) = self.stop_container(container_id.clone()).await {
+            if let Err(e) = self.stop_container(&container_id).await {
                 tracing::warn!("Failed to stop container {} during shutdown: {}", container_id, e);
             }
         }

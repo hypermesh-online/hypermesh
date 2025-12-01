@@ -408,7 +408,16 @@ impl ContainerRuntime {
     
     /// Get container status
     pub async fn status(&self, id: &ContainerId) -> Result<ContainerStatus> {
-        self.lifecycle.status(id).await
+        let lifecycle_status = self.lifecycle.status(id).await?;
+        // Convert lifecycle status to runtime status
+        Ok(match lifecycle_status.state {
+            ContainerState::Running => ContainerStatus::Running,
+            ContainerState::Stopped | ContainerState::Exited => ContainerStatus::Stopped,
+            ContainerState::Failed => ContainerStatus::Failed(
+                lifecycle_status.exit_code.map(|c| format!("Exit code: {}", c)).unwrap_or_else(|| "Unknown error".to_string())
+            ),
+            _ => ContainerStatus::Unknown,
+        })
     }
 
     /// List all containers

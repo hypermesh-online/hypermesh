@@ -385,8 +385,12 @@ impl ConsensusProofVM {
         let asset_adapters = Self::initialize_asset_adapters(&config).await?;
         
         // Initialize blockchain integration
+        let blockchain_config = integration::BlockchainConfig {
+            enabled: config.blockchain_config.enable_blockchain_storage,
+            endpoint: config.blockchain_config.blockchain_endpoint.clone(),
+        };
         let blockchain = Arc::new(integration::HyperMeshBlockchain::new(
-            config.blockchain_config.clone()
+            blockchain_config
         ).await?);
         
         // Initialize P2P router (using default implementation for now)

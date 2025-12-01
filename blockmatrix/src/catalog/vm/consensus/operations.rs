@@ -82,7 +82,7 @@ impl ConsensusOperation {
         _context: Arc<VMConsensusContext>,
     ) -> Self {
         let id = Uuid::new_v4().to_string();
-        
+
         Self {
             id,
             operation_type,
@@ -93,7 +93,12 @@ impl ConsensusOperation {
             metadata: OperationMetadata::default(),
         }
     }
-    
+
+    /// Get operation ID
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     /// Execute the operation with consensus validation
     pub async fn execute(&self, execution_data: &[u8]) -> Result<ConsensusExecutionResult> {
         let start_time = SystemTime::now();

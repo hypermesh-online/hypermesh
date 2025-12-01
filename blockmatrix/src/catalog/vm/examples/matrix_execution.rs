@@ -50,8 +50,8 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
     // Configure matrix VM with entity configurations
     let mut configured_matrix_vm = setup_entity_vm_configs(matrix_vm).await?;
     
-    // Vehicle to purchase (example VIN)
-    let vehicle_vin = Uuid::new_v4();
+    // Vehicle to purchase (example VIN as AssetId)
+    let vehicle_vin = AssetId::new(AssetType::Container);
     
     // Create multi-entity workflow for vehicle purchase
     let workflow = MultiEntityWorkflow {
@@ -217,7 +217,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
     let vm = Arc::new(ConsensusProofVM::new(VMConfig::default()).await?);
     let matrix_vm = vm.create_matrix_aware_vm(matrix_manager).await?;
     
-    let patient_record_id = Uuid::new_v4();
+    let patient_record_id = AssetId::new(AssetType::Container);
     
     // Create privacy-focused execution context
     let matrix_context = MatrixExecutionContext {

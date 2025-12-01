@@ -133,7 +133,7 @@ impl ConsensusVM {
         );
         
         // Register active operation
-        let operation_id = operation.id().clone();
+        let operation_id = operation.id().to_string();
         self.active_operations.insert(operation_id, operation.clone());
         
         Ok(operation)

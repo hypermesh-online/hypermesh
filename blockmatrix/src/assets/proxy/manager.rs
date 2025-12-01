@@ -236,7 +236,7 @@ impl RemoteProxyManager {
 
         // Generate global proxy address using NAT-like addressing
         let proxy_address = self.nat_translator.generate_global_address(
-            &selected_node.node_id,
+            &node_id_str,
             asset_id,
             port,
         ).await?;
