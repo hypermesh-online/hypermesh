@@ -20,16 +20,8 @@ use hypermesh_assets::adapters::{
 
 /// Create a valid ConsensusProof for testing
 fn create_test_consensus_proof(resource_type: &str, stake_amount: u64, difficulty: u32, committed_space: u64) -> ConsensusProof {
+    // ConsensusProof::new expects: (stake, time, space, work)
     ConsensusProof::new(
-        SpaceProof::new(
-            format!("/test/{}", resource_type),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
-            committed_space,
-        ),
         StakeProof::new(
             "test-node".to_string(),
             stake_amount,
@@ -40,12 +32,21 @@ fn create_test_consensus_proof(resource_type: &str, stake_amount: u64, difficult
                 allocation_rights: vec![resource_type.to_string()],
             },
         ),
+        TimeProof::new(1000, None, 1),
+        SpaceProof::new(
+            format!("/test/{}", resource_type),
+            NetworkPosition {
+                address: "2001:db8::1".to_string(),
+                zone: "us-west-1".to_string(),
+                distance_metric: 100,
+            },
+            committed_space,
+        ),
         WorkProof::new(
             format!("{}-challenge", resource_type).as_bytes(),
             difficulty,
             resource_type.to_string(),
         ).unwrap(),
-        TimeProof::new(1000, None, 1),
     )
 }
 
@@ -249,16 +250,8 @@ async fn test_consensus_proof_validation_failures() {
     let adapter = CpuAssetAdapter::new().await;
     
     // Test with invalid PoSpace (0 committed space)
+    // ConsensusProof::new expects: (stake, time, space, work)
     let invalid_space_proof = ConsensusProof::new(
-        SpaceProof::new(
-            "/test/cpu".to_string(),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
-            0, // Invalid: 0 committed space
-        ),
         StakeProof::new(
             "test-node".to_string(),
             100,
@@ -269,15 +262,7 @@ async fn test_consensus_proof_validation_failures() {
                 allocation_rights: vec!["cpu".to_string()],
             },
         ),
-        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
         TimeProof::new(1000, None, 1),
-    );
-    
-    let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.unwrap();
-    assert!(!valid, "Consensus proof with 0 committed space should fail");
-    
-    // Test with insufficient stake
-    let invalid_stake_proof = ConsensusProof::new(
         SpaceProof::new(
             "/test/cpu".to_string(),
             NetworkPosition {
@@ -285,8 +270,17 @@ async fn test_consensus_proof_validation_failures() {
                 zone: "us-west-1".to_string(),
                 distance_metric: 100,
             },
-            2,
+            0, // Invalid: 0 committed space
         ),
+        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
+    );
+    
+    let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.unwrap();
+    assert!(!valid, "Consensus proof with 0 committed space should fail");
+    
+    // Test with insufficient stake
+    // ConsensusProof::new expects: (stake, time, space, work)
+    let invalid_stake_proof = ConsensusProof::new(
         StakeProof::new(
             "test-node".to_string(),
             10, // Invalid: insufficient stake for CPU (needs 50+)
@@ -297,15 +291,7 @@ async fn test_consensus_proof_validation_failures() {
                 allocation_rights: vec!["cpu".to_string()],
             },
         ),
-        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
         TimeProof::new(1000, None, 1),
-    );
-    
-    let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.unwrap();
-    assert!(!valid, "Consensus proof with insufficient stake should fail");
-    
-    // Test with insufficient work difficulty
-    let invalid_work_proof = ConsensusProof::new(
         SpaceProof::new(
             "/test/cpu".to_string(),
             NetworkPosition {
@@ -315,6 +301,15 @@ async fn test_consensus_proof_validation_failures() {
             },
             2,
         ),
+        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
+    );
+    
+    let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.unwrap();
+    assert!(!valid, "Consensus proof with insufficient stake should fail");
+    
+    // Test with insufficient work difficulty
+    // ConsensusProof::new expects: (stake, time, space, work)
+    let invalid_work_proof = ConsensusProof::new(
         StakeProof::new(
             "test-node".to_string(),
             100,
@@ -325,8 +320,17 @@ async fn test_consensus_proof_validation_failures() {
                 allocation_rights: vec!["cpu".to_string()],
             },
         ),
-        WorkProof::new(b"cpu-challenge", 8, "cpu".to_string()).unwrap(), // Invalid: insufficient difficulty (needs 16+)
         TimeProof::new(1000, None, 1),
+        SpaceProof::new(
+            "/test/cpu".to_string(),
+            NetworkPosition {
+                address: "2001:db8::1".to_string(),
+                zone: "us-west-1".to_string(),
+                distance_metric: 100,
+            },
+            2,
+        ),
+        WorkProof::new(b"cpu-challenge", 8, "cpu".to_string()).unwrap(), // Invalid: insufficient difficulty (needs 16+)
     );
     
     let valid = adapter.validate_consensus_proof(&invalid_work_proof).await.unwrap();

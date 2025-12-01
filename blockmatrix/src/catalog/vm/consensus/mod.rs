@@ -314,11 +314,12 @@ impl ConsensusVMPrimitive {
         match self {
             ConsensusVMPrimitive::Load { asset_id, space_proof } => {
                 // Create minimal consensus proof with space validation
+                // ConsensusProof::new expects: (stake, time, space, work)
                 let minimal_proof = ConsensusProof::new(
-                    space_proof.clone(),
                     StakeProof::default(),
-                    WorkProof::default(),
                     TimeProof::default(),
+                    space_proof.clone(),
+                    WorkProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -331,11 +332,12 @@ impl ConsensusVMPrimitive {
             },
             
             ConsensusVMPrimitive::Store { asset_id, data, stake_proof } => {
+                // ConsensusProof::new expects: (stake, time, space, work)
                 let minimal_proof = ConsensusProof::new(
-                    SpaceProof::default(),
                     stake_proof.clone(),
-                    WorkProof::default(),
                     TimeProof::default(),
+                    SpaceProof::default(),
+                    WorkProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -348,11 +350,12 @@ impl ConsensusVMPrimitive {
             },
             
             ConsensusVMPrimitive::Compute { operation: op_type, input, work_proof } => {
+                // ConsensusProof::new expects: (stake, time, space, work)
                 let minimal_proof = ConsensusProof::new(
-                    SpaceProof::default(),
                     StakeProof::default(),
-                    work_proof.clone(),
                     TimeProof::default(),
+                    SpaceProof::default(),
+                    work_proof.clone(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -365,11 +368,12 @@ impl ConsensusVMPrimitive {
             },
             
             ConsensusVMPrimitive::Sync { timestamp: _, time_proof } => {
+                // ConsensusProof::new expects: (stake, time, space, work)
                 let minimal_proof = ConsensusProof::new(
-                    SpaceProof::default(),
                     StakeProof::default(),
-                    WorkProof::default(),
                     time_proof.clone(),
+                    SpaceProof::default(),
+                    WorkProof::default(),
                 );
                 
                 let operation = vm.create_consensus_operation(
@@ -414,11 +418,12 @@ mod tests {
         let vm = ConsensusVM::new(requirements).unwrap();
         
         // Create consensus proof with all four proofs
+        // ConsensusProof::new expects: (stake, time, space, work)
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         // Test validation (will likely fail due to minimal proofs, but tests structure)

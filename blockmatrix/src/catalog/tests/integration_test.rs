@@ -321,7 +321,8 @@ fn create_test_consensus_proof() -> ConsensusProof {
     
     let time_proof = TimeProof::new(1000, None, 1);
     
-    ConsensusProof::new(space_proof, stake_proof, work_proof, time_proof)
+    // ConsensusProof::new expects: (stake, time, space, work)
+    ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof)
 }
 
 fn create_test_host(host_id: &str, name: &str) -> P2PHost {

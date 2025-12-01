@@ -488,11 +488,12 @@ mod tests {
     #[tokio::test]
     async fn test_consensus_operation_creation() {
         let context = Arc::new(VMConsensusContext::new());
+        // ConsensusProof::new expects: (stake, time, space, work)
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         let operation = ConsensusOperation::new(
@@ -509,11 +510,12 @@ mod tests {
     #[tokio::test]
     async fn test_operation_builder() {
         let context = Arc::new(VMConsensusContext::new());
+        // ConsensusProof::new expects: (stake, time, space, work)
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         let operation = ConsensusOperationBuilder::new("test".to_string())

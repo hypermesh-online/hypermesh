@@ -837,8 +837,8 @@ impl CatalogHyperMeshBridge {
                 let container_spec = ContainerSpec {
                     name: format!("{}-{}", image_name, image_tag),
                     image: format!("{}:{}", image_name, image_tag),
-                    command: container_config.command.clone(),
-                    args: container_config.args.clone(),
+                    command: Some(container_config.command.clone()),
+                    args: Some(container_config.args.clone()),
                     env: container_config.environment_variables.clone(),
                     resources: ResourceRequirements::default(),
                     limits: None,

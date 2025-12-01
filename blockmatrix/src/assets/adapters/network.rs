@@ -881,19 +881,26 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyLevel::Private,
+            // ConsensusProof::new expects: (stake, time, space, work)
             consensus_proof: ConsensusProof::new(
+                StakeProof {
+                    stake_holder: "test-holder".to_string(),
+                    stake_holder_id: "test-holder-id".to_string(),
+                    stake_amount: 50,
+                    stake_timestamp: SystemTime::now(),
+                },
+                TimeProof {
+                    network_time_offset: Duration::from_millis(500),
+                    time_verification_timestamp: SystemTime::now(),
+                    nonce: 42,
+                    proof_hash: vec![5, 6, 7, 8],
+                },
                 SpaceProof {
                     node_id: "test-node".to_string(),
                     storage_path: "/test/network".to_string(),
                     allocated_size: 1000,
                     proof_hash: vec![1, 2, 3, 4],
                     timestamp: SystemTime::now(),
-                },
-                StakeProof {
-                    stake_holder: "test-holder".to_string(),
-                    stake_holder_id: "test-holder-id".to_string(),
-                    stake_amount: 50,
-                    stake_timestamp: SystemTime::now(),
                 },
                 WorkProof {
                     worker_id: "test-worker".to_string(),
@@ -902,12 +909,6 @@ mod tests {
                     computational_power: 20,
                     workload_type: WorkloadType::Network,
                     work_state: WorkState::Completed,
-                },
-                TimeProof {
-                    network_time_offset: Duration::from_millis(500),
-                    time_verification_timestamp: SystemTime::now(),
-                    nonce: 42,
-                    proof_hash: vec![5, 6, 7, 8],
                 },
             ),
             certificate_fingerprint: "test-cert".to_string(),

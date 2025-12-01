@@ -475,11 +475,12 @@ mod tests {
         
         let time_proof = TimeProof::new(Duration::from_secs(10));
         
+        // ConsensusProof::new expects: (stake, time, space, work)
         let consensus_proof = ConsensusProof::new(
-            stake_proof, 
-            space_proof, 
-            work_proof, 
-            time_proof
+            stake_proof,
+            time_proof,
+            space_proof,
+            work_proof
         );
         
         // Test basic validation (synchronous)

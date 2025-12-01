@@ -518,7 +518,20 @@ impl ConsensusManager {
         // This would include the four-proof system from Proof of State
         use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
 
+        // ConsensusProof::new expects: (stake, time, space, work)
         ConsensusProof::new(
+            StakeProof {
+                stake_holder: hex::encode(&self.local_node.id[..8]),
+                stake_holder_id: hex::encode(&self.local_node.id),
+                stake_amount: 1000,
+                stake_timestamp: SystemTime::now(),
+            },
+            TimeProof {
+                network_time_offset: Duration::from_secs(0),
+                time_verification_timestamp: SystemTime::now(),
+                nonce: rand::random(),
+                proof_hash: Sha256::digest(&proposal.signature).to_vec(),
+            },
             SpaceProof {
                 node_id: hex::encode(&self.local_node.id[..8]),
                 storage_path: "/consensus".to_string(),
@@ -526,12 +539,6 @@ impl ConsensusManager {
                 total_storage: 10240,
                 file_hash: hex::encode(Sha256::digest(&proposal.signature)),
                 proof_timestamp: SystemTime::now(),
-            },
-            StakeProof {
-                stake_holder: hex::encode(&self.local_node.id[..8]),
-                stake_holder_id: hex::encode(&self.local_node.id),
-                stake_amount: 1000,
-                stake_timestamp: SystemTime::now(),
             },
             WorkProof {
                 owner_id: hex::encode(&self.local_node.id[..8]),
@@ -542,12 +549,6 @@ impl ConsensusManager {
                 work_state: WorkState::Completed,
                 work_challenges: vec![],
                 proof_timestamp: SystemTime::now(),
-            },
-            TimeProof {
-                network_time_offset: Duration::from_secs(0),
-                time_verification_timestamp: SystemTime::now(),
-                nonce: rand::random(),
-                proof_hash: Sha256::digest(&proposal.signature).to_vec(),
             },
         )
     }

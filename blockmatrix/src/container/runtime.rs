@@ -38,42 +38,42 @@ pub struct ContainerHandle {
 impl ContainerHandle {
     /// Get container status
     pub async fn status(&self) -> Result<ContainerStatus> {
-        self.runtime.status(self.id.clone()).await
+        self.runtime.status(&self.id).await
     }
 
     /// Start the container
     pub async fn start(&self) -> Result<()> {
-        self.runtime.start(self.id.clone()).await
+        self.runtime.start(&self.id).await
     }
 
     /// Stop the container
     pub async fn stop(&self, timeout: Option<Duration>) -> Result<()> {
-        self.runtime.stop(self.id.clone(), timeout).await
+        self.runtime.stop(&self.id, timeout).await
     }
 
     /// Pause the container
     pub async fn pause(&self) -> Result<()> {
-        self.runtime.pause(self.id.clone()).await
+        self.runtime.pause(&self.id).await
     }
 
     /// Resume the container
     pub async fn resume(&self) -> Result<()> {
-        self.runtime.resume(self.id.clone()).await
+        self.runtime.resume(&self.id).await
     }
 
     /// Delete the container
     pub async fn delete(&self) -> Result<()> {
-        self.runtime.delete(self.id.clone()).await
+        self.runtime.delete(&self.id).await
     }
 
     /// Get resource usage
     pub async fn usage(&self) -> Result<ResourceUsage> {
-        self.runtime.get_usage(self.id.clone()).await
+        self.runtime.get_usage(&self.id).await
     }
 
     /// Get metrics
     pub async fn metrics(&self) -> Result<ContainerMetrics> {
-        self.runtime.get_metrics(self.id.clone()).await
+        self.runtime.get_metrics(&self.id).await
     }
     
     /// Migrate container to another node

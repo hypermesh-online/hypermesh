@@ -452,7 +452,8 @@ impl ConsensusRuntime {
             proof_hash: vec![5, 6, 7, 8], // In production: real cryptographic proof
         };
         
-        Ok(ConsensusProof::new(space_proof, stake_proof, work_proof, time_proof))
+        // ConsensusProof::new expects: (stake, time, space, work)
+        Ok(ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof))
     }
     
     /// Get runtime metrics

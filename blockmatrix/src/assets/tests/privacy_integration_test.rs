@@ -155,7 +155,7 @@ async fn test_privacy_allocation_workflow() {
         proof_hash: vec![9, 10, 11, 12, 13, 14, 15, 16],
     };
     
-    let consensus_proof = ConsensusProof::new(space_proof, stake_proof, work_proof, time_proof);
+    let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
     
     // Request privacy-controlled asset allocation
     let allocation_result = privacy_manager.allocate_privacy_controlled_access(
