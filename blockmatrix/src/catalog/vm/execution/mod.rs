@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::consensus::{ConsensusVM, ConsensusOperation, ConsensusExecutionResult};
@@ -27,7 +28,7 @@ use super::{AssetManagementConfig, PrivacyConfig, AssetAllocation, PrivacyLevel}
 /// Main VM executor with consensus-native execution
 pub struct VMExecutor {
     /// Consensus VM for proof validation
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Execution scheduler for managing operations
     scheduler: Arc<ExecutionScheduler>,
     /// Runtime environment with consensus integration
@@ -167,19 +168,19 @@ pub struct ExecutionMetadata {
 impl VMExecutor {
     /// Create new VM executor
     pub async fn new(
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         asset_config: AssetManagementConfig,
     ) -> Result<Self> {
         let scheduler = Arc::new(ExecutionScheduler::new(
             Arc::clone(&consensus_vm),
             asset_config.clone(),
         ).await?);
-        
+
         let runtime = Arc::new(ConsensusRuntime::new(
             Arc::clone(&consensus_vm),
             Arc::clone(&scheduler),
         ).await?);
-        
+
         Ok(Self {
             consensus_vm,
             scheduler,
@@ -217,7 +218,7 @@ impl VMExecutor {
         }
         
         // Create consensus operation for execution
-        let consensus_operation = self.consensus_vm.create_consensus_operation(
+        let consensus_operation = self.consensus_vm.write().await.create_consensus_operation(
             "execute",
             context_arc.asset_id(),
             context_arc.consensus_proof().clone(),
@@ -318,8 +319,14 @@ impl VMExecutor {
     /// Calculate consensus requirements hash for metadata
     fn calculate_requirements_hash(&self) -> [u8; 32] {
         use sha2::{Sha256, Digest};
-        
-        let requirements = self.consensus_vm.requirements();
+
+        // Use blocking read for synchronous context
+        // TODO: Make this function async in the future
+        let requirements = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.consensus_vm.read().await.requirements()
+            })
+        });
         let mut hasher = Sha256::new();
         
         hasher.update(&[

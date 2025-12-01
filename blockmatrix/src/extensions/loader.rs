@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result as AnyhowResult};
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 // TODO: Add libloading dependency to Cargo.toml
 // use libloading::{Library, Symbol};
 
@@ -109,7 +110,7 @@ pub enum LoadingMethod {
 /// Loaded extension container
 pub struct LoadedExtension {
     /// Extension instance (Arc for sharing across threads)
-    pub extension: Arc<dyn HyperMeshExtension>,
+    pub extension: Arc<RwLock<dyn HyperMeshExtension>>,
 
     /// Loading context
     pub context: LoadContext,
@@ -273,13 +274,20 @@ impl ExtensionLoader {
         };
 
         // Create the extension instance
+        // TODO: This is stub code - libloading dependency needed for actual implementation
+        // For now, return error since we can't actually load extensions
+        return Err(ExtensionError::InitializationFailed {
+            reason: "Extension loading not yet implemented (libloading dependency needed)".to_string(),
+        });
+
+        // The code below would work once libloading is available:
+        /*
         let extension_ptr = unsafe { constructor() };
         if extension_ptr.is_null() {
             return Err(ExtensionError::InitializationFailed {
                 reason: "Constructor returned null pointer".to_string(),
             });
         }
-
         let mut extension_box: Box<dyn HyperMeshExtension> = unsafe { Box::from_raw(extension_ptr) };
 
         // Initialize the extension
@@ -293,14 +301,15 @@ impl ExtensionLoader {
 
         extension_box.initialize(config).await?;
 
-        // Convert Box to Arc for shared ownership
-        let extension: Arc<dyn HyperMeshExtension> = Arc::from(extension_box);
+        // Convert Box to Arc<RwLock> for shared ownership with mutability
+        let extension: Arc<RwLock<dyn HyperMeshExtension>> = Arc::new(RwLock::new(*extension_box));
 
         Ok(LoadedExtension {
             extension,
             context,
             _library: Some(library),
         })
+        */
     }
 
     /// Load WebAssembly module
@@ -336,7 +345,7 @@ impl ExtensionLoader {
         };
 
         // Shutdown the extension
-        loaded_ext.extension.shutdown().await?;
+        loaded_ext.extension.write().await.shutdown().await?;
 
         // The library will be unloaded when LoadedExtension is dropped
         info!("Successfully unloaded extension: {}", extension_id);
@@ -344,7 +353,7 @@ impl ExtensionLoader {
     }
 
     /// Get loaded extension
-    pub async fn get_extension(&self, extension_id: &str) -> Option<Arc<dyn HyperMeshExtension>> {
+    pub async fn get_extension(&self, extension_id: &str) -> Option<Arc<RwLock<dyn HyperMeshExtension>>> {
         let loaded = self.loaded.read().await;
         loaded.get(extension_id).map(|le| Arc::clone(&le.extension))
     }

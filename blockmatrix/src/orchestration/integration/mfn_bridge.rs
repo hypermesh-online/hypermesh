@@ -8,6 +8,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::pin::Pin;
+use std::future::Future;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
@@ -400,7 +402,11 @@ impl MfnBridge {
     }
     
     /// Execute an MFN operation with optimal layer coordination
-    pub async fn execute_operation(&self, operation: MfnOperation) -> Result<LayerResponse> {
+    pub fn execute_operation(
+        &self,
+        operation: MfnOperation,
+    ) -> Pin<Box<dyn Future<Output = Result<LayerResponse>> + Send + '_>> {
+        Box::pin(async move {
         let start_time = Instant::now();
         let operation_id = Uuid::new_v4();
         
@@ -445,6 +451,7 @@ impl MfnBridge {
         
         debug!("MFN operation completed in {}µs", operation_latency_us);
         Ok(result)
+        })
     }
     
     /// Execute Layer 1 (IFR) resource lookup with 88.6% improvement

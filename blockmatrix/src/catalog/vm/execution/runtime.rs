@@ -25,7 +25,7 @@ use super::{RuntimeExecutionResult, MemoryUsagePattern, StorageOperation};
 /// Production-ready consensus runtime with native VM execution
 pub struct ConsensusRuntime {
     /// Consensus VM integration
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Execution scheduler
     scheduler: Arc<ExecutionScheduler>,
     /// Asset manager for resource allocation
@@ -203,7 +203,7 @@ impl Default for SandboxConfig {
 impl ConsensusRuntime {
     /// Create new consensus runtime
     pub async fn new(
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         scheduler: Arc<ExecutionScheduler>,
     ) -> Result<Self> {
         let asset_manager = Arc::new(AssetManager::new());
@@ -257,7 +257,7 @@ impl ConsensusRuntime {
         }
         
         // Execute consensus operation
-        let consensus_result = self.consensus_vm.execute_consensus_operation(
+        let consensus_result = self.consensus_vm.write().await.execute_consensus_operation(
             &execution_plan.consensus_operation,
             &[], // Empty execution data for now
         ).await?;

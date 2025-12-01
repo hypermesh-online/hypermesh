@@ -17,6 +17,8 @@ pub mod stdlib;
 
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::future::Future;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
@@ -417,11 +419,12 @@ impl JuliaVM {
     }
     
     /// Validate consensus requirements in AST
-    async fn validate_consensus_requirements(
-        &self,
-        ast: &JuliaExpression,
-        context: &ExecutionContext,
-    ) -> Result<()> {
+    fn validate_consensus_requirements<'a>(
+        &'a self,
+        ast: &'a JuliaExpression,
+        context: &'a ExecutionContext,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+        Box::pin(async move {
         match ast {
             JuliaExpression::ConsensusOperation { required_proofs, .. } => {
                 for requirement in required_proofs {
@@ -455,8 +458,9 @@ impl JuliaVM {
             },
             _ => {}, // No consensus requirements for other expressions
         }
-        
+
         Ok(())
+        })
     }
     
     /// Validate individual consensus requirement

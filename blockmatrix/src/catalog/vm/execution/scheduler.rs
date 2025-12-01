@@ -21,7 +21,7 @@ use super::super::{AssetManagementConfig, ConsensusRequirements};
 /// Execution scheduler with consensus-aware resource allocation
 pub struct ExecutionScheduler {
     /// Consensus VM for validation
-    consensus_vm: Arc<ConsensusVM>,
+    consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Asset management configuration
     asset_config: AssetManagementConfig,
     /// Pending execution queue
@@ -254,7 +254,7 @@ pub struct SchedulerMetrics {
 impl ExecutionScheduler {
     /// Create new execution scheduler
     pub async fn new(
-        consensus_vm: Arc<ConsensusVM>,
+        consensus_vm: Arc<RwLock<ConsensusVM>>,
         asset_config: AssetManagementConfig,
     ) -> Result<Self> {
         let config = SchedulerConfig::default();
