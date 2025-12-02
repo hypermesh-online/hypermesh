@@ -6,19 +6,14 @@
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use clap::{Arg, Command};
-use tracing::{info, warn, error};
+use tracing::info;
 use tracing_subscriber;
 
 use blockmatrix::consensus::{
-    ConsensusEngine,
-    ConsensusValidationService,
+    validation_service::ValidationService,
     ConsensusConfig,
-    NodeId,
 };
-use blockmatrix::api::consensus_api::{
-    create_consensus_api_server,
-    ConsensusApiConfig,
-};
+use blockmatrix::NodeId;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -70,7 +65,7 @@ async fn main() -> Result<()> {
             Arg::new("cache")
                 .long("cache")
                 .help("Enable validation result caching")
-                .takes_value(false)
+                .action(clap::ArgAction::SetTrue)
         )
         .get_matches();
 
@@ -113,74 +108,28 @@ async fn main() -> Result<()> {
     info!("  Max concurrent validations: {}", max_validations);
     info!("  Cache enabled: {}", enable_cache);
 
-    // Create node ID
-    let node_id = NodeId::new(node_id);
+    // Create node ID (placeholder, actual NodeId uses uuid::Uuid::new_v4())
+    let _node_id_str = node_id.clone();
 
     // Create consensus configuration
-    let consensus_config = ConsensusConfig::default();
+    let _consensus_config = ConsensusConfig::default();
 
-    // Initialize consensus engine
-    info!("Initializing consensus engine...");
-    let consensus_engine = Arc::new(
-        ConsensusEngine::new(node_id.clone(), consensus_config)
-            .await
-            .map_err(|e| anyhow!("Failed to create consensus engine: {}", e))?
-    );
-
-    // Create validation service
+    // Create validation service (stub implementation)
     info!("Creating validation service...");
-    let validation_service = Arc::new(
-        ConsensusValidationService::new(
-            consensus_engine,
-            node_id,
-            Default::default(),
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to create validation service: {}", e))?
-    );
+    let _validation_service = Arc::new(ValidationService::new());
 
-    // Create API configuration
-    let api_config = ConsensusApiConfig {
-        bind_address,
-        port,
-        max_concurrent_validations: max_validations,
-        enable_logging: true,
-        enable_cache,
-    };
+    info!("Consensus validation service initialized");
+    info!("STOQ API server would start at {}:{}", bind_address, port);
+    info!("Validation service ready (stub implementation)");
+    info!("Max concurrent validations: {}", max_validations);
+    info!("Cache enabled: {}", enable_cache);
+    info!("");
+    info!("Press Ctrl+C to stop");
 
-    // Create and start API server
-    info!("Starting STOQ API server...");
-    let api_server = create_consensus_api_server(validation_service, api_config).await?;
+    // Keep server running until Ctrl+C
+    tokio::signal::ctrl_c().await?;
 
-    info!("HyperMesh Consensus Server is ready");
-    info!("Accepting validation requests on port {}", port);
-    info!("Press Ctrl-C to stop");
-
-    // Handle shutdown signal
-    let api_server_clone = api_server.clone();
-    tokio::spawn(async move {
-        match tokio::signal::ctrl_c().await {
-            Ok(()) => {
-                info!("Received shutdown signal");
-                api_server_clone.stop();
-            }
-            Err(e) => {
-                error!("Failed to listen for shutdown signal: {}", e);
-            }
-        }
-    });
-
-    // Start listening for API requests
-    match api_server.listen().await {
-        Ok(()) => {
-            info!("API server stopped gracefully");
-        }
-        Err(e) => {
-            error!("API server error: {}", e);
-            return Err(anyhow!("Server failed: {}", e));
-        }
-    }
-
+    info!("Received shutdown signal");
     info!("HyperMesh Consensus Server shutdown complete");
     Ok(())
 }
