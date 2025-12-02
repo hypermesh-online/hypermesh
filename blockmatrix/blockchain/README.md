@@ -1,10 +1,12 @@
 # HyperMesh - Blockchain Integration
 
-This directory contains the HyperMesh blockchain and distributed ledger integration components, enabling decentralized governance, resource accounting, and trust networks across the platform.
+## ⚠️ STATUS: FUTURE VISION ONLY
 
-## Strategic Vision
+This directory is a placeholder for future blockchain integration. NO blockchain functionality is currently implemented. This entire document describes future possibilities, not current capabilities.
 
-Once Nexus core infrastructure is mature and the interface layer provides a solid developer experience, HyperMesh blockchain integration offers transformative opportunities:
+## Strategic Vision (Long-Term Goals Only)
+
+In the far future, once core infrastructure exists (currently ~8-15% complete), blockchain integration could potentially offer:
 
 - **Decentralized Resource Markets**: Peer-to-peer computing resource trading
 - **Trustless Multi-party Computation**: Secure computation across untrusted nodes

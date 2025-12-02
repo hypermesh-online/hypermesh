@@ -1,6 +1,8 @@
 # eBPF Programs for HyperMesh
 
-This directory contains pre-built eBPF programs for HyperMesh's kernel-level monitoring on Linux.
+## ⚠️ STATUS: NOT INTEGRATED
+
+This directory contains example eBPF program templates. These are NOT integrated into HyperMesh and do NOT currently work with the main system. They exist as placeholders for future development.
 
 ## Programs
 
@@ -100,9 +102,9 @@ echo "All programs compiled successfully!"
 echo "Note: Run with CAP_BPF or as root to load these programs"
 ```
 
-## Loading Programs in HyperMesh
+## Future Integration Plans
 
-These compiled eBPF programs (.o files) can be loaded by HyperMesh using the aya framework:
+In the future, these eBPF programs could potentially be loaded by HyperMesh using the aya framework. This is NOT currently implemented:
 
 ```rust
 use aya::Bpf;

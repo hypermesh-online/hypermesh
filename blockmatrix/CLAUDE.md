@@ -1,5 +1,17 @@
 # HyperMesh Vision & Core Functionality
 
+## ⚠️ DEVELOPMENT STATUS WARNING
+
+**Current Implementation: ~8-15% Complete**
+
+This document describes the VISION and ARCHITECTURE for HyperMesh/BlockMatrix. Most features described are planned functionality, not current capabilities. See README.md for actual current state.
+
+### Reality Check:
+- **What exists**: Basic Rust structure, stub implementations, design documents
+- **What works**: Very limited - mostly test frameworks and basic types
+- **What doesn't work**: Container runtime, multi-node consensus, eBPF, production features
+- **Nexus CLI**: Does NOT exist (only minimal stubs present, not functional)
+
 ## Primary Mission
 Rebuild cloud infrastructure from the ground up, eliminating the systemic security vulnerabilities, performance bottlenecks, and architectural debt that plague current container orchestration systems.
 
@@ -16,20 +28,20 @@ Create a distributed computing platform that provides:
 ### 1. Security by Design
 - **Transport Security**: QUIC over IPv6 with certificate-based authentication baked into every connection
 - **Memory Safety**: Rust core eliminates entire vulnerability classes (buffer overflows, use-after-free)
-- **Kernel Integration**: eBPF provides secure, efficient system-level operations without kernel modules
+- **Kernel Integration**: eBPF planned to provide secure, efficient system-level operations (not yet implemented)
 - **Zero Trust**: Triple validation (user + system + certificate) for all operations
 - **Isolation**: Hardware-assisted virtualization with capability-based security models
 
 ### 2. Performance Without Compromise  
 - **Protocol Efficiency**: Full-duplex QUIC eliminates TCP handshake overhead and provides built-in multiplexing
 - **Zero-Cost Abstractions**: Rust's compile-time guarantees enable high-level programming without runtime penalty
-- **Kernel Bypass**: eBPF programs run in kernel space, avoiding expensive system calls
+- **Kernel Bypass**: Future eBPF programs will run in kernel space (not yet implemented)
 - **Predictable Latency**: No garbage collection pauses or unexpected runtime overhead
 - **Resource Awareness**: Real-time monitoring and adaptive resource allocation
 
 ### 3. Distributed-First Architecture
-- **P2P Mesh Networks**: Nodes can discover and connect directly without centralized coordination
-- **Byzantine Fault Tolerance**: Consensus mechanisms that work even when nodes are compromised
+- **P2P Mesh Networks**: Nodes will be able to discover and connect directly (currently single-node only)
+- **Byzantine Fault Tolerance**: Framework exists but not production-ready (experimental only)
 - **Geographic Distribution**: Data locality and edge computing built into the core design
 - **Network Partitions**: Graceful degradation and automatic healing when connectivity is lost
 - **Multi-Cloud**: Abstract away infrastructure providers for true cloud portability
@@ -46,23 +58,23 @@ Create a distributed computing platform that provides:
 
 **Key Innovations:**
 - Certificate rotation and revocation integrated into transport protocol
-- Per-connection resource quotas enforced by kernel-level eBPF programs
+- Per-connection resource quotas will be enforced by eBPF (future feature)
 - Automatic quality-of-service adaptation based on network conditions
 - Built-in support for multipath networking and load balancing
 
-### Container Runtime (Secure Isolation)
-**Primary Functions:**
-- Launch and manage containerized workloads with hardware-enforced isolation
-- Provide secure inter-container communication without network overhead
-- Enforce resource quotas with microsecond-level precision
-- Support live migration of running containers across nodes
-- Enable snapshot and restore functionality for fault tolerance
+### Container Runtime - PLANNED FEATURE
+**Planned Functions:** (Not Yet Implemented)
+- Will launch and manage containerized workloads with hardware-enforced isolation
+- Future secure inter-container communication without network overhead
+- Planned resource quota enforcement with microsecond-level precision
+- Future live migration of running containers across nodes
+- Planned snapshot and restore functionality for fault tolerance
 
-**Key Innovations:**
-- Microkernel-based isolation using Intel VT-x/AMD-V hardware features
-- Capability-based security with fine-grained permission management
-- Copy-on-write filesystem layers optimized for container workflows
-- Direct memory mapping for high-performance inter-process communication
+**Planned Innovations:** (Design Phase)
+- Future microkernel-based isolation using Intel VT-x/AMD-V hardware features
+- Planned capability-based security with fine-grained permission management
+- Future copy-on-write filesystem layers for container workflows
+- Planned direct memory mapping for high-performance IPC
 
 ### Distributed State Engine (etcd Replacement)
 **Primary Functions:**
@@ -73,7 +85,7 @@ Create a distributed computing platform that provides:
 - Enable offline operation with eventual consistency when partitioned
 
 **Key Innovations:**
-- Raft consensus with BFT framework (not production-ready) extensions
+- Raft consensus with BFT framework (experimental only, not production-ready)
 - Encrypted state replication with forward secrecy guarantees
 - Automatic backup and point-in-time recovery capabilities
 - Multi-master writes with conflict-free replicated data types (CRDTs)
@@ -110,7 +122,7 @@ Create a distributed computing platform that provides:
 Once core functionality is proven and stable, extend the platform to provide:
 
 ### Developer Experience
-- **Native CLI**: Fast, intuitive command-line tools written in our system language
+- **CLI Tools**: Future command-line interface (not yet developed)
 - **Web Dashboard**: Real-time monitoring and control interface for cluster management
 - **APIs**: REST and GraphQL APIs with OpenAPI/schema documentation
 - **SDKs**: Client libraries in major programming languages with idiomatic interfaces
@@ -130,14 +142,14 @@ Once core functionality is proven and stable, extend the platform to provide:
 - **Secret Management**: HSM integration with automatic key rotation
 - **Image Registry**: Distributed container image storage with deduplication
 
-## Success Metrics
+## Success Metrics (Future Goals)
 
-### Performance Targets
-- **Connection Establishment**: <10ms for new connections, <1ms for resumed connections  
-- **Container Startup**: <100ms from request to running container
-- **Service Discovery**: <1ms average lookup time across 10,000+ services
-- **Scaling Response**: Autoscaling decisions within 5 seconds of demand change
-- **Network Throughput**: >95% of underlying hardware bandwidth utilization
+### Performance Targets (Not Yet Achieved)
+- **Connection Establishment**: Target <10ms for new connections, <1ms for resumed connections
+- **Container Startup**: Goal <100ms from request to running container (containers not implemented)
+- **Service Discovery**: Target <1ms average lookup time (not implemented)
+- **Scaling Response**: Goal of autoscaling within 5 seconds (no scaling yet)
+- **Network Throughput**: Target >95% bandwidth utilization (not measured)
 
 ### Security Goals
 - **Zero Remote Code Execution**: Memory safety eliminates RCE via buffer overflows
@@ -163,27 +175,6 @@ HyperMesh represents a fundamental shift toward infrastructure that is:
 
 This vision guides every architectural decision and implementation choice, ensuring HyperMesh becomes the foundation for the next generation of cloud-native applications.
 
-## Nexus CLI Status
+## CLI Status
 
-The Nexus CLI is in early development with minimal implementation:
-
-### Current Status
-- **Minimal Implementation**: Only `minimal_nexus.rs` and `simple_nexus.rs` exist
-- **Basic Structure**: Framework for future CLI development
-- **Configuration Examples**: Sample YAML files in `nexus-config-examples/`
-
-### Missing Components
-- **NEXUS_CLI_SPEC.md**: Referenced but does not exist
-- **NEXUS_CLI_GUIDE.md**: Referenced but does not exist
-- **Command Implementation**: Most commands not implemented
-- **Production Features**: No error handling, logging, or security integration
-
-### Development Path
-The CLI requires significant development before being functional:
-1. Implement core command structure
-2. Add actual cluster management capabilities
-3. Integrate with HyperMesh components
-4. Add proper error handling and validation
-5. Create actual documentation
-
-**Current State**: Early prototype, not suitable for any production use
+**IMPORTANT**: There is NO Nexus CLI in this project. Any references to a Nexus CLI in documentation are incorrect. While there may be some minimal stub files (minimal_nexus.rs, simple_nexus.rs), these are not functional and should not be used or referenced.

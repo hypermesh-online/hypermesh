@@ -1,6 +1,8 @@
-# Nexus - Core System Components
+# Core System Components
 
-This directory contains the Nexus core system components, the foundational infrastructure layer implemented primarily in Rust with eBPF programs for kernel-level operations.
+## ⚠️ DEVELOPMENT STATUS: Early Prototype
+
+This directory contains early prototype code. Most features described below are planned but NOT yet implemented. The "Nexus" branding should be ignored - there is no Nexus CLI or system.
 
 ## Architecture Overview
 
@@ -17,13 +19,13 @@ core/
 └── shared/           # Shared libraries and utilities
 ```
 
-## Key Technologies
+## Planned Technologies (Not Yet Integrated)
 
-- **Rust**: Memory-safe systems programming with zero-cost abstractions
-- **eBPF**: Kernel-level networking and security policy enforcement
-- **QUIC**: Modern transport protocol with built-in security and multiplexing
-- **Hardware Virtualization**: Intel VT-x/AMD-V for secure container isolation
-- **Consensus Algorithms**: Byzantine fault-tolerant distributed state management
+- **Rust**: Basic structure exists, many compilation errors
+- **eBPF**: NOT IMPLEMENTED - only stub files exist
+- **QUIC**: Partially designed, not fully integrated
+- **Hardware Virtualization**: NOT IMPLEMENTED
+- **Consensus Algorithms**: Basic Raft only, no Byzantine fault tolerance in production
 
 ## Development Environment Setup
 
@@ -52,29 +54,29 @@ cargo test
 cargo ebpf build --target bpfel-unknown-none
 ```
 
-## Component Status
+## Component Status (All Incomplete)
 
-- [ ] **Transport Layer**: QUIC protocol implementation with certificate integration
-- [ ] **Container Runtime**: Secure isolation with hardware virtualization
-- [ ] **State Engine**: Distributed consensus and key-value storage
-- [ ] **Scheduler**: Intelligent workload placement and auto-scaling
-- [ ] **Service Mesh**: P2P networking with load balancing
-- [ ] **Security Framework**: Triple validation and policy enforcement
-- [ ] **eBPF Integration**: Kernel-level networking and monitoring
-- [ ] **API Server**: REST API with authentication and authorization
+- [ ] **Transport Layer**: QUIC protocol (basic design only, not functional)
+- [ ] **Container Runtime**: NOT IMPLEMENTED
+- [ ] **State Engine**: Single-node only, no real distribution
+- [ ] **Scheduler**: NOT IMPLEMENTED
+- [ ] **Service Mesh**: NOT IMPLEMENTED
+- [ ] **Security Framework**: Basic types only
+- [ ] **eBPF Integration**: NOT IMPLEMENTED (stub files only)
+- [ ] **API Server**: NOT IMPLEMENTED
 
-## Performance Targets
+## Future Performance Targets (Not Current Capabilities)
 
-- Container startup: <100ms
-- Network latency: <1ms for local communication
-- Consensus latency: <10ms for state updates
-- Throughput: >1M requests/second per node
-- Memory overhead: <50MB per container
+- Container startup: <100ms (containers not implemented)
+- Network latency: <1ms goal
+- Consensus latency: <10ms target (single-node only currently)
+- Throughput: >1M requests/second goal (not measured)
+- Memory overhead: <50MB target per container (no containers yet)
 
-## Security Goals
+## Future Security Goals (Not Yet Achieved)
 
-- Zero remote code execution vulnerabilities
-- Hardware-enforced isolation boundaries
-- Automatic certificate rotation every 24 hours
-- Real-time security policy enforcement
-- Comprehensive audit logging
+- Zero remote code execution vulnerabilities (Rust helps but not proven)
+- Hardware-enforced isolation boundaries (not implemented)
+- Automatic certificate rotation (planned feature)
+- Real-time security policy enforcement (not implemented)
+- Comprehensive audit logging (basic logging only)
