@@ -6,7 +6,8 @@
 //!
 //! STOQ is designed as a pure transport protocol without application-layer features.
 
-#![warn(missing_docs)]
+// Documentation warnings disabled during early development
+// #![warn(missing_docs)]
 
 pub mod transport;
 pub mod config;

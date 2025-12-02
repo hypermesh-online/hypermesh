@@ -3,20 +3,19 @@
 //! Implements Byzantine fault-tolerant consensus for distributed asset allocation,
 //! state synchronization, and conflict resolution across HyperMesh nodes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::sync::{RwLock, mpsc};
-use async_trait::async_trait;
+use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
 
 use crate::assets::core::{
-    AssetId, AssetType, AssetResult, AssetError,
-    AssetState, ConsensusProof, ProxyAddress,
+    AssetId, AssetResult, AssetError,
+    AssetState, ConsensusProof,
 };
 
-use super::{NodeId, AllocationDecision};
+use super::NodeId;
 
 /// Consensus manager for multi-node coordination
 pub struct ConsensusManager {

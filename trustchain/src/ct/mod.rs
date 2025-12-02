@@ -5,17 +5,16 @@
 
 use std::sync::Arc;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
-use std::collections::{HashMap, VecDeque};
 use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use tokio::sync::{RwLock, Mutex};
 use tracing::{info, debug, warn, error};
 use sha2::{Sha256, Digest};
 // use merkletree::{MerkleTree, Proof, Hashable}; // Temporarily commented due to API changes
 
 use crate::config::CTConfig;
-use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
+use crate::consensus::{ConsensusProof, ConsensusContext};
 use crate::errors::{CTError, TrustChainError, Result as TrustChainResult};
 
 pub mod merkle_log;

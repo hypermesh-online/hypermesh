@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError};
+use crate::assets::core::{AssetId, AssetResult};
 use super::NodeId;
 
 /// Byzantine behavior detector

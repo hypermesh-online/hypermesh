@@ -4,8 +4,8 @@
 //! algorithms for transition period and defense-in-depth security strategies.
 
 use std::time::SystemTime;
-use anyhow::{Result, anyhow};
-use tracing::{info, debug, warn, error};
+use anyhow::Result;
+use tracing::{info, debug, warn};
 use serde::{Serialize, Deserialize};
 
 use super::{
@@ -341,8 +341,8 @@ impl HybridCrypto {
     
     /// Internal: AES-GCM encryption
     fn aes_encrypt(&self, data: &[u8], key: &[u8; 32]) -> Result<(Vec<u8>, [u8; 12], [u8; 16])> {
-        use aes_gcm::{Aes256Gcm, Key, Nonce, AeadCore, AeadInPlace, KeyInit};
-        use rand::RngCore;
+        use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
+        
         
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
         let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());

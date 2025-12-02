@@ -6,14 +6,9 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::{Ipv6Addr, SocketAddr, SocketAddrV6};
-use std::collections::HashMap;
+use std::net::Ipv6Addr;
 use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
-use bytes::Bytes;
+use tracing::{info, debug};
 
 // ARCHITECTURAL ENFORCEMENT: Use STOQ transport instead of direct QUIC
 use crate::stoq_client::{TrustChainStoqClient, TrustChainStoqConfig, ServiceEndpoint, ServiceType};

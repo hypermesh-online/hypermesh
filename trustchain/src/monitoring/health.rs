@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Instant, SystemTime};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::debug;
 
 /// Health check system
 pub struct HealthCheck {
@@ -146,7 +146,7 @@ impl HealthCheck {
     /// Check CA service health
     async fn check_ca_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate CA health check
@@ -171,7 +171,7 @@ impl HealthCheck {
     /// Check CT service health
     async fn check_ct_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate CT health check
@@ -192,7 +192,7 @@ impl HealthCheck {
     /// Check DNS service health
     async fn check_dns_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate DNS health check
@@ -213,7 +213,7 @@ impl HealthCheck {
     /// Check consensus service health
     async fn check_consensus_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate consensus health check
@@ -234,7 +234,7 @@ impl HealthCheck {
     /// Check STOQ transport health
     async fn check_stoq_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate STOQ health check
@@ -255,7 +255,7 @@ impl HealthCheck {
     /// Check API service health
     async fn check_api_health(&self) {
         let start = Instant::now();
-        let mut is_healthy = true;
+        let is_healthy = true;
         let mut details = HashMap::new();
 
         // Simulate API health check

@@ -7,8 +7,8 @@ use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    AsyncConsensus, ConsensusResult, LogIndex, DefaultConsensus, ConsensusConfig
+    ConsensusProof,
+    AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
 };
 
 /// Asset record types for blockchain operations

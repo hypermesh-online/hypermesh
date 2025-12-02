@@ -8,7 +8,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::errors::{StorageError, Result as TrustChainResult};
+use crate::errors::Result as TrustChainResult;
 use super::LogEntry;
 
 /// Simplified CT storage using in-memory storage

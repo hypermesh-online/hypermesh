@@ -31,7 +31,6 @@ pub use types::{
     SecurityEvent,
 };
 
-use anyhow::Result as AnyhowResult;
 
 /// Security manager for HyperMesh
 pub struct SecurityManager {

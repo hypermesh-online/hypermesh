@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetResult, AssetError, ProxyAddress, ProxyNodeInfo, PrivacyLevel
+    AssetResult, AssetError, ProxyNodeInfo, PrivacyLevel
 };
 
 /// Type alias for routing table
@@ -515,7 +515,7 @@ impl ProxyRouter {
                 let success_factor = route_metrics.success_rate;
                 let load_factor = 1.0 - route_metrics.current_load;
                 
-                weight += (latency_factor * 0.2 + success_factor * 0.2 + load_factor * 0.1);
+                weight += latency_factor * 0.2 + success_factor * 0.2 + load_factor * 0.1;
             }
             
             if weight > best_weight {

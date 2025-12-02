@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use serde::{Serialize, Deserialize};
 use tracing::{info, warn, error};
 
-use crate::{IntegrationResult, IntegrationError};
+use crate::IntegrationResult;
 
 /// Component lifecycle management trait
 #[async_trait::async_trait]

@@ -3,17 +3,17 @@
 //! Integrates FALCON-1024 signatures and Kyber encryption with X.509 certificates
 //! for quantum-resistant certificate authority operations in TrustChain.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 use anyhow::{Result, anyhow};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use serde::{Serialize, Deserialize};
 
-use rcgen::{Certificate as RcgenCertificate, CertificateParams, DnType, SanType, Ia5String};
+use rcgen::{CertificateParams, DnType, SanType, Ia5String};
 use x509_parser::parse_x509_certificate;
 
 use super::{
-    FalconKeyPair, FalconPublicKey, FalconPrivateKey, FalconSignature,
-    KyberKeyPair, KyberPublicKey, KyberPrivateKey, PostQuantumCrypto, PQCError
+    FalconKeyPair, FalconPublicKey, FalconSignature,
+    KyberKeyPair, KyberPublicKey, PostQuantumCrypto
 };
 
 /// Post-quantum X.509 certificate with embedded FALCON-1024 public key

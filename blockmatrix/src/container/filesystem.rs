@@ -6,7 +6,7 @@ use super::error::{Result, ContainerError};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::SystemTime;
 use tracing::{info, debug};
 

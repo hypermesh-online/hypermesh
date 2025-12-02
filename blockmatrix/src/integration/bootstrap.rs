@@ -7,9 +7,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::{Duration, SystemTime, Instant};
 use std::collections::HashMap;
-use std::net::{SocketAddr, Ipv6Addr};
-use tokio::sync::{RwLock, Mutex, Notify};
-use tracing::{info, warn, error, debug, instrument};
+use std::net::SocketAddr;
+use tokio::sync::{RwLock, Notify};
+use tracing::{info, instrument};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
 use dashmap::DashMap;
@@ -285,7 +285,7 @@ pub struct HealthState {
 impl BootstrapManager {
     /// Create new bootstrap manager
     pub fn new(config: BootstrapConfig) -> Self {
-        let mut phase_notifications = DashMap::new();
+        let phase_notifications = DashMap::new();
         phase_notifications.insert(BootstrapPhase::Traditional, Arc::new(Notify::new()));
         phase_notifications.insert(BootstrapPhase::Hybrid, Arc::new(Notify::new()));
         phase_notifications.insert(BootstrapPhase::PartialFederation, Arc::new(Notify::new()));

@@ -9,14 +9,12 @@
 //! All assets require Consensus Proof validation (PoSpace + PoStake + PoWork + PoTime)
 //! and support user-configurable privacy levels with remote proxy addressing.
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 // Submodules
 pub mod asset_id;

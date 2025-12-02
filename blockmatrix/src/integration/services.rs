@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, debug};
 
 use crate::{IntegrationResult, IntegrationError};
 

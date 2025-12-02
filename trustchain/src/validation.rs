@@ -3,7 +3,7 @@
 
 use anyhow::{Result, anyhow};
 use regex::Regex;
-use std::net::{IpAddr, Ipv6Addr};
+use std::net::Ipv6Addr;
 
 /// Validate node ID format
 pub fn validate_node_id(node_id: &str) -> Result<()> {

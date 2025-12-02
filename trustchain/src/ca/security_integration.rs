@@ -3,14 +3,12 @@
 //! Certificate Authority with mandatory consensus validation and security monitoring
 
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use std::collections::HashMap;
+use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use tracing::{info, debug, warn, error};
-use anyhow::Result;
 
-use crate::consensus::{ConsensusProof, ConsensusResult, FourProofValidator};
-use crate::security::{SecurityMonitor, SecurityValidationResult, SecuritySeverity};
+use crate::consensus::ConsensusResult;
+use crate::security::{SecurityMonitor, SecurityValidationResult};
 use crate::security::monitoring::{LiveCertificateOperation, ConsensusValidationStatus, OperationState};
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use crate::crypto::{PostQuantumCrypto, FalconKeyPair, FalconSignature, PQCAlgorithm};
@@ -282,7 +280,7 @@ impl SecurityIntegratedCA {
         info!("Proceeding with FALCON-1024 certificate generation for operation: {}", operation_id);
         
         // Issue certificate with post-quantum signature if enabled
-        let mut issued_cert = if self.config.mandatory_post_quantum {
+        let issued_cert = if self.config.mandatory_post_quantum {
             info!("🔐 Generating certificate with FALCON-1024 post-quantum signature");
             self.issue_certificate_with_falcon(&request, &operation_id).await?
         } else {

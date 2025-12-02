@@ -8,7 +8,7 @@
 
 use std::fmt;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use tracing::{info, debug, warn, error};
 
 pub mod falcon;

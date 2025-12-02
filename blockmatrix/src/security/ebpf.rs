@@ -2,7 +2,7 @@
 
 use super::{
     NetworkPacket, SystemCall, ProcessContext,
-    error::{Result, SecurityError},
+    error::Result,
     config::EBPFConfig,
 };
 use async_trait::async_trait;
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error, instrument};
+use tracing::{info, debug, warn, instrument};
 
 /// eBPF program handle
 #[derive(Debug, Clone)]

@@ -6,20 +6,17 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::{Ipv6Addr, SocketAddr};
-use std::collections::HashMap;
+use std::net::Ipv6Addr;
 use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug};
 use bytes::Bytes;
 
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 
 // Import STOQ transport
 use stoq::{
-    StoqTransport, Endpoint, Connection, FalconVariant
+    StoqTransport, Endpoint, Connection
 };
 use stoq::transport::TransportConfig;
 

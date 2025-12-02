@@ -1,12 +1,12 @@
 //! Extension system type definitions
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 use semver::Version;
 
-use crate::assets::core::{AssetType, AssetId, AssetAllocation, PrivacyLevel, ConsensusProof};
+use crate::assets::core::{AssetType, PrivacyLevel, ConsensusProof};
 
 /// Extension system errors
 #[derive(Debug, thiserror::Error)]

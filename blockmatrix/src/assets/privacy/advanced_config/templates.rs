@@ -3,7 +3,6 @@
 //! Configuration templates and presets for quick privacy setup.
 
 use std::collections::HashMap;
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{AssetResult, AssetError};

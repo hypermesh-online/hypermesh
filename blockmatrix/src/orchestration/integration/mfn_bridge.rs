@@ -3,7 +3,7 @@
 //! Provides the coordination layer between orchestration components and the validated
 //! MFN 4-layer foundation, enabling revolutionary distributed computing capabilities.
 
-use super::{IntegrationConfig, PerformanceTargets, AlertThresholds};
+use super::{IntegrationConfig, PerformanceTargets};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -268,7 +268,7 @@ pub enum LayerResponse {
 impl MfnBridge {
     /// Create a new MFN bridge
     pub async fn new(config: IntegrationConfig) -> Result<Self> {
-        let (layer_sender, mut layer_receiver) = mpsc::unbounded_channel();
+        let (layer_sender, layer_receiver) = mpsc::unbounded_channel();
         
         // Initialize layer coordination state
         let layer_coordination = Arc::new(RwLock::new(LayerCoordination {

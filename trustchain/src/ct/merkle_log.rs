@@ -5,8 +5,8 @@
 
 use std::collections::VecDeque;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tracing::{debug, warn};
+use anyhow::anyhow;
+use tracing::debug;
 use sha2::{Sha256, Digest};
 // use merkletree::{MerkleTree, Proof, Hashable, hash::{Algorithm, Sha256Algorithm}}; // Temporarily commented due to API changes
 

@@ -15,13 +15,11 @@ use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 
-use hickory_proto::op::{Header, MessageType, OpCode, ResponseCode};
+use hickory_proto::op::ResponseCode;
 use hickory_proto::rr::{Name, RecordType, Record, RData};
-use hickory_proto::serialize::binary::{BinEncodable, BinDecodable};
-use hickory_client::client::{Client, AsyncClient};
-use hickory_client::udp::UdpClientConnection;
+use hickory_proto::serialize::binary::BinDecodable;
 
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 

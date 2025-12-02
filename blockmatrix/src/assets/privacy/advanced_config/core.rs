@@ -3,12 +3,10 @@
 //! Fundamental privacy configuration structures and enums that form
 //! the foundation of the privacy management system.
 
-use std::collections::HashMap;
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
-use super::super::{PrivacyAllocationType, ResourceAllocationConfig, ConsensusRequirementConfig, ProxyConfiguration};
+use super::super::PrivacyAllocationType;
 
 // Re-export sub-modules
 pub use super::data_management::{DataMinimizationSettings, RetentionPreferences};

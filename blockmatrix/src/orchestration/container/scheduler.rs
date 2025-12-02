@@ -3,16 +3,16 @@
 //! Revolutionary container scheduling that uses Layer 2 (DSR) neural pattern recognition
 //! for optimal container placement decisions, achieving <100ms scheduling with 96%+ accuracy.
 
-use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
-use crate::{NodeId, ContainerId, ServiceId};
-use super::{ContainerSpec, NodeState, ResourceRequirements, PlacementConstraint, NodeHealth};
+use crate::orchestration::integration::MfnBridge;
+use crate::{NodeId, ServiceId};
+use super::{ContainerSpec, NodeState, ResourceRequirements, NodeHealth};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// DSR-powered container scheduler
 pub struct DsrScheduler {

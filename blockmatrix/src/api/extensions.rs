@@ -15,8 +15,7 @@ use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError};
 
 use crate::extensions::{
     manager::{UnifiedExtensionManager, ExtensionInfo},
-    ExtensionRequest, ExtensionResponse, ExtensionCapability,
-    ExtensionCategory, ExtensionMetadata,
+    ExtensionRequest,
 };
 
 /// Helper to create a success JSON API response

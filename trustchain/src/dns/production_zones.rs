@@ -5,7 +5,6 @@
 
 use std::net::Ipv6Addr;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 use super::authoritative_server::{DnsZone, FederatedNetwork, NetworkStatus};
 

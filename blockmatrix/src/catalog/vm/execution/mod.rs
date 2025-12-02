@@ -20,9 +20,8 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 
-use crate::consensus::proof::ConsensusProof;
-use super::consensus::{ConsensusVM, ConsensusOperation, ConsensusExecutionResult};
-use super::{AssetManagementConfig, PrivacyConfig, AssetAllocation, PrivacyLevel};
+use super::consensus::{ConsensusVM, ConsensusExecutionResult};
+use super::{AssetManagementConfig, PrivacyLevel};
 // Already imported above, no need to import again
 
 /// Main VM executor with consensus-native execution

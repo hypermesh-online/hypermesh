@@ -35,13 +35,9 @@ pub use super::keys::{
 };
 
 use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use crate::assets::core::{AssetResult, AssetError};
+use crate::assets::core::AssetResult;
 
-use super::{
-    PrivacyAllocationType, ResourceAllocationConfig, ConsensusRequirementConfig,
-    ProxyConfiguration
-};
+use super::PrivacyAllocationType;
 
 /// Privacy configuration manager
 pub struct PrivacyConfigManager {

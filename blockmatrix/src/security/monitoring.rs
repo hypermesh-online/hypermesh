@@ -2,7 +2,6 @@
 
 use super::error::Result;
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;

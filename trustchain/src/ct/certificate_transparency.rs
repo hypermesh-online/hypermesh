@@ -5,18 +5,13 @@
 
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
 use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
-use merkletree::merkle::MerkleTree;
-use merkletree::proof::Proof;
-use merkletree::store::VecStore;
-use merkletree::hash::Algorithm;
-use sha2::{Sha256 as Sha2_256, Digest as _};
+use sha2::Digest as _;
 
 /// SHA256 algorithm for MerkleTree
 #[derive(Clone, Debug, Default)]
@@ -42,7 +37,7 @@ impl std::hash::Hasher for Sha256Algorithm {
 // }
 use uuid::Uuid;
 use hex;
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
 use ring::rand::{SystemRandom, SecureRandom};
 
 use crate::errors::{TrustChainError, Result as TrustChainResult};
@@ -362,7 +357,7 @@ impl CertificateTransparencyLog {
 
         // Add to Merkle tree (Note: with current merkletree crate, we rebuild the tree)
         {
-            let mut tree = self.merkle_tree.write().await;
+            let tree = self.merkle_tree.write().await;
             // For simplicity, we'll track the entry but rebuild if needed
             // In production, consider a different merkle tree implementation
             debug!("Added entry {} to merkle tree (tracking: {})", entry_id, ct_entry.leaf_hash.len());

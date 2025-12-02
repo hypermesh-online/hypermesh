@@ -5,7 +5,7 @@
 
 use super::types::*;
 use super::OsAbstraction;
-use anyhow::{Result, Context};
+use anyhow::Result;
 use std::sync::Mutex;
 use std::time::Instant;
 

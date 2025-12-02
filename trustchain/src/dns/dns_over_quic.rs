@@ -3,11 +3,8 @@
 //! This module provides legacy DNS-over-QUIC support while migrating to STOQ transport.
 //! All new implementations should use dns_over_stoq.rs instead.
 
-use std::sync::Arc;
-use std::time::Duration;
 use std::net::SocketAddrV6;
-use anyhow::{Result, anyhow};
-use tracing::{info, debug, warn, error};
+use tracing::{warn, error};
 
 use crate::errors::{DnsError, Result as TrustChainResult};
 

@@ -8,14 +8,13 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration, Instant};
 use std::process::{Command, Stdio};
-use std::io::{Write, BufRead, BufReader};
-use std::thread;
+use std::io::Write;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
-use crate::catalog::vm::consensus::{ConsensusVM, ConsensusOperation, ConsensusExecutionResult};
+use crate::catalog::vm::consensus::ConsensusVM;
 use crate::assets::core::{AssetManager, AssetId, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
 use crate::assets::core::adapter::{StorageType, StorageRequirements};
 use super::context::ExecutionContext;

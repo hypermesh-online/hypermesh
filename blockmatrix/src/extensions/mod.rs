@@ -46,7 +46,6 @@
 //! - TrustChain certificate verification for signed extensions
 //! - Isolated execution environments with controlled API access
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 // Submodules for extension system

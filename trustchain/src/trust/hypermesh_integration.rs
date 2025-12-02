@@ -6,16 +6,13 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use std::net::Ipv6Addr;
-use std::collections::{HashMap, HashSet};
 use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use uuid::Uuid;
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use crate::consensus::{ConsensusProof, FourProofValidator};
+use crate::errors::Result as TrustChainResult;
+use crate::consensus::FourProofValidator;
 
 /// HyperMesh trust validator with Byzantine fault detection
 pub struct HyperMeshTrustValidator {

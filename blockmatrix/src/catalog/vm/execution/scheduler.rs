@@ -5,18 +5,18 @@
 //! executions while maintaining consensus proof validation.
 
 use std::sync::Arc;
-use std::collections::{HashMap, VecDeque, BinaryHeap};
-use std::time::{SystemTime, Duration, Instant};
+use std::collections::{HashMap, BinaryHeap};
+use std::time::{SystemTime, Duration};
 use std::cmp::Ordering;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex, Semaphore};
 use uuid::Uuid;
 
 use crate::catalog::vm::consensus::{ConsensusVM, ConsensusOperation};
-use crate::assets::core::{AssetType, AssetId};
+use crate::assets::core::AssetType;
 use super::context::ExecutionContext;
-use super::super::{AssetManagementConfig, ConsensusRequirements};
+use super::super::AssetManagementConfig;
 
 /// Execution scheduler with consensus-aware resource allocation
 pub struct ExecutionScheduler {

@@ -7,10 +7,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetId, AssetType, AssetResult, AssetError};
+use crate::assets::core::{AssetId, AssetResult};
 use super::NodeId;
 
 /// Asset migrator for moving assets between nodes

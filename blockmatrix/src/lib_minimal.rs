@@ -2,7 +2,6 @@
 //!
 //! Temporary minimal build to achieve Gate 0 success
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 // Core modules only

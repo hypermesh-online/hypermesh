@@ -120,7 +120,6 @@
 //! # }
 //! ```
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 // Re-export all public APIs

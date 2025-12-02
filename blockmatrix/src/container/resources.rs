@@ -5,8 +5,8 @@ use super::error::{Result, ContainerError};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, Instant};
-use tracing::{info, debug, warn, error};
+use std::time::{Duration, SystemTime};
+use tracing::{info, debug, warn};
 
 /// Resource allocation for containers
 #[derive(Debug, Clone, Serialize, Deserialize)]

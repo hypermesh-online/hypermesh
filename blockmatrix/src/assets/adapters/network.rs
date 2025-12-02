@@ -19,7 +19,7 @@ use crate::assets::core::{
     AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, NetworkUsage, NetworkLimit,
+    ResourceUsage, ResourceLimits, NetworkUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     NetworkRequirements,
 };
@@ -811,8 +811,8 @@ impl AssetAdapter for NetworkAssetAdapter {
         let healthy = failed_interfaces == 0 && down_interfaces < 2 && available > 0;
         
         let mut performance_metrics = HashMap::new();
-        performance_metrics.insert("total_bandwidth_gbps".to_string(), (self.total_bandwidth as f64 / 1000.0));
-        performance_metrics.insert("available_bandwidth_gbps".to_string(), (available as f64 / 1000.0));
+        performance_metrics.insert("total_bandwidth_gbps".to_string(), self.total_bandwidth as f64 / 1000.0);
+        performance_metrics.insert("available_bandwidth_gbps".to_string(), available as f64 / 1000.0);
         performance_metrics.insert("bandwidth_utilization_percent".to_string(), 
             ((self.total_bandwidth - available) as f64 / self.total_bandwidth as f64) * 100.0);
         performance_metrics.insert("active_allocations".to_string(), stats.active_allocations as f64);

@@ -3,13 +3,13 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use parking_lot::RwLock;
-use tokio::time::{interval, Instant, Duration};
-use tracing::{debug, warn, error};
+use tokio::time::{Instant, Duration};
+use tracing::debug;
 use sha2::{Sha256, Digest};
 // X509 parsing removed for MVP simplicity
 
 use super::config::AuthenticationConfig;
-use super::error::{TransportError, Result};
+use super::error::Result;
 
 /// Certificate validation result
 #[derive(Debug, Clone)]

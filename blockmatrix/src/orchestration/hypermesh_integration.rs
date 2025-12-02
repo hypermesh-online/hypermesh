@@ -10,24 +10,18 @@ use std::time::{SystemTime, Duration};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
-use uuid::Uuid;
 
 use crate::container::{
     ContainerRuntime, ContainerSpec, CreateOptions,
-    ContainerId, ContainerStatus, ContainerState,
-    ResourceRequirements as ContainerResourceRequirements, ResourceLimits, ResourceUsage as ContainerResourceUsage,
+    ContainerId, ContainerStatus,
 };
 use crate::container::runtime::ContainerHandle;
 use crate::assets::core::{
     AssetManager, AssetId, AssetType, AssetAllocationRequest, AssetAllocation,
-    ConsensusProof, AssetResult, AssetStatus, AssetState,
-    SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState,
+    ConsensusProof, AssetStatus, WorkloadType,
     ResourceRequirements, PrivacyLevel,
 };
-use crate::catalog::vm::{
-    ConsensusProofVM, VMConfig, ExecutionContext, ExecutionResult,
-    AssetManagementConfig,
-};
+use crate::catalog::vm::ConsensusProofVM;
 
 /// HyperMesh-integrated container orchestrator
 pub struct HyperMeshContainerOrchestrator {

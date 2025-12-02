@@ -3,7 +3,6 @@
 //! Comprehensive error handling for TrustChain services with detailed
 //! error context and recovery information, including security error types.
 
-use std::fmt;
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
 

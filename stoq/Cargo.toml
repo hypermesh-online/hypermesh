@@ -6,6 +6,9 @@ authors = ["HyperMesh Team"]
 description = "STOQ Protocol - Pure QUIC over IPv6 Transport (Transport Layer Only)"
 license = "MIT OR Apache-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
 # Core async runtime
 tokio = { workspace = true }

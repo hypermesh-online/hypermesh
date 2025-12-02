@@ -5,12 +5,10 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tracing::{debug, error};
+use tracing::debug;
 use sha2::{Sha256, Digest};
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer};
 use ring::rand::SystemRandom;
-use rand;
 
 use crate::errors::{CTError, CryptoError, Result as TrustChainResult};
 use super::{LogEntry, SignedCertificateTimestamp};
@@ -180,7 +178,7 @@ impl SCTManager {
     // Internal helper methods
 
     fn generate_keypair(rng: &SystemRandom) -> TrustChainResult<(SigningKey, VerifyingKey)> {
-        use ring::signature::{Ed25519KeyPair, KeyPair};
+        use ring::signature::Ed25519KeyPair;
         
         // Generate Ed25519 key pair using ring
         let key_pair = Ed25519KeyPair::generate_pkcs8(rng)

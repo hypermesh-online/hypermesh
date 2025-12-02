@@ -4,12 +4,11 @@
 //! languages and the ConsensusProof system. It handles language-specific
 //! constructs and converts them into unified consensus operations.
 
-use std::sync::Arc;
 use std::collections::HashMap;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
-use super::{ConsensusConstruct, ConsensusMapping, ConsensusTranslator};
+use super::{ConsensusMapping, ConsensusTranslator};
 
 /// Main consensus bridge coordinator
 pub struct ConsensusBridge {

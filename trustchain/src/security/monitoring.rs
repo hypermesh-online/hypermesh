@@ -3,15 +3,15 @@
 //! Real-time security monitoring with consensus validation integration
 
 use std::sync::Arc;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, debug};
 
-use crate::consensus::{ConsensusProof, ConsensusResult};
+use crate::consensus::ConsensusProof;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
-use super::{SecuritySeverity, SecurityEvent};
+use super::SecuritySeverity;
 
 /// Real-time security monitoring dashboard
 pub struct SecurityMonitoringDashboard {

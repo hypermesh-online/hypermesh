@@ -17,7 +17,7 @@ mod os_integration_tests {
 
     // Mock minimal imports to avoid compilation issues
     mod mock_os_abstraction {
-        use std::collections::HashMap;
+        
 
         #[derive(Debug, Clone)]
         pub struct CpuInfo {

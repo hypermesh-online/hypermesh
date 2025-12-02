@@ -5,21 +5,16 @@
 //! STOQ protocol integration, and <35ms certificate operations.
 
 use std::sync::Arc;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
 use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
 use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
+use tracing::{info, warn};
 use hex;
-use ring::digest;
-use rustls::pki_types::{CertificateDer as RustlsCertDer, PrivateKeyDer as RustlsPrivateKeyDer};
-use rcgen::{Certificate as RcgenCertificate, CertificateParams, KeyPair};
-use x509_parser::parse_x509_certificate;
+use rcgen::{CertificateParams, KeyPair};
 use uuid::Uuid;
 
-use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements, ConsensusResult, FourProofValidator};
+use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult, FourProofValidator};
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
@@ -401,7 +396,7 @@ impl CertificateStore {
     }
 
     pub async fn revoke_certificate(&self, serial_number: &str, _reason: String) -> TrustChainResult<()> {
-        if let Some(mut cert) = self.certificates.get_mut(serial_number) {
+        if let Some(cert) = self.certificates.get_mut(serial_number) {
             // Update certificate status to revoked
             self.metrics.revoked_certificates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             info!("Certificate revoked: {}", serial_number);

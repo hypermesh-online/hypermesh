@@ -7,10 +7,10 @@ use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, debug};
 
 use crate::consensus::{ConsensusProof, StakeProof, TimeProof, SpaceProof, WorkProof};
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use crate::errors::Result as TrustChainResult;
 
 /// Byzantine fault detector with consensus integration
 pub struct ByzantineDetector {

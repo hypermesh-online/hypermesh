@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 
 use super::{PrivacyAllocationResult, allocation_types::PrivacyAllocationType};
-use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetResult, PrivacyLevel};
 
 /// Privacy enforcement engine
 pub struct PrivacyEnforcer {

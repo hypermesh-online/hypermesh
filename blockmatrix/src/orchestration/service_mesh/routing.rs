@@ -8,7 +8,7 @@ use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::RwLock;

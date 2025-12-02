@@ -13,7 +13,6 @@ use blockmatrix::consensus::{
     validation_service::ValidationService,
     ConsensusConfig,
 };
-use blockmatrix::NodeId;
 
 #[tokio::main]
 async fn main() -> Result<()> {

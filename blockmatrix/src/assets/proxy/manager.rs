@@ -10,16 +10,15 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ProxyNetworkConfig, ProxySystemStats, ProxySystemError,
+    ProxyNetworkConfig, ProxySystemStats,
     ProxyRouter, ProxyForwarder, TrustChainIntegration,
-    QuantumSecurity, ShardedDataAccess, NATTranslator,
-    PortRange
+    QuantumSecurity, ShardedDataAccess, NATTranslator
 };
 use super::forwarding::{ForwardingRule, ForwardingRuleType};
 
 use crate::assets::core::{
     ProxyAddress, AssetId, AssetResult, AssetError, PrivacyLevel,
-    ProxyNodeInfo, ProxyCapabilities
+    ProxyNodeInfo
 };
 
 /// The main Remote Proxy Manager implementing NAT-like addressing

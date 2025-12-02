@@ -11,7 +11,8 @@
 //!
 //! NETWORK ADDRESS: catalog.hypermesh.online (via TrustChain DNS)
 
-#![warn(missing_docs)]
+// Documentation warnings disabled during early development
+// #![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 pub mod assets;

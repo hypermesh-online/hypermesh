@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 use tokio::sync::{RwLock, Notify};
-use tracing::{info, warn, error, instrument};
+use tracing::{info, error, instrument};
 use serde::{Serialize, Deserialize};
 
 use crate::{IntegrationResult, IntegrationError};

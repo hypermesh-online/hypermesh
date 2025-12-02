@@ -5,17 +5,13 @@
 //! migration capabilities.
 
 use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, Ipv6Addr};
-use std::sync::Arc;
+use std::net::Ipv6Addr;
 use std::time::{Duration, SystemTime};
-use tokio::sync::{RwLock, mpsc};
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
 use crate::assets::core::{
-    AssetId, AssetType, AssetResult, AssetError,
-    AssetStatus, AssetState, ConsensusProof,
-    ProxyAddress, PrivacyLevel,
+    AssetId, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyLevel,
 };
 
 pub mod coordinator;

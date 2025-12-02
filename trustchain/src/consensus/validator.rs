@@ -4,11 +4,11 @@
 //! Replaces ALL security bypasses and testing shortcuts.
 
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
-use tracing::{info, debug, warn, error};
-use sha2::{Sha256, Digest};
+use tracing::{info, warn, error};
+use sha2::Digest;
 use crate::consensus::proof::*;
 
 /// Production consensus validator with Byzantine fault detection

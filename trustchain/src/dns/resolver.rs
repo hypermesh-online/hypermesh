@@ -3,15 +3,15 @@
 //! Upstream DNS resolution with IPv6-only networking and TrustChain domain handling.
 
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use std::net::{Ipv6Addr, SocketAddrV6};
+use std::time::SystemTime;
+use std::net::Ipv6Addr;
 use tokio::sync::{RwLock, Mutex};
 use serde::{Serialize, Deserialize};
-use tracing::{debug, warn, error};
+use tracing::{debug, warn};
 
-use trust_dns_client::{client::{AsyncClient, ClientHandle}, udp::UdpClientConnection};
-use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
-use trust_dns_proto::rr::{DNSClass, Name, RData, Record, RecordType};
+use trust_dns_client::client::{AsyncClient, ClientHandle};
+use trust_dns_proto::op::Message;
+use trust_dns_proto::rr::{Name, RData, Record};
 
 use crate::errors::{DnsError, Result as TrustChainResult};
 use super::{DnsQuery, DnsResponse, DnsRecord, DnsRecordData};

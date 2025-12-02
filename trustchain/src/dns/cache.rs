@@ -2,7 +2,6 @@
 //! 
 //! High-performance DNS cache with TTL support and automatic cleanup.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use dashmap::DashMap;
@@ -11,7 +10,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 use trust_dns_proto::rr::RecordType;
-use crate::errors::{DnsError, Result as TrustChainResult};
+use crate::errors::Result as TrustChainResult;
 use super::{DnsResponse};
 
 /// DNS cache entry

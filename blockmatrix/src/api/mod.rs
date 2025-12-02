@@ -11,7 +11,7 @@ use std::net::Ipv6Addr;
 use anyhow::Result;
 use tracing::info;
 
-use stoq::{StoqApiServer, ApiHandler};
+use stoq::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
 
 use crate::HyperMeshSystem;

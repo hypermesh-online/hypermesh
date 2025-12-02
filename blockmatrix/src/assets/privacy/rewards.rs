@@ -8,10 +8,10 @@ use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CaesarRewardConfig, ResourceAllocationConfig, PrivacyAllocationType,
+    CaesarRewardConfig, ResourceAllocationConfig,
     PayoutFrequency
 };
-use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetResult, PrivacyLevel};
 
 /// CAESAR reward calculator and manager
 pub struct CaesarRewardCalculator {

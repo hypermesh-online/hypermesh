@@ -12,12 +12,12 @@ use std::time::{SystemTime, Duration};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 
 use stoq::{StoqApiClient, transport::{StoqTransport, TransportConfig}};
 
 use crate::ca::CertificateRequest;
-use super::{ConsensusProof, ConsensusResult, ConsensusRequirements};
+use super::ConsensusRequirements;
 
 /// HyperMesh consensus validation client
 pub struct HyperMeshConsensusClient {

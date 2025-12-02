@@ -5,7 +5,6 @@
 
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration};
-use std::collections::HashMap;
 use sha2::{Sha256, Digest};
 use anyhow::{Result, anyhow};
 use rand::Rng;

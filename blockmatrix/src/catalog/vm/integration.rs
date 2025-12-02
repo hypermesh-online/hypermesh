@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use async_trait::async_trait;
 use crate::catalog::vm::execution::context::{
-    BlockchainExecutionContext, P2PExecutionContext, PeerInfo, PeerResourceInfo,
+    BlockchainExecutionContext, P2PExecutionContext, PeerInfo,
     NetworkTopology, RoutingPreferences,
 };
 

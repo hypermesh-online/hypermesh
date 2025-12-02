@@ -5,8 +5,7 @@
 
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
-use crate::consensus::proof::ConsensusProof;
+use crate::assets::core::{AssetResult, PrivacyLevel};
 
 /// Privacy allocation types from Proof of State patterns
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

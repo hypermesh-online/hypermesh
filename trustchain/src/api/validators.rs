@@ -2,7 +2,6 @@
 //! 
 //! Input validation for API requests.
 
-use serde::{Serialize, Deserialize};
 use std::net::Ipv6Addr;
 
 use crate::errors::{ApiError, Result as TrustChainResult};

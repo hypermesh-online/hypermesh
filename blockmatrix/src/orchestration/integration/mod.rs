@@ -10,9 +10,7 @@ pub mod performance;
 pub use mfn_bridge::{MfnBridge, LayerCoordination, MfnOperation, LayerResponse};
 pub use performance::{PerformanceValidator, PerformanceReport, ValidationResult};
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 /// Integration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

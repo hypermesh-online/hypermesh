@@ -3,7 +3,6 @@
 //! This module provides the centralized extension manager that integrates
 //! extensions as first-class citizens in the HyperMesh ecosystem.
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -12,9 +11,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::{
-    ExtensionCapability, ExtensionCategory, ExtensionConfig, ExtensionError,
-    ExtensionMetadata, ExtensionRequest, ExtensionResponse, ExtensionResult,
-    ExtensionStatus, HyperMeshExtension, ResourceLimits, ValidationReport,
+    ExtensionCapability, ExtensionConfig, ExtensionError,
+    ExtensionMetadata, ExtensionRequest, ExtensionResponse, ExtensionResult, HyperMeshExtension, ResourceLimits, ValidationReport,
     AssetExtensionHandler, AssetLibraryExtension,
 };
 

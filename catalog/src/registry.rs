@@ -873,3 +873,4 @@ mod tests {
         assert_eq!(results.total_count, 0);
     }
 }
+}

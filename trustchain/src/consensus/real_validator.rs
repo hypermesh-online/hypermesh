@@ -7,7 +7,6 @@ use anyhow::{Result, anyhow};
 use sha2::{Sha256, Digest};
 use std::time::{SystemTime, Duration, Instant};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use tracing::{info, warn, error, debug};
 
 use super::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, Proof};

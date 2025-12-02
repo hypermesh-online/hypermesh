@@ -291,7 +291,7 @@ impl StoqApiClient {
         };
 
         // Get or create connection to service
-        let mut connection = self.get_connection(service).await
+        let connection = self.get_connection(service).await
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
 
         // Open bidirectional stream

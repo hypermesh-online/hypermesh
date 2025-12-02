@@ -13,7 +13,6 @@
 //! - Machine learning-powered anomaly detection
 //! - Automated incident response
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 // Re-exports from sibling modules
@@ -29,7 +28,6 @@ pub use super::error::{SecurityError, Result};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-use uuid::Uuid;
 
 /// Security framework main orchestrator
 pub struct HyperMeshSecurity {

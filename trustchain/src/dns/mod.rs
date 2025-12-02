@@ -5,23 +5,18 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::{Ipv6Addr, SocketAddrV6};
-use std::collections::HashMap;
-use dashmap::DashMap;
+use std::net::Ipv6Addr;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result as AnyhowResult, anyhow};
-use tokio::sync::{RwLock, Mutex};
-use tokio::net::UdpSocket;
+use anyhow::Result as AnyhowResult;
+use tokio::sync::Mutex;
 use tracing::{info, debug, warn, error};
 
 // ARCHITECTURAL ENFORCEMENT: Use STOQ transport instead of direct QUIC
-use stoq::{Connection, Endpoint};
-use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
+use trust_dns_proto::op::ResponseCode;
 use trust_dns_proto::rr::{DNSClass, Name, RData, Record, RecordType};
-use hickory_client::{client::{AsyncClient, ClientHandle}, udp::UdpClientConnection};
 
 use crate::config::DnsConfig;
-use crate::consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
+use crate::consensus::ConsensusContext;
 use crate::errors::{DnsError, Result as TrustChainResult};
 
 pub mod cache;

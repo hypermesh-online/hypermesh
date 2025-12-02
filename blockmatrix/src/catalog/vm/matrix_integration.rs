@@ -15,23 +15,16 @@ use std::collections::HashMap;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-use async_trait::async_trait;
 
 use crate::assets::matrix_blockchain::{
-    MatrixBlockchainManager, EntityBlockchain, EntityConfig, EntityType,
-    ValidationRequest, PublicValidationResponse, ValidationResult,
-    MatrixCoordinate, PrivacyPolicyConfig, AssetPrivacyLevel
+    MatrixBlockchainManager, EntityType,
+    ValidationRequest, PublicValidationResponse, PrivacyPolicyConfig
 };
-use crate::assets::blockchain::HyperMeshAssetRecord;
 use crate::assets::core::AssetId as CoreAssetId;
-use crate::consensus::ConsensusProof;
 use super::{
     ConsensusProofVM, VMConfig, ExecutionResult, ExecutionContext,
     PrivacyLevel, AssetAllocation, AssetId
 };
-use super::consensus::ConsensusVM;
-use super::execution::VMExecutor;
-use super::languages::MultiLanguageSupport;
 
 /// Matrix-aware VM execution context
 #[derive(Debug, Clone)]

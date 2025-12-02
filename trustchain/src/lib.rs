@@ -30,7 +30,6 @@ pub use stoq_client::{TrustChainStoqClient, TrustChainStoqConfig, ServiceEndpoin
 pub use crypto::{PostQuantumCrypto, FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm};
 
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, error, warn};
 
 /// Main TrustChain service coordinator with security integration

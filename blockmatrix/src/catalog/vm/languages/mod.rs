@@ -35,7 +35,7 @@ use crate::consensus::proof::ConsensusProof;
 use super::consensus::ConsensusVM;
 use super::execution::{ExecutionContext, ExecutionResult};
 pub use consensus_bridge::ConsensusBridge;
-use super::{AssetId, PrivacyLevel};
+use super::PrivacyLevel;
 
 /// Supported programming languages based on Proof of State analysis
 const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[

@@ -22,9 +22,8 @@ use crate::assets::core::{
     AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, MemoryUsage, MemoryLimit,
+    ResourceUsage, ResourceLimits, MemoryUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
-    MemoryRequirements,
 };
 use crate::os_integration::{create_os_abstraction, OsAbstraction};
 

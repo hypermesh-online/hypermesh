@@ -1,12 +1,10 @@
 //! Intrusion detection and threat analysis
 
-use super::{NetworkPacket, SeverityLevel, error::{Result, SecurityError}};
-use super::ebpf::SecurityEvent;
+use super::{NetworkPacket, SeverityLevel, error::Result};
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::warn;
 
 /// Threat indicator
 #[derive(Debug, Clone, Serialize, Deserialize)]

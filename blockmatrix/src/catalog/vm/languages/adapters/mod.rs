@@ -34,16 +34,15 @@ use super::{ConsensusConstructType, SourceLocation};
 
 use std::sync::Arc;
 use anyhow::Result;
-use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 
 use crate::consensus::proof::ConsensusProof;
 use super::super::consensus::ConsensusVM;
-use super::super::execution::{ExecutionContext, ExecutionResult};
+use super::super::execution::ExecutionContext;
 use super::{
     LanguageRuntime, LanguageSpecificConfig, ConsensusRequirements,
-    ConsensusConstruct, AssetRequirements, TranslatedError, ConsensusBridge
+    ConsensusConstruct, ConsensusBridge
 };
 
 /// Base adapter functionality shared across all language adapters

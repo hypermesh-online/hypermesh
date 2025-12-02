@@ -28,7 +28,7 @@ pub use scaling::{PredictiveScaler, ScalingTrigger, WorkloadPrediction, ScalingD
 pub use resource_manager::{IfrResourceManager, ResourceAllocation, ResourceConstraint, NodeResources};
 pub use migration::{ContainerMigrator, MigrationDecision, MigrationReason, MigrationPlan};
 
-use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
+use crate::orchestration::integration::MfnBridge;
 use crate::{ContainerConfig, ServiceId, NodeId, ContainerId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Container orchestration engine with MFN integration

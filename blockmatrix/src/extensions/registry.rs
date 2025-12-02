@@ -2,19 +2,15 @@
 //!
 //! Manages the registration, discovery, and lifecycle of loaded extensions.
 
-use anyhow::Result as AnyhowResult;
 use semver::{Version, VersionReq};
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 use super::{
-    AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
-    ExtensionDependency, ExtensionError, ExtensionMetadata, ExtensionResult,
-    ExtensionState as ExtState, ExtensionStatus, HyperMeshExtension,
+    AssetExtensionHandler, ExtensionCategory, ExtensionError, ExtensionMetadata, ExtensionResult, ExtensionStatus, HyperMeshExtension,
 };
 
 use crate::assets::core::AssetType;

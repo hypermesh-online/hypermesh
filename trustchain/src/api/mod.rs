@@ -3,16 +3,14 @@
 //! **STOQ Protocol Only** - HTTP version REMOVED
 //! All TrustChain services now communicate via STOQ (QUIC transport).
 
-use std::sync::Arc;
 use std::time::SystemTime;
 use std::net::Ipv6Addr;
 use serde::{Serialize, Deserialize};
-use tokio::sync::RwLock;
 
-use crate::consensus::{ConsensusProof, ConsensusContext};
-use crate::ca::{CertificateRequest, IssuedCertificate};
+use crate::consensus::ConsensusProof;
+use crate::ca::IssuedCertificate;
 use crate::ct::SignedCertificateTimestamp;
-use crate::dns::{DnsQuery, DnsResponse};
+use crate::dns::DnsResponse;
 
 // STOQ API (Primary interface)
 pub mod stoq_api;

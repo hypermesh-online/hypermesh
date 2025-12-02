@@ -6,18 +6,16 @@
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
-use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
 use tokio::sync::RwLock;
 use tracing::{info, debug, warn, error};
 
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate, CertificateParams, KeyPair};
+use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate, KeyPair};
 use x509_parser::parse_x509_certificate;
 
 use crate::consensus::{
-    ConsensusProof, ConsensusContext, ConsensusRequirements, ConsensusResult,
+    ConsensusProof, ConsensusContext, ConsensusRequirements,
     HyperMeshConsensusClient, HyperMeshClientConfig, ConsensusValidationService,
     ConsensusValidationStatus, ConsensusValidationResult, ConsensusClientMetrics,
     FourProofSet

@@ -6,7 +6,7 @@
 
 use std::time::SystemTime;
 use anyhow::{Result, anyhow};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
 
 use pqcrypto_kyber::kyber1024;
@@ -300,8 +300,8 @@ impl KyberCrypto {
     
     /// Internal: AES-GCM encryption
     fn aes_encrypt(&self, data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>> {
-        use aes_gcm::{Aes256Gcm, Key, Nonce, AeadCore, AeadInPlace, KeyInit};
-        use rand::RngCore;
+        use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
+        
         
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
         let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());

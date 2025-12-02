@@ -22,7 +22,7 @@ use super::super::super::consensus::ConsensusVM;
 use super::super::super::execution::{ExecutionContext, ExecutionResult};
 use super::super::super::julia::JuliaVM;
 use super::{
-    LanguageRuntime, BaseAdapter, AdapterConfig, ExecutionEnvironment,
+    LanguageRuntime, BaseAdapter,
     LanguageSpecificConfig, ConsensusBridge,
 };
 use super::super::{
@@ -99,7 +99,7 @@ impl JuliaAdapter {
         consensus_proof: ConsensusProof,
     ) -> Result<ExecutionResult> {
         // Create execution environment
-        let mut env = self.base.create_execution_environment(&context).await?;
+        let env = self.base.create_execution_environment(&context).await?;
         
         // Validate consensus proof
         if !self.base.validate_adapter_consensus_proof(&consensus_proof).await? {

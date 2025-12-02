@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
-use tracing::{info, debug, warn, instrument};
+use tracing::{info, debug, instrument};
 
 use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
-use stoq::{StoqApiServer, StoqApiClient};
+use stoq::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
 
 use crate::ca::TrustChainCA;

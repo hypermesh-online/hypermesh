@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::time::Duration;
 use anyhow::Result;
-use uuid::Uuid;
 
 use crate::catalog::vm::{
     ConsensusProofVM, VMConfig, MatrixAwareVM, MatrixExecutionContext,
@@ -19,7 +18,7 @@ use crate::catalog::vm::{
 use crate::catalog::vm::execution::ExecutionContext;
 use crate::assets::core::{AssetId, AssetType};
 use crate::assets::matrix_blockchain::{
-    MatrixBlockchainManager, EntityBlockchain, EntityConfig,
+    MatrixBlockchainManager, EntityConfig,
     EntityType, MatrixCoordinate, GeographicDimension,
     OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
     AssetPrivacyLevel
@@ -50,7 +49,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
     let matrix_vm = vm.create_matrix_aware_vm(Arc::clone(&matrix_manager)).await?;
     
     // Configure matrix VM with entity configurations
-    let mut configured_matrix_vm = setup_entity_vm_configs(matrix_vm).await?;
+    let configured_matrix_vm = setup_entity_vm_configs(matrix_vm).await?;
     
     // Vehicle to purchase (example VIN as AssetId)
     let vehicle_vin = AssetId::new(AssetType::Container);

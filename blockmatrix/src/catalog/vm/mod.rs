@@ -90,7 +90,7 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use execution::context::{P2PExecutionContext, NetworkTopology, RoutingPreferences, ExecutionPermissions, ResourceLimits, SchedulingInfo};
+use execution::context::{ExecutionPermissions, ResourceLimits, SchedulingInfo};
 
 // Re-export core types
 pub use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};

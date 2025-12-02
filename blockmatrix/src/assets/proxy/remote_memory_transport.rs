@@ -9,13 +9,12 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{RwLock, Mutex, Semaphore};
 use tokio::io::AsyncReadExt;
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use quinn::{Endpoint, Connection, SendStream, RecvStream};
+use quinn::{Endpoint, Connection, RecvStream};
 use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{
-    AssetId, AssetResult, AssetError, ProxyAddress,
+    AssetResult, AssetError,
 };
 use super::{GlobalAddress, MemoryPermissions};
 

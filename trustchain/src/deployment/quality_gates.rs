@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use tracing::{info, warn, error};
+use anyhow::Result;
+use tracing::{info, error};
 
 /// Quality gate validation results
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -289,7 +289,7 @@ impl QualityGate for ConsensusValidationGate {
     fn is_blocking(&self) -> bool { true }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
-        use std::process::Command;
+        
         use std::fs;
 
         // Check for proper consensus validation implementation

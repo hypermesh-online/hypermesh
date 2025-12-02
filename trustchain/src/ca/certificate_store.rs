@@ -5,7 +5,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
 
 use super::{IssuedCertificate, CertificateStatus};

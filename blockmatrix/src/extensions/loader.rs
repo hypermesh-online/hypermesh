@@ -5,13 +5,12 @@
 
 #![allow(unsafe_code)]
 
-use anyhow::{Context, Result as AnyhowResult};
-use async_trait::async_trait;
+use anyhow::Context;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 // TODO: Add libloading dependency to Cargo.toml
 // use libloading::{Library, Symbol};
@@ -30,10 +29,9 @@ impl Library {
 struct Symbol<T>(std::marker::PhantomData<T>);
 
 use super::{
-    ExtensionCapability, ExtensionConfig, ExtensionError, ExtensionMetadata,
+    ExtensionCapability, ExtensionError, ExtensionMetadata,
     ExtensionResult, HyperMeshExtension, ResourceLimits,
 };
-use crate::assets::core::PrivacyLevel;
 
 /// Type alias for extension constructor function
 pub type ExtensionConstructor = unsafe extern "C" fn() -> *mut dyn HyperMeshExtension;
@@ -337,7 +335,7 @@ impl ExtensionLoader {
 
     /// Unload an extension
     pub async fn unload_extension(&self, extension_id: &str) -> ExtensionResult<()> {
-        let mut loaded_ext = {
+        let loaded_ext = {
             let mut loaded = self.loaded.write().await;
             loaded.remove(extension_id).ok_or_else(|| {
                 ExtensionError::ExtensionNotFound {

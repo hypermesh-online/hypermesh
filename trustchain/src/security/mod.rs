@@ -4,15 +4,15 @@
 //! for all certificate operations, Byzantine fault detection, and real-time security alerts.
 
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use std::time::SystemTime;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::RwLock;
 use tracing::{info, warn, error, debug};
 use dashmap::DashMap;
 
 use crate::consensus::{ConsensusProof, ConsensusResult, FourProofValidator, ConsensusRequirements};
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use crate::errors::Result as TrustChainResult;
 
 pub mod monitoring;
 pub mod byzantine;

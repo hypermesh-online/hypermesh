@@ -2,7 +2,6 @@
 //! 
 //! Policy validation for certificate requests.
 
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
 
 use crate::consensus::ConsensusRequirements;

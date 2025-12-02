@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ use crate::assets::core::{
     AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, StorageUsage, StorageLimit,
+    ResourceUsage, ResourceLimits, StorageUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     StorageRequirements, StorageType,
 };

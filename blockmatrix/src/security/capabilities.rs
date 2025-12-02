@@ -1,12 +1,10 @@
 //! Capability-based security system
 
-use super::{Principal, Resource, Operation, error::{Result, SecurityError}};
-use async_trait::async_trait;
+use super::{Principal, Resource, Operation, error::Result};
 use serde::{Serialize, Deserialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use tracing::{info, debug};
 
 /// Capability identifier
 pub type CapabilityId = String;

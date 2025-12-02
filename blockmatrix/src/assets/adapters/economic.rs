@@ -7,8 +7,8 @@
 //! - Economic consensus validation
 
 use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetAllocation, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
-    ResourceUsage, ResourceLimits, ResourceRequirements, PrivacyLevel, ProxyAddress,
+    AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
+    ResourceUsage, ResourceLimits, PrivacyLevel, ProxyAddress,
     AdapterHealth, AdapterCapabilities, AssetType,
 };
 use crate::assets::core::privacy::{
@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use uuid::Uuid;
 
 /// Economic resource requirements for Caesar operations
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -3,14 +3,14 @@
 //! Implements peer discovery, service registration, and network topology
 //! management for the HyperMesh multi-node system.
 
-use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
+use std::collections::HashMap;
+use std::net::SocketAddrV6;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetType, AssetResult, AssetError};
+use crate::assets::core::{AssetResult, AssetError};
 use super::{NodeId, NodeCapabilities};
 
 /// Node discovery service

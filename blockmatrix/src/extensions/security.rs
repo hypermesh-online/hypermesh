@@ -2,13 +2,12 @@
 //!
 //! Implements capability-based security, resource quotas, and runtime monitoring.
 
-use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{RwLock, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
 use super::{
     ExtensionCapability, ExtensionError, ExtensionMetadata, ExtensionResult,

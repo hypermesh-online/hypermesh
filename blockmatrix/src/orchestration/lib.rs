@@ -16,7 +16,6 @@
 //! - Auto-scaling: <1.2ms predictive decisions using CPE
 //! - End-to-end orchestration: <2ms latency constraint
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 pub mod service_mesh;

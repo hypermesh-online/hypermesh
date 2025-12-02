@@ -7,6 +7,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/hypermesh/hypermesh"
 description = "HyperMesh - Distributed Computing Platform with Proof of State Consensus"
 
+[lints]
+workspace = true
+
 [lib]
 name = "blockmatrix"
 path = "src/lib.rs"

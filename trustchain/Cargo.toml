@@ -8,6 +8,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/web3-ecosystem/trustchain"
 keywords = ["ca", "certificate", "transparency", "dns", "consensus"]
 
+[lints]
+workspace = true
+
 [dependencies]
 # Core async runtime
 tokio = { workspace = true }

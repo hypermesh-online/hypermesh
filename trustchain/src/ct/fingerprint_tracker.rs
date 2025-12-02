@@ -3,7 +3,7 @@
 //! Tracks certificate fingerprints for real-time monitoring and
 //! duplicate detection with efficient in-memory and persistent storage.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use dashmap::DashMap;
@@ -11,9 +11,9 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use tokio::time::{interval, Instant};
 use tracing::{debug, info, warn, error};
-use sha2::{Sha256, Digest};
+use sha2::Digest;
 
-use crate::errors::{CTError, Result as TrustChainResult};
+use crate::errors::Result as TrustChainResult;
 
 /// Real-time fingerprint tracker
 pub struct FingerprintTracker {

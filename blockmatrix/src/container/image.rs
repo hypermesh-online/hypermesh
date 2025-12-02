@@ -1,6 +1,5 @@
 //! Container image management
 
-use crate::ContainerId;
 use super::config::StorageConfig;
 use super::error::{Result, ContainerError};
 use async_trait::async_trait;
@@ -8,7 +7,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use tracing::{info, debug, warn, error};
+use tracing::{info, warn};
 
 /// Container image metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]

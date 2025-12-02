@@ -3,10 +3,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use semver::Version;
 
 use crate::assets::core::{AssetType, AssetId, AssetAllocation, PrivacyLevel, ConsensusProof};
-use super::types::{ExtensionResult, ResourceUsageReport};
+use super::types::ResourceUsageReport;
 
 /// Asset creation specification
 #[derive(Debug, Clone, Serialize, Deserialize)]

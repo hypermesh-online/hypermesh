@@ -9,14 +9,10 @@ use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
-use uuid::Uuid;
 
-use crate::assets::core::asset_id::{AssetId, AssetType};
-use super::blockchain::{HyperMeshAssetRecord, AssetPrivacyLevel};
+use crate::assets::core::asset_id::AssetId;
 use super::matrix_blockchain::{
-    MatrixBlockchainManager, EntityBlockchain, EntityType, ValidationRequest,
-    PublicValidationResponse, ValidationResult, ZKStatement, ValidationValue,
-    EntityIdentifier, ProofRequirement
+    MatrixBlockchainManager, EntityType, ValidationResult, ZKStatement, ProofRequirement
 };
 use crate::consensus::ConsensusProof;
 

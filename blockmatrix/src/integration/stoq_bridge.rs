@@ -6,9 +6,9 @@
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
-use tracing::{info, debug, warn, instrument};
+use tracing::{info, instrument};
 
-use stoq::{StoqApiServer, StoqApiClient, ApiHandler, ApiRequest, ApiResponse, ApiError};
+use stoq::{StoqApiServer, StoqApiClient, ApiHandler, ApiError};
 use stoq::transport::{StoqTransport, TransportConfig};
 
 // Re-export for compatibility (types moved from api_bridge to stoq_bridge)

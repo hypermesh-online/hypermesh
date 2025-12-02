@@ -12,15 +12,12 @@ use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{
     AssetId, AssetType, AssetResult, AssetError,
-    AssetStatus, AssetState, ConsensusProof,
-    ProxyAddress, PrivacyLevel,
 };
 
 use super::{
     NodeId, NetworkTopology, NetworkPartition, DistributedAssetState,
     AllocationDecision, ResourceSharingRequest, ResourceSharingOffer,
     MultiNodeEvent, MultiNodeCoordinatorTrait, MultiNodeMetrics,
-    ResourceAmount, ServiceLevelAgreement, DataLocalityRequirement,
 };
 
 /// Node information and capabilities
@@ -335,7 +332,7 @@ impl MultiNodeCoordinator {
 
                 // Simple partition detection: nodes that can't reach each other
                 // In production, this would use actual network probing
-                let mut detected_partitions: Vec<NetworkPartition> = Vec::new();
+                let detected_partitions: Vec<NetworkPartition> = Vec::new();
 
                 // Check for healed partitions
                 let mut partitions_write = partitions.write().await;

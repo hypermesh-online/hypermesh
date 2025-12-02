@@ -2,7 +2,7 @@
 //!
 //! Provides consensus validation for HyperMesh operations.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use async_trait::async_trait;
 
 /// Consensus validator trait

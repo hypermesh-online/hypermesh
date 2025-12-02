@@ -7,7 +7,6 @@ use std::time::Duration;
 use semver::Version;
 
 use crate::assets::core::{AssetType, AssetId, ConsensusProof, ProxyAddress};
-use super::types::ExtensionResult;
 
 /// Asset package information
 #[derive(Debug, Clone, Serialize, Deserialize)]

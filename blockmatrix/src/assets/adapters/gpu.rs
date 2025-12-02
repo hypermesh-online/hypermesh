@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
@@ -19,11 +19,11 @@ use crate::assets::core::{
     AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, GpuUsage, GpuLimit,
+    ResourceUsage, ResourceLimits, GpuUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     GpuRequirements,
 };
-use crate::os_integration::{create_os_abstraction, OsAbstraction, GpuType as OsGpuType};
+use crate::os_integration::{create_os_abstraction, OsAbstraction};
 
 /// GPU allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -9,7 +9,6 @@
 //! - Privacy-aware allocation types
 //! - Consensus proof validation (PoSpace + PoStake + PoWork + PoTime)
 
-#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 use anyhow::Result;

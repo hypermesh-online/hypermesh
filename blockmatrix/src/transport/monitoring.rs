@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use parking_lot::RwLock;
 use serde::{Serialize, Deserialize};
 use tracing::{debug, info};

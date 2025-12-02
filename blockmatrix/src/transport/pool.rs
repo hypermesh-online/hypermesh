@@ -3,7 +3,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 use std::net::SocketAddr;
-use std::collections::HashMap;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use tokio::time::{interval, Instant};
@@ -11,7 +10,6 @@ use tracing::{debug, warn, info};
 use serde::{Serialize, Deserialize};
 
 use super::config::ConnectionPoolConfig;
-use super::error::{TransportError, Result};
 use super::HyperMeshConnection;
 
 /// STOQ connection (alias for HyperMeshConnection)

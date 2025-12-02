@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::assets::core::{
-    AssetId, AssetType, AssetAllocationRequest, AssetResult,
+    AssetId, AssetAllocationRequest,
     PrivacyLevel, AssetAllocation, AssetStatus, AssetState,
     ResourceUsage, ProxyAddress,
 };
@@ -93,7 +93,7 @@ pub fn create_asset_status(
 ) -> AssetStatus {
     let now = SystemTime::now();
     
-    let mut status = AssetStatus {
+    let status = AssetStatus {
         asset_id,
         state,
         allocated_at: now,

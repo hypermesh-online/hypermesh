@@ -12,12 +12,11 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
-use crate::catalog::vm::{ConsensusProofVM, VMConfig, ExecutionContext, ExecutionResult};
+use crate::catalog::vm::{ConsensusProofVM, ExecutionContext};
 use crate::orchestration::hypermesh_integration::{
-    HyperMeshContainerOrchestrator, HyperMeshContainerSpec, ContainerDeploymentResult,
-    AssetRequirements, PrivacyRequirements, PerformanceRequirements, ContainerMetadata,
+    HyperMeshContainerOrchestrator, HyperMeshContainerSpec, PrivacyRequirements, PerformanceRequirements, ContainerMetadata,
 };
-use crate::assets::core::{AssetType, AssetId, ConsensusProof};
+use crate::assets::core::{AssetType, ConsensusProof};
 use crate::container::{ContainerSpec, ResourceRequirements};
 
 /// Catalog asset types that can be deployed

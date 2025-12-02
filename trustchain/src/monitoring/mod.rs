@@ -2,9 +2,8 @@
 //!
 //! Built-in monitoring without external dependencies for production deployment
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tokio::time::interval;

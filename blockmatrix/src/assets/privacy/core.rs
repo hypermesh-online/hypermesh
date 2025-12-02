@@ -6,10 +6,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use crate::assets::core::PrivacyLevel;
 
-use super::{
-    PrivacyAllocationType, ResourceAllocationConfig, ConsensusRequirementConfig,
-    ProxyConfiguration
-};
+use super::PrivacyAllocationType;
 
 // Import from retention module (these were stub definitions here)
 use super::retention::{
