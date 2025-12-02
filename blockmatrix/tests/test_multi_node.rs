@@ -1,5 +1,8 @@
 // Multi-Node Simulation Tests for Sprint 3
 // Tests HyperMesh's ability to manage multiple nodes with OS abstraction
+// STUB: These tests simulate multi-node but HyperMesh doesn't actually support multi-node yet
+// TODO: Implement real multi-node support in HyperMesh core
+// Priority: HIGH - Required for Option 2 (Distributed System)
 
 #[cfg(test)]
 mod multi_node_tests {

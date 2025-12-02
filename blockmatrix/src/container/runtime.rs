@@ -235,6 +235,9 @@ impl ContainerRuntime {
     }
     
     /// Create a new container
+    // STUB: Container creation is simulated, not actually creating containers
+    // TODO: Implement actual container runtime using runc, containerd, or custom implementation
+    // Priority: HIGH - Required for Option 2 (Container Runtime)
     #[instrument(skip(self), fields(image = %spec.image))]
     pub async fn create(&self, spec: ContainerSpec, options: CreateOptions) -> Result<ContainerHandle> {
         let start_time = Instant::now();
@@ -317,6 +320,9 @@ impl ContainerRuntime {
     }
     
     /// Start a container
+    // STUB: Container start is simulated, not actually starting containers
+    // TODO: Implement actual container lifecycle management
+    // Priority: HIGH - Required for Option 2 (Container Runtime)
     #[instrument(skip(self))]
     pub async fn start(&self, id: &ContainerId) -> Result<()> {
         let start_time = Instant::now();

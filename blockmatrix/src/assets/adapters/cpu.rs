@@ -340,8 +340,10 @@ impl CpuAssetAdapter {
                 asset_id: asset_id.to_string()
             })?;
         
-        // TODO: Implement actual CPU utilization measurement
-        // For now, return the cached value or simulate
+        // STUB: This function does not measure actual CPU utilization
+        // TODO: Implement real CPU monitoring using sysinfo crate or /proc/stat
+        // Priority: HIGH - Required for Option 2 (Resource Monitoring)
+        // Currently returns cached/simulated value for development
         Ok(allocation.current_utilization)
     }
     
@@ -353,7 +355,9 @@ impl CpuAssetAdapter {
             CpuOperation::Allocate => {
                 stats.total_allocations += 1;
                 stats.active_allocations += 1;
-                // TODO: Add actual CPU time tracking
+                // STUB: CPU time tracking not implemented
+                // TODO: Track actual CPU time using clock_gettime() or similar
+                // Priority: MEDIUM - Required for Option 3 (Usage Accounting)
             },
             CpuOperation::Deallocate => {
                 stats.total_deallocations += 1;
@@ -443,7 +447,10 @@ impl AssetAdapter for CpuAssetAdapter {
             numa_node: allocated_cores.first().and_then(|&core_id| {
                 // Get NUMA node from first allocated core
                 // This is simplified - in practice, might want to validate all cores are on same NUMA node
-                None // TODO: Implement NUMA node detection
+                // STUB: NUMA node detection not implemented
+                // TODO: Use libnuma or hwloc crate to detect actual NUMA topology
+                // Priority: MEDIUM - Required for Option 3 (Performance Optimization)
+                None
             }),
             privacy_level: request.privacy_level.clone(),
             isolation_enabled: true, // Enable isolation by default
@@ -623,11 +630,13 @@ impl AssetAdapter for CpuAssetAdapter {
                 asset_id: asset_id.to_string()
             })?;
         
-        // TODO: Implement actual CPU usage monitoring
+        // STUB: CPU usage monitoring not fully implemented
+        // TODO: Implement actual CPU usage monitoring using sysinfo crate or /proc/stat
+        // Priority: HIGH - Required for Option 2 (Resource Monitoring)
         let cpu_usage = CpuUsage {
             utilization_percent: allocation.current_utilization,
             frequency_mhz: allocation.frequency_mhz,
-            temperature_celsius: Some(45.0), // TODO: Get actual temperature
+            temperature_celsius: Some(45.0), // STUB: Temperature monitoring not implemented
             active_cores: allocation.allocated_cores.len() as u32,
         };
         

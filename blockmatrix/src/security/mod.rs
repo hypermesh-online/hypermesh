@@ -44,6 +44,9 @@ impl SecurityManager {
     }
 
     /// Validate security configuration
+    // STUB: Security validation not implemented
+    // TODO: Implement actual security configuration validation
+    // Priority: HIGH - Required for Option 2 (Security Layer)
     pub fn validate(&self) -> Result<()> {
         // Add validation logic here
         Ok(())

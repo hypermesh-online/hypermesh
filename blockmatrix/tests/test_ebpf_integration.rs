@@ -1,6 +1,11 @@
 // eBPF Integration Tests for Sprint 3
 // Tests Linux eBPF kernel integration with XDP, kprobe, and map operations
 // Requires: Linux kernel 4.4+, CAP_BPF or root privileges
+//
+// STUB: eBPF is not actually implemented in HyperMesh yet
+// TODO: Implement actual eBPF integration in monitoring/native module
+// Priority: LOW - Required for Option 4 (Advanced Kernel Monitoring)
+// All tests in this file are ignored until eBPF is implemented
 
 #[cfg(target_os = "linux")]
 #[cfg(test)]
@@ -32,6 +37,7 @@ mod ebpf_integration_tests {
     }
 
     #[test]
+    #[ignore = "eBPF not actually implemented - stub only. See monitoring/native/mod.rs"]
     fn test_xdp_program_lifecycle() {
         if !has_ebpf_privileges() {
             eprintln!("Skipping test: requires CAP_BPF or root privileges");

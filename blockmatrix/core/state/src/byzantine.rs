@@ -341,9 +341,12 @@ impl FaultDetector {
         }
     }
     
+    // STUB: This function simulates fault detection but doesn't actually detect Byzantine behavior
+    // TODO: Implement real Byzantine fault detection algorithms
+    // Priority: LOW - Required for Option 4 (Full Byzantine Consensus)
     async fn detect_faults(&mut self) -> Vec<FaultReport> {
         let mut reports = Vec::new();
-        
+
         // Check for timeout-based faults
         // Check for inconsistent behavior
         // Check for signature verification failures

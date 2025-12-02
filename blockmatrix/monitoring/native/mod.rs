@@ -24,6 +24,9 @@ pub struct NativeMetricsCollector {
     interval: Duration,
 
     /// eBPF program handles (when available)
+    // STUB: eBPF integration not implemented
+    // TODO: Implement actual eBPF programs for kernel-level metrics
+    // Priority: LOW - Required for Option 4 (Advanced Monitoring)
     ebpf_programs: Option<EbpfPrograms>,
 
     /// System metrics collector

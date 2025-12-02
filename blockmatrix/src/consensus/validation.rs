@@ -33,7 +33,10 @@ impl ConsensusValidator for DefaultConsensusValidator {
             return Ok(false);
         }
 
-        // TODO: Implement actual consensus validation logic
+        // STUB: This function does not actually validate consensus proofs.
+        // TODO: Implement real proof validation for PoSp, PoSt, PoWk, PoTm
+        // Priority: HIGH - Required for Option 2 (Core Functionality)
+        // Currently always returns true for development
         Ok(true)
     }
 

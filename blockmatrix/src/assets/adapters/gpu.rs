@@ -180,6 +180,9 @@ impl GpuAssetAdapter {
     }
     
     /// Detect system GPU configuration using OS abstraction layer
+    // STUB: GPU detection returns simulated devices, not actual hardware
+    // TODO: Implement actual GPU detection using nvidia-ml, OpenCL, or Vulkan APIs
+    // Priority: MEDIUM - Required for Option 3 (GPU Support)
     async fn detect_gpu_configuration() -> (u32, HashMap<u32, GpuDevice>) {
         // Use OS abstraction for real hardware detection
         match create_os_abstraction() {

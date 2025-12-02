@@ -534,6 +534,9 @@ impl NATTranslator {
     }
     
     /// Translate global address to local address
+    // STUB: NAT translation doesn't actually map to real memory addresses
+    // TODO: Implement actual memory mapping using mmap() or similar
+    // Priority: HIGH - Required for Option 2 (Remote Memory Access)
     pub async fn translate_to_local(&self, global_addr: &GlobalAddress) -> AssetResult<usize> {
         let global_to_local = self.global_to_local.read().await;
         let mapping = global_to_local.get(global_addr)
