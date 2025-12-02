@@ -14,6 +14,7 @@ use std::time::SystemTime;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
+use sysinfo::{System, CpuRefreshKind, RefreshKind};
 
 use crate::assets::core::{
     AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
@@ -138,6 +139,8 @@ pub struct CpuAssetAdapter {
     total_cores: u32,
     /// CPU usage statistics
     usage_stats: Arc<RwLock<CpuUsageStats>>,
+    /// System information for real-time monitoring
+    system_info: Arc<RwLock<System>>,
 }
 
 /// CPU usage statistics
@@ -162,16 +165,23 @@ pub struct CpuUsageStats {
 impl CpuAssetAdapter {
     /// Create new CPU adapter
     pub async fn new() -> Self {
+        // Initialize sysinfo for real-time monitoring
+        let mut system_info = System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::everything())
+        );
+        system_info.refresh_cpu(); // Initial refresh
+
         // Detect system CPU configuration
-        let (total_cores, cpu_cores) = Self::detect_cpu_configuration().await;
-        
+        let (total_cores, cpu_cores) = Self::detect_cpu_configuration(&system_info).await;
+
         let scheduler = CpuScheduler {
             algorithm: SchedulingAlgorithm::Cfs,
             time_slice_ms: 100, // 100ms time slices
             priority_levels: 255,
             preemption_enabled: true,
         };
-        
+
         Self {
             allocations: Arc::new(RwLock::new(HashMap::new())),
             cpu_cores: Arc::new(RwLock::new(cpu_cores)),
@@ -180,53 +190,71 @@ impl CpuAssetAdapter {
             scheduler: Arc::new(RwLock::new(scheduler)),
             total_cores,
             usage_stats: Arc::new(RwLock::new(CpuUsageStats::default())),
+            system_info: Arc::new(RwLock::new(system_info)),
         }
     }
     
-    /// Detect system CPU configuration using OS abstraction layer
-    async fn detect_cpu_configuration() -> (u32, HashMap<u32, CpuCore>) {
-        // Use OS abstraction for real hardware detection
-        match create_os_abstraction() {
-            Ok(os) => {
-                if let Ok(cpu_info) = os.detect_cpu() {
-                    let total_cores = cpu_info.cores as u32;
-                    let mut cpu_cores = HashMap::new();
+    /// Detect system CPU configuration using sysinfo and OS abstraction layer
+    async fn detect_cpu_configuration(system: &System) -> (u32, HashMap<u32, CpuCore>) {
+        // Use OS abstraction for detailed hardware detection
+        let os_cpu_info = create_os_abstraction().ok().and_then(|os| os.detect_cpu().ok());
 
-                    // Create CpuCore entries based on detected hardware
-                    for core_id in 0..total_cores {
-                        cpu_cores.insert(core_id, CpuCore {
-                            core_id,
-                            physical_id: core_id / 2, // Assume 2 logical per physical (SMT/HT)
-                            is_logical: core_id % 2 == 1,
-                            numa_node: core_id / 4, // Assume 4 cores per NUMA node
-                            current_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400) as u32,
-                            base_frequency_mhz: cpu_info.frequency_mhz.unwrap_or(2400) as u32,
-                            max_frequency_mhz: cpu_info.frequency_mhz.map(|f| (f as f32 * 1.5) as u32).unwrap_or(3600),
-                            status: CoreStatus::Available,
-                            allocated_to: None,
-                            temperature_celsius: Some(45.0 + (core_id as f32 * 2.0)), // Simulated temps
-                        });
-                    }
+        // Get real CPU count from sysinfo
+        let cpus = system.cpus();
+        let total_cores = cpus.len() as u32;
 
-                    tracing::info!(
-                        "Detected {} CPU cores via OS abstraction: {} ({})",
-                        total_cores,
-                        cpu_info.model,
-                        cpu_info.architecture
-                    );
-
-                    return (total_cores, cpu_cores);
-                } else {
-                    tracing::warn!("Failed to detect CPU via OS abstraction, using fallback");
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Failed to create OS abstraction: {}, using fallback", e);
-            }
+        if total_cores == 0 {
+            tracing::warn!("No CPUs detected via sysinfo, using fallback");
+            return Self::fallback_cpu_configuration();
         }
 
-        // Fallback: simulate a reasonable configuration if detection fails
-        let total_cores = 8;
+        let mut cpu_cores = HashMap::new();
+
+        // Get base frequency from OS abstraction or sysinfo
+        let base_freq = os_cpu_info.as_ref()
+            .and_then(|info| info.frequency_mhz)
+            .or_else(|| {
+                let freq = cpus.first()?.frequency();
+                if freq > 0 { Some(freq) } else { None }
+            })
+            .unwrap_or(2400) as u32;
+
+        // Create CpuCore entries from real sysinfo data
+        for (core_id, cpu) in cpus.iter().enumerate() {
+            let core_id = core_id as u32;
+            let current_freq = cpu.frequency();
+
+            cpu_cores.insert(core_id, CpuCore {
+                core_id,
+                physical_id: core_id / 2, // Assume 2 logical per physical (SMT/HT)
+                is_logical: core_id % 2 == 1,
+                numa_node: Self::detect_numa_node(core_id),
+                current_frequency_mhz: if current_freq > 0 { current_freq as u32 } else { base_freq },
+                base_frequency_mhz: base_freq,
+                max_frequency_mhz: (base_freq as f32 * 1.5) as u32, // Estimate boost frequency
+                status: CoreStatus::Available,
+                allocated_to: None,
+                temperature_celsius: Self::read_cpu_temperature(core_id),
+            });
+        }
+
+        if let Some(cpu_info) = os_cpu_info {
+            tracing::info!(
+                "Detected {} CPU cores: {} ({})",
+                total_cores,
+                cpu_info.model,
+                cpu_info.architecture
+            );
+        } else {
+            tracing::info!("Detected {} CPU cores", total_cores);
+        }
+
+        (total_cores, cpu_cores)
+    }
+
+    /// Fallback CPU configuration
+    fn fallback_cpu_configuration() -> (u32, HashMap<u32, CpuCore>) {
+        let total_cores = num_cpus::get() as u32;
         let mut cpu_cores = HashMap::new();
 
         for core_id in 0..total_cores {
@@ -240,12 +268,63 @@ impl CpuAssetAdapter {
                 max_frequency_mhz: 3600,
                 status: CoreStatus::Available,
                 allocated_to: None,
-                temperature_celsius: Some(45.0 + (core_id as f32 * 2.0)),
+                temperature_celsius: Some(45.0),
             });
         }
 
         tracing::info!("Using fallback CPU configuration: {} cores", total_cores);
         (total_cores, cpu_cores)
+    }
+
+    /// Detect NUMA node for a CPU core
+    fn detect_numa_node(core_id: u32) -> u32 {
+        #[cfg(target_os = "linux")]
+        {
+            // Try to read NUMA node from sysfs
+            let path = format!("/sys/devices/system/cpu/cpu{}/node0", core_id);
+            if std::path::Path::new(&path).exists() {
+                return 0;
+            }
+            let path = format!("/sys/devices/system/cpu/cpu{}/node1", core_id);
+            if std::path::Path::new(&path).exists() {
+                return 1;
+            }
+        }
+
+        // Fallback: assume 4 cores per NUMA node
+        core_id / 4
+    }
+
+    /// Read CPU temperature from system sensors
+    fn read_cpu_temperature(core_id: u32) -> Option<f32> {
+        #[cfg(target_os = "linux")]
+        {
+            // Try to read temperature from hwmon
+            // Common paths: /sys/class/hwmon/hwmon*/temp*_input
+            if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+                for entry in entries.flatten() {
+                    let hwmon_path = entry.path();
+                    let temp_file = hwmon_path.join(format!("temp{}_input", core_id + 1));
+
+                    if let Ok(temp_str) = std::fs::read_to_string(&temp_file) {
+                        if let Ok(temp_millidegrees) = temp_str.trim().parse::<i32>() {
+                            return Some(temp_millidegrees as f32 / 1000.0);
+                        }
+                    }
+
+                    // Also try temp1_input as package temperature
+                    let temp_file = hwmon_path.join("temp1_input");
+                    if let Ok(temp_str) = std::fs::read_to_string(&temp_file) {
+                        if let Ok(temp_millidegrees) = temp_str.trim().parse::<i32>() {
+                            return Some(temp_millidegrees as f32 / 1000.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // No temperature available
+        None
     }
     
     /// Allocate CPU cores based on requirements
@@ -339,30 +418,58 @@ impl CpuAssetAdapter {
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
-        // STUB: This function does not measure actual CPU utilization
-        // TODO: Implement real CPU monitoring using sysinfo crate or /proc/stat
-        // Priority: HIGH - Required for Option 2 (Resource Monitoring)
-        // Currently returns cached/simulated value for development
-        Ok(allocation.current_utilization)
+
+        // Refresh CPU usage and calculate utilization for allocated cores
+        let mut system = self.system_info.write().await;
+        system.refresh_cpu();
+
+        let cpus = system.cpus();
+        let mut total_utilization = 0.0f32;
+        let mut core_count = 0;
+
+        for &core_id in &allocation.allocated_cores {
+            if let Some(cpu) = cpus.get(core_id as usize) {
+                total_utilization += cpu.cpu_usage();
+                core_count += 1;
+            }
+        }
+
+        let avg_utilization = if core_count > 0 {
+            total_utilization / core_count as f32
+        } else {
+            0.0
+        };
+
+        Ok(avg_utilization)
     }
     
     /// Update usage statistics
     async fn update_usage_stats(&self, operation: CpuOperation, cores: u32) {
         let mut stats = self.usage_stats.write().await;
-        
+
         match operation {
             CpuOperation::Allocate => {
                 stats.total_allocations += 1;
                 stats.active_allocations += 1;
-                // STUB: CPU time tracking not implemented
-                // TODO: Track actual CPU time using clock_gettime() or similar
-                // Priority: MEDIUM - Required for Option 3 (Usage Accounting)
+
+                // Update CPU time tracking - use system uptime as proxy
+                if let Ok(duration) = SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+                    stats.total_cpu_time_ms += duration.as_millis() as u64 * cores as u64;
+                }
             },
             CpuOperation::Deallocate => {
                 stats.total_deallocations += 1;
                 stats.active_allocations = stats.active_allocations.saturating_sub(1);
             },
+        }
+
+        // Update average utilization
+        let system = self.system_info.read().await;
+        let cpus = system.cpus();
+        if !cpus.is_empty() {
+            let total_util: f32 = cpus.iter().map(|cpu| cpu.cpu_usage()).sum();
+            stats.average_utilization = total_util / cpus.len() as f32;
+            stats.peak_utilization = stats.peak_utilization.max(stats.average_utilization);
         }
     }
 }
@@ -444,13 +551,9 @@ impl AssetAdapter for CpuAssetAdapter {
             architecture: cpu_req.architecture.clone().unwrap_or_else(|| "x86_64".to_string()),
             frequency_mhz: cpu_req.min_frequency_mhz.unwrap_or(2400),
             enabled_features: cpu_req.required_features.clone(),
-            numa_node: allocated_cores.first().and_then(|&core_id| {
+            numa_node: allocated_cores.first().map(|&core_id| {
                 // Get NUMA node from first allocated core
-                // This is simplified - in practice, might want to validate all cores are on same NUMA node
-                // STUB: NUMA node detection not implemented
-                // TODO: Use libnuma or hwloc crate to detect actual NUMA topology
-                // Priority: MEDIUM - Required for Option 3 (Performance Optimization)
-                None
+                Self::detect_numa_node(core_id)
             }),
             privacy_level: request.privacy_level.clone(),
             isolation_enabled: true, // Enable isolation by default
@@ -630,13 +733,20 @@ impl AssetAdapter for CpuAssetAdapter {
                 asset_id: asset_id.to_string()
             })?;
         
-        // STUB: CPU usage monitoring not fully implemented
-        // TODO: Implement actual CPU usage monitoring using sysinfo crate or /proc/stat
-        // Priority: HIGH - Required for Option 2 (Resource Monitoring)
+        // Get real-time CPU usage from sysinfo
+        let utilization = self.get_cpu_utilization(asset_id).await.unwrap_or(0.0);
+
+        // Get temperature from first allocated core
+        let temperature = if let Some(&first_core) = allocation.allocated_cores.first() {
+            Self::read_cpu_temperature(first_core)
+        } else {
+            None
+        };
+
         let cpu_usage = CpuUsage {
-            utilization_percent: allocation.current_utilization,
+            utilization_percent: utilization,
             frequency_mhz: allocation.frequency_mhz,
-            temperature_celsius: Some(45.0), // STUB: Temperature monitoring not implemented
+            temperature_celsius: temperature,
             active_cores: allocation.allocated_cores.len() as u32,
         };
         

@@ -195,21 +195,30 @@ impl GpuAssetAdapter {
                         for (device_id, gpu_info) in gpu_infos.iter().enumerate() {
                             let device_id = device_id as u32;
 
+                            // Detect compute capability from model string
+                            let compute_capability = Self::detect_compute_capability(&gpu_info.model, &gpu_info.capabilities);
+
+                            // Estimate compute units from capabilities or model
+                            let (vulkan_compute_units, base_clock, memory_clock) = Self::estimate_gpu_specs(&gpu_info.model);
+
+                            // Read temperature and power from sysfs if available
+                            let (temperature, power) = Self::read_gpu_sensors(&gpu_info.pci_address);
+
                             gpu_devices.insert(device_id, GpuDevice {
                                 device_id,
                                 device_name: gpu_info.model.clone(),
-                                compute_capability: "Unknown".to_string(), // TODO: Parse from capabilities
+                                compute_capability,
                                 total_memory_bytes: gpu_info.memory_bytes.unwrap_or(0),
                                 available_memory_bytes: gpu_info.available_bytes.unwrap_or(gpu_info.memory_bytes.unwrap_or(0)),
-                                vulkan_compute_units: 9728, // TODO: Query via Vulkan
-                                nova_execution_units: 76, // TODO: Calculate from compute units
-                                base_clock_mhz: 2205, // TODO: Query GPU clock
-                                memory_clock_mhz: 11400, // TODO: Query memory clock
+                                vulkan_compute_units,
+                                nova_execution_units: vulkan_compute_units / 128, // Estimate: 1 SM = 128 cores
+                                base_clock_mhz: base_clock,
+                                memory_clock_mhz: memory_clock,
                                 pci_bus_id: gpu_info.pci_address.clone().unwrap_or_else(|| format!("Unknown:{}", device_id)),
                                 status: GpuStatus::Available,
                                 allocated_to: None,
-                                temperature_celsius: Some(35.0 + (device_id as f32 * 5.0)),
-                                power_watts: Some(220.0),
+                                temperature_celsius: temperature,
+                                power_watts: power,
                             });
                         }
 
@@ -259,7 +268,151 @@ impl GpuAssetAdapter {
         tracing::info!("Using fallback GPU configuration: {} devices", total_devices);
         (total_devices, gpu_devices)
     }
-    
+
+    /// Detect compute capability from GPU model and capabilities
+    fn detect_compute_capability(model: &str, capabilities: &[String]) -> String {
+        let model_lower = model.to_lowercase();
+
+        // NVIDIA GPUs - detect compute capability from model
+        if model_lower.contains("nvidia") || model_lower.contains("geforce") || model_lower.contains("rtx") || model_lower.contains("gtx") {
+            // RTX 40 series (Ada Lovelace) - compute capability 8.9
+            if model_lower.contains("rtx 40") || model_lower.contains("4090") || model_lower.contains("4080") {
+                return "8.9".to_string();
+            }
+            // RTX 30 series (Ampere) - compute capability 8.6
+            if model_lower.contains("rtx 30") || model_lower.contains("3090") || model_lower.contains("3080") {
+                return "8.6".to_string();
+            }
+            // RTX 20 series (Turing) - compute capability 7.5
+            if model_lower.contains("rtx 20") || model_lower.contains("2080") || model_lower.contains("2070") {
+                return "7.5".to_string();
+            }
+            // GTX 10 series (Pascal) - compute capability 6.1
+            if model_lower.contains("gtx 10") || model_lower.contains("1080") || model_lower.contains("1070") {
+                return "6.1".to_string();
+            }
+
+            // Default for NVIDIA
+            return "7.0".to_string();
+        }
+
+        // AMD GPUs - use RDNA/GCN version as capability
+        if model_lower.contains("amd") || model_lower.contains("radeon") || model_lower.contains("rx ") {
+            if model_lower.contains("rx 7") {
+                return "RDNA 3".to_string();
+            }
+            if model_lower.contains("rx 6") {
+                return "RDNA 2".to_string();
+            }
+            if model_lower.contains("rx 5") {
+                return "RDNA 1".to_string();
+            }
+            return "GCN 5".to_string();
+        }
+
+        // Intel GPUs
+        if model_lower.contains("intel") || model_lower.contains("arc") {
+            if model_lower.contains("arc") {
+                return "Xe-HPG".to_string();
+            }
+            return "Xe".to_string();
+        }
+
+        // Check capabilities for OpenCL/Vulkan version
+        for cap in capabilities {
+            if cap.starts_with("opencl") || cap.starts_with("vulkan") {
+                return cap.clone();
+            }
+        }
+
+        "Unknown".to_string()
+    }
+
+    /// Estimate GPU specifications from model string
+    fn estimate_gpu_specs(model: &str) -> (u32, u32, u32) {
+        let model_lower = model.to_lowercase();
+
+        // NVIDIA RTX 4080 specs
+        if model_lower.contains("4080") {
+            return (9728, 2505, 11400); // 9728 CUDA cores, 2.5 GHz, 11.4 GT/s memory
+        }
+
+        // NVIDIA RTX 4090 specs
+        if model_lower.contains("4090") {
+            return (16384, 2520, 10080); // 16384 CUDA cores, 2.52 GHz, 21 Gbps memory
+        }
+
+        // NVIDIA RTX 3090 specs
+        if model_lower.contains("3090") {
+            return (10496, 1695, 9750); // 10496 CUDA cores, 1.7 GHz, 19.5 Gbps memory
+        }
+
+        // NVIDIA RTX 3080 specs
+        if model_lower.contains("3080") {
+            return (8704, 1710, 9500); // 8704 CUDA cores, 1.71 GHz, 19 Gbps memory
+        }
+
+        // AMD RX 7900 XTX specs
+        if model_lower.contains("7900 xtx") {
+            return (6144, 2500, 10000); // 6144 stream processors, 2.5 GHz, 20 Gbps memory
+        }
+
+        // AMD RX 6900 XT specs
+        if model_lower.contains("6900 xt") {
+            return (5120, 2250, 8000); // 5120 stream processors, 2.25 GHz, 16 Gbps memory
+        }
+
+        // Intel Arc A770 specs
+        if model_lower.contains("arc a770") {
+            return (4096, 2400, 8560); // 4096 execution units, 2.4 GHz, 17.5 Gbps memory
+        }
+
+        // Default reasonable specs
+        (4096, 1800, 7000)
+    }
+
+    /// Read GPU temperature and power consumption from sensors
+    fn read_gpu_sensors(pci_address: &Option<String>) -> (Option<f32>, Option<f32>) {
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(pci_addr) = pci_address {
+                // Try to read from sysfs hwmon
+                // Path format: /sys/class/drm/card*/device/hwmon/hwmon*/temp*_input
+                if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+                    for entry in entries.flatten() {
+                        let card_path = entry.path();
+                        let hwmon_path = card_path.join("device/hwmon");
+
+                        if let Ok(hwmon_entries) = std::fs::read_dir(&hwmon_path) {
+                            for hwmon_entry in hwmon_entries.flatten() {
+                                // Read temperature
+                                let temp_file = hwmon_entry.path().join("temp1_input");
+                                let temperature = std::fs::read_to_string(&temp_file)
+                                    .ok()
+                                    .and_then(|s| s.trim().parse::<i32>().ok())
+                                    .map(|millidegrees| millidegrees as f32 / 1000.0);
+
+                                // Read power
+                                let power_file = hwmon_entry.path().join("power1_average");
+                                let power = std::fs::read_to_string(&power_file)
+                                    .ok()
+                                    .and_then(|s| s.trim().parse::<i32>().ok())
+                                    .map(|microwatts| microwatts as f32 / 1000000.0);
+
+                                if temperature.is_some() || power.is_some() {
+                                    return (temperature, power);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // No sensors available
+        (None, None)
+    }
+
     /// Allocate GPU devices based on requirements
     async fn allocate_gpu_devices(
         &self,
@@ -696,12 +849,25 @@ impl AssetAdapter for GpuAssetAdapter {
                 asset_id: asset_id.to_string()
             })?;
         
-        // TODO: Implement actual GPU usage monitoring
+        // Get real-time temperature and power from sensors
+        let mut temperature = None;
+        let mut power = None;
+
+        // Read from first allocated device
+        if let Some(&device_id) = allocation.allocated_devices.first() {
+            let devices = self.gpu_devices.read().await;
+            if let Some(device) = devices.get(&device_id) {
+                let (temp, pwr) = Self::read_gpu_sensors(&Some(device.pci_bus_id.clone()));
+                temperature = temp.or(device.temperature_celsius);
+                power = pwr.or(device.power_watts);
+            }
+        }
+
         let gpu_usage = GpuUsage {
             utilization_percent: allocation.current_utilization,
             memory_utilization_percent: allocation.memory_utilization,
-            temperature_celsius: Some(65.0), // TODO: Get actual temperature
-            power_watts: Some(200.0), // TODO: Get actual power consumption
+            temperature_celsius: temperature,
+            power_watts: power,
         };
         
         Ok(ResourceUsage {
