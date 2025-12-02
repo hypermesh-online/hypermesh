@@ -1,7 +1,11 @@
 //! Byzantine Fault-Tolerant DNS Validation Tests
-//! 
+//!
 //! Comprehensive test suite for Byzantine fault tolerance in DNS resolution
 //! including consensus mechanisms, fault detection, and recovery testing.
+//!
+//! STUB: These tests simulate Byzantine behavior but HyperMesh doesn't have real Byzantine consensus
+//! TODO: Implement actual Byzantine consensus algorithms (PBFT, BFT-SMaRt, HotStuff)
+//! Priority: LOW - Required for Option 4 (Full Byzantine Consensus)
 
 use std::time::{Duration, Instant};
 use std::collections::{HashMap, HashSet};
