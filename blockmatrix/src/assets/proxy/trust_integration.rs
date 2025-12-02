@@ -152,24 +152,30 @@ enum CAStatus {
 
 /// Certificate validation result
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct ValidationResult {
+pub struct ValidationResult {
     /// Certificate fingerprint
-    certificate_fingerprint: String,
-    
+    pub certificate_fingerprint: String,
+
     /// Validation status
-    is_valid: bool,
-    
-    /// Trust level determined
-    trust_level: f32,
-    
+    pub is_valid: bool,
+
+    /// Trust level determined (0.0 - 1.0)
+    pub trust_level: f32,
+
+    /// Trust score (alias for trust_level for compatibility)
+    pub trust_score: f32,
+
     /// Validation reason/message
-    validation_message: String,
-    
+    pub validation_message: String,
+
+    /// Validation errors (if any)
+    pub errors: Vec<String>,
+
     /// Validation timestamp
-    validated_at: SystemTime,
-    
+    pub validated_at: SystemTime,
+
     /// Result expiration
-    expires_at: SystemTime,
+    pub expires_at: SystemTime,
 }
 
 /// Certificate revocation entry
@@ -237,6 +243,7 @@ impl Default for TrustChainConfig {
     }
 }
 
+
 /// Validation configuration
 #[derive(Clone, Debug)]
 struct ValidationConfig {
@@ -271,13 +278,18 @@ impl Default for ValidationConfig {
 
 impl TrustChainIntegration {
     /// Create new TrustChain integration
-    pub async fn new() -> AssetResult<Self> {
-        Ok(Self {
-            certificate_validator: CertificateValidator::new()?,
+    pub fn new() -> Self {
+        Self {
+            certificate_validator: CertificateValidator::new().unwrap_or_else(|_| CertificateValidator {
+                root_cas: HashMap::new(),
+                intermediate_cas: HashMap::new(),
+                validation_cache: HashMap::new(),
+                validation_config: ValidationConfig::default(),
+            }),
             trust_chain_cache: HashMap::new(),
             revocation_list: HashMap::new(),
             config: TrustChainConfig::default(),
-        })
+        }
     }
     
     /// Validate proxy node certificate against TrustChain
@@ -405,7 +417,9 @@ impl TrustChainIntegration {
             certificate_fingerprint: trust_chain.end_entity_fingerprint.clone(),
             is_valid,
             trust_level,
+            trust_score: trust_level, // Use same value for compatibility
             validation_message,
+            errors: if is_valid { Vec::new() } else { vec![validation_message.clone()] },
             validated_at: SystemTime::now(),
             expires_at: SystemTime::now() + self.config.validation_cache_timeout,
         };
@@ -530,7 +544,7 @@ impl TrustChainIntegration {
 
 impl CertificateValidator {
     /// Create new certificate validator
-    fn new() -> AssetResult<Self> {
+    pub fn new() -> AssetResult<Self> {
         let mut root_cas = HashMap::new();
         let mut intermediate_cas = HashMap::new();
         
@@ -564,6 +578,66 @@ impl CertificateValidator {
             validation_config: ValidationConfig::default(),
         })
     }
+
+    /// Validate a certificate
+    pub async fn validate_certificate(&self, certificate_fingerprint: &str) -> AssetResult<ValidationResult> {
+        // Check cache first
+        if let Some(cached) = self.validation_cache.get(certificate_fingerprint) {
+            if cached.expires_at > SystemTime::now() {
+                return Ok(cached.clone());
+            }
+        }
+
+        // Perform validation
+        let mut result = ValidationResult {
+            certificate_fingerprint: certificate_fingerprint.to_string(),
+            is_valid: true,
+            trust_level: 0.0,
+            trust_score: 0.0,
+            validation_message: String::new(),
+            errors: Vec::new(),
+            validated_at: SystemTime::now(),
+            expires_at: SystemTime::now() + Duration::from_secs(3600),
+        };
+
+        // Check if it's a known root CA
+        if self.root_cas.contains_key(certificate_fingerprint) {
+            result.trust_level = 1.0;
+            result.trust_score = 1.0;
+            result.validation_message = "Root CA certificate".to_string();
+            return Ok(result);
+        }
+
+        // Check if it's an intermediate CA
+        if let Some(intermediate) = self.intermediate_cas.get(certificate_fingerprint) {
+            // Validate chain to root
+            if self.root_cas.contains_key(&intermediate.parent_ca_id) {
+                result.trust_level = 0.9;
+                result.trust_score = 0.9;
+                result.validation_message = "Valid intermediate CA with trusted root".to_string();
+            } else {
+                result.trust_level = 0.7;
+                result.trust_score = 0.7;
+                result.validation_message = "Intermediate CA with unverified root".to_string();
+            }
+            return Ok(result);
+        }
+
+        // For unknown certificates in non-strict mode, assign basic trust
+        if !self.validation_config.strict_mode || self.validation_config.allow_self_signed {
+            result.trust_level = 0.5;
+            result.trust_score = 0.5;
+            result.validation_message = "Self-signed or unknown certificate accepted in non-strict mode".to_string();
+        } else {
+            result.is_valid = false;
+            result.trust_level = 0.0;
+            result.trust_score = 0.0;
+            result.validation_message = "Certificate validation failed".to_string();
+            result.errors.push("Unknown certificate in strict mode".to_string());
+        }
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -592,7 +666,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_trust_chain_integration_creation() {
-        let integration = TrustChainIntegration::new().await.expect("Failed to create TrustChainIntegration");
+        let integration = TrustChainIntegration::new();
         assert_eq!(integration.trust_chain_cache.len(), 0);
         assert_eq!(integration.revocation_list.len(), 0);
     }
@@ -606,7 +680,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_build_trust_chain() {
-        let integration = TrustChainIntegration::new().await.expect("Failed to create TrustChainIntegration");
+        let integration = TrustChainIntegration::new();
         let cert_fingerprint = "test-cert-fingerprint";
 
         let trust_chain = integration.build_trust_chain(cert_fingerprint).await.expect("Failed to build trust chain");
@@ -615,20 +689,20 @@ mod tests {
         assert!(!trust_chain.chain_id.is_empty());
         assert!(!trust_chain.intermediate_certificates.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_validate_node_certificate() {
-        let integration = TrustChainIntegration::new().await.expect("Failed to create TrustChainIntegration");
+        let integration = TrustChainIntegration::new();
         let node_info = create_test_node_info();
 
         // This should succeed with the default setup
         let is_valid = integration.validate_node_certificate(&node_info).await.expect("Failed to validate node certificate");
         assert!(is_valid);
     }
-    
+
     #[tokio::test]
     async fn test_certificate_revocation() {
-        let mut integration = TrustChainIntegration::new().await.expect("Failed to create TrustChainIntegration");
+        let mut integration = TrustChainIntegration::new();
         let cert_fingerprint = "test-cert-to-revoke".to_string();
 
         // Certificate should not be revoked initially

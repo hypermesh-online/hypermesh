@@ -10,6 +10,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use libc::{mmap, munmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FAILED};
 
 use crate::assets::core::{AssetId, AssetResult, AssetError, ProxyAddress};
 
@@ -51,25 +52,28 @@ pub enum GlobalAddressType {
 pub struct LocalAddressMapping {
     /// Global address
     pub global_address: GlobalAddress,
-    
+
     /// Local memory/resource address
     pub local_address: usize,
-    
+
     /// Size of the mapped region
     pub region_size: u64,
-    
+
     /// Access permissions
     pub access_permissions: MemoryPermissions,
-    
+
+    /// Privacy configuration
+    pub privacy_config: Option<PrivacyConfig>,
+
     /// Translation state
     pub translation_state: TranslationState,
-    
+
     /// Usage statistics
     pub usage_stats: AddressUsageStats,
-    
+
     /// Last accessed timestamp
     pub last_accessed: SystemTime,
-    
+
     /// Expiration timestamp
     pub expires_at: SystemTime,
 }
@@ -79,21 +83,39 @@ pub struct LocalAddressMapping {
 pub struct MemoryPermissions {
     /// Read access
     pub read: bool,
-    
+
     /// Write access
     pub write: bool,
-    
+
     /// Execute access
     pub execute: bool,
-    
+
     /// Share access with other nodes
     pub share: bool,
-    
+
     /// Cache access (for performance)
     pub cache: bool,
-    
+
     /// Prefetch access (for optimization)
     pub prefetch: bool,
+}
+
+// Use PrivacyLevel from core module
+pub use crate::assets::core::PrivacyLevel;
+
+/// Privacy configuration for NAT translations
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PrivacyConfig {
+    /// Privacy level
+    pub level: PrivacyLevel,
+    /// Allowed network IDs
+    pub allowed_networks: Vec<String>,
+    /// Allowed peer IDs
+    pub allowed_peers: Vec<String>,
+    /// Maximum concurrent access
+    pub max_concurrent_access: u32,
+    /// Require consensus validation
+    pub require_consensus: bool,
 }
 
 /// Translation state tracking
@@ -471,37 +493,55 @@ impl NATTranslator {
         Ok(proxy_addr)
     }
     
-    /// Create NAT translation mapping
+    /// Create NAT translation mapping with real memory
     pub async fn create_translation(
         &self,
         global_addr: GlobalAddress,
         region_size: u64,
         permissions: MemoryPermissions,
     ) -> AssetResult<LocalAddressMapping> {
-        
         let start_time = SystemTime::now();
-        
-        // Allocate local address
-        let local_address = self.allocate_local_address(region_size).await?;
-        
+
+        // Map real memory using mmap
+        let prot = self.permissions_to_prot(&permissions);
+        let local_address = unsafe {
+            let ptr = mmap(
+                std::ptr::null_mut(),
+                region_size as usize,
+                prot,
+                MAP_PRIVATE | MAP_ANONYMOUS,
+                -1,
+                0,
+            );
+
+            if ptr == MAP_FAILED {
+                return Err(AssetError::AdapterError {
+                    message: format!("mmap failed: {}", std::io::Error::last_os_error())
+                });
+            }
+
+            ptr as usize
+        };
+
         // Create mapping
         let mapping = LocalAddressMapping {
             global_address: global_addr.clone(),
             local_address,
             region_size,
             access_permissions: permissions,
+            privacy_config: None,
             translation_state: TranslationState::Active,
             usage_stats: AddressUsageStats::default(),
             last_accessed: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour default
         };
-        
+
         // Store mappings
         {
             let mut global_to_local = self.global_to_local.write().await;
             global_to_local.insert(global_addr.clone(), mapping.clone());
         }
-        
+
         let global_addr_str = global_addr.to_string();
 
         {
@@ -524,19 +564,91 @@ impl NATTranslator {
         }
 
         tracing::info!(
-            "Created NAT translation: {} -> 0x{:x} ({} bytes)",
+            "Created NAT translation: {} -> 0x{:x} ({} bytes) with real memory mapping",
             global_addr_str,
             local_address,
             region_size
         );
-        
+
         Ok(mapping)
     }
+
+    /// Create translation with privacy controls
+    pub async fn create_translation_with_privacy(
+        &self,
+        global_addr: GlobalAddress,
+        region_size: u64,
+        permissions: MemoryPermissions,
+        privacy: PrivacyConfig,
+    ) -> AssetResult<LocalAddressMapping> {
+        // Validate privacy settings
+        self.validate_privacy_config(&privacy).await?;
+
+        // Create translation with privacy metadata
+        let mut mapping = self.create_translation(global_addr, region_size, permissions).await?;
+
+        // Attach privacy configuration
+        mapping.privacy_config = Some(privacy);
+
+        // Update the stored mapping
+        {
+            let mut global_to_local = self.global_to_local.write().await;
+            global_to_local.insert(mapping.global_address.clone(), mapping.clone());
+        }
+
+        Ok(mapping)
+    }
+
+    /// Convert MemoryPermissions to PROT flags
+    fn permissions_to_prot(&self, perms: &MemoryPermissions) -> i32 {
+        let mut prot = 0;
+        if perms.read { prot |= PROT_READ; }
+        if perms.write { prot |= PROT_WRITE; }
+        if perms.execute { prot |= PROT_EXEC; }
+        prot
+    }
+
+    /// Validate privacy configuration
+    async fn validate_privacy_config(&self, privacy: &PrivacyConfig) -> AssetResult<()> {
+        // Validate max concurrent access
+        if privacy.max_concurrent_access == 0 {
+            return Err(AssetError::AdapterError {
+                message: "Max concurrent access must be greater than 0".to_string()
+            });
+        }
+
+        // Validate privacy level settings
+        match privacy.level {
+            PrivacyLevel::Private => {
+                if !privacy.allowed_networks.is_empty() || !privacy.allowed_peers.is_empty() {
+                    return Err(AssetError::AdapterError {
+                        message: "Private level should not have allowed networks or peers".to_string()
+                    });
+                }
+            },
+            PrivacyLevel::PrivateNetwork | PrivacyLevel::PublicNetwork => {
+                if privacy.allowed_networks.is_empty() {
+                    return Err(AssetError::AdapterError {
+                        message: "Network privacy level requires allowed networks".to_string()
+                    });
+                }
+            },
+            PrivacyLevel::P2P => {
+                if privacy.allowed_peers.is_empty() {
+                    return Err(AssetError::AdapterError {
+                        message: "P2P privacy level requires allowed peers".to_string()
+                    });
+                }
+            },
+            PrivacyLevel::FullPublic => {
+                // No restrictions for full public
+            }
+        }
+
+        Ok(())
+    }
     
-    /// Translate global address to local address
-    // STUB: NAT translation doesn't actually map to real memory addresses
-    // TODO: Implement actual memory mapping using mmap() or similar
-    // Priority: HIGH - Required for Option 2 (Remote Memory Access)
+    /// Translate global address to local address (now with real memory mapping)
     pub async fn translate_to_local(&self, global_addr: &GlobalAddress) -> AssetResult<usize> {
         let global_to_local = self.global_to_local.read().await;
         let mapping = global_to_local.get(global_addr)
@@ -577,125 +689,49 @@ impl NATTranslator {
             })
     }
     
-    /// Remove translation
+    /// Remove translation and unmap memory
     pub async fn remove_translation(&self, global_addr: &GlobalAddress) -> AssetResult<()> {
         let mapping = {
             let mut global_to_local = self.global_to_local.write().await;
             global_to_local.remove(global_addr)
         };
-        
+
         if let Some(mapping) = mapping {
             // Remove reverse mapping
             {
                 let mut local_to_global = self.local_to_global.write().await;
                 local_to_global.remove(&mapping.local_address);
             }
-            
-            // Free local address
-            self.free_local_address(mapping.local_address, mapping.region_size).await?;
-            
+
+            // Unmap the actual memory
+            unsafe {
+                let result = munmap(mapping.local_address as *mut libc::c_void, mapping.region_size as usize);
+                if result != 0 {
+                    return Err(AssetError::AdapterError {
+                        message: format!("munmap failed: {}", std::io::Error::last_os_error())
+                    });
+                }
+            }
+
             // Update statistics
             {
                 let mut stats = self.translation_stats.write().await;
                 stats.active_translations = stats.active_translations.saturating_sub(1);
                 stats.total_memory_mapped = stats.total_memory_mapped.saturating_sub(mapping.region_size);
             }
-            
+
             tracing::info!(
-                "Removed NAT translation: {} -> 0x{:x}",
+                "Removed NAT translation and unmapped memory: {} -> 0x{:x}",
                 global_addr.to_string(),
                 mapping.local_address
             );
         }
-        
+
         Ok(())
     }
     
-    /// Allocate local address from address space
-    async fn allocate_local_address(&self, size: u64) -> AssetResult<usize> {
-        let mut allocator = self.address_allocator.write().await;
-        
-        // Find suitable free range
-        for (i, range) in allocator.free_ranges.iter().enumerate() {
-            if range.size >= size {
-                let allocated_addr = range.start;
-                
-                // Update free ranges
-                if range.size == size {
-                    // Exact fit - remove the range
-                    allocator.free_ranges.remove(i);
-                } else {
-                    // Split the range
-                    allocator.free_ranges[i] = AddressRange {
-                        start: range.start + size as usize,
-                        end: range.end,
-                        size: range.size - size,
-                    };
-                }
-                
-                // Add to allocated ranges
-                allocator.allocated_ranges.push(AddressRange {
-                    start: allocated_addr,
-                    end: allocated_addr + size as usize - 1,
-                    size,
-                });
-                
-                return Ok(allocated_addr);
-            }
-        }
-        
-        Err(AssetError::AdapterError {
-            message: format!("Cannot allocate {} bytes - insufficient address space", size)
-        })
-    }
-    
-    /// Free local address back to address space
-    async fn free_local_address(&self, addr: usize, size: u64) -> AssetResult<()> {
-        let mut allocator = self.address_allocator.write().await;
-        
-        // Remove from allocated ranges
-        allocator.allocated_ranges.retain(|range| range.start != addr);
-        
-        // Add back to free ranges
-        let free_range = AddressRange {
-            start: addr,
-            end: addr + size as usize - 1,
-            size,
-        };
-        
-        // Insert in sorted order and merge adjacent ranges
-        let mut insert_pos = allocator.free_ranges.len();
-        for (i, range) in allocator.free_ranges.iter().enumerate() {
-            if range.start > addr {
-                insert_pos = i;
-                break;
-            }
-        }
-        
-        allocator.free_ranges.insert(insert_pos, free_range);
-        
-        // Merge adjacent ranges
-        self.merge_free_ranges(&mut allocator.free_ranges);
-        
-        Ok(())
-    }
-    
-    /// Merge adjacent free ranges for efficiency
-    fn merge_free_ranges(&self, ranges: &mut Vec<AddressRange>) {
-        ranges.sort_by_key(|r| r.start);
-        
-        let mut i = 0;
-        while i + 1 < ranges.len() {
-            if ranges[i].end + 1 == ranges[i + 1].start {
-                // Merge ranges
-                ranges[i].end = ranges[i + 1].end;
-                ranges[i].size += ranges[i + 1].size;
-                ranges.remove(i + 1);
-            } else {
-                i += 1;
-            }
-        }
-    }
+    // Note: allocate_local_address and free_local_address methods removed
+    // since we now use mmap/munmap directly for real memory management
     
     /// Generate local node ID
     fn generate_local_node_id() -> [u8; 8] {
@@ -800,5 +836,152 @@ mod tests {
         // Test reverse translation
         let reverse_global = translator.translate_to_global(local_addr).await.unwrap();
         assert_eq!(reverse_global.hash(), global_addr.hash());
+    }
+
+    #[tokio::test]
+    async fn test_real_memory_mapping() {
+        let translator = NATTranslator::new().await.unwrap();
+        let asset_id = AssetId::new(AssetType::Memory);
+
+        let global_addr = GlobalAddress::new(
+            [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
+            [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
+            &asset_id,
+            8081,
+            GlobalAddressType::Memory,
+        );
+
+        let permissions = MemoryPermissions {
+            read: true,
+            write: true,
+            execute: false,
+            share: false,
+            cache: true,
+            prefetch: false,
+        };
+
+        // Create mapping with real memory
+        let mapping = translator.create_translation(
+            global_addr.clone(),
+            4096, // 4KB page
+            permissions,
+        ).await.unwrap();
+
+        // Verify memory is actually mapped and usable
+        let local_ptr = mapping.local_address as *mut u8;
+        unsafe {
+            // Write to memory
+            *local_ptr = 42;
+            // Read back
+            assert_eq!(*local_ptr, 42);
+
+            // Write a sequence
+            for i in 0..256 {
+                *local_ptr.add(i) = i as u8;
+            }
+
+            // Verify sequence
+            for i in 0..256 {
+                assert_eq!(*local_ptr.add(i), i as u8);
+            }
+        }
+
+        // Clean up - remove translation and unmap memory
+        translator.remove_translation(&global_addr).await.unwrap();
+
+        // Verify stats updated
+        let stats = translator.get_stats().await.unwrap();
+        assert_eq!(stats.active_translations, 0);
+    }
+
+    #[tokio::test]
+    async fn test_translation_with_privacy() {
+        let translator = NATTranslator::new().await.unwrap();
+        let asset_id = AssetId::new(AssetType::Memory);
+
+        let global_addr = GlobalAddress::new(
+            [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
+            [0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22],
+            &asset_id,
+            8082,
+            GlobalAddressType::Memory,
+        );
+
+        let permissions = MemoryPermissions {
+            read: true,
+            write: false,
+            execute: false,
+            share: true,
+            cache: true,
+            prefetch: false,
+        };
+
+        let privacy_config = PrivacyConfig {
+            level: PrivacyLevel::P2P,
+            allowed_networks: vec![],
+            allowed_peers: vec!["peer1".to_string(), "peer2".to_string()],
+            max_concurrent_access: 5,
+            require_consensus: false,
+        };
+
+        // Create translation with privacy controls
+        let mapping = translator.create_translation_with_privacy(
+            global_addr.clone(),
+            8192, // 8KB
+            permissions,
+            privacy_config.clone(),
+        ).await.unwrap();
+
+        // Verify privacy config is attached
+        assert!(mapping.privacy_config.is_some());
+        let attached_privacy = mapping.privacy_config.unwrap();
+        assert_eq!(attached_privacy.level, PrivacyLevel::P2P);
+        assert_eq!(attached_privacy.allowed_peers.len(), 2);
+        assert_eq!(attached_privacy.max_concurrent_access, 5);
+
+        // Clean up
+        translator.remove_translation(&global_addr).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_invalid_privacy_config() {
+        let translator = NATTranslator::new().await.unwrap();
+        let asset_id = AssetId::new(AssetType::Memory);
+
+        let global_addr = GlobalAddress::new(
+            [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
+            [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11],
+            &asset_id,
+            8083,
+            GlobalAddressType::Memory,
+        );
+
+        let permissions = MemoryPermissions {
+            read: true,
+            write: true,
+            execute: false,
+            share: false,
+            cache: false,
+            prefetch: false,
+        };
+
+        // Invalid privacy config - P2P without peers
+        let invalid_privacy = PrivacyConfig {
+            level: PrivacyLevel::P2P,
+            allowed_networks: vec![],
+            allowed_peers: vec![], // Should fail - P2P needs peers
+            max_concurrent_access: 1,
+            require_consensus: false,
+        };
+
+        let result = translator.create_translation_with_privacy(
+            global_addr,
+            4096,
+            permissions,
+            invalid_privacy,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("P2P privacy level requires allowed peers"));
     }
 }

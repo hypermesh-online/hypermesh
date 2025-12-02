@@ -13,6 +13,7 @@ pub mod security;
 pub mod sharding;
 pub mod nat_translation;
 pub mod remote_memory_transport;
+pub mod proxy_selector;
 
 pub use manager::{RemoteProxyManager};
 pub use routing::{ProxyRouter, ProxyRoute, RouteTable};
@@ -20,11 +21,12 @@ pub use forwarding::{ProxyForwarder, ForwardingRule, ForwardingMode, ForwardingR
 pub use trust_integration::{TrustChainIntegration, CertificateValidator};
 pub use security::{QuantumSecurity, FalconSigner, KyberEncryption};
 pub use sharding::{ShardedDataAccess, ShardManager, EncryptedShard};
-pub use nat_translation::{NATTranslator, GlobalAddress, MemoryPermissions};
+pub use nat_translation::{NATTranslator, GlobalAddress, MemoryPermissions, PrivacyConfig};
 pub use remote_memory_transport::{
     RemoteMemoryTransport, TransportConfig, MappedMemoryRegion,
     MemoryOperationType, OperationResult, TransportMetrics,
 };
+pub use proxy_selector::{ProxySelector, ProxyNode, TrustLevel, ProxySelectorConfig};
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
