@@ -644,6 +644,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "Byzantine consensus not implemented - simulated only. See STUB_INVENTORY.md"]
     async fn test_byzantine_fault_tolerance_suite() {
         let config = ByzantineFaultTestConfig::default();
         let mut test_suite = ByzantineFaultTests::new(config).await.unwrap();

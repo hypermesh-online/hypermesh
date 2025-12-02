@@ -245,6 +245,7 @@ impl MetricsExporter for CsvExporter {
 mod tests {
     use super::*;
     use crate::monitoring::metrics::{ComponentMetrics, TimingStats};
+    use std::collections::HashMap;
     use std::time::SystemTime;
 
     fn create_test_snapshot() -> MetricsSnapshot {

@@ -290,7 +290,7 @@ mod tests {
             id: 1234,
             name: "example.com".to_string(),
             record_type: RecordType::AAAA,
-            class: DNSClass::IN,
+            class: hickory_proto::rr::DNSClass::IN,
             client_addr: Ipv6Addr::LOCALHOST,
             timestamp: SystemTime::now(),
         }

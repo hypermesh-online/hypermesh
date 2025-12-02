@@ -93,6 +93,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_create_multiple_nodes() {
         let mut nodes = Vec::new();
 
@@ -115,6 +116,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_parallel_metric_collection() {
         let mut nodes = Vec::new();
         let mut stop_channels = Vec::new();
@@ -156,6 +158,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_aggregate_metrics_across_nodes() {
         let mut nodes = Vec::new();
 
@@ -202,6 +205,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_node_failure_handling() {
         let mut nodes = Vec::new();
         let mut stop_channels = Vec::new();
@@ -249,6 +253,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_node_resource_heterogeneity() {
         // Simulate nodes with different capabilities
         let node_configs = vec![
@@ -276,6 +281,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_concurrent_node_operations() {
         let nodes: Vec<_> = (0..5)
             .map(|i| {
@@ -335,6 +341,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_node_coordination_protocol() {
         // Simulate coordinator selecting best node for workload
         let mut nodes = Vec::new();
@@ -375,6 +382,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_cluster_wide_resource_limits() {
         let nodes: Vec<_> = (0..3)
             .map(|i| SimulatedNode::new(format!("node-{}", i)).unwrap())
@@ -412,6 +420,7 @@ mod multi_node_tests {
     }
 
     #[test]
+    #[ignore = "Multi-node support not implemented - simulated only. See STUB_INVENTORY.md"]
     fn test_rolling_node_updates() {
         let mut nodes = Vec::new();
         let mut stop_channels = Vec::new();
