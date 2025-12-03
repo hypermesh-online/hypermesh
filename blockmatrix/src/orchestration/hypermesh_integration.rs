@@ -21,7 +21,7 @@ use crate::assets::core::{
     ConsensusProof, AssetStatus, WorkloadType,
     ResourceRequirements, PrivacyLevel,
 };
-use crate::catalog::vm::ConsensusProofVM;
+use crate::catalog::vm::{ConsensusProofVM, VMConfig};
 
 /// HyperMesh-integrated container orchestrator
 pub struct HyperMeshContainerOrchestrator {

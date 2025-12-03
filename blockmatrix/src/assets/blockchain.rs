@@ -3,13 +3,14 @@
 //! This module implements asset-based blockchain operations following Proof of State patterns.
 //! Assets are stored directly in blockchain blocks with ConsensusProof validation.
 
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
 };
+use trustchain::consensus::{WorkloadType, WorkState};
 
 /// Asset record types for blockchain operations
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

@@ -1,6 +1,6 @@
 //! ConsensusProof-native JuliaVM System with Matrix Chain Integration
 //!
-//! A virtual machine implementation where consensus proofs (PoSp+PoSt+PoWk+PoTm) are 
+//! A virtual machine implementation where consensus proofs (PoSp+PoSt+PoWk+PoTm) are
 //! language-level constructs, not just validation layers. Every VM operation requires
 //! consensus validation as part of the execution model.
 //!
@@ -85,12 +85,17 @@ pub mod examples;
 
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::time::Duration;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use execution::context::{ExecutionPermissions, ResourceLimits, SchedulingInfo};
+use execution::context::{
+    ExecutionPermissions, ResourceLimits, SchedulingInfo,
+    BlockchainExecutionContext, P2PExecutionContext,
+    NetworkTopology, RoutingPreferences
+};
 
 // Re-export core types
 pub use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};

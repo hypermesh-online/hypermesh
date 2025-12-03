@@ -10,7 +10,7 @@ use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
 
-use crate::assets::core::asset_id::AssetId;
+use crate::assets::core::asset_id::{AssetId, AssetType};
 use super::matrix_blockchain::{
     MatrixBlockchainManager, EntityType, ValidationResult, ZKStatement, ProofRequirement
 };

@@ -20,6 +20,7 @@ use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityType,
     ValidationRequest, PublicValidationResponse, PrivacyPolicyConfig
 };
+use crate::assets::blockchain::AssetPrivacyLevel;
 use crate::assets::core::AssetId as CoreAssetId;
 use super::{
     ConsensusProofVM, VMConfig, ExecutionResult, ExecutionContext,
