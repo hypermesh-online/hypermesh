@@ -103,4 +103,10 @@ impl SecurityMonitor {
         }
         metrics.events_processed += 1;
     }
+
+    /// Check if monitor is initialized (always returns true for non-Option types)
+    // STUB: Phase 3
+    pub fn is_some(&self) -> bool {
+        true
+    }
 }

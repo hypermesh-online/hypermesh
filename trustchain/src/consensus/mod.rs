@@ -176,6 +176,18 @@ impl ConsensusProof {
     }
 }
 
+// STUB: Phase 3 - Default implementation for ConsensusProof
+impl Default for ConsensusProof {
+    fn default() -> Self {
+        Self {
+            stake_proof: StakeProof::default(),
+            time_proof: TimeProof::default(),
+            space_proof: SpaceProof::default(),
+            work_proof: WorkProof::default(),
+        }
+    }
+}
+
 /// Requirements for consensus validation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConsensusRequirements {

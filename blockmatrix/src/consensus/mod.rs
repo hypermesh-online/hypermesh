@@ -25,6 +25,9 @@ use serde::{Serialize, Deserialize};
 /// Access level for resources in the HyperMesh network
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AccessLevel {
+    /// No access level (minimum)
+    // STUB: Phase 3
+    None,
     /// Public data accessible to all networks
     Public,
     /// Private data within organization only
@@ -33,6 +36,24 @@ pub enum AccessLevel {
     Federated,
     /// Restricted access requiring special permissions
     Restricted,
+    /// Verified access with full consensus validation
+    // STUB: Phase 3
+    Verified,
+}
+
+impl AccessLevel {
+    /// Get numeric value for access level comparison
+    // STUB: Phase 3
+    pub fn level_value(&self) -> u8 {
+        match self {
+            AccessLevel::None => 0,
+            AccessLevel::Private => 1,
+            AccessLevel::Public => 2,
+            AccessLevel::Federated => 3,
+            AccessLevel::Restricted => 4,
+            AccessLevel::Verified => 5,
+        }
+    }
 }
 
 /// Network position information for node topology

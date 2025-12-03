@@ -410,6 +410,26 @@ impl Default for SchedulingInfo {
     }
 }
 
+// STUB: Phase 3 - Default implementation for ExecutionContext
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        Self {
+            execution_id: uuid::Uuid::new_v4().to_string(),
+            consensus_proof: ConsensusProof::default(),
+            language: "default".to_string(),
+            asset_allocations: HashMap::new(),
+            privacy_settings: PrivacyConfig::default(),
+            blockchain_context: None,
+            p2p_context: None,
+            execution_env: HashMap::new(),
+            permissions: ExecutionPermissions::default(),
+            resource_limits: ResourceLimits::default(),
+            scheduling_info: SchedulingInfo::default(),
+            created_at: SystemTime::now(),
+        }
+    }
+}
+
 /// Builder for creating execution contexts with specific configurations
 pub struct ExecutionContextBuilder {
     consensus_proof: Option<ConsensusProof>,

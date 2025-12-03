@@ -405,6 +405,23 @@ impl ResourceUsageMetrics {
     }
 }
 
+// STUB: Phase 3 - Default implementation for ConsensusOperation
+impl Default for ConsensusOperation {
+    fn default() -> Self {
+        use crate::consensus::ConsensusProof;
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            operation_type: "default".to_string(),
+            asset_id: uuid::Uuid::from_bytes([0u8; 16]),
+            consensus_proof: ConsensusProof::default(),
+            created_at: SystemTime::now(),
+            state: OperationState::Created,
+            metadata: OperationMetadata::default(),
+        }
+    }
+}
+
 /// Operation builder for creating consensus operations with specific requirements
 pub struct ConsensusOperationBuilder {
     operation_type: String,

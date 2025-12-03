@@ -550,6 +550,12 @@ impl WorkProof {
             proof_timestamp: SystemTime::now(),
         }
     }
+
+    /// Unwrap the proof (return self)
+    // STUB: Phase 3
+    pub fn unwrap(self) -> Self {
+        self
+    }
 }
 
 impl Proof for WorkProof {

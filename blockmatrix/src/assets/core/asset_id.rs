@@ -26,6 +26,12 @@ pub enum AssetType {
     Container,
     /// Economic system assets (Caesar tokens, wallets, stakes)
     Economic,
+    /// Virtual machine instances and execution environments
+    // STUB: Phase 3
+    VirtualMachine,
+    /// Library assets and code dependencies
+    // STUB: Phase 3
+    Library,
 }
 
 impl AssetType {
@@ -39,6 +45,8 @@ impl AssetType {
             AssetType::Network => 4,
             AssetType::Container => 5,
             AssetType::Economic => 6,
+            AssetType::VirtualMachine => 7, // STUB: Phase 3
+            AssetType::Library => 8, // STUB: Phase 3
         }
     }
     
@@ -52,6 +60,8 @@ impl AssetType {
             AssetType::Network => "Network",
             AssetType::Container => "Container",
             AssetType::Economic => "Economic",
+            AssetType::VirtualMachine => "VirtualMachine", // STUB: Phase 3
+            AssetType::Library => "Library", // STUB: Phase 3
         }
     }
 }
@@ -102,6 +112,21 @@ impl AssetId {
             uuid,
             blockchain_hash,
             creation_timestamp,
+        }
+    }
+
+    /// Create asset ID from hash (for default/test purposes)
+    // STUB: Phase 3
+    pub fn new_from_hash(hash: &[u8; 32]) -> Self {
+        Self {
+            asset_type: AssetType::Container,
+            uuid: Uuid::from_bytes(*hash.get(..16).map(|s| {
+                let mut arr = [0u8; 16];
+                arr.copy_from_slice(s);
+                arr
+            }).unwrap_or([0u8; 16])),
+            blockchain_hash: *hash,
+            creation_timestamp: SystemTime::now(),
         }
     }
     

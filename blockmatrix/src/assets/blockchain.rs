@@ -75,6 +75,9 @@ pub enum AssetPrivacyLevel {
     PublicNetwork,
     /// Maximum rewards, full HyperMesh participation
     FullPublic,
+    /// Public access (general public visibility)
+    // STUB: Phase 3
+    Public,
 }
 
 impl HyperMeshAssetRecord {

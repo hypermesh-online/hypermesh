@@ -120,6 +120,10 @@ pub enum ForwardingMode {
     
     /// Direct memory mapping
     DirectMemory,
+
+    /// Direct forwarding without proxy
+    // STUB: Phase 3
+    Direct,
 }
 
 /// Forwarding configuration

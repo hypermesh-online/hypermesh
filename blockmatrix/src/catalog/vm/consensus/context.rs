@@ -111,6 +111,21 @@ pub struct ResourceUtilizationStats {
     pub peak_concurrent_operations: u32,
 }
 
+// STUB: Phase 3 - Clone implementation for VMConsensusContext
+impl Clone for VMConsensusContext {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            current_operation: Arc::clone(&self.current_operation),
+            execution_history: Arc::clone(&self.execution_history),
+            asset_operations: Arc::clone(&self.asset_operations),
+            temporal_state: Arc::clone(&self.temporal_state),
+            metrics: Arc::clone(&self.metrics),
+            created_at: self.created_at,
+        }
+    }
+}
+
 impl VMConsensusContext {
     /// Create new consensus context
     pub fn new() -> Self {

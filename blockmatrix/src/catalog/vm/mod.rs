@@ -617,12 +617,12 @@ mod tests {
     #[tokio::test]
     async fn test_matrix_integration_types() {
         use crate::assets::matrix_blockchain::{MatrixBlockchainManager, EntityType};
-        use crate::assets::core::AssetType;
+        use crate::assets::core::{AssetType, asset_id::AssetId as RealAssetId};
 
         // Test CrossEntityValidation creation
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: AssetId::new(AssetType::Container),
+            asset_id: RealAssetId::new(AssetType::Container).uuid,
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,
@@ -672,6 +672,7 @@ mod tests {
         use crate::catalog::vm::execution::ExecutionContext;
         use crate::consensus::ConsensusProof;
         use uuid::Uuid;
+        use crate::assets::core::{AssetType, asset_id::AssetId as RealAssetId};
         
         // Create base execution context
         let base_context = ExecutionContext {
@@ -716,7 +717,7 @@ mod tests {
             cross_entity_validations: vec![
                 CrossEntityValidation {
                     entity_domain: "dmv.hypermesh.online".to_string(),
-                    asset_id: AssetId::new(AssetType::Container),
+                    asset_id: RealAssetId::new(AssetType::Container).uuid,
                     validation_fields: vec!["registration_status".to_string()],
                     validation_type: ValidationRequirementType::AssetExists,
                     privacy_level: PrivacyLevel::P2P,

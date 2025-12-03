@@ -575,17 +575,17 @@ mod tests {
         assert!(has_p2p);
     }
     
-    #[test]
-    fn test_julia_asset_requirements_analysis() {
-        let adapter = create_test_adapter();
-        
+    #[tokio::test]
+    async fn test_julia_asset_requirements_analysis() {
+        let adapter = create_test_adapter().await;
+
         let code = r#"
             using LinearAlgebra
             @threads for i in 1:1000000
                 result = rand(1000, 1000) * rand(1000, 1000)
             end
         "#;
-        
+
         let requirements = adapter.analyze_julia_asset_requirements(code).unwrap();
         
         // Should detect CPU and memory requirements
@@ -597,10 +597,10 @@ mod tests {
         assert!(cpu_req.required_features.contains(&"threading".to_string()));
     }
     
-    #[test]
-    fn test_julia_error_translation() {
-        let adapter = create_test_adapter();
-        
+    #[tokio::test]
+    async fn test_julia_error_translation() {
+        let adapter = create_test_adapter().await;
+
         let error = "UndefVarError: x not defined";
         let translated = adapter.translate_julia_error(error).unwrap();
         

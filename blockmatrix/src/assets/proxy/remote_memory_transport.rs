@@ -668,13 +668,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_operation_id_generation() {
-        // Endpoint would be created with actual configuration in production
+        // STUB: Phase 3 - Endpoint configuration needs proper rustls setup
+        // Modern rustls API requires crypto provider setup
         let endpoint = quinn::Endpoint::server(
-            quinn::ServerConfig::with_crypto(Arc::new(quinn::rustls::ServerConfig::builder()
-                .with_safe_defaults()
-                .with_no_client_auth()
-                .with_single_cert(vec![], quinn::rustls::PrivateKey(vec![]))
-                .unwrap())),
+            quinn::ServerConfig::with_crypto(Arc::new(
+                quinn::rustls::ServerConfig::builder()
+                    .with_no_client_auth()
+                    .with_single_cert(vec![], quinn::rustls::PrivateKey(vec![]))
+                    .unwrap()
+            )),
             "127.0.0.1:0".parse().unwrap(),
         ).unwrap();
 
