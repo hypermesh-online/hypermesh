@@ -778,8 +778,8 @@ mod tests {
         assert!(orchestrator.is_ok());
     }
     
-    #[test]
-    fn test_asset_priority_mapping() {
+    #[tokio::test]
+    async fn test_asset_priority_mapping() {
         let orchestrator = create_test_orchestrator().await.unwrap();
         
         assert!(matches!(

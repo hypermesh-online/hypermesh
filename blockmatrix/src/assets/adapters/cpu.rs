@@ -838,6 +838,7 @@ mod tests {
     use super::*;
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
     use std::time::Duration;
+    use std::collections::HashMap;
     
     async fn create_test_cpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
@@ -886,6 +887,8 @@ mod tests {
                 },
             ),
             certificate_fingerprint: "test-cert".to_string(),
+            duration_limit: Some(Duration::from_secs(3600)),
+            tags: HashMap::new(),
         }
     }
     

@@ -1119,7 +1119,7 @@ fn parallel_compute() {
     }
     
     // Helper function
-    fn create_test_adapter() -> RustAdapter {
+    async fn create_test_adapter() -> RustAdapter {
         let consensus_requirements = VMConsensusRequirements::default();
         let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
         let consensus_bridge = Arc::new(ConsensusBridge::new().await.unwrap());

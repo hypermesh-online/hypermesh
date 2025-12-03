@@ -865,6 +865,7 @@ impl AssetAdapter for NetworkAssetAdapter {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use super::*;
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
     
@@ -915,6 +916,8 @@ mod tests {
                 },
             ),
             certificate_fingerprint: "test-cert".to_string(),
+            duration_limit: Some(Duration::from_secs(3600)),
+            tags: HashMap::new(),
         }
     }
     

@@ -674,12 +674,12 @@ mod tests {
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
-            circuit_breaker: crate::CircuitBreakerConfig {
+            circuit_breaker: crate::orchestration::CircuitBreakerConfig {
                 failure_threshold: 0.05,
                 recovery_timeout_ms: 30000,
                 min_request_threshold: 10,
             },
-            load_balancing: crate::LoadBalancingConfig {
+            load_balancing: crate::orchestration::LoadBalancingConfig {
                 strategy: LoadBalancingStrategy::NeuralOptimal,
                 health_check_interval_ms: 5000,
                 health_check_timeout_ms: 1000,
@@ -697,12 +697,12 @@ mod tests {
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
-            circuit_breaker: crate::CircuitBreakerConfig {
+            circuit_breaker: crate::orchestration::CircuitBreakerConfig {
                 failure_threshold: 0.05,
                 recovery_timeout_ms: 30000,
                 min_request_threshold: 10,
             },
-            load_balancing: crate::LoadBalancingConfig {
+            load_balancing: crate::orchestration::LoadBalancingConfig {
                 strategy: LoadBalancingStrategy::NeuralOptimal,
                 health_check_interval_ms: 5000,
                 health_check_timeout_ms: 1000,

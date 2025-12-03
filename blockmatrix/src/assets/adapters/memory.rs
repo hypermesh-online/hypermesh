@@ -738,12 +738,14 @@ impl AssetAdapter for MemoryAssetAdapter {
 mod tests {
     use super::*;
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+    use std::collections::HashMap;
+    use std::time::Duration;
     
     async fn create_test_memory_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
             asset_type: AssetType::Memory,
             requested_resources: crate::assets::core::ResourceRequirements {
-                memory_usage: Some(MemoryRequirements {
+                memory_usage: Some(crate::catalog::vm::languages::MemoryRequirements {
                     size_bytes: 1024 * 1024 * 1024, // 1GB
                     memory_type: Some("DDR4".to_string()),
                     ecc_required: false,
@@ -785,6 +787,8 @@ mod tests {
                 },
             ),
             certificate_fingerprint: "test-cert".to_string(),
+            duration_limit: Some(Duration::from_secs(3600)),
+            tags: HashMap::new(),
         }
     }
     

@@ -858,7 +858,7 @@ def test_function():
     }
     
     // Helper functions
-    fn create_test_adapter() -> PythonAdapter {
+    async fn create_test_adapter() -> PythonAdapter {
         let consensus_requirements = VMConsensusRequirements::default();
         let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
         let consensus_bridge = Arc::new(ConsensusBridge::new().await.unwrap());
