@@ -1,150 +1,244 @@
-# TrustChain - CA/CT/DNS Foundation for HyperMesh Integration
+# TrustChain - Block-MATRIX Federated Trust System
 
-**Status: 🚧 DEVELOPMENT - Core Framework Complete**
+**Status: 🚧 DEVELOPMENT - Revolutionary Federated Trust Architecture**
 
-TrustChain provides the cryptographic foundation layer for STOQ transport security, specifically designed to enable trust.hypermesh.online DNS/CT/CA services. Core certificate authority, transparency logging, and DNS frameworks are implemented with STOQ integration points.
+TrustChain implements the Block-MATRIX Federated Trust System - a revolutionary trust model where DNS registration is a blockchain asset requiring Proof of State validation. Unlike traditional CA/CT/DNS, every node is its own DNS provider first, with optional blockchain registration for earning CAESAR rewards.
 
-## 🎯 Implementation Status
+## 🎯 Core Innovation: DNS-as-Asset
 
-### Core Framework Status
-- **Framework modules**: CA/CT/DNS core structures defined
-- **STOQ Integration**: Certificate validation interfaces for transport security
-- **Trust Foundation**: Basic certificate authority framework for trust.hypermesh.online
-- **Development Focus**: DNS/CT/CA services specifically for STOQ protocol trust
-- **Integration Target**: Enable secure HyperMesh networking via STOQ transport
+### Revolutionary Trust Model
+- **DNS Registration = Blockchain Asset**: Full Proof of State (WHO/WHEN/WHERE/WHAT) required
+- **Node-as-DNS-Provider First**: Each node bootstraps independently, no upstream dependency
+- **Matrix-Based Trust**: Trust relationships computed from matrix topology positions
+- **Earn CAESAR Rewards**: Blockchain-registered DNS names earn network rewards
+- **No Central Authority**: Federated trust through matrix consensus, not hierarchical CA
 
-## 🔄 Bootstrap Integration Strategy
+## 🔄 Block-MATRIX Architecture
 
-### Integration Challenge
-- STOQ needs certificate validation → requires TrustChain CA
-- HyperMesh needs secure networking → requires STOQ transport
-- TrustChain provides DNS/CT/CA → enables trust.hypermesh.online
+### Four Privacy Tiers
 
-### Bootstrap Approach
-1. **Phase 0**: Traditional DNS bootstrap with TrustChain CA framework
-2. **Phase 1**: STOQ transport using TrustChain certificates
-3. **Phase 2**: HyperMesh networking via secured STOQ channels
-4. **Phase 3**: Full trust.hypermesh.online namespace operation
+| Tier | Trust Model | Validation | Rewards | Use Case |
+|------|------------|------------|---------|----------|
+| **Anonymous** | No validation | None | None | Privacy-first sharing |
+| **Private P2P** | Direct peer trust | Peer attestation | Minimal | Trusted groups |
+| **Federated** | Network-level trust | Matrix consensus | Medium | Organizations |
+| **Public** | Full blockchain | Complete PoS | Maximum | Public services |
 
-## 🏗️ Architecture Components
+### Proof of State Requirements
+Every DNS asset requires ALL FOUR proofs:
+- **PoSpace (WHERE)**: Network location and topology position in matrix
+- **PoStake (WHO)**: Identity, ownership, and economic stake in system
+- **PoWork (WHAT)**: Computational contribution and service provision
+- **PoTime (WHEN)**: Temporal ordering and registration timestamp
 
-### Core Services Framework
-- **Certificate Authority (CA)**: Framework for certificate issuance and validation
-- **Certificate Transparency (CT)**: Logging infrastructure for certificate transparency
-- **DNS Resolution**: DNS-over-QUIC foundation for trust.hypermesh.online
-- **STOQ Integration**: Certificate validation endpoints for transport security
-- **API Framework**: REST endpoints for CA/CT operations
+## 🏗️ Node Bootstrap Protocol
 
-### Key Integration Points
-- **STOQ Certificate Validation**: Provides certificate trust for STOQ transport
-- **HyperMesh DNS Services**: Enables trust.hypermesh.online namespace resolution
-- **Bootstrap Support**: Traditional DNS fallback during initial deployment
-- **Security Framework**: Certificate-based trust model for Web3 ecosystem
-
-## 🚀 Development Setup
-
-```bash
-# Build TrustChain framework
-cargo build
-
-# Test certificate authority framework
-cargo test
-
-# Run integration tests with STOQ
-cargo test --features stoq-integration
-
-# Start development services (framework only)
-cargo run --bin trustchain-server
+### Independent Bootstrap (No Upstream Dependency)
+```rust
+// Every node starts as its own DNS provider
+Node::bootstrap() {
+    1. Generate local identity (cryptographic keypair)
+    2. Initialize local DNS namespace (node-local resolution)
+    3. Establish matrix position (compute topology coordinates)
+    4. Begin peer discovery (local network first)
+    5. Optional: Register on blockchain for rewards
+}
 ```
 
-## 🔗 STOQ Integration Architecture
+### Registration Flow (Optional, for Rewards)
+```rust
+// Blockchain registration for earning CAESAR
+DNSAsset::register() {
+    1. Prepare Proof of State (all four proofs)
+    2. Submit to blockchain consensus
+    3. Stake CAESAR tokens (if public tier)
+    4. Begin earning rewards for DNS services
+}
+```
 
-### Certificate Validation Flow
-1. **STOQ Transport**: Requests certificate validation from TrustChain
-2. **TrustChain CA**: Validates certificates and provides trust decisions
-3. **Certificate Transparency**: Logs all certificate operations for transparency
-4. **DNS Resolution**: Resolves trust.hypermesh.online for bootstrap
+## 🔮 Matrix Trust Computation
 
-### trust.hypermesh.online Services
-- **Certificate Authority**: `ca.trust.hypermesh.online`
-- **Certificate Transparency**: `ct.trust.hypermesh.online`
-- **DNS Services**: `dns.trust.hypermesh.online`
-- **Bootstrap Services**: Traditional DNS fallback support
+### Trust Based on Matrix Topology
+```rust
+// Trust decreases with matrix distance
+trust_score = base_trust * (1.0 / (1.0 + matrix_distance))
+
+// Tensor operations for multi-dimensional trust
+trust_tensor = Matrix4D::compute_trust_field(
+    source_position,
+    target_position,
+    temporal_proof,
+    stake_weight
+)
+```
+
+### Federated Trust Networks
+- **Local Clusters**: High trust within matrix neighborhoods
+- **Bridge Nodes**: Connect disparate matrix regions
+- **Trust Propagation**: Reputation flows through matrix paths
+- **Byzantine Resistance**: Matrix consensus prevents single-point failures
+
+## 🚀 Implementation Architecture
+
+### Core Components
+```rust
+// Block-MATRIX trust system components
+pub struct TrustChain {
+    // DNS-as-Asset blockchain registry
+    dns_registry: BlockchainRegistry,
+
+    // Matrix topology for trust computation
+    trust_matrix: Matrix4D,
+
+    // Proof of State validator
+    pos_validator: ProofOfState,
+
+    // CAESAR reward distribution
+    reward_engine: CaesarRewards,
+
+    // Federated peer network
+    federation: FederatedNetwork,
+}
+```
+
+### DNS Asset Types
+```rust
+// Everything in DNS namespace is an asset
+pub enum DNSAsset {
+    // Service endpoints (earn maximum rewards)
+    Service { name: String, endpoints: Vec<Endpoint> },
+
+    // Compute resources (GPU, CPU, storage)
+    Resource { name: String, capacity: ResourceSpec },
+
+    // Identity attestations (trust anchors)
+    Identity { name: String, pubkey: PublicKey },
+
+    // Smart contract interfaces
+    Contract { name: String, address: H256 },
+}
+```
+
+## 🔗 Integration with HyperMesh Ecosystem
+
+### STOQ Transport Integration
+- **Certificate-Free Trust**: Matrix position proves identity
+- **Quantum-Resistant**: FALCON-1024 for all cryptographic operations
+- **Zero-Knowledge Proofs**: Privacy-preserving trust attestations
+
+### HyperMesh Asset System
+- **DNS Names as Assets**: Full integration with HyperMesh asset framework
+- **Remote Proxy Addressing**: NAT-like resolution through trust matrix
+- **Privacy-Aware Resolution**: Respect privacy tiers in name resolution
+
+### CAESAR Economic Integration
+- **Stake to Register**: Public DNS requires CAESAR stake
+- **Earn from Services**: Rewards for providing DNS resolution
+- **Slashing for Misbehavior**: Economic penalties for false records
 
 ## 📋 Development Roadmap
 
-### Phase 1: STOQ Integration Foundation
-- Complete TrustChain CA framework for STOQ certificate validation
-- Implement certificate transparency logging for STOQ operations
-- Enable trust.hypermesh.online DNS services for bootstrap
-- Test STOQ transport with TrustChain certificate validation
+### Phase 1: Matrix Trust Foundation
+- [x] Design Block-MATRIX trust model
+- [ ] Implement matrix topology computation
+- [ ] Build Proof of State validation
+- [ ] Create local node bootstrap
 
-### Phase 2: HyperMesh Network Security
-- Integrate TrustChain services with HyperMesh networking
-- Enable secure STOQ channels for HyperMesh communication
-- Implement DNS-over-QUIC for trust.hypermesh.online namespace
-- Complete CA/CT/DNS integration testing
+### Phase 2: Federated Network
+- [ ] Implement peer discovery protocol
+- [ ] Build federated trust propagation
+- [ ] Add Byzantine fault tolerance
+- [ ] Test multi-tier privacy model
 
-### Phase 3: Production Deployment
-- Deploy trust.hypermesh.online services with traditional DNS fallback
-- Enable production STOQ transport with TrustChain security
-- Scale certificate authority operations for HyperMesh ecosystem
-- Monitor and optimize CA/CT performance
+### Phase 3: Blockchain Integration
+- [ ] Connect to CAESAR reward system
+- [ ] Implement DNS asset registration
+- [ ] Add staking mechanisms
+- [ ] Deploy slashing conditions
+
+### Phase 4: Production Deployment
+- [ ] Launch federated trust network
+- [ ] Enable public DNS registration
+- [ ] Scale to thousands of nodes
+- [ ] Monitor and optimize matrix operations
 
 ## 🔧 Configuration
 
 ```yaml
-# trustchain.yaml - STOQ Integration Focus
+# trustchain.yaml - Block-MATRIX Configuration
 bootstrap:
-  domain: "trust.hypermesh.online"
-  traditional_dns_fallback: true
+  # Node starts as own DNS provider
+  independent_start: true
+  blockchain_registration: optional
 
-ca:
-  # Certificate authority for STOQ transport validation
-  cert_validity_hours: 24
-  stoq_integration: true
+matrix:
+  # Trust computation parameters
+  dimensions: 4  # Space + Time
+  trust_decay_rate: 0.5
+  max_distance: 10
 
-ct:
-  # Certificate transparency for STOQ operations
-  log_stoq_certificates: true
+privacy_tiers:
+  anonymous:
+    validation: none
+    rewards: false
+  private_p2p:
+    validation: peer_attestation
+    rewards: minimal
+  federated:
+    validation: matrix_consensus
+    rewards: medium
+  public:
+    validation: full_proof_of_state
+    rewards: maximum
 
-dns:
-  # DNS services for trust.hypermesh.online
-  quic_port: 853
-  traditional_fallback: true
+proof_of_state:
+  # All four proofs required
+  require_space: true
+  require_stake: true
+  require_work: true
+  require_time: true
 
-stoq_integration:
-  # Core integration with STOQ transport
-  certificate_validation_endpoint: true
-  trust_decisions: true
+caesar_integration:
+  # Economic parameters
+  minimum_stake: 100
+  reward_per_resolution: 0.001
+  slashing_penalty: 10
 ```
 
-## 📚 Technical Reference
+## 📚 Technical Advantages
 
-- **STOQ Integration**: Certificate validation API for transport security
-- **DNS Bootstrap**: trust.hypermesh.online namespace resolution
-- **CA Framework**: Certificate authority operations for Web3 ecosystem
-- **CT Logging**: Certificate transparency for audit and compliance
+### Over Traditional DNS
+- **No Root Servers**: Every node is sovereign
+- **No ICANN Control**: Blockchain consensus instead of central authority
+- **Censorship Resistant**: Federated trust prevents single-point censorship
+- **Economic Incentives**: Earn rewards for good behavior
 
-## 🔄 Current Development Status
+### Over Traditional CA/CT
+- **No Certificate Chains**: Matrix position is identity proof
+- **No Expiration**: Continuous trust computation
+- **No Revocation Lists**: Slashing provides immediate punishment
+- **Quantum Resistant**: FALCON-1024 throughout
 
-### Framework Complete
-- [x] Core CA/CT/DNS module structure
-- [x] STOQ integration interface design
-- [x] Certificate validation framework
-- [x] Basic DNS resolution structure
+### Privacy First
+- **Anonymous Tier**: Complete privacy, no tracking
+- **Selective Disclosure**: Choose your trust level
+- **Zero-Knowledge Proofs**: Prove properties without revealing data
+- **User Sovereignty**: Control your own DNS namespace
 
-### In Development
-- [ ] Complete STOQ certificate validation implementation
-- [ ] Certificate transparency logging for STOQ operations
-- [ ] DNS-over-QUIC for trust.hypermesh.online
-- [ ] Integration testing with STOQ transport
+## 🔄 Current Development Focus
 
-### Planned
-- [ ] Production deployment of trust.hypermesh.online
-- [ ] HyperMesh network security integration
-- [ ] Performance optimization and scaling
+### Immediate Priorities
+1. **Matrix Topology Engine**: Computing trust relationships
+2. **Proof of State Validator**: Implementing four-proof system
+3. **Node Bootstrap**: Independent startup protocol
+4. **Federated Discovery**: Peer-finding without central servers
+
+### Integration Points
+- **STOQ Protocol**: Transport security through matrix trust
+- **HyperMesh Assets**: DNS names as blockchain assets
+- **CAESAR Rewards**: Economic incentives for participation
+- **Catalog VMs**: Resolve VM endpoints through trust matrix
 
 ---
 
-*TrustChain: Certificate foundation for STOQ transport security*
+*TrustChain: Revolutionizing trust through Block-MATRIX federation - where every node is sovereign and DNS is a blockchain asset*
