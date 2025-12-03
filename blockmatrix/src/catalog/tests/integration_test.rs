@@ -291,12 +291,8 @@ async fn test_blockchain_blocks() {
 
 fn create_test_consensus_proof() -> ConsensusProof {
     let space_proof = SpaceProof::new(
+        "test-node".to_string(),
         "/test/space".to_string(),
-        NetworkPosition {
-            address: "test-address".to_string(),
-            zone: "test-zone".to_string(),
-            distance_metric: 1,
-        },
         1024, // 1KB space commitment
     );
     
@@ -304,22 +300,18 @@ fn create_test_consensus_proof() -> ConsensusProof {
         "test-stakeholder".to_string(),
         "test-node".to_string(),
         1000, // Authority level
-        crate::consensus::proof::AccessPermissions {
-            read_level: crate::consensus::proof::AccessLevel::Public,
-            write_level: crate::consensus::proof::AccessLevel::Network,
-            admin_level: crate::consensus::proof::AccessLevel::None,
-            allocation_rights: vec!["test-compute".to_string()],
-        },
-        vec![], // No allowances for test
     );
-    
+
     let work_proof = WorkProof::new(
-        b"test-challenge",
-        8, // Low difficulty for testing
-        "test-compute".to_string(),
-    ).unwrap();
-    
-    let time_proof = TimeProof::new(1000, None, 1);
+        "test-owner".to_string(),
+        "test-workload".to_string(),
+        12345,
+        100,
+        WorkloadType::Compute,
+        WorkState::Completed,
+    );
+
+    let time_proof = TimeProof::new(Duration::from_secs(1));
     
     // ConsensusProof::new expects: (stake, time, space, work)
     ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof)

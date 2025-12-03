@@ -525,11 +525,12 @@ mod tests {
         let proxy_addr = ProxyAddress::new([1u8; 16], [2u8; 8], 8080);
         
         let rule = ForwardingRule {
-            rule_type: super::super::ForwardingRuleType::Http,
             source_pattern: "*".to_string(),
             destination: "forwarded".to_string(),
-            port_mapping: None,
-            protocol_settings: HashMap::new(),
+            mode: ForwardingMode::Direct,
+            rule_type: super::super::ForwardingRuleType::Http,
+            priority: 1,
+            auth_required: false,
         };
         
         forwarder.install_rule(&proxy_addr, &rule).await.unwrap();

@@ -411,12 +411,8 @@ mod tests {
     async fn test_execution_request_validation() {
         // Create mock consensus proof components
         let space_proof = SpaceProof::new(
+            "test-node".to_string(),
             "/test/storage".to_string(),
-            NetworkPosition {
-                address: "test-address".to_string(),
-                zone: "test-zone".to_string(),
-                distance_metric: 100,
-            },
             1024 * 1024 * 1024,
         );
 
@@ -424,22 +420,18 @@ mod tests {
             "test-holder".to_string(),
             "test-node".to_string(),
             1000,
-            AccessPermissions {
-                read_level: AccessLevel::Public,
-                write_level: AccessLevel::Public,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec!["cpu".to_string()],
-            },
-            vec!["test-allowance".to_string()],
         );
 
         let work_proof = WorkProof::new(
-            b"test-challenge",
-            16,
-            "cpu".to_string(),
-        ).unwrap();
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            12345,
+            100,
+            WorkloadType::Compute,
+            WorkState::Completed,
+        );
 
-        let time_proof = TimeProof::new(1000, None, 1);
+        let time_proof = TimeProof::new(Duration::from_secs(1));
 
         let consensus_proof = ConsensusProof::new(
             space_proof,

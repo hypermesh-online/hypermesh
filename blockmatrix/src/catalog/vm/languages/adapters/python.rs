@@ -877,32 +877,29 @@ def test_function():
     }
     
     fn create_test_consensus_proof() -> ConsensusProof {
-        use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, NetworkPosition, AccessPermissions, AccessLevel};
+        use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+        use std::time::Duration;
         
         ConsensusProof::new(
             StakeProof::new(
                 "test".to_string(),
                 "test-node".to_string(),
                 1000,
-                AccessPermissions {
-                    read_level: AccessLevel::Private,
-                    write_level: AccessLevel::None,
-                    admin_level: AccessLevel::None,
-                    allocation_rights: vec![],
-                },
-                vec![],
             ),
-            TimeProof::new(0, None, 0),
+            TimeProof::new(Duration::from_secs(0)),
             SpaceProof::new(
+                "test-node".to_string(),
                 "/tmp/test".to_string(),
-                NetworkPosition {
-                    address: "::1".to_string(),
-                    zone: "local".to_string(),
-                    distance_metric: 0,
-                },
                 1024,
             ),
-            WorkProof::new(b"test", 16, "test".to_string()).unwrap(),
+            WorkProof::new(
+                "test-owner".to_string(),
+                "test-workload".to_string(),
+                12345,
+                100,
+                WorkloadType::Compute,
+                WorkState::Completed,
+            ),
         )
     }
 }

@@ -127,9 +127,10 @@ async fn test_privacy_allocation_workflow() {
     let space_proof = SpaceProof {
         node_id: "test-node".to_string(),
         storage_path: "/test/storage".to_string(),
-        allocated_size: 1_000_000_000, // 1GB
-        proof_hash: vec![1, 2, 3, 4, 5, 6, 7, 8],
-        timestamp: SystemTime::now(),
+        total_size: 1_000_000_000, // 1GB
+        total_storage: 2_000_000_000, // 2GB
+        file_hash: "test_hash".to_string(),
+        proof_timestamp: SystemTime::now(),
     };
     
     let stake_proof = StakeProof {
@@ -140,12 +141,14 @@ async fn test_privacy_allocation_workflow() {
     };
     
     let work_proof = WorkProof {
-        worker_id: "test-worker".to_string(),
+        owner_id: "test-worker".to_string(),
         workload_id: "cpu-allocation-work".to_string(),
-        process_id: 12345,
+        pid: 12345,
         computational_power: 200, // Above minimum
         workload_type: WorkloadType::Compute,
         work_state: WorkState::Completed,
+        work_challenges: vec!["test_challenge".to_string()],
+        proof_timestamp: SystemTime::now(),
     };
     
     let time_proof = TimeProof {

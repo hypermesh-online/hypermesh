@@ -23,30 +23,24 @@ fn create_test_consensus_proof(resource_type: &str, stake_amount: u64, difficult
     // ConsensusProof::new expects: (stake, time, space, work)
     ConsensusProof::new(
         StakeProof::new(
+            "test-holder".to_string(),
             "test-node".to_string(),
             stake_amount,
-            AccessPermissions {
-                read_level: AccessLevel::Public,
-                write_level: AccessLevel::Network,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec![resource_type.to_string()],
-            },
         ),
-        TimeProof::new(1000, None, 1),
+        TimeProof::new(Duration::from_secs(1)),
         SpaceProof::new(
+            "test-node".to_string(),
             format!("/test/{}", resource_type),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
             committed_space,
         ),
         WorkProof::new(
-            format!("{}-challenge", resource_type).as_bytes(),
-            difficulty,
-            resource_type.to_string(),
-        ).unwrap(),
+            format!("{}-owner", resource_type),
+            format!("{}-workload", resource_type),
+            12345,
+            difficulty as u64 * 10, // Convert difficulty to computational_power
+            WorkloadType::Compute,
+            WorkState::Completed,
+        ),
     )
 }
 
@@ -253,26 +247,24 @@ async fn test_consensus_proof_validation_failures() {
     // ConsensusProof::new expects: (stake, time, space, work)
     let invalid_space_proof = ConsensusProof::new(
         StakeProof::new(
+            "test-holder".to_string(),
             "test-node".to_string(),
             100,
-            AccessPermissions {
-                read_level: AccessLevel::Public,
-                write_level: AccessLevel::Network,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec!["cpu".to_string()],
-            },
         ),
-        TimeProof::new(1000, None, 1),
+        TimeProof::new(Duration::from_secs(1)),
         SpaceProof::new(
+            "test-node".to_string(),
             "/test/cpu".to_string(),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
             0, // Invalid: 0 committed space
         ),
-        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
+        WorkProof::new(
+            "test-owner".to_string(),
+            "cpu-workload".to_string(),
+            12345,
+            100,
+            WorkloadType::Compute,
+            WorkState::Completed,
+        ),
     );
     
     let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.unwrap();
@@ -282,26 +274,24 @@ async fn test_consensus_proof_validation_failures() {
     // ConsensusProof::new expects: (stake, time, space, work)
     let invalid_stake_proof = ConsensusProof::new(
         StakeProof::new(
+            "test-holder".to_string(),
             "test-node".to_string(),
             10, // Invalid: insufficient stake for CPU (needs 50+)
-            AccessPermissions {
-                read_level: AccessLevel::Public,
-                write_level: AccessLevel::Network,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec!["cpu".to_string()],
-            },
         ),
-        TimeProof::new(1000, None, 1),
+        TimeProof::new(Duration::from_secs(1)),
         SpaceProof::new(
+            "test-node".to_string(),
             "/test/cpu".to_string(),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
             2,
         ),
-        WorkProof::new(b"cpu-challenge", 16, "cpu".to_string()).unwrap(),
+        WorkProof::new(
+            "test-owner".to_string(),
+            "cpu-workload".to_string(),
+            12345,
+            100,
+            WorkloadType::Compute,
+            WorkState::Completed,
+        ),
     );
     
     let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.unwrap();
@@ -311,26 +301,24 @@ async fn test_consensus_proof_validation_failures() {
     // ConsensusProof::new expects: (stake, time, space, work)
     let invalid_work_proof = ConsensusProof::new(
         StakeProof::new(
+            "test-holder".to_string(),
             "test-node".to_string(),
             100,
-            AccessPermissions {
-                read_level: AccessLevel::Public,
-                write_level: AccessLevel::Network,
-                admin_level: AccessLevel::None,
-                allocation_rights: vec!["cpu".to_string()],
-            },
         ),
-        TimeProof::new(1000, None, 1),
+        TimeProof::new(Duration::from_secs(1)),
         SpaceProof::new(
+            "test-node".to_string(),
             "/test/cpu".to_string(),
-            NetworkPosition {
-                address: "2001:db8::1".to_string(),
-                zone: "us-west-1".to_string(),
-                distance_metric: 100,
-            },
             2,
         ),
-        WorkProof::new(b"cpu-challenge", 8, "cpu".to_string()).unwrap(), // Invalid: insufficient difficulty (needs 16+)
+        WorkProof::new(
+            "test-owner".to_string(),
+            "cpu-workload".to_string(),
+            12345,
+            50, // Invalid: insufficient computational_power (needs 100+)
+            WorkloadType::Compute,
+            WorkState::Completed,
+        ),
     );
     
     let valid = adapter.validate_consensus_proof(&invalid_work_proof).await.unwrap();

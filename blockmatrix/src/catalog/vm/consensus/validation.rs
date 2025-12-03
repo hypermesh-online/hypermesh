@@ -484,12 +484,8 @@ mod tests {
         let context = VMConsensusContext::new();
         
         let proof = SpaceProof::new(
+            "test-node".to_string(),
             "/test/storage".to_string(),
-            NetworkPosition {
-                address: "::1".to_string(),
-                zone: "test".to_string(),
-                distance_metric: 100,
-            },
             2048, // Above minimum
         );
         

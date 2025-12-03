@@ -272,9 +272,10 @@ mod integration_tests {
         let space_proof = SpaceProof {
             node_id: "test-node".to_string(),
             storage_path: "/test/storage".to_string(),
-            allocated_size: 1024 * 1024 * 1024, // 1GB
-            proof_hash: vec![1, 2, 3, 4, 5, 6, 7, 8],
-            timestamp: SystemTime::now(),
+            total_size: 1024 * 1024 * 1024, // 1GB
+            total_storage: 2048 * 1024 * 1024, // 2GB
+            file_hash: "test_hash".to_string(),
+            proof_timestamp: SystemTime::now(),
         };
         
         let stake_proof = StakeProof {
@@ -285,12 +286,14 @@ mod integration_tests {
         };
         
         let work_proof = WorkProof {
-            worker_id: "test-worker".to_string(),
+            owner_id: "test-worker".to_string(),
             workload_id: "test-workload".to_string(),
-            process_id: 12345,
+            pid: 12345,
             computational_power: 100,
             workload_type: core::WorkloadType::Compute,
             work_state: core::WorkState::Completed,
+            work_challenges: vec!["test_challenge".to_string()],
+            proof_timestamp: SystemTime::now(),
         };
         
         let time_proof = TimeProof {

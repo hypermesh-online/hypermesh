@@ -967,12 +967,7 @@ mod tests {
     async fn test_container_orchestrator_creation() {
         let integration_config = IntegrationConfig::default();
         let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
-        let config = ContainerConfig {
-            dsr_scheduling_enabled: true,
-            ifr_resource_lookup_enabled: true,
-            max_scheduling_candidates: 10,
-            scheduling_timeout_ms: 100,
-        };
+        let config = ContainerConfig::default();
         
         let orchestrator = ContainerOrchestrator::new(config, mfn_bridge).await;
         assert!(orchestrator.is_ok());
@@ -982,12 +977,7 @@ mod tests {
     async fn test_container_scheduling_performance() {
         let integration_config = IntegrationConfig::default();
         let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
-        let config = ContainerConfig {
-            dsr_scheduling_enabled: true,
-            ifr_resource_lookup_enabled: true,
-            max_scheduling_candidates: 10,
-            scheduling_timeout_ms: 100,
-        };
+        let config = ContainerConfig::default();
         
         let orchestrator = ContainerOrchestrator::new(config, mfn_bridge).await.unwrap();
         

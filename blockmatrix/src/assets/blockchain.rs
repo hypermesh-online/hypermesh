@@ -417,12 +417,8 @@ mod tests {
         
         // Create real consensus proof for testing
         let space_proof = SpaceProof::new(
+            "test-node".to_string(),
             format!("/hypermesh/assets/{}", asset_id.to_hex_string()),
-            crate::consensus::proof::NetworkPosition {
-                address: "hypermesh://test-node".to_string(),
-                zone: "test-zone".to_string(),
-                distance_metric: 1,
-            },
             1024, // 1KB allocation
         );
 
@@ -430,22 +426,18 @@ mod tests {
             "test-authority".to_string(),
             "test-node-id".to_string(),
             1000,
-            crate::consensus::proof::AccessPermissions {
-                read_level: crate::consensus::proof::AccessLevel::Public,
-                write_level: crate::consensus::proof::AccessLevel::Network,
-                admin_level: crate::consensus::proof::AccessLevel::None,
-                allocation_rights: vec!["Creation".to_string()],
-            },
-            vec!["delegate:cpu".to_string()],
         );
 
         let work_proof = WorkProof::new(
-            b"test-challenge",
-            8, // Low difficulty for testing
-            "Creation".to_string(),
-        ).unwrap();
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            12345,
+            100, // computational_power
+            WorkloadType::Compute,
+            WorkState::Completed,
+        );
 
-        let time_proof = TimeProof::new(1000, None, 1);
+        let time_proof = TimeProof::new(Duration::from_secs(1));
 
         let consensus_proof = ConsensusProof::new(
             stake_proof,
