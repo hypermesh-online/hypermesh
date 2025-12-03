@@ -1026,7 +1026,7 @@ mod tests {
         
         // Create test container specification
         let container_spec = ContainerSpec {
-            id: ContainerId("test-container-1".to_string()),
+            id: ContainerId(Uuid::new_v4()),
             service_id: ServiceId("test-service".to_string()),
             image: "nginx:latest".to_string(),
             resources: ResourceRequirements {

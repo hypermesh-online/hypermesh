@@ -617,12 +617,12 @@ mod tests {
     #[tokio::test]
     async fn test_matrix_integration_types() {
         use crate::assets::matrix_blockchain::{MatrixBlockchainManager, EntityType};
-        use uuid::Uuid;
-        
+        use crate::assets::core::AssetType;
+
         // Test CrossEntityValidation creation
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: Uuid::new_v4(),
+            asset_id: AssetId::new(AssetType::Container),
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,
@@ -699,7 +699,7 @@ mod tests {
             language: "julia".to_string(),
             asset_allocations: std::collections::HashMap::new(),
             privacy_settings: PrivacyConfig::default(),
-            blockchain_context: serde_json::Value::Null,
+            blockchain_context: BlockchainExecutionContext::default(),
             p2p_context: P2PExecutionContext {
                 connected_peers: Vec::new(),
                 peer_resources: std::collections::HashMap::new(),
@@ -716,7 +716,7 @@ mod tests {
             cross_entity_validations: vec![
                 CrossEntityValidation {
                     entity_domain: "dmv.hypermesh.online".to_string(),
-                    asset_id: Uuid::new_v4(),
+                    asset_id: AssetId::new(AssetType::Container),
                     validation_fields: vec!["registration_status".to_string()],
                     validation_type: ValidationRequirementType::AssetExists,
                     privacy_level: PrivacyLevel::P2P,

@@ -702,7 +702,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_language_support_creation() {
         let consensus_requirements = VMConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(consensus_requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
         
         let multi_lang = MultiLanguageSupport::new(consensus_vm).await;
         assert!(multi_lang.is_ok());

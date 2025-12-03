@@ -508,7 +508,7 @@ impl ConsensusManager {
     /// Verify signature (placeholder)
     async fn verify_signature(&self, signature: &[u8], node: &NodeId) -> bool {
         // In production, this would verify using the node's public key
-        !signature.is_empty() && !node.public_key.is_empty()
+        !signature.is_empty() && !node.pub_key.is_empty()
     }
 
     /// Generate consensus proof

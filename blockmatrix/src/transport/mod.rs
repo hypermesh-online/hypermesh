@@ -145,7 +145,7 @@ impl HyperMeshTransport {
 
     /// Accept a connection
     pub async fn accept(&self) -> Result<(String, NodeId)> {
-        Ok((String::new(), NodeId::new("".to_string()))) // Stub implementation
+        Ok((String::new(), NodeId::from_name(""))) // Stub implementation
     }
 
     /// Close a connection
@@ -160,7 +160,7 @@ impl HyperMeshTransport {
 
     /// Receive message
     pub async fn receive_message(&self) -> Result<(NodeId, Vec<u8>)> {
-        Ok((NodeId::new("".to_string()), Vec::new())) // Stub implementation
+        Ok((NodeId::from_name(""), Vec::new())) // Stub implementation
     }
 }
 

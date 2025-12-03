@@ -661,7 +661,7 @@ mod tests {
     use super::*;
 
     use crate::catalog::vm::consensus::ConsensusVM;
-    use crate::consensus::ConsensusRequirements;
+    use crate::catalog::vm::ConsensusRequirements;
 
     #[tokio::test]
     async fn test_scheduler_creation() {

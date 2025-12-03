@@ -647,8 +647,14 @@ mod tests {
     use crate::assets::core::ProxyCapabilities;
     
     fn create_test_node_info() -> ProxyNodeInfo {
+        // Convert string to [u8; 8] for node_id
+        let mut node_id_bytes = [0u8; 8];
+        let bytes = "test-node".as_bytes();
+        let len = bytes.len().min(8);
+        node_id_bytes[..len].copy_from_slice(&bytes[..len]);
+
         ProxyNodeInfo {
-            node_id: "test-node".to_string(),
+            node_id: node_id_bytes,
             network_address: "192.168.1.100".to_string(),
             capabilities: ProxyCapabilities {
                 http_proxy: true,

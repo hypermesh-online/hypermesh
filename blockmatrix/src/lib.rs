@@ -297,10 +297,10 @@ mod tests {
         space_proof.node_id = "test-node".to_string();
 
         let work_proof = WorkProof::new(
-            100,
+            "owner-1".to_string(),
             "workload-1".to_string(),
             12345,
-            "owner-1".to_string(),
+            100,
             WorkloadType::Compute,
             WorkState::Completed,
         );

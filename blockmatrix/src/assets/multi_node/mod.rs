@@ -30,39 +30,8 @@ pub use load_balancer::{LoadBalancer, BalancingStrategy, ResourceMetrics};
 pub use fault_tolerance::{ByzantineDetector, FaultRecovery, NodeHealthMonitor};
 pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
 
-/// Node identifier in the HyperMesh network
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NodeId {
-    /// Unique node identifier (derived from certificate)
-    pub id: [u8; 32],
-    /// Node's IPv6 address
-    pub ipv6_address: Ipv6Addr,
-    /// Node's public key for verification
-    pub public_key: Vec<u8>,
-    /// Node's trust score (0.0 to 1.0) - not included in Hash/Eq
-    pub trust_score: f32,
-}
-
-// Manual implementations that exclude f32 trust_score from Hash/Eq
-impl std::hash::Hash for NodeId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.ipv6_address.hash(state);
-        self.public_key.hash(state);
-        // Exclude trust_score from hash (it's a metric, not identity)
-    }
-}
-
-impl PartialEq for NodeId {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && self.ipv6_address == other.ipv6_address
-            && self.public_key == other.public_key
-        // Exclude trust_score from equality (it's a metric, not identity)
-    }
-}
-
-impl Eq for NodeId {}
+// Use canonical NodeId from transport layer
+pub use crate::transport::NodeId;
 
 /// Multi-node network topology
 #[derive(Clone, Debug)]

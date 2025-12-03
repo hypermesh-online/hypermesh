@@ -180,9 +180,8 @@ pub struct ServiceId(pub String);
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ContainerId(pub String);
 
-/// Node identifier
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct NodeId(pub String);
+// NodeId is now imported from transport layer
+pub use crate::transport::NodeId;
 
 /// Orchestration decision types
 #[derive(Debug, Clone, Serialize, Deserialize)]

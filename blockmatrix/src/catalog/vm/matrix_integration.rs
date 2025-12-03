@@ -887,9 +887,10 @@ mod tests {
     
     #[test]
     fn test_cross_entity_validation_creation() {
+        use crate::assets::core::{AssetId, AssetType};
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: Uuid::new_v4(),
+            asset_id: AssetId::new(AssetType::Container),
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,

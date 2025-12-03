@@ -658,15 +658,9 @@ impl Default for CurrentPerformance {
 // Mock STOQ types for compilation (would be replaced with actual STOQ imports)
 mod stoq {
     use serde::{Deserialize, Serialize};
-    
-    #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
-    pub struct NodeId(String);
-    
-    impl NodeId {
-        pub fn new(id: String) -> Self {
-            Self(id)
-        }
-    }
+
+    // Use canonical NodeId from transport layer
+    use crate::transport::NodeId;
     
     #[derive(Debug, Clone)]
     pub struct Node {

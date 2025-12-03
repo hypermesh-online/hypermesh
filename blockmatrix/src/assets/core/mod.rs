@@ -463,10 +463,10 @@ mod tests {
         space_proof.node_id = "test-node".to_string();
         
         let work_proof = WorkProof::new(
-            100,                         // computational_power
-            "test-workload".to_string(), // workload_id  
-            12345,                       // pid
             "test-worker".to_string(),   // owner_id
+            "test-workload".to_string(), // workload_id
+            12345,                       // pid
+            100,                         // computational_power
             WorkloadType::Compute,       // workload_type
             WorkState::Completed,        // work_state
         );

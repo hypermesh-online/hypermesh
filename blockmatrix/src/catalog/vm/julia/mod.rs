@@ -706,7 +706,7 @@ mod tests {
     #[tokio::test]
     async fn test_julia_vm_creation() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(super::super::consensus::ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(super::super::consensus::ConsensusVM::new(requirements).unwrap()));
         
         let julia_vm = JuliaVM::new(consensus_vm).await;
         // May fail due to unimplemented dependencies, but tests structure

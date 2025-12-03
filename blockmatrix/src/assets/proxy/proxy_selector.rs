@@ -464,7 +464,7 @@ mod tests {
     #[tokio::test]
     async fn test_proxy_registration() {
         let trust_chain = Arc::new(TrustChainIntegration::new());
-        let validator = Arc::new(CertificateValidator::new());
+        let validator = Arc::new(CertificateValidator::new().unwrap());
         let selector = ProxySelector::new(trust_chain, validator, ProxySelectorConfig::default());
 
         let proxy = ProxyNode {

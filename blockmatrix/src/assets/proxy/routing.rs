@@ -622,8 +622,14 @@ mod tests {
     }
     
     fn create_test_node_info(node_id: &str, trust_score: f32) -> ProxyNodeInfo {
+        // Convert string to [u8; 8] for node_id
+        let mut node_id_bytes = [0u8; 8];
+        let bytes = node_id.as_bytes();
+        let len = bytes.len().min(8);
+        node_id_bytes[..len].copy_from_slice(&bytes[..len]);
+
         ProxyNodeInfo {
-            node_id: node_id.to_string(),
+            node_id: node_id_bytes,
             network_address: format!("192.168.1.{}", 100),
             capabilities: ProxyCapabilities {
                 http_proxy: true,

@@ -276,7 +276,7 @@ mod tests {
         let errors = vec![
             (TransportError::network("test"), "network"),
             (TransportError::config("test"), "config"),
-            (TransportError::NoConnection(NodeId::new("test".to_string())), "connection"),
+            (TransportError::NoConnection("test".to_string()), "connection"),
             (TransportError::PoolFull { max_size: 100 }, "pool"),
         ];
         

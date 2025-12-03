@@ -527,27 +527,28 @@ mod tests {
     #[tokio::test]
     async fn test_julia_adapter_creation() {
         let consensus_requirements = VMConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(consensus_requirements).unwrap());
-        
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
+
         let adapter = JuliaAdapter::new(consensus_vm, None).await;
         // May fail due to unimplemented dependencies, but tests structure
         assert!(adapter.is_ok() || adapter.is_err());
     }
     
-    #[test]
-    fn test_julia_consensus_construct_parsing() {
-        let consensus_vm = Arc::new(
+    #[tokio::test]
+    async fn test_julia_consensus_construct_parsing() {
+        let consensus_vm = Arc::new(RwLock::new(
             ConsensusVM::new(VMConsensusRequirements::default()).unwrap()
-        );
+        ));
+        let consensus_vm_clone = Arc::clone(&consensus_vm);
         let adapter = JuliaAdapter {
             base: BaseAdapter::new(
                 "julia".to_string(),
                 "JuliaVM".to_string(),
-                consensus_vm,
+                Arc::clone(&consensus_vm),
                 Arc::new(ConsensusBridge::new().await.unwrap()),
                 None,
             ),
-            julia_vm: Arc::new(JuliaVM::new(consensus_vm).await.unwrap()),
+            julia_vm: Arc::new(JuliaVM::new(consensus_vm_clone).await.unwrap()),
             julia_config: JuliaAdapterConfig::default(),
         };
         
@@ -619,20 +620,20 @@ mod tests {
     }
     
     // Helper function to create test adapter
-    fn create_test_adapter() -> JuliaAdapter {
+    async fn create_test_adapter() -> JuliaAdapter {
         let consensus_requirements = VMConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(consensus_requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
         let consensus_bridge = Arc::new(ConsensusBridge::new().await.unwrap());
-        
+
         JuliaAdapter {
             base: BaseAdapter::new(
                 "julia".to_string(),
                 "JuliaVM".to_string(),
-                consensus_vm.clone(),
+                Arc::clone(&consensus_vm),
                 consensus_bridge,
                 None,
             ),
-            julia_vm: Arc::new(JuliaVM::new(consensus_vm).await.unwrap()),
+            julia_vm: Arc::new(JuliaVM::new(Arc::clone(&consensus_vm)).await.unwrap()),
             julia_config: JuliaAdapterConfig::default(),
         }
     }

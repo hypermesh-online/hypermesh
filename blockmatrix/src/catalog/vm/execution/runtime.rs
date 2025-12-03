@@ -899,19 +899,19 @@ impl Default for MemoryUsagePattern {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusRequirements;
+    use crate::catalog::vm::ConsensusRequirements;
     use crate::catalog::vm::consensus::ConsensusVM;
     
     #[tokio::test]
     async fn test_consensus_runtime_creation() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(requirements).unwrap()));
         let scheduler = Arc::new(ExecutionScheduler::new(
             Arc::clone(&consensus_vm),
             super::super::super::AssetManagementConfig::default(),
         ).await.unwrap());
-        
-        let runtime = ConsensusRuntime::new(consensus_vm, scheduler).await;
+
+        let runtime = ConsensusRuntime::new(Arc::clone(&consensus_vm), scheduler).await;
         assert!(runtime.is_ok());
     }
     

@@ -295,7 +295,7 @@ impl AssetBlockchainManager {
         &self,
         record: &HyperMeshAssetRecord,
     ) -> ConsensusResult<ConsensusProof> {
-        let node_id = crate::transport::NodeId::new(self.node_authority.clone());
+        let node_id = crate::transport::NodeId::from_name(self.node_authority.clone());
         let operation_type = record.record_type.to_string();
         
         self.consensus.create_consensus_proof(

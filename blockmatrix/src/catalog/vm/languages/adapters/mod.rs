@@ -641,7 +641,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_adapter_creation() {
         let consensus_requirements = VMConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(consensus_requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(consensus_requirements).unwrap()));
         let consensus_bridge = Arc::new(ConsensusBridge::new().await.unwrap());
         
         let adapter = BaseAdapter::new(

@@ -219,10 +219,10 @@ impl MultiNodeCoordinator {
 
         Self {
             local_node: Arc::new(RwLock::new(NodeId {
+                name: "local".to_string(),
                 id: [0u8; 32],
-                ipv6_address: "::1".parse().unwrap(),
-                public_key: Vec::new(),
-                trust_score: 1.0,
+                address: "::1".parse().unwrap(),
+                pub_key: Vec::new(),
             })),
             nodes: Arc::new(RwLock::new(HashMap::new())),
             topology: Arc::new(RwLock::new(NetworkTopology {
@@ -580,7 +580,8 @@ impl MultiNodeCoordinator {
                    (performance * 0.2) +
                    (response_time * 0.2);
 
-        score * node_info.node_id.trust_score as f64
+        // trust_score field removed from NodeId, using default value of 1.0
+        score * 1.0_f64
     }
 }
 

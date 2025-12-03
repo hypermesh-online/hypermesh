@@ -414,7 +414,7 @@ mod tests {
     #[tokio::test]
     async fn test_vm_executor_creation() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(super::super::consensus::ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(super::super::consensus::ConsensusVM::new(requirements).unwrap()));
         let asset_config = AssetManagementConfig::default();
         
         let executor = VMExecutor::new(consensus_vm, asset_config).await;
