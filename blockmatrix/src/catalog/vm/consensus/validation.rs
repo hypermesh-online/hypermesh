@@ -167,10 +167,12 @@ impl StakeProofValidator {
             // Use stake amount as a proxy for permission level
             // Higher stake = higher trust = more permissions
             let required_stake = match required_level {
+                AccessLevel::None => 0,           // No stake required for no access
                 AccessLevel::Private => 1000,     // Low stake requirement for private ops
                 AccessLevel::Federated => 5000,   // Medium stake for federated ops
                 AccessLevel::Restricted => 25000, // High stake for restricted operations
                 AccessLevel::Public => 10000,     // Standard stake for public operations
+                AccessLevel::Verified => 50000,   // Highest stake for verified operations
             };
 
             return Ok(proof.stake_amount >= required_stake);
@@ -460,18 +462,9 @@ impl ProofValidator<TimeProof> for TimeProofValidator {
     }
 }
 
-/// Extension trait for AccessLevel to provide numeric comparison
-impl AccessLevel {
-    /// Get numeric value for access level comparison
-    pub fn level_value(&self) -> u8 {
-        match self {
-            AccessLevel::Private => 1,
-            AccessLevel::Federated => 2,
-            AccessLevel::Restricted => 3,
-            AccessLevel::Public => 4,
-        }
-    }
-}
+// REMOVED: Phase 4b - Duplicate level_value implementation
+// AccessLevel::level_value() is already defined in blockmatrix/src/consensus/mod.rs
+// Use that implementation instead of this duplicate
 
 #[cfg(test)]
 mod tests {

@@ -175,6 +175,8 @@ impl AssetPrivacyLevel {
             AssetPrivacyLevel::P2P => 2,
             AssetPrivacyLevel::PublicNetwork => 3,
             AssetPrivacyLevel::FullPublic => 4,
+            // STUB: Phase 4b - Public privacy level added
+            AssetPrivacyLevel::Public => 5,
         }
     }
 }

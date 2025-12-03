@@ -118,13 +118,13 @@ impl AssetId {
     /// Create asset ID from hash (for default/test purposes)
     // STUB: Phase 3
     pub fn new_from_hash(hash: &[u8; 32]) -> Self {
+        // Extract first 16 bytes for UUID
+        let mut uuid_bytes = [0u8; 16];
+        uuid_bytes.copy_from_slice(&hash[..16]);
+
         Self {
             asset_type: AssetType::Container,
-            uuid: Uuid::from_bytes(*hash.get(..16).map(|s| {
-                let mut arr = [0u8; 16];
-                arr.copy_from_slice(s);
-                arr
-            }).unwrap_or([0u8; 16])),
+            uuid: Uuid::from_bytes(uuid_bytes),
             blockchain_hash: *hash,
             creation_timestamp: SystemTime::now(),
         }

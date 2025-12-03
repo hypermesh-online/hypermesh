@@ -420,13 +420,13 @@ impl Default for ExecutionContext {
             language: "default".to_string(),
             asset_allocations: HashMap::new(),
             privacy_settings: PrivacyConfig::default(),
-            blockchain_context: None,
-            p2p_context: None,
-            execution_env: HashMap::new(),
+            // FIXED: Phase 4b - blockchain_context and p2p_context are not Option types
+            blockchain_context: BlockchainExecutionContext::default(),
+            p2p_context: P2PExecutionContext::default(),
             permissions: ExecutionPermissions::default(),
             resource_limits: ResourceLimits::default(),
             scheduling_info: SchedulingInfo::default(),
-            created_at: SystemTime::now(),
+            // REMOVED: Phase 4b - execution_env and created_at are not fields in ExecutionContext
         }
     }
 }

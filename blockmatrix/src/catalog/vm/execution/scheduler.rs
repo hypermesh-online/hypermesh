@@ -500,6 +500,9 @@ impl ExecutionScheduler {
                 AssetType::Network => resource_tracker.available_bandwidth,
                 AssetType::Container => 100, // Assume containers are lightweight
                 AssetType::Economic => 1000, // Economic assets (tokens, etc.)
+                // STUB: Phase 4b - VirtualMachine and Library resource tracking not yet implemented
+                AssetType::VirtualMachine => 10, // Placeholder for VM instances
+                AssetType::Library => 1000, // Libraries are lightweight
             };
             
             if available_amount > 0 {

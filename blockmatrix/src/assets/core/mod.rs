@@ -406,6 +406,9 @@ impl AssetManager {
                 AssetType::Network => stats.network_assets += 1,
                 AssetType::Container => stats.container_assets += 1,
                 AssetType::Economic => stats.economic_assets += 1,
+                // STUB: Phase 4b - VM and Library assets not yet tracked in statistics
+                AssetType::VirtualMachine => {},
+                AssetType::Library => {},
             }
             
             match status.state {
