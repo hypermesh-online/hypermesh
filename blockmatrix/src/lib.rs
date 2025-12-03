@@ -147,6 +147,11 @@ pub mod assets;
 // Consensus module (re-exports from TrustChain)
 pub mod consensus;
 
+// Matrix Coordinate System - Phase 1: Block-MATRIX Foundation
+/// Revolutionary matrix-based topology system for distributed computing
+/// Each node has a geospatial position (x,y,z) enabling tensor operations
+pub mod matrix;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
