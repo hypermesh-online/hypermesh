@@ -2,6 +2,17 @@
 //!
 //! This module provides STOQ protocol implementation for HyperMesh
 //! distributed communication and transport.
+//!
+//! IMPLEMENTATION STATUS: Structures Only (~10%)
+//!
+//! This module defines transport layer structures and connection management,
+//! but the actual QUIC protocol implementation is pending. Current capabilities:
+//! - Connection and endpoint structures defined ✓
+//! - IPv6 addressing implemented ✓
+//! - Connection pooling logic exists ✓
+//! - QUIC transport protocol NOT implemented ✗
+//!
+//! See STUB_INVENTORY.md for details.
 
 pub mod types;
 pub mod config;

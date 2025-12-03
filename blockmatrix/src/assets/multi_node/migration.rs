@@ -1,5 +1,13 @@
 //! Asset Migration for Multi-Node HyperMesh
 //!
+//! STUB: Multi-Node Support Not Implemented
+//!
+//! This module contains the architecture and interfaces for multi-node
+//! coordination, but the system currently operates in single-node mode only.
+//! All functions in this module return placeholder values or Ok(()) stubs.
+//!
+//! See STUB_INVENTORY.md for implementation status.
+//!
 //! Handles live migration of assets between nodes with minimal downtime
 //! and data consistency guarantees.
 

@@ -1,5 +1,13 @@
 //! Multi-Node Asset Management and Coordination
 //!
+//! STUB: Multi-Node Support Not Implemented
+//!
+//! This module contains the architecture and interfaces for multi-node
+//! coordination, but the system currently operates in single-node mode only.
+//! All functions in this module return placeholder values or Ok(()) stubs.
+//!
+//! See STUB_INVENTORY.md for implementation status.
+//!
 //! Implements distributed asset coordination across multiple HyperMesh nodes
 //! with Byzantine fault tolerance, consensus-based allocation, and automatic
 //! migration capabilities.

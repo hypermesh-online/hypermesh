@@ -1,5 +1,13 @@
 //! Multi-Node Coordinator Implementation
 //!
+//! STUB: Multi-Node Support Not Implemented
+//!
+//! This module contains the architecture and interfaces for multi-node
+//! coordination, but the system currently operates in single-node mode only.
+//! All functions in this module return placeholder values or Ok(()) stubs.
+//!
+//! See STUB_INVENTORY.md for implementation status.
+//!
 //! Manages distributed asset coordination across multiple HyperMesh nodes
 //! with consensus-based decision making and Byzantine fault tolerance.
 

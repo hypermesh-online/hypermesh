@@ -1,5 +1,13 @@
 //! Consensus Management for Multi-Node Asset Coordination
 //!
+//! STUB: Multi-Node Support Not Implemented
+//!
+//! This module contains the architecture and interfaces for multi-node
+//! coordination, but the system currently operates in single-node mode only.
+//! All functions in this module return placeholder values or Ok(()) stubs.
+//!
+//! See STUB_INVENTORY.md for implementation status.
+//!
 //! Implements Byzantine fault-tolerant consensus for distributed asset allocation,
 //! state synchronization, and conflict resolution across HyperMesh nodes.
 

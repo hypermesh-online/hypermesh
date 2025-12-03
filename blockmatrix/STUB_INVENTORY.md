@@ -28,6 +28,7 @@ These stubs are blocking core functionality and must be implemented for basic op
 - **Status**: **IMPLEMENTED** - Full Proof of State validation with TrustChain integration
 - **Impact**: Real consensus validation for all four proofs (WHO, WHEN, WHERE, WHAT)
 - **Completed**: Deserializes ConsensusProof, validates with requirements, detailed error reporting
+- **Note**: AssetId generation is implemented, blockchain registration is planned but not implemented
 
 #### Container Runtime
 - **Files**: `src/container/runtime.rs`, `src/container/lifecycle.rs`
@@ -58,6 +59,13 @@ These stubs are blocking core functionality and must be implemented for basic op
 - **Status**: Always returns Ok(())
 - **Impact**: No security validation
 - **TODO**: Implement actual security checks
+
+#### Privacy System
+- **File**: `src/assets/core/privacy.rs`
+- **Status**: Types and data structures defined
+- **Implementation**: Privacy levels exist, enforcement logic pending
+- **Impact**: Can define privacy requirements, cannot enforce them yet
+- **TODO**: Implement privacy enforcement mechanism
 
 ### Category B: Advanced Features (MEDIUM Priority - Option 3)
 
@@ -174,7 +182,7 @@ Many tests pass because stubs return success. These provide false confidence:
 5. **Multi-Node**: 100% stub (single-node only)
 
 ### Least Stubbed Components
-1. **Transport Layer**: ~40% implemented (QUIC basics work)
+1. **Transport Layer**: ~10% implemented (structures only, no QUIC implementation)
 2. **Asset Types**: ~50% implemented (structure exists)
 3. **OS Abstraction**: ~60% implemented (detection works)
 

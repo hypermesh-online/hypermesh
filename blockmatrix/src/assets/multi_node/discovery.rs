@@ -1,5 +1,13 @@
 //! Node Discovery and Service Announcement
 //!
+//! STUB: Multi-Node Support Not Implemented
+//!
+//! This module contains the architecture and interfaces for multi-node
+//! coordination, but the system currently operates in single-node mode only.
+//! All functions in this module return placeholder values or Ok(()) stubs.
+//!
+//! See STUB_INVENTORY.md for implementation status.
+//!
 //! Implements peer discovery, service registration, and network topology
 //! management for the HyperMesh multi-node system.
 

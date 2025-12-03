@@ -51,7 +51,7 @@ cargo test
 - Privacy-aware resource allocation (Private → FullPublic levels)
 
 **2. STOQ Protocol Transport** (Planned)
-- QUIC over IPv6 with TLS 1.3 encryption (foundation only)
+- IPv6 networking structures (QUIC planned but not implemented)
 - Content-aware chunking and CDN routing (not implemented)
 - Target performance: 100 Mbps/1 Gbps/2.5 Gbps adaptive tiers (future goal)
 
@@ -67,7 +67,7 @@ cargo test
 
 ## HyperMesh Architecture: Core Components
 
-### 1. Network Layer (QUIC over IPv6)
+### 1. Network Layer (IPv6, QUIC Planned)
 **Secure Full-Duplex Transport**
 - Certificate-based authentication baked into transport protocol
 - Rate limiting and flow control at connection level
@@ -156,7 +156,7 @@ cargo test
 ## Performance and Security Goals (Future Targets)
 
 ### Planned Network Performance
-- **Target: 50-90% reduction in connection establishment time** (QUIC vs TCP - not yet measured)
+- **Target: 50-90% reduction in connection establishment time** (QUIC planned, not yet implemented)
 - **Planned: Built-in congestion control** (future optimization)
 - **Goal: Connection pooling and multiplexing** (not implemented)
 - **Future: 0-RTT resumption** (planned feature)
@@ -199,7 +199,7 @@ cargo test
 hypermesh/
 ├── core/           # Core system components (Rust + eBPF)
 ├── interface/      # Testing and development interface
-├── blockchain/     # Future distributed ledger integration
+├── blockchain/     # Planned distributed ledger integration (not implemented)
 ├── docs/          # Architecture and API documentation
 └── tools/         # CLI utilities and development tools
 ```
@@ -214,7 +214,7 @@ hypermesh/
 
 ### ❌ **NOT Available Yet**
 - **Byzantine fault tolerance** - Framework only, not functional
-- **QUIC transport** - Planned but not fully integrated
+- **QUIC transport** - Structures defined, protocol not implemented
 - **eBPF integration** - Not implemented
 - **Production features** - No monitoring, scaling, or deployment capabilities
 - **Nexus CLI** - Does not exist (contrary to documentation claims)
@@ -223,7 +223,7 @@ hypermesh/
 
 ### Key Technologies
 - **Rust**: Memory-safe systems programming
-- **QUIC Protocol**: Modern transport layer over IPv6
+- **QUIC Protocol**: Modern transport layer over IPv6 (planned, not implemented)
 - **Proof of State Consensus**: Four-proof Byzantine fault tolerance
 - **STOQ CDN**: Content-aware distribution network
 
