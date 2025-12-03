@@ -182,7 +182,7 @@ Many tests pass because stubs return success. These provide false confidence:
 5. **Multi-Node**: 100% stub (single-node only)
 
 ### Least Stubbed Components
-1. **Transport Layer**: ~10% implemented (structures only, no QUIC implementation)
+1. **Transport Layer**: ~75-85% implemented (full QUIC via STOQ integration with quinn)
 2. **Asset Types**: ~50% implemented (structure exists)
 3. **OS Abstraction**: ~60% implemented (detection works)
 

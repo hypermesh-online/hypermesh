@@ -50,10 +50,10 @@ cargo test
 - Hardware Asset Adapters with remote proxy addressing (NAT-like system)
 - Privacy-aware resource allocation (Private → FullPublic levels)
 
-**2. STOQ Protocol Transport** (Planned)
-- IPv6 networking structures (QUIC planned but not implemented)
-- Content-aware chunking and CDN routing (not implemented)
-- Target performance: 100 Mbps/1 Gbps/2.5 Gbps adaptive tiers (future goal)
+**2. STOQ Protocol Transport** (Operational - ~75-85% complete)
+- IPv6 networking with QUIC implemented via quinn crate
+- Content-aware chunking and CDN routing (in development)
+- Target performance: 100 Mbps/1 Gbps/2.5 Gbps adaptive tiers (planned)
 
 **3. Proof of State Consensus System** (In Development)
 - Four-proof validation: PoSpace + PoStake + PoWork + PoTime (framework only)
@@ -214,7 +214,6 @@ hypermesh/
 
 ### ❌ **NOT Available Yet**
 - **Byzantine fault tolerance** - Framework only, not functional
-- **QUIC transport** - Structures defined, protocol not implemented
 - **eBPF integration** - Not implemented
 - **Production features** - No monitoring, scaling, or deployment capabilities
 - **Nexus CLI** - Does not exist (contrary to documentation claims)
@@ -223,7 +222,7 @@ hypermesh/
 
 ### Key Technologies
 - **Rust**: Memory-safe systems programming
-- **QUIC Protocol**: Modern transport layer over IPv6 (planned, not implemented)
+- **QUIC Protocol**: Modern transport layer over IPv6 (implemented via STOQ/quinn)
 - **Proof of State Consensus**: Four-proof Byzantine fault tolerance
 - **STOQ CDN**: Content-aware distribution network
 

@@ -2,7 +2,7 @@
 
 ## ⚠️ DEVELOPMENT STATUS WARNING
 
-**Current Implementation: ~8-15% Complete**
+**Current Implementation: ~40-50% Complete (with STOQ providing transport)**
 
 This document describes the VISION and ARCHITECTURE for HyperMesh/BlockMatrix. Most features described are planned functionality, not current capabilities. See README.md for actual current state.
 

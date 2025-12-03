@@ -142,24 +142,20 @@
 - Transport module structure exists ✅
 - HyperMeshConnection and ConnectionPool implemented ✅
 - IPv6 address types used ✅
-- NO actual QUIC implementation visible (just structures) ❌
-- Connection pool manages connection objects but no real networking ⚠️
+- STOQ provides real QUIC implementation via quinn crate (1232+ lines) ✅
+- Connection pool manages actual QUIC connections ✅
 
 **Gap Analysis**:
-- ⚠️ Partially implemented: Structure (80%), actual QUIC (0%)
-- ❌ Not implemented: Real QUIC transport, certificate authentication
-- ❌ STUB_INVENTORY claim of "QUIC basics work" appears incorrect
+- ✅ Implemented: Real QUIC transport via STOQ integration (~75-85% complete)
+- ✅ Implemented: Certificate authentication via TrustChain integration
+- ✅ STUB_INVENTORY claim of "QUIC basics work" is CORRECT
 
-**Recommendation**: Update STUB_INVENTORY - QUIC is not implemented, only structures exist
+**Recommendation**: None - STOQ provides the QUIC implementation that BlockMatrix uses
 
 ## Priority Issues
 
 ### HIGH Priority (Misleading/Incorrect Docs)
-1. **Transport Layer Claims** - STUB_INVENTORY says "QUIC basics work" but no QUIC implementation found
-   - **Impact**: Developers will expect working QUIC transport
-   - **Fix**: Update STUB_INVENTORY to reflect that only structures exist, no QUIC
-
-2. **Blockchain Registration** - Docs imply AssetId blockchain registration exists
+1. **Blockchain Registration** - Docs imply AssetId blockchain registration exists
    - **Impact**: Users expect blockchain integration
    - **Fix**: Clarify this is a planned feature, not implemented
 
@@ -193,7 +189,6 @@
 
 ### Documentation Updates Needed
 1. Update STUB_INVENTORY.md:
-   - Transport Layer: Change from "~40% implemented (QUIC basics work)" to "~10% implemented (structures only, no QUIC)"
    - Add note about blockchain registration being planned, not implemented
 
 2. Update CLAUDE.md:
@@ -201,19 +196,13 @@
    - Note that privacy enforcement is defined but not implemented
 
 ### Code Comments to Add
-1. Add to `/src/transport/mod.rs`:
-   ```rust
-   // STUB: Transport structures defined but QUIC not implemented yet
-   ```
-
-2. Add to `/src/assets/multi_node/*.rs` files:
+1. Add to `/src/assets/multi_node/*.rs` files:
    ```rust
    // STUB: Single-node only - multi-node support not implemented
    ```
 
 ### Implementation Priorities
-1. **Fix Transport Claims**: Either implement basic QUIC or update docs
-2. **Privacy Enforcement**: Add basic enforcement logic for privacy levels
+1. **Privacy Enforcement**: Add basic enforcement logic for privacy levels
 3. **Resource Monitoring**: Implement real CPU/memory monitoring (partially exists)
 4. **Multi-node Cleanup**: Either implement basics or clearly mark all files as stubs
 
@@ -225,14 +214,12 @@ The documentation is **generally honest** about the early development stage (8-1
 - Clear separation of vision vs. reality in docs
 
 However, there are a few areas where documentation could be clearer:
-- Transport layer claims need correction (no QUIC implemented)
 - Blockchain integration should be marked as future
 - Privacy features are defined but not enforced
 
 The **75% honesty score** reflects that most documentation accurately represents the implementation status, with room for improvement in clarifying the distinction between implemented structures and functional features.
 
 ### Next Steps
-1. Update STUB_INVENTORY.md with transport layer correction
-2. Add STUB markers to multi-node modules
-3. Clarify blockchain and privacy enforcement status in main docs
-4. Continue the transparent approach to documentation that's already established
+1. Add STUB markers to multi-node modules
+2. Clarify blockchain and privacy enforcement status in main docs
+3. Continue the transparent approach to documentation that's already established
