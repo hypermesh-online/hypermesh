@@ -150,7 +150,7 @@ impl RemoteProxyManager {
     pub async fn new(config: ProxyNetworkConfig) -> AssetResult<Self> {
         let router = Arc::new(ProxyRouter::new().await?);
         let forwarder = Arc::new(ProxyForwarder::new().await?);
-        let trust_integration = Arc::new(TrustChainIntegration::new().await?);
+        let trust_integration = Arc::new(TrustChainIntegration::new());
         let quantum_security = Arc::new(QuantumSecurity::new().await?);
         let sharded_access = Arc::new(ShardedDataAccess::new().await?);
         let nat_translator = Arc::new(NATTranslator::new().await?);

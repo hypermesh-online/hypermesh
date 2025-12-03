@@ -815,9 +815,8 @@ impl PerformanceValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::integration::mfn_bridge::MfnBridge;
-    use crate::integration::IntegrationConfig;
-    
+    use super::super::{MfnBridge, IntegrationConfig};
+
     #[tokio::test]
     async fn test_performance_validator_creation() {
         let config = IntegrationConfig::default();

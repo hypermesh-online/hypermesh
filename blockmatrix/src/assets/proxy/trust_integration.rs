@@ -413,13 +413,14 @@ impl TrustChainIntegration {
             validation_message = format!("Trust level too low: {} < {}", trust_level, self.config.min_trust_level);
         }
         
+        let validation_message_clone = validation_message.clone();
         let result = ValidationResult {
             certificate_fingerprint: trust_chain.end_entity_fingerprint.clone(),
             is_valid,
             trust_level,
             trust_score: trust_level, // Use same value for compatibility
             validation_message,
-            errors: if is_valid { Vec::new() } else { vec![validation_message.clone()] },
+            errors: if is_valid { Vec::new() } else { vec![validation_message_clone] },
             validated_at: SystemTime::now(),
             expires_at: SystemTime::now() + self.config.validation_cache_timeout,
         };

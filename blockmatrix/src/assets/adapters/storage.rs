@@ -1226,6 +1226,7 @@ impl AssetAdapter for StorageAssetAdapter {
 mod tests {
     use super::*;
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+    use std::time::Duration;
     
     async fn create_test_storage_request() -> AssetAllocationRequest {
         AssetAllocationRequest {

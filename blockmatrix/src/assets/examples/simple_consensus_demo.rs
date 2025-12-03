@@ -63,10 +63,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 3. Create unified ConsensusProof
     let consensus_proof = ConsensusProof::new(
-        space_proof,
         stake_proof,
-        work_proof,
         time_proof,
+        space_proof,
+        work_proof,
     );
     println!("✅ Created unified ConsensusProof (4 proofs combined)");
     

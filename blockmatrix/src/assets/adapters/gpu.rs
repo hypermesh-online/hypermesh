@@ -958,6 +958,7 @@ impl AssetAdapter for GpuAssetAdapter {
 mod tests {
     use super::*;
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+    use std::time::Duration;
     
     async fn create_test_gpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {

@@ -411,7 +411,8 @@ pub struct ProxyStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{AssetId, AssetType};
+    use super::AssetId;
+    use crate::AssetType;
     
     #[test]
     fn test_proxy_address_creation() {

@@ -478,8 +478,9 @@ impl AssetAllocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{AssetId, AssetType};
-    use super::status::AssetStatus;
+    use super::AssetId;
+    use crate::AssetType;
+    use crate::assets::core::status::AssetStatus;
     
     #[test]
     fn test_privacy_level_access_control() {

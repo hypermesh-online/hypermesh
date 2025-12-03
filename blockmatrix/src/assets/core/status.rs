@@ -398,8 +398,9 @@ impl std::fmt::Display for AlertCategory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{AssetId, AssetType};
-    use super::privacy::PrivacyLevel;
+    use super::AssetId;
+    use crate::AssetType;
+    use crate::assets::core::privacy::PrivacyLevel;
     
     #[test]
     fn test_asset_state_operations() {

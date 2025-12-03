@@ -9,7 +9,9 @@
 //! - Privacy-aware allocation types
 //! - Consensus proof validation (PoSpace + PoStake + PoWork + PoTime)
 
-#![deny(unsafe_code)]
+// Allow unsafe code for necessary system calls (mmap/munmap in NAT system)
+// Individual modules use #![deny(unsafe_code)] where appropriate
+#![warn(unsafe_code)]
 
 use anyhow::Result;
 use std::sync::Arc;
@@ -307,9 +309,9 @@ mod tests {
 
         let consensus_proof = ConsensusProof::new(
             stake_proof,
+            time_proof,
             space_proof,
-            work_proof,
-            time_proof
+            work_proof
         );
 
         // Basic validation should pass

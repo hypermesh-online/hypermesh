@@ -899,7 +899,8 @@ impl Default for MemoryUsagePattern {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::{ConsensusRequirements, ConsensusVM};
+    use crate::consensus::ConsensusRequirements;
+    use crate::catalog::vm::consensus::ConsensusVM;
     
     #[tokio::test]
     async fn test_consensus_runtime_creation() {

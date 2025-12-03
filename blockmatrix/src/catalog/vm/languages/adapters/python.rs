@@ -880,15 +880,6 @@ def test_function():
         use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, NetworkPosition, AccessPermissions, AccessLevel};
         
         ConsensusProof::new(
-            SpaceProof::new(
-                "/tmp/test".to_string(),
-                NetworkPosition {
-                    address: "::1".to_string(),
-                    zone: "local".to_string(),
-                    distance_metric: 0,
-                },
-                1024,
-            ),
             StakeProof::new(
                 "test".to_string(),
                 "test-node".to_string(),
@@ -901,8 +892,17 @@ def test_function():
                 },
                 vec![],
             ),
-            WorkProof::new(b"test", 16, "test".to_string()).unwrap(),
             TimeProof::new(0, None, 0),
+            SpaceProof::new(
+                "/tmp/test".to_string(),
+                NetworkPosition {
+                    address: "::1".to_string(),
+                    zone: "local".to_string(),
+                    distance_metric: 0,
+                },
+                1024,
+            ),
+            WorkProof::new(b"test", 16, "test".to_string()).unwrap(),
         )
     }
 }

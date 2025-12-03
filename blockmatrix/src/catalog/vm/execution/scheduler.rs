@@ -659,37 +659,39 @@ impl Clone for SchedulerMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusVM;
-    
+
+    use crate::catalog::vm::consensus::ConsensusVM;
+    use crate::consensus::ConsensusRequirements;
+
     #[tokio::test]
     async fn test_scheduler_creation() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(requirements).unwrap()));
         let asset_config = AssetManagementConfig::default();
-        
+
         let scheduler = ExecutionScheduler::new(consensus_vm, asset_config).await;
         assert!(scheduler.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_resource_requirements_analysis() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(requirements).unwrap()));
         let asset_config = AssetManagementConfig::default();
         let scheduler = ExecutionScheduler::new(consensus_vm, asset_config).await.unwrap();
-        
+
         let julia_code = "using Nova\nfor i in 1:1000\n    println(i)\nend";
         let requirements = scheduler.analyze_resource_requirements(julia_code, "julia").await.unwrap();
-        
+
         assert!(requirements.contains_key(&AssetType::Cpu));
         assert!(requirements.contains_key(&AssetType::Memory));
         assert!(requirements.contains_key(&AssetType::Gpu)); // Due to Nova
     }
-    
+
     #[tokio::test]
     async fn test_code_complexity_analysis() {
         let requirements = ConsensusRequirements::default();
-        let consensus_vm = Arc::new(ConsensusVM::new(requirements).unwrap());
+        let consensus_vm = Arc::new(RwLock::new(ConsensusVM::new(requirements).unwrap()));
         let asset_config = AssetManagementConfig::default();
         let scheduler = ExecutionScheduler::new(consensus_vm, asset_config).await.unwrap();
         

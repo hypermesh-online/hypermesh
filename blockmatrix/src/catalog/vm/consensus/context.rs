@@ -547,10 +547,10 @@ mod tests {
         
         // Create mock consensus operation
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         let operation = super::ConsensusOperation::new(

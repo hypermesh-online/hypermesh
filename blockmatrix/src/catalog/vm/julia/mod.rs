@@ -719,10 +719,10 @@ mod tests {
         assert!(matches!(value, JuliaValue::Integer(42)));
         
         let consensus_proof = ConsensusProof::new(
-            crate::consensus::SpaceProof::default(),
             crate::consensus::StakeProof::default(),
-            crate::consensus::WorkProof::default(),
             crate::consensus::TimeProof::default(),
+            crate::consensus::SpaceProof::default(),
+            crate::consensus::WorkProof::default(),
         );
         
         let consensus_value = JuliaValue::ConsensusProof(consensus_proof);

@@ -522,10 +522,10 @@ mod tests {
     #[test]
     fn test_execution_context_creation() {
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         let context = ExecutionContext::new(
@@ -542,10 +542,10 @@ mod tests {
     #[test]
     fn test_execution_context_builder() {
         let consensus_proof = ConsensusProof::new(
-            SpaceProof::default(),
             StakeProof::default(),
-            WorkProof::default(),
             TimeProof::default(),
+            SpaceProof::default(),
+            WorkProof::default(),
         );
         
         let context = ExecutionContextBuilder::new("python".to_string())
@@ -570,10 +570,10 @@ mod tests {
             permissions,
             ..ExecutionContext::new(
                 ConsensusProof::new(
-                    SpaceProof::default(),
                     StakeProof::default(),
-                    WorkProof::default(),
                     TimeProof::default(),
+                    SpaceProof::default(),
+                    WorkProof::default(),
                 ),
                 "test".to_string(),
                 HashMap::new(),

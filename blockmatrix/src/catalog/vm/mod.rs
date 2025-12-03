@@ -676,15 +676,6 @@ mod tests {
         // Create base execution context
         let base_context = ExecutionContext {
             consensus_proof: ConsensusProof::new(
-                crate::consensus::proof::SpaceProof::new(
-                    "/test".to_string(),
-                    crate::consensus::proof::NetworkPosition {
-                        address: "test.hypermesh.online".to_string(),
-                        zone: "test".to_string(),
-                        distance_metric: 0,
-                    },
-                    0,
-                ),
                 crate::consensus::proof::StakeProof::new(
                     "test.hypermesh.online".to_string(),
                     "test-node".to_string(),
@@ -697,12 +688,21 @@ mod tests {
                     },
                     vec!["test-allowance".to_string()],
                 ),
+                crate::consensus::proof::TimeProof::new(0, None, 0),
+                crate::consensus::proof::SpaceProof::new(
+                    "/test".to_string(),
+                    crate::consensus::proof::NetworkPosition {
+                        address: "test.hypermesh.online".to_string(),
+                        zone: "test".to_string(),
+                        distance_metric: 0,
+                    },
+                    0,
+                ),
                 crate::consensus::proof::WorkProof::new(
                     b"test-challenge",
                     4,
                     "test".to_string(),
                 ).unwrap(),
-                crate::consensus::proof::TimeProof::new(0, None, 0),
             ),
             language: "julia".to_string(),
             asset_allocations: std::collections::HashMap::new(),

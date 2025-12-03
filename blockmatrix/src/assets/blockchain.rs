@@ -7,7 +7,7 @@ use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
-    ConsensusProof,
+    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
 };
 
@@ -448,10 +448,10 @@ mod tests {
         let time_proof = TimeProof::new(1000, None, 1);
 
         let consensus_proof = ConsensusProof::new(
-            space_proof,
             stake_proof,
-            work_proof,
             time_proof,
+            space_proof,
+            work_proof,
         );
 
         let record = HyperMeshAssetRecord::new(
