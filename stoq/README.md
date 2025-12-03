@@ -1,12 +1,12 @@
-# STOQ Protocol - Pure QUIC over IPv6 Transport
+# STOQ Protocol - Intelligent Protocol with Protocol-Level Validation
 
-**Status: 🚧 DEVELOPMENT - Pure Transport Protocol (Phase 1 Complete)**
+**Status: 🚧 DEVELOPMENT - Intelligence Layer + Transport (Phase 2 Active)**
 
-STOQ is a pure transport protocol providing QUIC over IPv6 with zero application logic. Like TCP/IP, STOQ focuses exclusively on packet delivery, connection management, and transport-layer concerns. Features adaptive network tier detection, FALCON-1024 quantum-resistant cryptography, and protocol extension framework.
+STOQ is an intelligent protocol that combines QUIC over IPv6 transport with protocol-level validation and matrix-aware routing. Unlike pure transport protocols, STOQ validates Proof of State tokens, verifies asset hashes, provides matrix shard addressing, and enforces privacy tiers at the protocol layer. Features adaptive network tier detection, FALCON-1024 quantum-resistant cryptography, and tensor-aware routing for Block-MATRIX integration.
 
 ## ⚡ Architecture Principle
 
-**STOQ is a pure transport protocol** - it contains NO application logic, NO SDKs, NO monitoring dashboards. Applications (like HyperMesh) use STOQ the same way HTTP uses TCP - as a transport layer only.
+**STOQ is an intelligent protocol with built-in validation** - it provides protocol-level PoS validation, matrix shard addressing, privacy tier enforcement, and tensor-aware routing. Applications (like HyperMesh) leverage STOQ's intelligence layer for validated, privacy-aware, matrix-integrated communication.
 
 ## 🚀 Quick Start
 
@@ -26,24 +26,48 @@ cargo test falcon --lib
 
 ## 🏗️ Architecture
 
+### Intelligence Layer Features
+- **PoS Token Validation**: Protocol-level validation of Proof of State tokens
+- **Asset Hash Verification**: Content integrity checks at protocol layer
+- **Matrix Shard Addressing**: Provides x,y,z coordinates for Block-MATRIX shard placement
+- **Privacy Tier Enforcement**: Different protocol behavior for Anonymous/Private/Federated/Public tiers
+- **Tensor-Aware Routing**: Smart routing decisions based on matrix topology and distance calculations
+
 ### Core Transport Features
-- **Protocol**: QUIC over IPv6 (quinn-based implementation)
+- **Protocol**: QUIC over IPv6 (quinn-based implementation) with intelligence extensions
 - **Security**: FALCON-1024 post-quantum cryptography (fully implemented)
 - **Adaptive Tiers**: Network performance detection and configuration adaptation
 - **Memory Safety**: Eliminated unsafe operations, secure memory management
 - **DoS Protection**: Connection limits and 0-RTT replay attack mitigation
 
 ### Protocol Extensions Framework
-- **Packet Tokenization**: SHA-256 cryptographic validation (defined, not integrated)
-- **Packet Sharding**: Fragmentation/reassembly logic (available as library functions)
-- **Multi-hop Routing**: IPv6 hop chain tracking framework (extensible design)
-- **Extension Integration**: Framework exists, transport integration pending
+- **PoS Tokenization**: SHA-256 cryptographic validation with Proof of State token verification
+- **Matrix Sharding**: Fragmentation/reassembly with matrix coordinate addressing (x,y,z)
+- **Tensor Routing**: Multi-hop routing with matrix topology awareness and distance optimization
+- **Privacy Extensions**: Protocol behavior adaptation based on privacy tier requirements
+- **Extension Integration**: Intelligence layer actively integrated with transport
 
 ### Quantum-Resistant Security
 - **FALCON-1024**: NIST Post-Quantum Cryptography standard
 - **Key Management**: Automatic key generation and rotation
 - **Transport Integration**: Handshake-level quantum resistance
 - **Security Level**: 256-bit equivalent quantum security
+
+## 🌐 Matrix Integration
+
+STOQ provides deep integration with the Block-MATRIX topology system:
+
+### Matrix-Aware Features
+- **Shard Addressing**: Every packet includes matrix coordinates (x,y,z) for optimal shard placement
+- **Tensor Routing**: Routes packets based on matrix topology, minimizing hop distance
+- **Distance Calculations**: Optimizes paths using Euclidean distance in tensor space
+- **Topology Awareness**: Understands matrix structure for efficient data distribution
+
+### Privacy Tiers & Matrix Behavior
+- **Anonymous**: No coordinate tracking, randomized routing through matrix
+- **Private**: Direct tensor routing within trusted matrix regions
+- **Federated**: Cross-region routing with federation-aware path selection
+- **Public**: Full matrix visibility for optimal global routing
 
 ## 🔧 Configuration
 
@@ -81,21 +105,26 @@ transport.send(&connection, b"Hello, STOQ!").await?;
 let data = transport.receive(&connection).await?;
 ```
 
-### Protocol Extensions
+### Intelligence Layer Usage
 ```rust
-// Use protocol extensions
+// Use intelligence extensions
 let extensions = DefaultStoqExtensions::new();
 
-// Tokenize packet
-let token = extensions.tokenize_packet(data);
+// Validate PoS token at protocol level
+let pos_token = extensions.validate_pos_token(data)?;
 
-// Shard large data
-let shards = extensions.shard_packet(data, 1024)?;
-let reassembled = extensions.reassemble_shards(shards)?;
+// Create matrix-aware shard with coordinates
+let shards = extensions.shard_with_matrix(data, 1024, (x, y, z))?;
+let reassembled = extensions.reassemble_from_matrix(shards)?;
 
-// Create enhanced packet
+// Create intelligent packet with validation
 let mut packet = StoqPacket::new(data.into());
-packet.token = Some(token);
+packet.pos_token = Some(pos_token);
+packet.matrix_coords = Some((x, y, z));
+packet.privacy_tier = PrivacyTier::Federated;
+
+// Asset hash verification
+packet.asset_hash = extensions.compute_asset_hash(data);
 ```
 
 ### FALCON Cryptography
@@ -136,10 +165,12 @@ cargo test transport
 
 ### Current Status
 - **Transport Core**: QUIC over IPv6 with quinn library foundation ✅
+- **Intelligence Layer**: Protocol-level PoS validation and matrix integration ✅
 - **Quantum Security**: FALCON-1024 cryptography fully implemented ✅
+- **Matrix Awareness**: Tensor routing and shard addressing active ✅
+- **Privacy Enforcement**: Tier-based protocol behavior implemented ✅
 - **Adaptive Networks**: Tier detection and configuration adaptation ✅
 - **Memory Safety**: Unsafe operations eliminated, secure by design ✅
-- **Extension Framework**: Protocol extensions defined, integration pending ⚠️
 
 ## 🛡️ Security
 
@@ -154,18 +185,24 @@ cargo test transport
 - 256-bit equivalent quantum resistance
 - NIST PQC standardized algorithms
 
-### Protocol Security
-- SHA-256 packet tokenization
-- Cryptographic shard verification
-- Hop chain integrity validation
+### Protocol Intelligence Security
+- PoS token validation at protocol layer
+- Asset hash verification for content integrity
+- Matrix coordinate authentication
+- Privacy tier enforcement mechanisms
+- SHA-256 packet tokenization with PoS integration
+- Cryptographic shard verification with matrix addressing
+- Tensor-aware hop chain integrity validation
 
 ## 🔗 Integration
 
-STOQ provides a clean transport layer for:
-- HyperMesh distributed computing
-- TrustChain certificate authorities
-- High-performance networked applications
-- Quantum-resistant communication systems
+STOQ provides an intelligent protocol layer for:
+- HyperMesh distributed computing with validated asset transfers
+- Block-MATRIX tensor topology with coordinate-based routing
+- TrustChain certificate authorities with PoS validation
+- Privacy-aware networked applications with tier enforcement
+- High-performance matrix-integrated systems
+- Quantum-resistant communication with protocol-level intelligence
 
 ## 📄 License
 
@@ -173,4 +210,4 @@ MIT OR Apache-2.0
 
 ---
 
-*STOQ: Pure QUIC transport with quantum resistance - Professional, clean, production-ready.*
+*STOQ: Intelligent protocol with matrix integration, PoS validation, and quantum resistance - Professional, validated, production-ready.*
