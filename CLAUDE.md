@@ -21,6 +21,12 @@
 | **STOQ** | `/stoq` | ✅ **92% Complete** | QUIC transport with eBPF integration |
 | **TrustChain** | `/trustchain` | ✅ **95% Complete** | FALCON-1024 CA production-ready |
 
+### Critical Architectural Note: Block-MATRIX Topology
+All components operate within a Block-MATRIX network where each node is a cell in a geospatial matrix (x,y,z coordinates). This enables:
+- **Tensor Operations**: Mathematical matrix operations for routing and resource allocation
+- **Every Node = Blockchain**: Independent blockchain per node, no merkle consolidation
+- **Matrix-Aware Coordination**: Intelligent shard distribution based on topology
+
 ### **Repository Sync Commands**
 ```bash
 ./sync-repos.sh              # Sync all components
@@ -96,6 +102,11 @@ pub struct NetworkAssetAdapter; // IMPLEMENTED
 pub struct ContainerAssetAdapter; // IMPLEMENTED
 ```
 
+**Asset allocation uses tensor operations on the Block-MATRIX:**
+- CPU/GPU/Memory allocation calculated using matrix position and neighbor capabilities
+- Tensor-based routing for optimal resource placement
+- Geospatial awareness in allocation decisions
+
 ### **Privacy-Aware Resource Allocation (✅ Implemented)**
 **Location**: `/blockmatrix/src/assets/privacy/`
 
@@ -134,19 +145,22 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 - `/blockmatrix/src/assets/proxy/nat_translation.rs` - Address translation logic
 - `/blockmatrix/src/assets/proxy/routing.rs` - Proxy forwarding and selection
 
-### **Circular Dependency Bootstrap Solution**
-**Problem**:
-```
-HyperMesh → needs DNS resolution → TrustChain
-TrustChain → needs blockchain consensus → HyperMesh
-Both → need secure transport → STOQ  
-STOQ → needs certificate validation → TrustChain
-```
+## Node Bootstrap Architecture
 
-**Solution Status**:
-- ✅ TrustChain starts with traditional DNS (trust.hypermesh.online)
-- ✅ STOQ extracted as standalone protocol
-- ✅ Phased bootstrap approach: Phase 0 (traditional) → Phase 3 (federated)
+### Node-as-DNS-Provider First
+**Critical Difference from Traditional Systems:**
+- Each node is its OWN DNS provider BEFORE network registration
+- No upstream dependency (no 8.8.8.8, no trust.hypermesh.online)
+- Node bootstraps independently, THEN chooses to register with network
+
+### DNS-as-Asset with Blockchain Registration
+DNS registration is NOT a simple service - it's an ASSET requiring full Proof of State:
+- **PoSpace (WHERE)**: Node's position in matrix + storage commitment
+- **PoStake (WHO)**: Ownership, economic stake in the name
+- **PoWork (WHAT)**: Computational proof of registration work
+- **PoTime (WHEN)**: Temporal ordering, prevents replay attacks
+
+DNS names are blockchain assets earning CAESAR rewards.
 
 ### **Domain/Namespace Goals**
 **Target Resolution**:
@@ -163,6 +177,60 @@ STOQ → needs certificate validation → TrustChain
 - ✅ VM resource allocation through Asset Adapters
 - ✅ NAT-like memory addressing for VM execution
 - ✅ Asset-aware execution: VM treats all resources as BlockMatrix Assets
+
+## STOQ: Intelligent Protocol, Not Just Transport
+
+**STOQ is NOT just QUIC wrapper** - it provides protocol-level intelligence:
+- **PoS Token Validation**: Validates Proof of State at protocol layer (not application)
+- **Asset Hash Validation**: Verifies content integrity at protocol layer
+- **Shard Addressing**: Provides matrix positions for shard placement
+- **Privacy Tier Enforcement**: Different behavior for Anonymous vs Public connections
+- **Protocol-Level Routing**: Smart routing decisions based on matrix topology
+
+## Four Privacy Tiers (Network-Level Behavior)
+
+| Tier | Validation | Signing | Tracking | Rewards |
+|------|-----------|---------|----------|---------|
+| **Anonymous** | None | No | No | None |
+| **Private P2P** | Peer-only | Optional | Minimal | Low |
+| **Federated** | Network-level | Yes | Network-only | Medium |
+| **Public** | Full PoS | Yes | Full transparency | Maximum |
+
+**Privacy Flexibility Matrix**: Asset privacy is INDEPENDENT from network privacy:
+- Encrypted asset on Anonymous network = Secure + Untraceable
+- Anonymous asset on Public network = Untraceable content, tracked communication
+- Public asset on Anonymous network = Open content, private routing
+
+## Revolutionary Distribution: Instruction-Based Retrieval
+
+**Traditional**: Send raw data → Receiver
+**Block-MATRIX**: Send instructions → Receiver queries matrix positions → Gets shards → Reconstructs
+
+**Benefits**:
+- Bandwidth efficiency (send KB instructions, not GB files)
+- Distributed load (receiver pulls from multiple matrix positions)
+- Resilience (if one node fails, query other positions)
+- Deduplication (shared shards referenced once, used many times)
+
+## Data Processing Pipeline (EXACT ORDER)
+
+**Compression → Encryption → Sharding → Distribution**
+
+1. **Compression First**: Reduce data size (better compression on raw data)
+2. **Encryption Second**: Apply Kyber/FALCON-1024 quantum-resistant encryption
+3. **Sharding Third**: Split encrypted data into matrix-aware shards
+4. **Distribution Fourth**: Place shards at calculated matrix positions
+
+**Bucket Deduplication**: Hash buckets mapped to matrix positions prevent duplicate storage while maintaining redundancy through matrix topology.
+
+## HyperMesh Coordination Intelligence
+
+**Matrix-Aware Shard Distribution**:
+- Shards placed based on matrix topology (x,y,z) calculations
+- Tensor operations determine optimal placement
+- Geographic and network proximity considered
+- Load balancing through matrix mathematics
+- Self-healing through matrix neighbor discovery
 
 ---
 
@@ -185,10 +253,18 @@ STOQ → needs certificate validation → TrustChain
 - `/BOOTSTRAP_ROADMAP.md` - Phased deployment approach
 
 ### **Architecture Decisions Made**
+- ✅ **Block-MATRIX Topology**: Each node is matrix cell (x,y,z) with tensor operations
+- ✅ **Every Node = Own Blockchain**: Independent chains, no merkle consolidation
+- ✅ **Node-as-DNS-Provider First**: Self-sufficient bootstrap, no upstream dependency
+- ✅ **DNS-as-Asset**: Requires full Proof of State, blockchain-registered
+- ✅ **Four Privacy Tiers**: Anonymous | Private P2P | Federated | Public (network-level)
+- ✅ **Privacy Flexibility Matrix**: Asset privacy ≠ network privacy
+- ✅ **STOQ Protocol Intelligence**: PoS validation, shard addressing at protocol layer
+- ✅ **Compression→Encryption→Sharding→Distribution**: Exact pipeline order
+- ✅ **Instruction-Based Retrieval**: Send maps not files
+- ✅ **Matrix-Aware Coordination**: Tensor operations for resource allocation
 - ✅ Separate protocols (TrustChain, STOQ, Catalog) from BlockMatrix
-- ✅ Catalog provides VM/Asset SDK, BlockMatrix orchestrates
 - ✅ Everything is a BlockMatrix Asset with remote NAT-like addressing
-- ✅ Privacy constraints at Protocol/Asset/Network levels (Anonymous|Private|Federated|Public)
 - ✅ IPv6-only networking throughout ecosystem
 - ✅ Four-proof consensus (PoSpace, PoStake, PoWork, PoTime) for all operations
 - ✅ Quantum-resistant cryptography (FALCON-1024, Kyber)
@@ -197,4 +273,9 @@ STOQ → needs certificate validation → TrustChain
 
 **Current Phase**: Integration and optimization with 40-50% core implementation complete
 **Next Milestone**: End-to-end testing and production hardening
-- we shouldn't be using HTTP at all .. everything should be running through STOQ.
+
+**Critical Understanding**:
+- The Block-MATRIX topology IS the trust mechanism - position in matrix determines trust relationships
+- STOQ provides protocol-level intelligence, not just transport
+- Everything runs through STOQ - no HTTP, no traditional networking
+- Matrix operations (tensor math) drive all routing and resource decisions
