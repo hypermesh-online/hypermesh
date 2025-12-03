@@ -1,24 +1,48 @@
-# HyperMesh Vision & Core Functionality
+# BlockMatrix Vision & Core Functionality
 
 ## ⚠️ DEVELOPMENT STATUS WARNING
 
 **Current Implementation: ~40-50% Complete (with STOQ providing transport)**
 
-This document describes the VISION and ARCHITECTURE for HyperMesh/BlockMatrix. Most features described are planned functionality, not current capabilities. See README.md for actual current state.
+This document describes the VISION and ARCHITECTURE for BlockMatrix. Most features described are planned functionality, not current capabilities. See README.md for actual current state.
 
 ### Reality Check:
 - **What exists**: Basic Rust structure, stub implementations, design documents
 - **What works**: Very limited - mostly test frameworks and basic types
 - **What doesn't work**: Container runtime, multi-node consensus, eBPF, production features
-- **Nexus CLI**: Does NOT exist (only minimal stubs present, not functional)
+- **CLI Status**: No CLI currently implemented. Future CLI will support matrix topology queries and tensor-based resource management
+
+## 🎯 Core Innovation: Block-MATRIX Topology
+
+**BlockMatrix is NOT traditional cloud infrastructure** - it's a revolutionary matrix-based distributed computing platform:
+
+### Matrix Topology (LITERAL Matrix)
+- **Each Node = Matrix Cell**: Nodes have geospatial positions (x,y,z coordinates)
+- **Every Node = Own Blockchain**: Independent blockchain per node, no merkle consolidation
+- **Tensor Operations**: Mathematical matrix operations for routing, resource allocation, path finding
+- **Neighbor Discovery**: Based on matrix position and distance calculations
+- **Intelligent Routing**: Matrix-aware shard distribution and data flow
+
+### Revolutionary Concepts
+1. **Node-as-DNS-Provider First** - Bootstraps independently before network registration
+2. **DNS-as-Asset** - DNS registration requires full Proof of State, blockchain-registered
+3. **Four Privacy Tiers** - Anonymous | Private P2P | Federated | Public
+4. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
+5. **Instruction-Based Retrieval** - Send shard maps, not files
+6. **Bucket Deduplication** - Content-addressed storage with hash buckets mapped to matrix positions
 
 ## Primary Mission
-Rebuild cloud infrastructure from the ground up, eliminating the systemic security vulnerabilities, performance bottlenecks, and architectural debt that plague current container orchestration systems.
+Create a **matrix-topology-based distributed computing platform** that provides:
+- **Matrix Architecture**: Geospatial node positioning with tensor-based operations
+- **Native Security**: Security built into protocol (STOQ intelligence layer)
+- **Every-Node-Blockchain**: Distributed consensus at every level, independent chains
+- **Privacy Tiers**: Four network privacy levels with independent asset privacy
+- **Instruction-Based Distribution**: Revolutionary data retrieval using shard maps
 
 ## Core Vision
 Create a distributed computing platform that provides:
 - **Native Security**: Security built into the protocol and transport layers, not bolted on
-- **Infinite Scalability**: True horizontal and vertical scaling without architectural limits  
+- **Infinite Scalability**: True horizontal and vertical scaling without architectural limits
 - **Resource Efficiency**: Zero-waste computing with predictable performance characteristics
 - **P2P Capability**: Direct peer-to-peer connectivity without relying on centralized infrastructure
 - **Developer Experience**: Intuitive APIs and tooling that make distributed computing accessible
@@ -45,6 +69,12 @@ Create a distributed computing platform that provides:
 - **Geographic Distribution**: Data locality and edge computing built into the core design
 - **Network Partitions**: Graceful degradation and automatic healing when connectivity is lost
 - **Multi-Cloud**: Abstract away infrastructure providers for true cloud portability
+
+### Block-MATRIX Topology Integration
+- **Geospatial Node Organization**: Nodes positioned in x,y,z matrix coordinates
+- **Tensor-Based Routing**: Mathematical matrix operations for optimal paths
+- **Matrix-Aware Sharding**: Intelligent shard placement based on topology
+- **Distance Calculations**: Routing decisions based on matrix distance metrics
 
 ## Core Functional Components
 
@@ -142,6 +172,14 @@ Once core functionality is proven and stable, extend the platform to provide:
 - **Secret Management**: HSM integration with automatic key rotation
 - **Image Registry**: Distributed container image storage with deduplication
 
+## STOQ Integration: Protocol Intelligence
+
+BlockMatrix uses STOQ not as simple transport, but as an **intelligence layer**:
+- **Protocol-Level Validation**: PoS token and asset hash verification
+- **Matrix Shard Addressing**: Provides matrix positions for shard storage
+- **Privacy Tier Enforcement**: Different protocol behavior per tier
+- **Tensor-Aware Routing**: Smart routing based on matrix topology
+
 ## Success Metrics (Future Goals)
 
 ### Performance Targets (Not Yet Achieved)
@@ -166,15 +204,11 @@ Once core functionality is proven and stable, extend the platform to provide:
 - **Community**: Active open-source ecosystem with third-party integrations
 
 ## Long-Term Impact
-HyperMesh represents a fundamental shift toward infrastructure that is:
+BlockMatrix represents a fundamental shift toward infrastructure that is:
 - **Secure by Default**: Eliminates common vulnerability classes through design choices
 - **Globally Distributed**: Enables true edge computing with consistent developer experience  
 - **Resource Efficient**: Maximizes hardware utilization while minimizing energy consumption
 - **Democratically Accessible**: Lowers barriers to entry for distributed computing applications
 - **Future-Proof**: Architected to evolve with emerging hardware and networking technologies
 
-This vision guides every architectural decision and implementation choice, ensuring HyperMesh becomes the foundation for the next generation of cloud-native applications.
-
-## CLI Status
-
-**IMPORTANT**: There is NO Nexus CLI in this project. Any references to a Nexus CLI in documentation are incorrect. While there may be some minimal stub files (minimal_nexus.rs, simple_nexus.rs), these are not functional and should not be used or referenced.
+This vision guides every architectural decision and implementation choice, ensuring BlockMatrix becomes the foundation for the next generation of cloud-native applications.
