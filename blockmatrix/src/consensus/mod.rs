@@ -121,15 +121,37 @@ impl Default for ConsensusConfig {
     }
 }
 
-// Placeholder modules for missing imports (to be implemented)
+// Real validation service implementation using TrustChain's Proof of State
 pub mod validation_service {
     use super::*;
+    use crate::consensus::validation::{ConsensusValidator, DefaultConsensusValidator};
+    use std::sync::Arc;
 
-    pub struct ValidationService;
+    pub struct ValidationService {
+        validator: Arc<dyn ConsensusValidator>,
+        requirements: ConsensusRequirements,
+    }
 
     impl ValidationService {
         pub fn new() -> Self {
-            Self
+            Self {
+                validator: Arc::new(DefaultConsensusValidator::new()),
+                requirements: ConsensusRequirements::default(),
+            }
+        }
+
+        pub fn with_requirements(requirements: ConsensusRequirements) -> Self {
+            Self {
+                validator: Arc::new(DefaultConsensusValidator::with_requirements(requirements.clone())),
+                requirements,
+            }
+        }
+
+        pub fn for_production() -> Self {
+            Self {
+                validator: Arc::new(DefaultConsensusValidator::with_requirements(ConsensusRequirements::production())),
+                requirements: ConsensusRequirements::production(),
+            }
         }
     }
 
@@ -139,9 +161,28 @@ pub mod validation_service {
     }
 
     impl ConsensusValidationService for ValidationService {
-        fn validate(&self, _proof: &ConsensusProof) -> Result<bool, ConsensusError> {
-            // Placeholder implementation
-            Ok(true)
+        fn validate(&self, proof: &ConsensusProof) -> Result<bool, ConsensusError> {
+            // Synchronous validation using the basic validate() method
+            if proof.validate_with_requirements(&self.requirements) {
+                Ok(true)
+            } else {
+                Err(ConsensusError::ValidationFailed("Consensus proof failed validation requirements".to_string()))
+            }
+        }
+    }
+
+    impl ValidationService {
+        pub async fn validate_async(&self, proof: &ConsensusProof) -> Result<bool, ConsensusError> {
+            // Convert proof to bytes for async validation
+            let proof_bytes = proof.to_bytes()
+                .map_err(|e| ConsensusError::Other(format!("Failed to serialize proof: {}", e)))?;
+
+            // Use the async validator
+            match self.validator.validate(&proof_bytes).await {
+                Ok(true) => Ok(true),
+                Ok(false) => Err(ConsensusError::ValidationFailed("Consensus proof validation failed".to_string())),
+                Err(e) => Err(ConsensusError::ValidationFailed(format!("Validation error: {}", e))),
+            }
         }
     }
 }
@@ -152,7 +193,7 @@ pub mod stoq_handlers {
     use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError};
     use std::sync::Arc;
     use serde_json::json;
-    use validation_service::ConsensusValidationService;
+    use super::validation_service::{ConsensusValidationService, ValidationService};
 
     pub struct StoqHandler;
 
@@ -168,7 +209,7 @@ pub mod stoq_handlers {
     }
 
     pub struct ValidateProofsHandler {
-        validation_service: Arc<dyn ConsensusValidationService>,
+        validation_service: Arc<ValidationService>,
     }
 
     pub struct ValidationStatusHandler {
@@ -184,7 +225,7 @@ pub mod stoq_handlers {
     }
 
     impl ValidateProofsHandler {
-        pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
+        pub fn new(validation_service: Arc<ValidationService>) -> Self {
             Self { validation_service }
         }
     }
@@ -237,17 +278,43 @@ pub mod stoq_handlers {
         }
 
         async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-            // Parse proof data from request
-            let proof_data = serde_json::from_slice::<serde_json::Value>(&req.payload)
-                .map_err(|e| ApiError::InvalidRequest(format!("Invalid JSON: {}", e)))?;
+            // Parse proof data from request - expect ConsensusProof JSON or bytes
+            let validation_result = if req.payload.starts_with(b"{") || req.payload.starts_with(b"[") {
+                // JSON format
+                let consensus_proof = serde_json::from_slice::<ConsensusProof>(&req.payload)
+                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof JSON: {}", e)))?;
 
-            // TODO: Implement actual proof validation logic using validation_service
-            let response = json!({
-                "valid": true,
-                "proofs_validated": ["PoSpace", "PoStake", "PoWork", "PoTime"],
-                "timestamp": chrono::Utc::now(),
-                "proof_data": proof_data
-            });
+                // Validate using the service
+                self.validation_service.validate_async(&consensus_proof).await
+            } else {
+                // Binary format
+                let consensus_proof = ConsensusProof::from_bytes(&req.payload)
+                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof bytes: {}", e)))?;
+
+                // Validate using the service
+                self.validation_service.validate_async(&consensus_proof).await
+            };
+
+            let response = match validation_result {
+                Ok(true) => json!({
+                    "valid": true,
+                    "proofs_validated": ["PoStake (WHO)", "PoTime (WHEN)", "PoSpace (WHERE)", "PoWork (WHAT)"],
+                    "timestamp": chrono::Utc::now(),
+                    "message": "All four proofs validated successfully"
+                }),
+                Ok(false) => json!({
+                    "valid": false,
+                    "proofs_validated": [],
+                    "timestamp": chrono::Utc::now(),
+                    "message": "Consensus validation failed"
+                }),
+                Err(e) => json!({
+                    "valid": false,
+                    "error": e.to_string(),
+                    "timestamp": chrono::Utc::now(),
+                    "message": "Validation error occurred"
+                })
+            };
 
             let payload = serde_json::to_vec(&response)
                 .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;

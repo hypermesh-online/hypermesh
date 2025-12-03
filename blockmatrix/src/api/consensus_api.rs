@@ -10,7 +10,7 @@ use tracing::{info, instrument};
 use stoq::api::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
 
-use crate::consensus::validation_service::ConsensusValidationService;
+use crate::consensus::validation_service::{ConsensusValidationService, ValidationService};
 use crate::consensus::stoq_handlers::{
     ValidateCertificateHandler,
     ValidateProofsHandler,
@@ -45,10 +45,10 @@ impl Default for ConsensusApiConfig {
     }
 }
 
-/// Create and configure the consensus API server
+/// Create and configure the consensus API server with ValidationService
 #[instrument(skip(validation_service))]
-pub async fn create_consensus_api_server(
-    validation_service: Arc<dyn ConsensusValidationService>,
+pub async fn create_consensus_api_server_with_service(
+    validation_service: Arc<ValidationService>,
     config: ConsensusApiConfig,
 ) -> Result<Arc<StoqApiServer>> {
     info!("Creating HyperMesh consensus API server on {}:{}",
@@ -74,16 +74,19 @@ pub async fn create_consensus_api_server(
     let server = Arc::new(StoqApiServer::new(transport));
 
     // Register consensus handlers
+    // ValidateCertificateHandler expects Arc<dyn ConsensusValidationService>
     server.register_handler(Arc::new(
-        ValidateCertificateHandler::new(validation_service.clone())
+        ValidateCertificateHandler::new(validation_service.clone() as Arc<dyn ConsensusValidationService>)
     ));
 
+    // ValidateProofsHandler expects Arc<ValidationService>
     server.register_handler(Arc::new(
         ValidateProofsHandler::new(validation_service.clone())
     ));
 
+    // ValidationStatusHandler expects Arc<dyn ConsensusValidationService>
     server.register_handler(Arc::new(
-        ValidationStatusHandler::new(validation_service.clone())
+        ValidationStatusHandler::new(validation_service.clone() as Arc<dyn ConsensusValidationService>)
     ));
 
     server.register_handler(Arc::new(
@@ -96,9 +99,20 @@ pub async fn create_consensus_api_server(
     Ok(server)
 }
 
+/// Create and configure the consensus API server (backward compatibility)
+#[instrument(skip(validation_service))]
+pub async fn create_consensus_api_server(
+    validation_service: Arc<dyn ConsensusValidationService>,
+    config: ConsensusApiConfig,
+) -> Result<Arc<StoqApiServer>> {
+    // Create a default ValidationService to wrap the dyn trait
+    let service = Arc::new(ValidationService::new());
+    create_consensus_api_server_with_service(service, config).await
+}
+
 /// Create a minimal consensus API server for testing
 pub async fn create_test_consensus_server(
-    validation_service: Arc<dyn ConsensusValidationService>,
+    validation_service: Arc<ValidationService>,
 ) -> Result<Arc<StoqApiServer>> {
     let config = ConsensusApiConfig {
         bind_address: "[::1]".to_string(), // IPv6 localhost
@@ -108,7 +122,7 @@ pub async fn create_test_consensus_server(
         enable_cache: false,
     };
 
-    create_consensus_api_server(validation_service, config).await
+    create_consensus_api_server_with_service(validation_service, config).await
 }
 
 #[cfg(test)]
