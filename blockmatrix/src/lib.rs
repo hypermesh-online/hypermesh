@@ -157,6 +157,11 @@ pub mod matrix;
 /// independent blockchain without merkle tree consolidation
 pub mod blockchain;
 
+// Matrix Persistence Layer - Sprint 1.5
+/// Persistent storage for matrix state, blockchains, and topology with
+/// zero data loss recovery mechanisms
+pub mod persistence;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
@@ -183,6 +188,16 @@ pub use os_integration::{
         EbpfHandle, EbpfAttachType, EbpfMetrics, EbpfMetricType,
         GpuType, StorageType,
     },
+};
+
+// Re-export persistence types for easy access
+pub use persistence::{
+    PersistenceManager, PersistenceConfig, StorageStats,
+    MatrixState, MatrixStateSerializer, SerializationFormat,
+    BlockchainStorage, BlockQuery, ChainMetadata,
+    TopologyBackup, BackupMode,
+    SnapshotManager, SnapshotMetadata, SnapshotSchedule,
+    RecoveryManager, RecoveryReport, RecoveryStatus,
 };
 
 // Module stubs - some enabled for Gate 2

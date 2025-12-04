@@ -122,6 +122,11 @@ which = { workspace = true }
 num_cpus = "1.16"  # Cross-platform CPU core detection
 sysinfo = "0.30"  # System information (CPU, memory, processes)
 
+# Persistence dependencies - Sprint 1.5
+rmp-serde = "1.3"  # MessagePack serialization
+walkdir = "2.5"  # Directory traversal
+dirs = "5.0"  # User directories
+
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.29", features = ["fs"] }  # statvfs for storage detection
 aya = { version = "0.12", features = ["async_tokio"] }  # Pure Rust eBPF library
