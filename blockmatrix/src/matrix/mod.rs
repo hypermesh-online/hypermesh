@@ -10,6 +10,7 @@
 //! - **MatrixCoordinate**: 3D position in matrix space with distance calculations
 //! - **Transformations**: Translation, rotation, scaling for hierarchical addressing
 //! - **Neighbor Discovery**: Distance-based neighbor finding algorithms
+//! - **Tensor Operations**: Vector/matrix math for intelligent routing (Sprint 1.2)
 //!
 //! # Example
 //!
@@ -34,6 +35,7 @@
 pub mod coordinate;
 pub mod transforms;
 pub mod neighbors;
+pub mod tensor;
 
 // Re-export main types
 pub use coordinate::{MatrixCoordinate, CoordinateError};
