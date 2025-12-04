@@ -152,6 +152,11 @@ pub mod consensus;
 /// Each node has a geospatial position (x,y,z) enabling tensor operations
 pub mod matrix;
 
+// Every-Node-Blockchain Architecture - Sprint 1.3
+/// Revolutionary blockchain architecture where EVERY node maintains its own
+/// independent blockchain without merkle tree consolidation
+pub mod blockchain;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 

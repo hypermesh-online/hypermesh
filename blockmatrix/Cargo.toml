@@ -49,6 +49,8 @@ hypermesh-lib = { path = "../lib" }
 # TrustChain - Consensus and certificate system
 trustchain = { path = "../trustchain" }
 
+# Blockchain dependencies already included below
+
 # STOQ Protocol - Our transport layer
 stoq = { path = "../stoq" }
 
