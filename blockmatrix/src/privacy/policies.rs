@@ -677,12 +677,13 @@ mod tests {
         };
 
         manager.enforce(PrivacyTier::Anonymous, action.clone()).unwrap();
-        manager.enforce(PrivacyTier::Anonymous, action).unwrap();
+        // Second call should fail due to rate limit, but we need to handle the error
+        let _ = manager.enforce(PrivacyTier::Anonymous, action);
 
         let stats = manager.stats();
         assert_eq!(stats.total_checks, 2);
-        assert_eq!(stats.allowed, 1); // Second fails due to rate limit
-        assert_eq!(stats.violations, 1);
+        assert_eq!(stats.allowed, 1); // First succeeds
+        assert_eq!(stats.violations, 1); // Second fails due to rate limit
     }
 
     #[test]

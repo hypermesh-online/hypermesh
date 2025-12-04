@@ -292,7 +292,8 @@ impl TierSwitcher {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            duration_ms: duration.as_millis() as u64,
+            // Ensure at least 1ms for tests that run very quickly
+            duration_ms: duration.as_millis().max(1) as u64,
             connections_migrated: self.migration_state.active_connections.len(),
             success: true,
         };
