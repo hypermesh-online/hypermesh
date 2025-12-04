@@ -141,9 +141,10 @@ After deleting 7 fundamentally wrong files, we need to correct ~60-70% of remain
 1. **Matrix Topology**: BlockMatrix uses matrix-based resource topology
 2. **Tensor Operations**: All compute operations are tensor-based
 3. **Privacy Tiers**: Anonymous|Private|Federated|Public
-4. **Block-MATRIX Trust**: Federated trust, not traditional CA/DNS
-5. **Instruction-Based Retrieval**: Not DNS lookups
-6. **Every Node is Blockchain**: Distributed consensus at every level
+4. **Multi-Network Participation**: Single node joins multiple isolated networks simultaneously (e.g., bank public portal + customer network + employee network), complete traffic isolation, blockchain asset proofs validate across networks without bridging
+5. **Block-MATRIX Trust**: Federated trust, not traditional CA/DNS
+6. **Instruction-Based Retrieval**: Not DNS lookups
+7. **Every Node is Blockchain**: Distributed consensus at every level
 
 ### What to Remove:
 1. Traditional DNS/CA/CT references (except for bootstrap)

@@ -36,9 +36,10 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 1. **Node-as-DNS-Provider First** - Bootstraps independently before network registration
 2. **DNS-as-Asset** - DNS registration requires full Proof of State, blockchain-registered
 3. **Four Privacy Tiers** - Anonymous | Private P2P | Federated | Public
-4. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
-5. **Instruction-Based Retrieval** - Send shard maps, not files
-6. **Bucket Deduplication** - Content-addressed storage with hash buckets mapped to matrix positions
+4. **Multi-Network Participation** - Single node joins multiple isolated networks simultaneously (e.g., bank's public portal + customer network + employee network), complete traffic isolation, blockchain asset proofs validate across networks without bridging
+5. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
+6. **Instruction-Based Retrieval** - Send shard maps, not files
+7. **Bucket Deduplication** - Content-addressed storage with hash buckets mapped to matrix positions
 
 ## Primary Mission
 Create a **matrix-topology-based distributed computing platform** that provides:
@@ -46,6 +47,7 @@ Create a **matrix-topology-based distributed computing platform** that provides:
 - **Native Security**: Security built into protocol (STOQ intelligence layer)
 - **Every-Node-Blockchain**: Distributed consensus at every level, independent chains
 - **Privacy Tiers**: Four network privacy levels with independent asset privacy
+- **Multi-Network Participation**: Single node joins multiple isolated networks (bank public + private + federated), complete isolation, cross-network asset validation
 - **Instruction-Based Distribution**: Revolutionary data retrieval using shard maps
 
 ## Core Vision

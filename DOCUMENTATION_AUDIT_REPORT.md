@@ -45,22 +45,30 @@
    - Public (full PoS, max rewards)
    - **STATUS**: PARTIALLY FOUND but incorrectly described
 
-6. **STOQ Protocol Intelligence**
+6. **Multi-Network Participation**
+   - Single node joins multiple isolated networks simultaneously
+   - Each network has independent privacy tier (e.g., bank: public portal + customer network + employee network)
+   - Complete network traffic isolation - networks don't cross or bridge
+   - Blockchain asset proofs validate across networks without merging traffic
+   - Real-world: Car purchase validated across Bank→Dealer→Insurance→DMV networks
+   - **STATUS**: NOT FOUND - concept not documented anywhere
+
+7. **STOQ Protocol Intelligence**
    - Must validate PoS tokens, asset hashes at PROTOCOL LEVEL
    - Provides shard addressing based on matrix topology
    - **STATUS**: INCORRECTLY described as "just QUIC wrapper"
 
-7. **Instruction-Based Retrieval**
+8. **Instruction-Based Retrieval**
    - Don't send files, send SHARD MAP + RETRIEVAL INSTRUCTIONS
    - Receiver queries matrix positions
    - **STATUS**: NOT FOUND in any documentation
 
-8. **Content-Addressed Deduplication with Hash Buckets**
+9. **Content-Addressed Deduplication with Hash Buckets**
    - Shard hash → Bucket → Matrix positions
    - Network-wide deduplication
    - **STATUS**: PARTIALLY mentioned but not correctly explained
 
-9. **Tensor Operations on Network**
+10. **Tensor Operations on Network**
    - Mathematical matrix operations for routing
    - Distance calculations using matrix coordinates
    - **STATUS**: NOT FOUND in any documentation
@@ -244,6 +252,7 @@ After corrections, EVERY documentation file must:
 - [ ] Show node-as-DNS-provider (no upstream dependencies)
 - [ ] Describe DNS-as-Asset (blockchain registered)
 - [ ] Include four privacy tiers
+- [ ] Include multi-network participation (single node, multiple isolated networks, cross-network asset validation)
 - [ ] Show STOQ protocol intelligence
 - [ ] Reference instruction-based retrieval
 - [ ] Include tensor operations for routing
