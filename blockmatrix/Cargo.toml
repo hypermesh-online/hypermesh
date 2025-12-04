@@ -26,6 +26,10 @@ harness = false
 name = "tensor_bench"
 harness = false
 
+[[bench]]
+name = "phase1_bench"
+harness = false
+
 [dependencies]
 # Core dependencies
 tokio = { workspace = true }

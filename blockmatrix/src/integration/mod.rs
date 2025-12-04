@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod services;
 pub mod benches;
 pub mod tests;
+pub mod phase1_foundation;
 
 // Re-export main types from stoq_bridge instead
 pub use stoq_bridge::{
@@ -147,4 +148,14 @@ pub use self::metrics::{
 
 pub use self::services::{
     ServiceRegistry,
+};
+
+// Phase 1 Foundation - Sprint 1.6 Integration Layer
+pub use self::phase1_foundation::{
+    MatrixFoundation,
+    MatrixFoundationConfig,
+    MatrixNode,
+    NetworkStats,
+    Phase1Error,
+    Phase1Result,
 };
