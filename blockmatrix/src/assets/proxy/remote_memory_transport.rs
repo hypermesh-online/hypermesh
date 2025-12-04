@@ -670,13 +670,20 @@ mod tests {
     async fn test_operation_id_generation() {
         // STUB: Phase 3 - Endpoint configuration needs proper rustls setup
         // Modern rustls API requires crypto provider setup
+        // Create a dummy server config for testing
+        let cert = rustls::pki_types::CertificateDer::from(vec![]);
+        let key = rustls::pki_types::PrivateKeyDer::Pkcs8(vec![].into());
+        let server_crypto = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(vec![cert], key)
+            .unwrap();
+
+        let server_config = quinn::ServerConfig::with_crypto(Arc::new(
+            quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto).unwrap()
+        ));
+
         let endpoint = quinn::Endpoint::server(
-            quinn::ServerConfig::with_crypto(Arc::new(
-                quinn::rustls::ServerConfig::builder()
-                    .with_no_client_auth()
-                    .with_single_cert(vec![], quinn::rustls::PrivateKey(vec![]))
-                    .unwrap()
-            )),
+            server_config,
             "127.0.0.1:0".parse().unwrap(),
         ).unwrap();
 

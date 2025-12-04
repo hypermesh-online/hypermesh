@@ -918,12 +918,12 @@ mod tests {
         // Register a test endpoint
         let endpoint = ServiceEndpoint {
             id: "test-endpoint".to_string(),
-            service_id: ServiceId("test-service".to_string()),
+            service_id: "test-service".to_string(),
             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
             weight: 1.0,
             health: ServiceHealth::Healthy,
             connections: 0,
-            metrics: crate::service_mesh::EndpointMetrics {
+            metrics: crate::orchestration::service_mesh::EndpointMetrics {
                 avg_response_time_ms: 50.0,
                 request_rate: 100.0,
                 error_rate: 0.01,
@@ -938,7 +938,7 @@ mod tests {
         
         // Test discovery performance
         let start = Instant::now();
-        let endpoints = discovery.discover_service_endpoints(&ServiceId("test-service".to_string())).await;
+        let endpoints = discovery.discover_service_endpoints(&"test-service".to_string()).await;
         let discovery_time = start.elapsed();
         
         assert!(endpoints.is_ok());
@@ -968,12 +968,12 @@ mod tests {
         // Register same endpoint in both
         let endpoint = ServiceEndpoint {
             id: "comparison-endpoint".to_string(),
-            service_id: ServiceId("comparison-service".to_string()),
+            service_id: "comparison-service".to_string(),
             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9090),
             weight: 1.0,
             health: ServiceHealth::Healthy,
             connections: 10,
-            metrics: crate::service_mesh::EndpointMetrics {
+            metrics: crate::orchestration::service_mesh::EndpointMetrics {
                 avg_response_time_ms: 75.0,
                 request_rate: 200.0,
                 error_rate: 0.02,
@@ -987,7 +987,7 @@ mod tests {
         traditional_discovery.register_endpoint(endpoint.clone()).await.unwrap();
         cpe_discovery.register_endpoint(endpoint).await.unwrap();
         
-        let service_id = ServiceId("comparison-service".to_string());
+        let service_id = "comparison-service".to_string();
         
         // Test traditional discovery
         let traditional_start = Instant::now();

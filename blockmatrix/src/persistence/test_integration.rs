@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_persistence_error_types() {
-        use super::PersistenceError;
+        use crate::persistence::PersistenceError;
 
         let err1 = PersistenceError::ChecksumMismatch {
             expected: "abc".to_string(),

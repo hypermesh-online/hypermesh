@@ -492,8 +492,8 @@ mod tests {
         };
         
         assert!(requirements.cpu.is_some());
-        assert!(requirements.memory.is_some());
-        assert!(requirements.gpu.is_none());
+        assert!(requirements.memory_usage.is_some());
+        assert!(requirements.gpu_usage.is_none());
     }
     
     #[test]

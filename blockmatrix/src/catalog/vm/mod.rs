@@ -627,7 +627,7 @@ mod tests {
         // Test CrossEntityValidation creation
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: RealAssetId::new(AssetType::Container).uuid,
+            asset_id: RealAssetId::new(AssetType::Container),
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,
@@ -681,6 +681,7 @@ mod tests {
         
         // Create base execution context
         let base_context = ExecutionContext {
+            execution_id: "test-exec-001".to_string(),
             consensus_proof: ConsensusProof::new(
                 crate::consensus::proof::StakeProof::new(
                     "test.hypermesh.online".to_string(),
@@ -713,6 +714,9 @@ mod tests {
                 trust_scores: std::collections::HashMap::new(),
                 routing_preferences: RoutingPreferences::default(),
             },
+            permissions: execution::context::ExecutionPermissions::default(),
+            resource_limits: execution::context::ResourceLimits::default(),
+            scheduling_info: execution::context::SchedulingInfo::default(),
         };
         
         // Create matrix execution context
@@ -722,7 +726,7 @@ mod tests {
             cross_entity_validations: vec![
                 CrossEntityValidation {
                     entity_domain: "dmv.hypermesh.online".to_string(),
-                    asset_id: RealAssetId::new(AssetType::Container).uuid,
+                    asset_id: RealAssetId::new(AssetType::Container),
                     validation_fields: vec!["registration_status".to_string()],
                     validation_type: ValidationRequirementType::AssetExists,
                     privacy_level: PrivacyLevel::P2P,

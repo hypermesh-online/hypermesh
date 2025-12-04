@@ -674,12 +674,13 @@ mod tests {
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
-            circuit_breaker: crate::orchestration::CircuitBreakerConfig {
-                failure_threshold: 0.05,
+            circuit_breaker: CircuitBreakerConfig {
+                failure_threshold: 5,
+                success_threshold: 3,
+                timeout_ms: 5000,
                 recovery_timeout_ms: 30000,
-                min_request_threshold: 10,
             },
-            load_balancing: crate::orchestration::LoadBalancingConfig {
+            load_balancing: LoadBalancingConfig {
                 strategy: LoadBalancingStrategy::NeuralOptimal,
                 health_check_interval_ms: 5000,
                 health_check_timeout_ms: 1000,
@@ -697,12 +698,13 @@ mod tests {
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
-            circuit_breaker: crate::orchestration::CircuitBreakerConfig {
-                failure_threshold: 0.05,
+            circuit_breaker: CircuitBreakerConfig {
+                failure_threshold: 5,
+                success_threshold: 3,
+                timeout_ms: 5000,
                 recovery_timeout_ms: 30000,
-                min_request_threshold: 10,
             },
-            load_balancing: crate::orchestration::LoadBalancingConfig {
+            load_balancing: LoadBalancingConfig {
                 strategy: LoadBalancingStrategy::NeuralOptimal,
                 health_check_interval_ms: 5000,
                 health_check_timeout_ms: 1000,
@@ -714,7 +716,7 @@ mod tests {
         // Register a test endpoint
         let endpoint = ServiceEndpoint {
             id: "test-endpoint-1".to_string(),
-            service_id: ServiceId("test-service".to_string()),
+            service_id: "test-service".to_string(),
             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
             weight: 1.0,
             health: ServiceHealth::Healthy,
@@ -735,8 +737,8 @@ mod tests {
         // Test routing decision
         let start = Instant::now();
         let decision = controller.route_request(
-            ServiceId("client-service".to_string()),
-            ServiceId("test-service".to_string()),
+            "client-service".to_string(),
+            "test-service".to_string(),
             HashMap::new(),
         ).await;
         

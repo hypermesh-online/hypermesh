@@ -158,7 +158,7 @@ pub mod utils {
     }
     
     /// Estimate code complexity factor (1.0 = simple, 5.0 = very complex)
-    fn estimate_code_complexity(code: &str) -> f64 {
+    pub fn estimate_code_complexity(code: &str) -> f64 {
         let mut complexity = 1.0;
         
         // Count complexity indicators

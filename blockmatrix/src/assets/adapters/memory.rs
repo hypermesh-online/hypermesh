@@ -745,7 +745,7 @@ mod tests {
         AssetAllocationRequest {
             asset_type: AssetType::Memory,
             requested_resources: crate::assets::core::ResourceRequirements {
-                memory_usage: Some(crate::catalog::vm::languages::MemoryRequirements {
+                memory_usage: Some(crate::assets::core::adapter::MemoryRequirements {
                     size_bytes: 1024 * 1024 * 1024, // 1GB
                     memory_type: Some("DDR4".to_string()),
                     ecc_required: false,
@@ -806,7 +806,7 @@ mod tests {
         
         let allocation = adapter.allocate_asset(&request).await.unwrap();
         assert_eq!(allocation.asset_id.asset_type, AssetType::Memory);
-        assert!(allocation.proxy_address.is_some());
+        assert!(allocation.status.proxy_address.is_some());
         
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
@@ -818,7 +818,7 @@ mod tests {
         let request = create_test_memory_request().await;
         
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        let proxy_addr = allocation.proxy_address.unwrap();
+        let proxy_addr = allocation.status.proxy_address.unwrap();
         
         // Test proxy address resolution
         let resolved_asset_id = adapter.resolve_proxy_address(&proxy_addr).await.unwrap();

@@ -700,8 +700,8 @@ mod tests {
         let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
 
         let report = manager.recover().await.unwrap();
-        assert!(report.status == super::recovery::RecoveryStatus::Completed ||
-                report.status == super::recovery::RecoveryStatus::Partial);
+        assert!(report.status == crate::persistence::recovery::RecoveryStatus::Completed ||
+                report.status == crate::persistence::recovery::RecoveryStatus::Partial);
     }
 
     #[tokio::test]

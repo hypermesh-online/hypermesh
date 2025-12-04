@@ -4,7 +4,7 @@
 //! organizing nodes into geographic groups.
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::geospatial::hierarchy::{GeographicZone, GeographicLevel};
+use crate::matrix::geospatial::hierarchy::{GeographicZone, GeographicLevel, GeographicBounds};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

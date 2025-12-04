@@ -342,8 +342,7 @@ mod integration_tests {
         for i in 0..10 {
             let gps = GpsCoordinate::at_sea_level(
                 40.5 + (i as f64) * 0.05,
-                -74.0,
-                0.0
+                -74.0
             ).unwrap();
             let matrix = converter.gps_to_matrix(&gps).unwrap();
 

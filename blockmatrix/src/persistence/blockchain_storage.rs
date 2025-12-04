@@ -507,7 +507,7 @@ mod tests {
 
         // Write additional blocks
         for i in 1..10 {
-            let mut block = Block::new(i, prev_block.hash.clone(), coord.clone(), vec![]);
+            let mut block = Block::new(i, vec![], prev_block.hash.clone(), coord.clone());
             block.hash = format!("hash_{}", i); // Simplified for testing
             storage.write_block(&block).await.unwrap();
             prev_block = block;

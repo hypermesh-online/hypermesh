@@ -736,8 +736,8 @@ mod tests {
         alm_engine.update_topology(nodes, edges).await.unwrap();
         
         // Test routing performance
-        let source = ServiceId("service1".to_string());
-        let target = ServiceId("service2".to_string());
+        let source = "service1".to_string();
+        let target = "service2".to_string();
         let context = HashMap::new();
         
         // Traditional routing

@@ -1,11 +1,8 @@
 //! Security framework integration tests
 
 use crate::security::{
-    SecurityConfig, SecurityError,
-    capabilities::{CapabilityManager, Capability},
-    certificates::{CertificateManager, Certificate},
-    intrusion::{IntrusionDetector},
-    monitoring::{SecurityMonitor, SecurityEvent, SecurityEventType, SecuritySeverity},
+    SecurityConfig, SecurityError, SecurityManager,
+    monitoring::SecurityMonitor,
 };
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -17,38 +14,25 @@ use tokio;
 #[tokio::test]
 async fn test_security_config() {
     let config = SecurityConfig::default();
-    assert!(config.enforce_capabilities);
-    assert!(config.enable_tls);
+    // Check that config has expected fields
+    assert!(config.capabilities.enabled);
+    // Certificate config has different structure
+    assert!(config.certificates.lifecycle.default_validity_days > 0);
 }
 
 #[tokio::test]
-async fn test_capability_manager() {
-    let manager = CapabilityManager::new(SecurityConfig::default());
-    // Basic test - more comprehensive tests needed when implementation is complete
-    assert!(manager.is_some());
-}
-
-#[tokio::test]
-async fn test_certificate_manager() {
+async fn test_security_manager() {
     let config = SecurityConfig::default();
-    let manager = CertificateManager::new(config);
-    // Basic test - more comprehensive tests needed when implementation is complete
-    assert!(manager.is_some());
-}
-
-#[tokio::test]
-async fn test_intrusion_detector() {
-    let config = SecurityConfig::default();
-    let detector = IntrusionDetector::new(config);
-    // Basic test - more comprehensive tests needed when implementation is complete
-    assert!(detector.is_some());
+    let manager = SecurityManager::new(config);
+    // Basic test - validate method returns Ok
+    assert!(manager.validate().is_ok());
 }
 
 #[tokio::test]
 async fn test_security_monitor() {
-    let monitor = SecurityMonitor::new(SecurityConfig::default());
-    // Basic test - more comprehensive tests needed when implementation is complete
-    assert!(monitor.is_some());
+    let monitor = SecurityMonitor::new();
+    // Start monitoring and check it starts successfully
+    assert!(monitor.start().await.is_ok());
 }
 
 // Original tests commented out - need HyperMeshSecurity types

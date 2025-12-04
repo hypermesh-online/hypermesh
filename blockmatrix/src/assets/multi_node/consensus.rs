@@ -595,10 +595,10 @@ mod tests {
 
     fn create_test_node() -> NodeId {
         NodeId {
+            name: "test-node".to_string(),
             id: [1u8; 32],
-            ipv6_address: "::1".parse().unwrap(),
-            public_key: vec![1, 2, 3],
-            trust_score: 0.9,
+            address: "::1".parse().unwrap(),
+            pub_key: vec![1, 2, 3],
         }
     }
 

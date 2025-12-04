@@ -769,9 +769,9 @@ mod tests {
         }
     }
     
-    #[test]
-    fn test_python_consensus_construct_parsing() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_python_consensus_construct_parsing() {
+        let adapter = create_test_adapter().await;
         
         let code = r#"
 @consensus_required(space=2048, stake=1500)
@@ -795,9 +795,9 @@ proof = ConsensusProof(space_data)
         assert!(has_p2p);
     }
     
-    #[test]
-    fn test_python_asset_requirements() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_python_asset_requirements() {
+        let adapter = create_test_adapter().await;
         
         let code = r#"
 import numpy as np
@@ -826,9 +826,9 @@ def ml_compute():
         assert!(gpu_req.min_memory_bytes > 0);
     }
     
-    #[test]
-    fn test_python_error_translation() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_python_error_translation() {
+        let adapter = create_test_adapter().await;
         
         let error = "NameError: name 'undefined_var' is not defined";
         let translated = adapter.translate_python_error(error).unwrap();
@@ -840,7 +840,7 @@ def ml_compute():
     
     #[tokio::test]
     async fn test_python_to_julia_translation() {
-        let adapter = create_test_adapter();
+        let adapter = create_test_adapter().await;
         let consensus_proof = create_test_consensus_proof();
         
         let python_code = r#"

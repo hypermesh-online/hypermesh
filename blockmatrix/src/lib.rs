@@ -328,11 +328,11 @@ mod tests {
             1000
         );
 
-        let mut space_proof = SpaceProof::new(
-            1024 * 1024, // 1MB
-            "/test/storage".to_string()
+        let space_proof = SpaceProof::new(
+            "test-node".to_string(),
+            "/test/storage".to_string(),
+            1024 * 1024 // 1MB
         );
-        space_proof.node_id = "test-node".to_string();
 
         let work_proof = WorkProof::new(
             "owner-1".to_string(),

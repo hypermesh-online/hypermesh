@@ -459,11 +459,11 @@ mod tests {
             1000
         );
         
-        let mut space_proof = SpaceProof::new(
-            1024,
-            "/test/path".to_string()
+        let space_proof = SpaceProof::new(
+            "test-node".to_string(),
+            "/test/path".to_string(),
+            1024
         );
-        space_proof.node_id = "test-node".to_string();
         
         let work_proof = WorkProof::new(
             "test-worker".to_string(),   // owner_id

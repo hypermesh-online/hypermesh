@@ -294,7 +294,7 @@ mod tests {
         ];
         
         let not_retryable = vec![
-            TransportError::AuthenticationFailed(NodeId::new("test".to_string()), "test".to_string()),
+            TransportError::AuthenticationFailedWithDetails(NodeId::from_name("test").to_string(), "test".to_string()),
             TransportError::Configuration("test".to_string()),
             TransportError::InvalidOperation("test".to_string()),
         ];

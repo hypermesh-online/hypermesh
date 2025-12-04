@@ -1022,9 +1022,9 @@ mod tests {
         }
     }
     
-    #[test]
-    fn test_rust_consensus_construct_parsing() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_rust_consensus_construct_parsing() {
+        let adapter = create_test_adapter().await;
         
         let code = r#"
 #[consensus_required(space=2048, stake=1500)]
@@ -1049,9 +1049,9 @@ consensus_validate!(proof, 1024, 1000, 16, 0);
         assert!(has_p2p);
     }
     
-    #[test]
-    fn test_rust_asset_requirements() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_rust_asset_requirements() {
+        let adapter = create_test_adapter().await;
         
         let code = r#"
 use rayon::prelude::*;
@@ -1083,9 +1083,9 @@ fn parallel_compute() {
         assert!(cpu_req.required_features.contains(&"multithread".to_string()));
     }
     
-    #[test]
-    fn test_rust_error_translation() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_rust_error_translation() {
+        let adapter = create_test_adapter().await;
         
         let error = "error[E0425]: cannot find value `undefined_var` in this scope";
         let translated = adapter.translate_rust_error(error).unwrap();
@@ -1106,9 +1106,9 @@ fn parallel_compute() {
         assert!(config.gpu_crates.contains(&"novarc".to_string()));
     }
     
-    #[test]
-    fn test_cargo_toml_generation() {
-        let adapter = create_test_adapter();
+    #[tokio::test]
+    async fn test_cargo_toml_generation() {
+        let adapter = create_test_adapter().await;
         let cargo_toml = adapter.generate_cargo_toml().unwrap();
         
         assert!(cargo_toml.contains("[package]"));

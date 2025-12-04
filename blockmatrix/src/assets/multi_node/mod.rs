@@ -291,14 +291,14 @@ mod tests {
     #[test]
     fn test_node_id_creation() {
         let node_id = NodeId {
+            name: "test-node".to_string(),
             id: [1u8; 32],
-            ipv6_address: Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1),
-            public_key: vec![2, 3, 4, 5],
-            trust_score: 0.95,
+            address: Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1),
+            pub_key: vec![2, 3, 4, 5],
         };
 
         assert_eq!(node_id.id[0], 1);
-        assert_eq!(node_id.trust_score, 0.95);
+        assert_eq!(node_id.pub_key, vec![2, 3, 4, 5]);
     }
 
     #[test]

@@ -491,11 +491,15 @@ mod tests {
         let validator = WorkProofValidator::new(16).unwrap();
         
         // Test difficulty validation
+        // WorkProof::new needs: owner_id, workload_id, nonce, difficulty, workload_type, state
         let proof = WorkProof::new(
-            b"test-challenge",
-            20, // Above minimum
-            "cpu".to_string(),
-        ).unwrap();
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            12345, // nonce
+            20, // Above minimum difficulty
+            crate::consensus::proof::WorkloadType::Compute,
+            crate::consensus::proof::WorkState::Completed,
+        );
         
         let valid_difficulty = validator.validate_difficulty(&proof).await.unwrap();
         assert!(valid_difficulty);
