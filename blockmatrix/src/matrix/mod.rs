@@ -36,6 +36,7 @@ pub mod coordinate;
 pub mod transforms;
 pub mod neighbors;
 pub mod tensor;
+pub mod geospatial;
 
 // Re-export main types
 pub use coordinate::{MatrixCoordinate, CoordinateError};
