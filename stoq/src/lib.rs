@@ -14,6 +14,7 @@ pub mod config;
 pub mod extensions;
 pub mod protocol;
 pub mod api;
+pub mod network_isolation;
 
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
@@ -39,6 +40,12 @@ pub use extensions::{
 // Re-export API layer for application protocol
 pub use api::{
     StoqApiServer, StoqApiClient, ApiHandler, ApiRequest, ApiResponse, ApiError
+};
+
+// Re-export network isolation for multi-network support
+pub use network_isolation::{
+    NetworkIsolationManager, NetworkStack, IsolationConfig, PrivacyTier as StoqPrivacyTier,
+    NetworkTunnel, TrafficType, IsolationViolation
 };
 
 /// STOQ Protocol version

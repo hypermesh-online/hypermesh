@@ -29,6 +29,8 @@ pub mod discovery;
 pub mod load_balancer;
 pub mod fault_tolerance;
 pub mod resource_sharing;
+pub mod network_membership;
+pub mod multi_network_coordinator;
 
 pub use coordinator::{MultiNodeCoordinator, NodeInfo, NodeCapabilities};
 pub use consensus::{ConsensusManager, ConsensusDecision, VotingRound};
@@ -37,6 +39,17 @@ pub use discovery::{NodeDiscovery, DiscoveryProtocol, ServiceAnnouncement};
 pub use load_balancer::{LoadBalancer, BalancingStrategy, ResourceMetrics};
 pub use fault_tolerance::{ByzantineDetector, FaultRecovery, NodeHealthMonitor};
 pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
+
+// Multi-Network Participation (Revolutionary Concept #4)
+pub use network_membership::{
+    NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
+    PrivacyTier, NetworkDiscovery, MembershipStatus, NetworkRole,
+};
+pub use multi_network_coordinator::{
+    MultiNetworkCoordinator, MultiNetworkConfig, MatrixPosition,
+    NetworkAssetRouter, CrossNetworkValidator, EngagementMonitor,
+    IsolationReport, EngagementEventType, NetworkEngagementMetrics,
+};
 
 // Use canonical NodeId from transport layer
 pub use crate::transport::NodeId;
