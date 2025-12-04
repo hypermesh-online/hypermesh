@@ -68,6 +68,53 @@ impl ValidationPolicy {
             _reserved: [0u8; 8],
         }
     }
+
+    /// Create policy for specific privacy tier
+    pub fn for_privacy_tier(tier: u8) -> Self {
+        match tier {
+            0 => Self {
+                // Anonymous tier - minimal validation
+                requires_pos: false,
+                validate_asset_hash: false,
+                check_matrix_routing: false,
+                privacy_tier: 0,
+                max_packet_size: 65535,
+                rate_limit_per_sec: 100, // Lower rate limit
+                _reserved: [0u8; 8],
+            },
+            1 => Self {
+                // Private P2P tier - peer validation only
+                requires_pos: false,
+                validate_asset_hash: true,
+                check_matrix_routing: false,
+                privacy_tier: 1,
+                max_packet_size: 65535,
+                rate_limit_per_sec: 500,
+                _reserved: [0u8; 8],
+            },
+            2 => Self {
+                // Federated tier - cross-network validation
+                requires_pos: true,
+                validate_asset_hash: true,
+                check_matrix_routing: true,
+                privacy_tier: 2,
+                max_packet_size: 9000,
+                rate_limit_per_sec: 1000,
+                _reserved: [0u8; 8],
+            },
+            3 => Self {
+                // Public tier - full validation
+                requires_pos: true,
+                validate_asset_hash: true,
+                check_matrix_routing: true,
+                privacy_tier: 3,
+                max_packet_size: 9000,
+                rate_limit_per_sec: 10000,
+                _reserved: [0u8; 8],
+            },
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Policy manager - manages eBPF policy maps
@@ -207,5 +254,56 @@ mod tests {
         assert!(strict.requires_pos);
         assert!(strict.validate_asset_hash);
         assert!(strict.check_matrix_routing);
+    }
+
+    #[test]
+    fn test_privacy_tier_policies() {
+        // Test Anonymous tier (0)
+        let anon = ValidationPolicy::for_privacy_tier(0);
+        assert!(!anon.requires_pos);
+        assert!(!anon.validate_asset_hash);
+        assert_eq!(anon.privacy_tier, 0);
+        assert_eq!(anon.rate_limit_per_sec, 100);
+
+        // Test Private P2P tier (1)
+        let p2p = ValidationPolicy::for_privacy_tier(1);
+        assert!(!p2p.requires_pos);
+        assert!(p2p.validate_asset_hash);
+        assert_eq!(p2p.privacy_tier, 1);
+        assert_eq!(p2p.rate_limit_per_sec, 500);
+
+        // Test Federated tier (2)
+        let federated = ValidationPolicy::for_privacy_tier(2);
+        assert!(federated.requires_pos);
+        assert!(federated.validate_asset_hash);
+        assert!(federated.check_matrix_routing);
+        assert_eq!(federated.privacy_tier, 2);
+        assert_eq!(federated.rate_limit_per_sec, 1000);
+
+        // Test Public tier (3)
+        let public = ValidationPolicy::for_privacy_tier(3);
+        assert!(public.requires_pos);
+        assert!(public.validate_asset_hash);
+        assert!(public.check_matrix_routing);
+        assert_eq!(public.privacy_tier, 3);
+        assert_eq!(public.rate_limit_per_sec, 10000);
+    }
+
+    #[test]
+    fn test_tier_policy_manager_integration() {
+        let manager = PolicyManager::new().unwrap();
+
+        // Set different tier policies
+        manager.set_policy(100, ValidationPolicy::for_privacy_tier(0));
+        manager.set_policy(101, ValidationPolicy::for_privacy_tier(3));
+
+        // Verify policies
+        let anon_policy = manager.get_policy(100);
+        assert_eq!(anon_policy.privacy_tier, 0);
+        assert!(!anon_policy.requires_pos);
+
+        let public_policy = manager.get_policy(101);
+        assert_eq!(public_policy.privacy_tier, 3);
+        assert!(public_policy.requires_pos);
     }
 }
