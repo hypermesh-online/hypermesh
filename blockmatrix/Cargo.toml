@@ -58,6 +58,9 @@ trustchain = { path = "../trustchain" }
 # STOQ Protocol - Our transport layer
 stoq = { path = "../stoq" }
 
+# HyperMesh eBPF Intelligence Layer
+hypermesh-ebpf = { path = "../hypermesh-ebpf" }
+
 # Async runtime
 async-trait = { workspace = true }
 futures = { workspace = true }

@@ -1,0 +1,50 @@
+[package]
+name = "hypermesh-ebpf"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "HyperMesh eBPF Intelligence Layer - Kernel-level validation for Proof of State"
+license = "MIT OR Apache-2.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+# STOQ types only (no runtime dependencies)
+stoq = { path = "../stoq", default-features = false, features = [] }
+
+# eBPF infrastructure
+aya = "0.12"
+aya-log = "0.2"
+libbpf-sys = "1.4"
+
+# Core serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Hashing for validation
+blake3 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Data structures
+parking_lot = { workspace = true }
+
+[build-dependencies]
+# No build dependencies currently needed
+
+[features]
+default = []
+# Feature for enabling actual eBPF program loading (requires privileges)
+kernel-attach = []
+
+[lib]
+name = "hypermesh_ebpf"
+path = "src/lib.rs"

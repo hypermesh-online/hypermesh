@@ -5,6 +5,7 @@
 //! - AF_XDP zero-copy sockets
 //! - Transport-level metrics collection in kernel
 //! - Connection tracking and load balancing
+//! - Generic validation hooks for application-specific intelligence
 
 #[cfg(feature = "ebpf")]
 pub mod xdp;
@@ -14,6 +15,7 @@ pub mod af_xdp;
 pub mod metrics;
 #[cfg(feature = "ebpf")]
 pub mod loader;
+pub mod hooks;
 
 use anyhow::{Result, anyhow};
 use std::sync::Arc;

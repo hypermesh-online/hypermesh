@@ -5,7 +5,7 @@
 //! - Self-signed certificates for localhost testing only
 //! - Automatic 24-hour certificate rotation
 //! - Real-time certificate fingerprinting and validation
-//! - Proof of State consensus proof validation
+//! - Generic validation hooks for application-specific logic
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -75,7 +75,7 @@ impl CertificateConfig {
     }
 }
 
-/// STOQ node certificate with consensus validation
+/// STOQ node certificate
 #[derive(Debug)]
 pub struct StoqNodeCertificate {
     /// Node identifier
@@ -90,8 +90,8 @@ pub struct StoqNodeCertificate {
     pub expires_at: SystemTime,
     /// SHA-256 fingerprint
     pub fingerprint_sha256: [u8; 32],
-    /// Associated consensus proof (for TrustChain certificates)
-    pub consensus_proof: Option<Vec<u8>>, // Serialized ConsensusProof
+    /// Optional application-specific metadata (for custom validators)
+    pub metadata: Option<Vec<u8>>,
 }
 
 impl StoqNodeCertificate {
@@ -144,7 +144,7 @@ impl TrustChainClient {
         &self,
         common_name: &str,
         ipv6_addresses: &[Ipv6Addr],
-        consensus_proof: &[u8],
+        metadata: Option<&[u8]>,
     ) -> Result<StoqNodeCertificate> {
         info!("Requesting certificate from TrustChain CA: {}", self.endpoint);
 
@@ -192,13 +192,19 @@ impl TrustChainClient {
         let (mut send_stream, mut recv_stream) = connection.open_bi().await?;
 
         // Prepare certificate request
-        let request = serde_json::json!({
+        let mut request_json = serde_json::json!({
             "common_name": common_name,
             "san_entries": [common_name],
             "node_id": self.node_id,
             "ipv6_addresses": ipv6_addresses,
-            "consensus_proof": base64::prelude::BASE64_STANDARD.encode(consensus_proof)
         });
+
+        // Add optional metadata if provided (for application-specific validation)
+        if let Some(meta) = metadata {
+            request_json["metadata"] = serde_json::json!(base64::prelude::BASE64_STANDARD.encode(meta));
+        }
+
+        let request = request_json;
 
         let request_data = format!("POST /ca/certificate HTTP/1.1\r\n");
         let request_data = format!("{}Host: {}\r\n", request_data, host);
@@ -247,7 +253,7 @@ impl TrustChainClient {
             issued_at: now,
             expires_at,
             fingerprint_sha256: fingerprint,
-            consensus_proof: Some(consensus_proof.to_vec()),
+            metadata: metadata.map(|m| m.to_vec()),
         };
 
         info!("Certificate obtained from TrustChain CA: {}", stoq_cert.fingerprint());
@@ -730,7 +736,7 @@ impl CertificateManager {
             issued_at: now,
             expires_at,
             fingerprint_sha256: fingerprint,
-            consensus_proof: None, // No consensus proof for self-signed
+            metadata: None, // No metadata for self-signed certificates
         };
 
         // Store certificate
@@ -745,13 +751,14 @@ impl CertificateManager {
         debug!("Requesting certificate from TrustChain CA");
 
         if let Some(client) = &self.trustchain_client {
-            // SECURITY FIX: Generate real consensus proof instead of placeholder
-            let consensus_proof = self.generate_real_consensus_proof().await?;
+            // Applications can provide custom metadata for validation
+            // HyperMesh would provide Proof of State here
+            let metadata = self.generate_certificate_metadata().await?;
 
             let stoq_cert = client.request_certificate(
                 &self.config.common_name,
                 &self.config.ipv6_addresses,
-                &consensus_proof,
+                Some(&metadata),
             ).await?;
 
             // Store certificate
@@ -764,22 +771,21 @@ impl CertificateManager {
         }
     }
 
-    /// Generate real consensus proof for certificate requests (SECURITY FIX)
-    async fn generate_real_consensus_proof(&self) -> Result<Vec<u8>> {
-        // SECURITY FIX: Replace placeholder with real consensus proof generation
-        // This should integrate with the four-proof consensus system
+    /// Generate application-specific metadata for certificate requests
+    ///
+    /// This is a hook for applications to provide custom validation data.
+    /// HyperMesh overrides this to provide Proof of State.
+    /// Default implementation provides basic node identification.
+    async fn generate_certificate_metadata(&self) -> Result<Vec<u8>> {
         use sha2::{Sha256, Digest};
 
         let mut hasher = Sha256::new();
         hasher.update(self.config.node_id.as_bytes());
         hasher.update(&SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs().to_be_bytes());
-        hasher.update(b"real_consensus_proof");
 
-        // In production, this would generate:
-        // - Proof of Space (storage commitment)
-        // - Proof of Stake (economic stake)
-        // - Proof of Work (computational challenge)
-        // - Proof of Time (temporal ordering)
+        // Applications can override this method to provide custom metadata
+        // For HyperMesh: Proof of State (PoSpace + PoStake + PoWork + PoTime)
+        // For other apps: Custom validation data
 
         Ok(hasher.finalize().to_vec())
     }

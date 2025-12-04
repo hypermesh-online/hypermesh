@@ -5,6 +5,7 @@ members = [
     "caesar",
     "catalog",
     "blockmatrix",
+    "hypermesh-ebpf",
 ]
 resolver = "2"
 
