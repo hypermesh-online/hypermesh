@@ -103,10 +103,11 @@ impl NodeBlockchain {
             self.node_coordinate.clone(),
         );
 
+        let previous_clone = previous.clone();
         drop(head); // Release read lock
 
         // Validate the new block
-        if !self.validator.validate_block(&new_block, Some(previous)) {
+        if !self.validator.validate_block(&new_block, Some(&previous_clone)) {
             return Err("Block validation failed".to_string());
         }
 

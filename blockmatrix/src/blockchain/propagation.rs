@@ -125,8 +125,11 @@ impl BlockPropagator {
             }
 
             PropagationStrategy::NearestN(n) => {
-                // Get N nearest neighbors
+                // Get N nearest neighbors, extract just the coordinates
                 find_k_nearest(&self.node_coordinate, network_nodes, *n)
+                    .into_iter()
+                    .map(|(coord, _distance)| coord)
+                    .collect()
             }
 
             PropagationStrategy::DistanceThreshold(threshold) => {
@@ -153,7 +156,7 @@ impl BlockPropagator {
         let mut targets = Vec::new();
         for relay in relay_points {
             // Use routing to get path vector
-            let path = calculate_routing_path(&self.node_coordinate, &relay, 3);
+            let path = calculate_routing_path(&self.node_coordinate, &relay, 3.0);
 
             // Find nodes close to the path (within distance 2)
             for node in network_nodes {
