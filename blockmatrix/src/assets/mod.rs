@@ -12,6 +12,7 @@ pub mod blockchain;
 pub mod matrix_blockchain;
 pub mod cross_chain;
 pub mod pipeline;
+pub mod storage;
 
 // Re-export main types for easy access
 pub use core::{
@@ -49,4 +50,12 @@ pub use matrix_blockchain::{
 pub use pipeline::{
     AssetPipeline, PipelineConfig, ProcessedAsset, PipelineStats,
     Compressor, Encryptor, Sharder, MatrixDistributor,
+};
+
+pub use storage::{
+    ContentAddressedStorage, StorageStats, Hash,
+    HashBucket, BucketId, BucketMapper,
+    DeduplicationEngine, DeduplicationResult, DeduplicationStats,
+    ContentAddress, RetrievalInstructions,
+    ReplicationStrategy, ReplicationConfig, PopularityMetrics,
 };
