@@ -266,6 +266,18 @@ impl ContentAddress {
     }
 }
 
+impl Default for RetrievalInstructions {
+    fn default() -> Self {
+        Self {
+            shard_map: vec![],
+            reconstruction_order: vec![],
+            min_shards_required: 10, // Default for Reed-Solomon 10+4
+            strategy: RetrievalStrategy::default(),
+            network_hints: NetworkHints::default(),
+        }
+    }
+}
+
 impl RetrievalInstructions {
     /// Create new retrieval instructions
     pub fn new(shard_map: ShardMap) -> Self {

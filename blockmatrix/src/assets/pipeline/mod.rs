@@ -66,6 +66,18 @@ pub struct AssetMetadata {
     pub custom: std::collections::HashMap<String, String>,
 }
 
+impl Default for AssetMetadata {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            content_type: "application/octet-stream".to_string(),
+            size: 0,
+            created_at: 0,
+            custom: std::collections::HashMap::new(),
+        }
+    }
+}
+
 /// Pipeline error types
 #[derive(Debug, thiserror::Error)]
 pub enum PipelineError {

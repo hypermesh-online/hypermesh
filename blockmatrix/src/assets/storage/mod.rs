@@ -188,6 +188,11 @@ impl ContentAddressedStorage {
     pub async fn get_dedup_stats(&self) -> DeduplicationStats {
         self.deduplication.read().await.get_stats()
     }
+
+    /// Store content to shard mapping for retrieval
+    pub async fn store_content_mapping(&self, content_hash: Hash, shard_hashes: Vec<Hash>) -> Result<()> {
+        self.deduplication.write().await.store_content_mapping(content_hash, shard_hashes).await
+    }
 }
 
 /// Compute SHA-256 hash of data

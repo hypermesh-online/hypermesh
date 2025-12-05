@@ -372,18 +372,30 @@ pub struct SeasonalAdjustment {
 pub struct RewardConfiguration {
     /// User's reward tier
     pub current_tier: String,
-    
+
     /// Reward calculation preferences
     pub calculation_preferences: RewardCalculationPreferences,
-    
+
     /// Payout preferences
     pub payout_preferences: PayoutPreferences,
-    
+
     /// Tax and compliance settings
     pub tax_settings: TaxSettings,
-    
+
     /// Reward optimization settings
     pub optimization_settings: RewardOptimizationSettings,
+}
+
+impl Default for RewardConfiguration {
+    fn default() -> Self {
+        Self {
+            current_tier: "basic".to_string(),
+            calculation_preferences: RewardCalculationPreferences::default(),
+            payout_preferences: PayoutPreferences::default(),
+            tax_settings: TaxSettings::default(),
+            optimization_settings: RewardOptimizationSettings::default(),
+        }
+    }
 }
 
 /// Reward calculation preferences
@@ -417,6 +429,12 @@ pub enum RiskToleranceLevel {
     Low,
     Medium,
     High,
+}
+
+impl Default for RiskToleranceLevel {
+    fn default() -> Self {
+        Self::Medium
+    }
 }
 
 /// Payout preferences
@@ -996,5 +1014,125 @@ impl Default for DynamicAdjustmentFactors {
             },
             seasonal_adjustments: vec![],
         }
+    }
+}
+
+// Default implementations for nested structures
+
+impl Default for RewardCalculationMethod {
+    fn default() -> Self {
+        Self::Balanced
+    }
+}
+
+impl Default for RewardCalculationPreferences {
+    fn default() -> Self {
+        Self {
+            calculation_method: RewardCalculationMethod::default(),
+            risk_tolerance: RiskToleranceLevel::default(),
+            reward_privacy_balance: 0.5,
+            accept_dynamic_adjustments: true,
+        }
+    }
+}
+
+impl Default for PayoutPreferences {
+    fn default() -> Self {
+        Self {
+            frequency: PayoutFrequency::Daily,
+            minimum_threshold: 10.0,
+            auto_compound_percentage: 0.0,
+            preferred_token: "CAESAR".to_string(),
+            staking_preferences: StakingPreferences::default(),
+        }
+    }
+}
+
+impl Default for StakingPreferences {
+    fn default() -> Self {
+        Self {
+            auto_stake_percentage: 0.0,
+            preferred_duration: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
+            risk_tolerance: RiskToleranceLevel::default(),
+            liquid_reserve_percentage: 20.0,
+        }
+    }
+}
+
+impl Default for TaxSettings {
+    fn default() -> Self {
+        Self {
+            jurisdiction: "US".to_string(),
+            reporting_requirements: vec![],
+            withholding_preferences: WithholdingPreferences::default(),
+            cost_basis_tracking: true,
+        }
+    }
+}
+
+impl Default for WithholdingPreferences {
+    fn default() -> Self {
+        Self {
+            auto_withholding: false,
+            withholding_percentage: 0.0,
+            withholding_account: None,
+            quarterly_payments: false,
+        }
+    }
+}
+
+impl Default for RewardOptimizationSettings {
+    fn default() -> Self {
+        Self {
+            auto_optimization: true,
+            objectives: vec![OptimizationObjective::MaximizeRewards],
+            rebalancing: RebalancingPreferences::default(),
+            performance_tracking: PerformanceTracking::default(),
+        }
+    }
+}
+
+impl Default for RebalancingPreferences {
+    fn default() -> Self {
+        Self {
+            frequency: RebalancingFrequency::Weekly,
+            thresholds: HashMap::new(),
+            automatic: true,
+            consider_costs: true,
+        }
+    }
+}
+
+impl Default for RebalancingFrequency {
+    fn default() -> Self {
+        Self::Weekly
+    }
+}
+
+impl Default for PerformanceTracking {
+    fn default() -> Self {
+        Self {
+            track_rewards: true,
+            track_privacy: true,
+            benchmarks: vec![],
+            reporting: PerformanceReporting::default(),
+        }
+    }
+}
+
+impl Default for PerformanceReporting {
+    fn default() -> Self {
+        Self {
+            frequency: ReportingFrequency::Monthly,
+            formats: vec!["json".to_string()],
+            detailed_breakdowns: true,
+            privacy_aware: true,
+        }
+    }
+}
+
+impl Default for ReportingFrequency {
+    fn default() -> Self {
+        Self::Monthly
     }
 }

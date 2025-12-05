@@ -19,7 +19,10 @@ pub mod core;
 pub mod retention;
 pub mod keys;
 
-pub use manager::{PrivacyManager, PrivacyManagerConfig};
+pub use manager::{
+    PrivacyManager, PrivacyManagerConfig,
+    CaesarRewardPreferences, RewardOptimizationPreferences
+};
 // Import from modular config system
 pub use config::{
     UserPrivacyConfig, PrivacySettings, 

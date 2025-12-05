@@ -167,6 +167,15 @@ pub mod persistence;
 /// and flexibility matrix for independent network/asset privacy settings
 pub mod privacy;
 
+// Phase 2 Intelligence Layer - Sprint 2.6: Integration
+/// Unified intelligence layer integrating all Phase 2 revolutionary concepts:
+/// STOQ Protocol Intelligence, Privacy Tiers, Multi-Network Participation,
+/// Asset Pipeline, and Content-Addressed Storage
+pub mod intelligence;
+
+// Integration modules for cross-phase coordination
+pub mod integration;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
@@ -221,7 +230,6 @@ pub mod container;
 pub mod extensions;
 pub mod orchestration;
 pub mod platform;
-pub mod integration;
 pub mod security;
 
 // Export container types at root for backwards compatibility

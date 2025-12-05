@@ -72,6 +72,18 @@ pub struct ShardMetadata {
     pub hash: String,
 }
 
+impl Default for ShardMetadata {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            is_parity: false,
+            size: 0,
+            original_size: 0,
+            hash: String::new(),
+        }
+    }
+}
+
 /// Individual shard
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Shard {

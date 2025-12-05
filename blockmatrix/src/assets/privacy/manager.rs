@@ -73,6 +73,57 @@ pub struct AuditLoggingConfig {
     pub anonymize_logs: bool,
 }
 
+impl Default for PrivacyManagerConfig {
+    fn default() -> Self {
+        Self {
+            default_privacy_level: PrivacyLevel::Private,
+            default_resource_allocation: ResourceAllocationConfig::default(),
+            global_consensus_requirements: ConsensusRequirementConfig::default(),
+            base_reward_config: CaesarRewardConfig::default(),
+            proxy_integration_enabled: true,
+            enforcement_strictness: EnforcementStrictness::Moderate,
+            audit_logging: AuditLoggingConfig::default(),
+        }
+    }
+}
+
+impl Default for AuditLoggingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            log_all_events: false,
+            log_violations_only: true,
+            retention_period: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
+            anonymize_logs: false,
+        }
+    }
+}
+
+impl Default for CaesarRewardConfig {
+    fn default() -> Self {
+        Self {
+            base_reward_rate: 1.0,
+            privacy_multiplier: 1.0,
+            utilization_multiplier: 1.0,
+            consensus_bonus: 0.1,
+            max_reward_cap: 1000.0,
+            distribution_config: super::RewardDistributionConfig::default(),
+        }
+    }
+}
+
+impl Default for super::RewardDistributionConfig {
+    fn default() -> Self {
+        Self {
+            immediate_payout: false,
+            immediate_percentage: 0.5,
+            auto_stake_remainder: true,
+            minimum_payout_threshold: 10.0,
+            payout_frequency: super::PayoutFrequency::Daily,
+        }
+    }
+}
+
 /// Core privacy manager
 pub struct PrivacyManager {
     /// Manager configuration
