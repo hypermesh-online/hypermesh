@@ -179,6 +179,11 @@ pub mod integration;
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
+// Instruction-Based Retrieval System - Sprint 3.1: Revolutionary Concept #6
+/// Revolutionary retrieval system that sends compact instruction maps (<1KB)
+/// instead of transferring entire files, enabling clients to fetch shards directly
+pub mod retrieval;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetManager, AssetId, AssetType, AssetStatus, AssetState,

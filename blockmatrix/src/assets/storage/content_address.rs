@@ -437,14 +437,14 @@ mod tests {
             ([2u8; 32], vec![MatrixCoordinate::new(1, 0, 0).unwrap()]),
         ];
 
-        let instructions = RetrievalInstructions::new(shard_map);
-
         // Test nearest-first
+        let instructions = RetrievalInstructions::new(shard_map.clone());
         let plan = instructions.with_strategy(RetrievalStrategy::NearestFirst).get_retrieval_plan();
         assert_eq!(plan.steps.len(), 2);
         assert!(!plan.steps[0].parallel);
 
         // Test parallel
+        let instructions = RetrievalInstructions::new(shard_map);
         let plan = instructions.with_strategy(RetrievalStrategy::Parallel).get_retrieval_plan();
         assert_eq!(plan.steps.len(), 2);
         assert!(plan.steps[0].parallel);
