@@ -703,8 +703,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(pipeline_config.encryption_config.quantum_resistant);
-        assert_eq!(pipeline_config.sharding_config.parity_shards, 4);
+        assert!(pipeline_config.encryption.quantum_resistant);
+        assert_eq!(pipeline_config.sharding.parity_shards, 4);
     }
 
     #[tokio::test]

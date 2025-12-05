@@ -12,7 +12,7 @@ use tracing::{info, debug, warn, error, instrument};
 use serde::{Serialize, Deserialize};
 use futures::stream::{self, StreamExt};
 
-use crate::assets::pipeline::{Asset, ProcessedAsset, Shard};
+use crate::assets::pipeline::{Asset, ProcessedAsset, Shard, DistributedAsset};
 use crate::assets::multi_node::{NetworkId, PrivacyTier};
 use crate::assets::storage::{ContentAddress, DeduplicationResult};
 use crate::matrix::MatrixCoordinate;
@@ -100,14 +100,14 @@ impl AssetWorkflow {
     }
 
     /// Execute batch processing workflow
-    #[instrument(skip(self, assets))]
+    #[instrument(skip(self, assets, processor))]
     pub async fn batch_process<F, Fut>(
         &self,
         assets: Vec<Asset>,
         processor: F,
     ) -> WorkflowResult<Vec<ProcessedAsset>>
     where
-        F: Fn(Asset) -> Fut + Clone + Send + Sync + std::fmt::Debug,
+        F: Fn(Asset) -> Fut + Clone + Send + Sync,
         Fut: std::future::Future<Output = Result<ProcessedAsset>> + Send,
     {
         let start = Instant::now();
@@ -551,9 +551,16 @@ mod tests {
 
         let processor = |asset: Asset| async move {
             // Simulate processing
+            let asset_id = asset.id.clone();
             Ok(ProcessedAsset {
                 asset_id: asset.id,
-                shards: vec![],
+                encrypted_shards: vec![],
+                shard_keys: vec![],
+                distributed: DistributedAsset {
+                    asset_id,
+                    placements: vec![],
+                    metadata: Default::default(),
+                },
                 stats: Default::default(),
             })
         };

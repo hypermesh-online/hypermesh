@@ -184,6 +184,12 @@ pub mod os_integration;
 /// instead of transferring entire files, enabling clients to fetch shards directly
 pub mod retrieval;
 
+// Matrix-Aware Shard Distribution - Sprint 3.2: PoS-driven Architecture
+/// PoS-driven shard distribution with matrix-aware optimization
+/// Queries blockchain Asset records for node eligibility, then applies
+/// 8-octant distribution with golden ratio spacing within eligible pool
+pub mod distribution;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetManager, AssetId, AssetType, AssetStatus, AssetState,
