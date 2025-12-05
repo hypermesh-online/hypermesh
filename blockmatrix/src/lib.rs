@@ -190,6 +190,11 @@ pub mod retrieval;
 /// 8-octant distribution with golden ratio spacing within eligible pool
 pub mod distribution;
 
+// DNS-as-Asset System - Sprint 3.3: Multi-Tier DNS Resolution
+/// Revolutionary DNS-as-Asset system with multi-tier resolution
+/// (P2P direct, Public, Federated, Fully Federated) and blockchain registration
+pub mod dns;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetManager, AssetId, AssetType, AssetStatus, AssetState,
