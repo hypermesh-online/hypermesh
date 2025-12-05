@@ -647,15 +647,44 @@ mod tests {
             MultiNetworkConfig::default(),
         );
 
-        let asset_id = AssetId::new("car-title".to_string(), AssetType::Storage);
+        let asset_id = AssetId::new(AssetType::Storage);
         let bank_network = [1u8; 16];
         let dealer_network = [2u8; 16];
 
+        use crate::consensus::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+        use std::time::SystemTime;
+
         let proof = ConsensusProof {
-            proof_of_space: vec![1, 2, 3],
-            proof_of_stake: vec![4, 5, 6],
-            proof_of_work: vec![7, 8, 9],
-            proof_of_time: vec![10, 11, 12],
+            space_proof: SpaceProof {
+                node_id: "test-node".to_string(),
+                storage_path: "/tmp/test".to_string(),
+                total_size: 1000,
+                total_storage: 10000,
+                file_hash: "abcd1234".to_string(),
+                proof_timestamp: SystemTime::now(),
+            },
+            stake_proof: StakeProof {
+                stake_holder: "test".to_string(),
+                stake_holder_id: "test-id".to_string(),
+                stake_amount: 1000,
+                stake_timestamp: SystemTime::now(),
+            },
+            work_proof: WorkProof {
+                owner_id: "test-owner".to_string(),
+                workload_id: "test-workload".to_string(),
+                pid: 12345,
+                computational_power: 100,
+                workload_type: WorkloadType::Compute,
+                work_state: WorkState::Running,
+                work_challenges: vec!["challenge1".to_string()],
+                proof_timestamp: SystemTime::now(),
+            },
+            time_proof: TimeProof {
+                network_time_offset: std::time::Duration::from_secs(0),
+                time_verification_timestamp: SystemTime::now(),
+                nonce: 42,
+                proof_hash: vec![1, 2, 3, 4],
+            },
         };
 
         let valid = coordinator.validate_asset_cross_network(

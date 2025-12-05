@@ -233,6 +233,7 @@ pub mod error {
 
 // Integration types - re-export from integration module
 pub use integration::IntegrationError;
+pub use integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
 pub type IntegrationResult<T> = Result<T, IntegrationError>;
 // Export config module
 pub mod config {

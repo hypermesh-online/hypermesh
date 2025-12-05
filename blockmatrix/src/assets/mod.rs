@@ -11,6 +11,7 @@ pub mod multi_node;
 pub mod blockchain;
 pub mod matrix_blockchain;
 pub mod cross_chain;
+pub mod pipeline;
 
 // Re-export main types for easy access
 pub use core::{
@@ -43,4 +44,9 @@ pub use blockchain::{
 pub use matrix_blockchain::{
     MatrixCoordinate, EntityBlockchain, EntityType,
     MatrixBlockchainManager,
+};
+
+pub use pipeline::{
+    AssetPipeline, PipelineConfig, ProcessedAsset, PipelineStats,
+    Compressor, Encryptor, Sharder, MatrixDistributor,
 };

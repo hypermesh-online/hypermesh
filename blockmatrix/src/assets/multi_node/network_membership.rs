@@ -474,7 +474,7 @@ mod tests {
 
         // Add asset to network
         use crate::assets::core::AssetType;
-        let asset_id = AssetId::new("test-asset".to_string(), AssetType::Cpu);
+        let asset_id = AssetId::new(AssetType::Cpu);
         membership.add_asset_to_network(network_id, asset_id.clone()).await.unwrap();
 
         // Check visibility
