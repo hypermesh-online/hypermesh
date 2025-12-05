@@ -1,7 +1,28 @@
 //! CAESAR Reward Calculation System
 //!
-//! Calculates and manages CAESAR token rewards based on privacy levels,
-//! resource allocation, utilization, and consensus proof validation.
+//! Calculates and manages CAESAR token rewards for hosting paid content via NGauge.
+//!
+//! ## CRITICAL: When CAESAR Rewards Apply
+//!
+//! CAESAR earnings ONLY occur when hosting paid content through NGauge:
+//! - ✅ Advertisements
+//! - ✅ KYCML-related content
+//! - ✅ Paid hosting services (AWS-meets-torrent model)
+//!
+//! You do NOT earn CAESAR for:
+//! - ❌ General P2P network participation
+//! - ❌ Using work computer on private/federated network
+//! - ❌ Buying products/services (e.g., buying a car)
+//!
+//! Earnings are specific to Asset type and paid content hosting, not network participation.
+//!
+//! ## Reward Calculation
+//!
+//! For eligible paid content hosting, rewards are calculated based on:
+//! - Privacy levels (higher public access = higher rewards)
+//! - Resource allocation and utilization
+//! - Consensus proof validation
+//! - Performance metrics and tier bonuses
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -124,14 +145,25 @@ pub struct ContributionRequirement {
 }
 
 /// Types of contributions
+///
+/// NOTE: ResourceSharing only earns CAESAR when hosting paid content via NGauge
+/// (advertisements, KYCML content, paid hosting). General network participation
+/// does NOT earn CAESAR rewards.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ContributionType {
+    /// Hosting paid content (ads, KYCML, paid hosting) - earns CAESAR via NGauge
     ResourceSharing,
+    /// Consensus validation participation
     ConsensusParticipation,
+    /// Network stability contributions
     NetworkStability,
+    /// Community support activities
     CommunitySupport,
+    /// Security vulnerability reporting
     SecurityReporting,
+    /// Documentation contributions
     Documentation,
+    /// Code contributions to the platform
     CodeContribution,
 }
 

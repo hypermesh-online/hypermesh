@@ -56,14 +56,26 @@ impl PrivacyLevel {
         }
     }
     
-    /// Get expected CAESAR token reward multiplier
+    /// Get expected CAESAR token reward multiplier for hosting paid content via NGauge
+    ///
+    /// IMPORTANT: CAESAR rewards only apply when hosting paid content through NGauge:
+    /// - Advertisements
+    /// - KYCML-related content
+    /// - Paid hosting services (AWS-meets-torrent model)
+    ///
+    /// You do NOT earn CAESAR for:
+    /// - General P2P network participation
+    /// - Using work computer on private/federated network
+    /// - Buying products/services (e.g., buying a car)
+    ///
+    /// Earnings are specific to Asset type and content hosting, not just network participation.
     pub fn caesar_reward_multiplier(&self) -> f32 {
         match self {
-            PrivacyLevel::Private => 0.0, // No rewards for private resources
+            PrivacyLevel::Private => 0.0, // No paid content hosting at this level
             PrivacyLevel::PrivateNetwork => 0.25,
             PrivacyLevel::P2P => 0.5,
             PrivacyLevel::PublicNetwork => 0.75,
-            PrivacyLevel::FullPublic => 1.0, // Maximum rewards
+            PrivacyLevel::FullPublic => 1.0, // Maximum rewards for public paid content hosting
         }
     }
     
