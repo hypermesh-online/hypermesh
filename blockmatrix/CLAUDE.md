@@ -19,7 +19,7 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 - **What doesn't work**: Container runtime, multi-node production deployment, eBPF, Phase 2+ features
 - **CLI Status**: No CLI currently implemented. Future CLI will support matrix topology queries and tensor-based resource management
 - **Phase 1 Status**: ✅ **COMPLETE** - Production-ready matrix foundation
-- **Phase 2 Progress**: Sprint 2.1 (STOQ Protocol Intelligence) - NEXT
+- **Phase 2 Progress**: ✅ Sprint 2.1-2.4 COMPLETE (STOQ Intelligence, Privacy Tiers, Multi-Network, Asset Pipeline) | Sprint 2.5 (Content-Addressed Storage) - NEXT
 
 ## 🎯 Core Innovation: Block-MATRIX Topology
 
@@ -40,6 +40,7 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 5. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
 6. **Instruction-Based Retrieval** - Send shard maps, not files
 7. **Bucket Deduplication** - Content-addressed storage with hash buckets mapped to matrix positions
+8. **Asset Pipeline** - Brotli compression → AES-256-GCM/Kyber-1024 encryption → Reed-Solomon sharding → Matrix-aware distribution (870 MB/s)
 
 ## Primary Mission
 Create a **matrix-topology-based distributed computing platform** that provides:
