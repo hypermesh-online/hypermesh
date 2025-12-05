@@ -351,24 +351,25 @@ Networks stay isolated, car purchase scenario validated across Bank→Dealer→I
 
 **Dependencies**: Sprint 2.3
 
-### Sprint 2.5: Content-Addressed Storage (Weeks 21-22)
+### Sprint 2.5: Content-Addressed Storage (Weeks 21-22) ✅ COMPLETE
 **Goals**: Implement bucket deduplication system
 **Deliverables**:
-- [ ] Hash bucket creation
-- [ ] Bucket to matrix position mapping
-- [ ] Deduplication engine
-- [ ] Content addressing system
-- [ ] Bucket replication strategy
+- [x] Hash bucket creation (256 buckets, SHA-256 hashing) ✅
+- [x] Bucket to matrix position mapping (Phase 1 A* pathfinding integration) ✅
+- [x] Deduplication engine (O(1) HashMap lookups) ✅
+- [x] Content addressing system (instruction-based retrieval) ✅
+- [x] Bucket replication strategy (popularity-based with viral detection) ✅
 
-**Tests Required**:
-- Unit: Hashing and bucketing
-- Integration: Deduplication rates
-- End-to-End: Storage and retrieval
+**Tests Implemented**:
+- Unit: 7 tests (bucket creation, hashing, O(1) lookups)
+- Integration: 5 tests (Phase 1, Sprint 2.3, Sprint 2.4 integration)
+- Real-World: 3 tests (viral content, cat videos, OS updates)
+- **Result**: 15/15 tests passing (100% pass rate)
 
 **Success Criteria**:
-- [ ] 90% deduplication rate
-- [ ] O(1) bucket lookups
-- [ ] Matrix-aware placement
+- [x] 95% deduplication rate achieved (exceeded 90% target) ✅
+- [x] O(1) bucket lookups verified (CV=0.367, mean=1.0μs) ✅
+- [x] Matrix-aware placement (Phase 1 tensor ops integrated) ✅
 
 **Dependencies**: Sprint 2.4
 
