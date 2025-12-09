@@ -462,12 +462,12 @@ mod tests {
         assert!(!capacity.can_accept_shard(1024 * 1024)); // At capacity
     }
 
-    #[test]
-    fn test_distance_calculations() {
+    #[tokio::test]
+    async fn test_distance_calculations() {
         use crate::integration::phase1_foundation::MatrixFoundationConfig;
 
         let mapper = BucketMapper {
-            foundation: Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).unwrap()),
+            foundation: Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap()),
             bucket_locations: Arc::new(RwLock::new(HashMap::new())),
             access_patterns: Arc::new(RwLock::new(HashMap::new())),
             available_positions: Arc::new(RwLock::new(Vec::new())),

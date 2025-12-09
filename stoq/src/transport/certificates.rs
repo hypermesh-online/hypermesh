@@ -23,6 +23,9 @@ use sha2::{Sha256, Digest};
 use rsa::{RsaPrivateKey, pkcs8::EncodePrivateKey};
 use rand::rngs::OsRng;
 
+// Import STOQ ALPN protocol identifier
+use crate::protocol::STOQ_ALPN;
+
 /// Certificate manager configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CertificateConfig {
@@ -606,39 +609,53 @@ impl CertificateManager {
         let cert_guard = self.current_certificate.read().await;
         let cert = cert_guard.as_ref().ok_or_else(|| anyhow!("No certificate available"))?;
 
-        let server_config = rustls::ServerConfig::builder()
+        let mut server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(
                 vec![cert.certificate.clone()],
                 cert.private_key.clone_key(),
             )?;
 
-        debug!("Server crypto config created with certificate: {}", cert.fingerprint());
+        // Configure ALPN protocols - support both STOQ and standard HTTP/3
+        server_config.alpn_protocols = vec![
+            STOQ_ALPN.to_vec(),   // Primary: STOQ protocol
+            b"h3".to_vec(),       // Secondary: Standard HTTP/3 for compatibility
+        ];
+
+        debug!("Server crypto config created with certificate: {} and ALPN protocols: {:?}",
+               cert.fingerprint(), server_config.alpn_protocols);
         Ok(server_config)
     }
 
     /// Get client crypto configuration for QUIC
     pub async fn client_crypto_config(&self) -> Result<rustls::ClientConfig> {
-        match self.config.mode {
+        let mut config = match self.config.mode {
             CertificateMode::LocalhostTesting => {
                 // For localhost testing, accept self-signed certificates
-                let config = rustls::ClientConfig::builder()
+                rustls::ClientConfig::builder()
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
-                    .with_no_client_auth();
-                Ok(config)
+                    .with_no_client_auth()
             }
             CertificateMode::TrustChainProduction => {
                 // For production, use TrustChain CA certificates
                 let mut root_store = rustls::RootCertStore::empty();
                 root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-                let config = rustls::ClientConfig::builder()
+                rustls::ClientConfig::builder()
                     .with_root_certificates(root_store)
-                    .with_no_client_auth();
-                Ok(config)
+                    .with_no_client_auth()
             }
-        }
+        };
+
+        // Configure ALPN protocols for client - must match server
+        config.alpn_protocols = vec![
+            STOQ_ALPN.to_vec(),   // Primary: STOQ protocol
+            b"h3".to_vec(),       // Secondary: Standard HTTP/3 for compatibility
+        ];
+
+        debug!("Client crypto config created with ALPN protocols: {:?}", config.alpn_protocols);
+        Ok(config)
     }
 
     /// Validate certificate chain

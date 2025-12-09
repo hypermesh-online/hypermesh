@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Purchase Scenario</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+</head>
+<body>
+    <h1>Car Purchase Scenario</h1>
+    <div class="mermaid">
+        sequenceDiagram
+            participant Buyer
+            participant Dealer
+            participant Bank
+            participant Insurance
+            participant DMV
+
+            Buyer->>Dealer: 1. Browse car asset
+            Buyer->>Buyer: 2. Create 'Purchase Intent' on private chain
+            Dealer->>Buyer: 3. Request 'Purchase Intent'
+            Buyer->>Dealer: 4. Grant access to 'Purchase Intent'
+            Dealer->>Dealer: 5. Validate 'Purchase Intent'
+            Dealer->>Bank: 6. Create & Share 'Sales Agreement'
+            Bank->>Bank: 7. Validate 'Sales Agreement'
+            Bank->>Dealer: 8. Provide 'Proof of Financing'
+            Dealer->>Dealer: 9. Validate 'Proof of Financing'
+            Dealer->>Buyer: 10. Transfer 'Car Title' to private chain
+            Buyer->>Insurance: 11. Request insurance, provide 'Car Title'
+            Insurance->>Insurance: 12. Validate 'Car Title'
+            Insurance->>Buyer: 13. Issue 'Proof of Insurance' to private chain
+            Buyer->>DMV: 14. Request registration, provide 'Car Title' & 'Proof of Insurance'
+            DMV->>Insurance: 15. Validate 'Proof of Insurance' (by proxy)
+            DMV->>DMV: 16. Validate 'Car Title'
+            DMV->>Buyer: 17. Issue 'Registered Title' to private chain
+    </div>
+</body>
+</html>

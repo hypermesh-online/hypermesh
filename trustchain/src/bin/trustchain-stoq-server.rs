@@ -18,6 +18,11 @@ use trustchain::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Install rustls crypto provider
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok(); // Ignore error if already installed
+
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(

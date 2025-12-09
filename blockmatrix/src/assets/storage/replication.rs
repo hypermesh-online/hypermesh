@@ -387,7 +387,7 @@ mod tests {
 
         // Record multiple accesses
         for i in 0..100 {
-            metrics.record_access(&MatrixCoordinate::new(i % 10, i / 10, 0));
+            metrics.record_access(&MatrixCoordinate::new(i % 10, i / 10, 0).unwrap());
         }
 
         assert_eq!(metrics.access_count, 100);
@@ -405,7 +405,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_replication_factor_calculation() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).unwrap());
+        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
         let strategy = ReplicationStrategy::new(foundation);
 
         // Low popularity
@@ -420,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_access_recording() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).unwrap());
+        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
         let strategy = ReplicationStrategy::new(foundation);
 
         let content_id = "test_content".to_string();
@@ -434,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cleanup_old_metrics() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).unwrap());
+        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
         let strategy = ReplicationStrategy::new(foundation);
 
         // Add some metrics

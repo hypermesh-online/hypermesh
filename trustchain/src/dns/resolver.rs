@@ -137,11 +137,30 @@ impl TrustChainResolver {
     }
 
     async fn create_client(&self, resolver_addr: Ipv6Addr) -> TrustChainResult<AsyncClient> {
-        // Simplified DNS client creation for compilation
-        // TODO: Implement proper async DNS client when trust-dns API is stable
-        return Err(crate::errors::TrustChainError::Internal { 
-            message: "DNS client creation not implemented - API compatibility issues".to_string() 
-        });
+        // DNS client creation using tokio UDP
+        use trust_dns_client::client::AsyncClient;
+        use trust_dns_client::udp::UdpClientStream;
+
+        let socket_addr = std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
+            resolver_addr,
+            53, // Standard DNS port
+            0,
+            0,
+        ));
+
+        // Create UDP client stream (connects to resolver)
+        let stream = UdpClientStream::<tokio::net::UdpSocket>::new(socket_addr);
+
+        // Create async client
+        let (client, bg) = AsyncClient::connect(stream).await
+            .map_err(|e| crate::errors::TrustChainError::Internal {
+                message: format!("Failed to create DNS client: {}", e),
+            })?;
+
+        // Spawn background task for client
+        tokio::spawn(bg);
+
+        Ok(client)
     }
 
     async fn query_upstream_resolver(

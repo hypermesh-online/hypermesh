@@ -165,6 +165,11 @@ impl ApiHandler for HyperMeshStatusHandler {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Install rustls crypto provider
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok(); // Ignore error if already installed
+
     tracing_subscriber::fmt::init();
 
     // Create STOQ transport configuration

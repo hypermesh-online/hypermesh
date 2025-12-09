@@ -355,7 +355,7 @@ mod tests {
     use crate::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
 
     async fn create_test_engine() -> DeduplicationEngine {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).unwrap());
+        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
         let mapper = Arc::new(BucketMapper::new(foundation).await.unwrap());
         DeduplicationEngine::new(mapper)
     }

@@ -23,7 +23,8 @@ use super::NodeId;
 // Import network membership from our implementation
 pub use super::network_membership::{
     NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
-    PrivacyTier, NetworkDiscovery, MembershipStatus,
+    PrivacyTier, NetworkDiscovery, MembershipStatus, NetworkCredentials,
+    JoinRequirements, ApprovalProcess,
 };
 
 /// Multi-network coordinator - PRIMARY component for Sprint 2.3
@@ -556,9 +557,9 @@ mod tests {
 
     #[async_trait]
     impl TrustChainClient for MockTrustChainClient {
-        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<super::network_membership::NetworkCredentials> {
+        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
             use std::time::Duration;
-            Ok(super::network_membership::NetworkCredentials {
+            Ok(NetworkCredentials {
                 certificate: vec![1, 2, 3],
                 public_key: vec![4, 5, 6],
                 private_key_encrypted: vec![7, 8, 9],
@@ -576,7 +577,6 @@ mod tests {
         }
 
         async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
-            use super::network_membership::{JoinRequirements, ApprovalProcess};
             Ok(vec![
                 NetworkDiscovery {
                     network_id: [1u8; 16],

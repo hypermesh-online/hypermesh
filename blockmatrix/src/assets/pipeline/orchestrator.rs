@@ -75,7 +75,7 @@ pub struct ProcessedAsset {
 }
 
 /// Complete pipeline statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PipelineStats {
     /// Compression statistics
     pub compression: CompressionStats,

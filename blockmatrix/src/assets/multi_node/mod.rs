@@ -44,6 +44,7 @@ pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
 pub use network_membership::{
     NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
     PrivacyTier, NetworkDiscovery, MembershipStatus, NetworkRole,
+    NetworkCredentials, JoinRequirements, ApprovalProcess,
 };
 pub use multi_network_coordinator::{
     MultiNetworkCoordinator, MultiNetworkConfig, MatrixPosition,

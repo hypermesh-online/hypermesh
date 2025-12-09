@@ -1,13 +1,13 @@
 {
-  "timestamp": "2025-09-28T15:45:07.888281",
-  "total_tests": 26,
-  "passed": 23,
+  "timestamp": "2025-12-08T14:24:01.086068",
+  "total_tests": 25,
+  "passed": 22,
   "failed": 3,
   "vulnerabilities": [
     "XSS Protection",
     "CSRF Protection"
   ],
-  "pass_rate": "88.5%",
+  "pass_rate": "88.0%",
   "details": {
     "passed": [
       "FALCON Post-Quantum Crypto",
@@ -16,7 +16,6 @@
       "Input validation",
       "stoq/src/transport/mod.rs error handling",
       "trustchain/src/lib.rs error handling",
-      "hypermesh/src/lib.rs error handling",
       "Certificate: RSA key generation",
       "Certificate: Certificate validation",
       "Certificate: Fingerprint calculation",
@@ -35,7 +34,7 @@
       "Network: Rate limiting"
     ],
     "failed": [
-      "21 security bypasses",
+      "16 security bypasses",
       "Security: XSS Protection",
       "Security: CSRF Protection"
     ],

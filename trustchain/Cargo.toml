@@ -96,6 +96,12 @@ clap = { workspace = true }
 # IPv6 networking
 socket2 = { workspace = true }
 
+# HTTP/3 support
+h3 = "0.0.8"
+h3-quinn = "0.0.10"
+quinn = { workspace = true }
+http = "1.1"
+
 # Additional
 hex = { workspace = true }
 base64 = { workspace = true }
@@ -133,5 +139,13 @@ path = "src/bin/trustchain-stoq-server.rs"
 [[bin]]
 name = "validate-deployment"
 path = "src/bin/validate-deployment.rs"
+
+[[bin]]
+name = "trustchain-http3-server"
+path = "src/bin/trustchain-http3-server.rs"
+
+[[bin]]
+name = "trustchain-http3-server-minimal"
+path = "src/bin/trustchain-http3-server-minimal.rs"
 
 # Profiles are managed at workspace level

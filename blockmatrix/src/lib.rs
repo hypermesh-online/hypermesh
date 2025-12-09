@@ -141,6 +141,9 @@ impl Default for ServiceMeshConfig {
 /// API module with STOQ consensus server
 pub mod api;
 
+/// HTTP/3 server infrastructure
+pub mod http3;
+
 // Real asset module from the codebase
 pub mod assets;
 
@@ -247,6 +250,7 @@ pub mod extensions;
 pub mod orchestration;
 pub mod platform;
 pub mod security;
+// pub mod http3; // temporarily disabled
 
 // Export container types at root for backwards compatibility
 pub use container::{ContainerId, ContainerSpec, ContainerConfig, NetworkConfig};

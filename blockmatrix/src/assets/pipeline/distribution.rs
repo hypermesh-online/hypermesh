@@ -103,7 +103,7 @@ pub struct DistributedAsset {
 }
 
 /// Distribution metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DistributionMetadata {
     /// Total number of shards
     pub total_shards: usize,

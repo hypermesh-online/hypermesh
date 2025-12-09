@@ -1229,6 +1229,12 @@ impl StoqTransport {
     pub fn create_zero_copy_socket(&self, _interface: &str, _queue_id: u32) -> Result<()> {
         Err(anyhow!("eBPF feature not compiled"))
     }
+
+    /// Get access to the underlying Quinn endpoint for HTTP/3 integration
+    /// This allows using STOQ's transport layer with h3 protocol implementations
+    pub fn quinn_endpoint(&self) -> Arc<quinn::Endpoint> {
+        self.endpoint.clone()
+    }
 }
 
 #[async_trait]

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S cargo +stable -Zscript
+#!/usr/bin/env -S cargo +nightly -Zscript
 //! Simple Web3 Ecosystem Demo
 //!
 //! This script demonstrates the current working state of the Web3 ecosystem

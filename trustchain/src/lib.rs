@@ -18,6 +18,7 @@ pub mod security; // NEW: Security monitoring and Byzantine detection
 pub mod crypto;   // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
 pub mod deployment; // NEW: Quality gates and deployment validation
 pub mod monitoring; // NEW: Native monitoring system without external dependencies
+pub mod http3; // NEW: HTTP/3 server infrastructure
 
 // Re-export main types
 pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};

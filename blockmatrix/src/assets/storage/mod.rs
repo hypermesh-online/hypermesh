@@ -36,7 +36,7 @@ pub mod replication;
 pub use hash_bucket::{HashBucket, BucketId, ShardMetadata};
 pub use bucket_mapper::{BucketMapper, MatrixConstraints};
 pub use deduplication::{DeduplicationEngine, DeduplicationResult, DeduplicationStats};
-pub use content_address::{ContentAddress, RetrievalInstructions, ShardMap};
+pub use content_address::{ContentAddress, RetrievalInstructions, ShardMap, ContentMetadata};
 pub use replication::{ReplicationStrategy, ReplicationConfig, PopularityMetrics};
 
 use crate::integration::phase1_foundation::MatrixFoundation;

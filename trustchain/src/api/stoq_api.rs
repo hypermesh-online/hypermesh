@@ -358,16 +358,38 @@ impl TrustChainStoqApi {
     ) -> Result<Self> {
         info!("Creating TrustChain STOQ API server on {}", config.bind_address);
 
-        // Parse bind address
-        let bind_addr: std::net::Ipv6Addr = config.bind_address.split(':')
-            .next()
-            .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
-            .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
+        // Parse bind address (supports both "[::1]:9293" and "::1:9293" formats)
+        let (bind_addr, port) = if config.bind_address.starts_with('[') {
+            // Format: [::1]:9293
+            let parts: Vec<&str> = config.bind_address.rsplitn(2, "]:").collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid IPv6 bind address format (expected [addr]:port)"));
+            }
+            let addr_str = parts[1].trim_start_matches('[');
+            let port_str = parts[0];
 
-        let port: u16 = config.bind_address.split(':')
-            .nth(1)
-            .and_then(|p| p.parse().ok())
-            .ok_or_else(|| anyhow!("Invalid port"))?;
+            let bind_addr: std::net::Ipv6Addr = addr_str.parse()
+                .map_err(|_| anyhow!("Invalid IPv6 address: {}", addr_str))?;
+            let port: u16 = port_str.parse()
+                .map_err(|_| anyhow!("Invalid port: {}", port_str))?;
+
+            (bind_addr, port)
+        } else {
+            // Format: ::1:9293 (last segment is port)
+            let parts: Vec<&str> = config.bind_address.rsplitn(2, ':').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid bind address format"));
+            }
+            let addr_str = parts[1];
+            let port_str = parts[0];
+
+            let bind_addr: std::net::Ipv6Addr = addr_str.parse()
+                .map_err(|_| anyhow!("Invalid IPv6 address: {}", addr_str))?;
+            let port: u16 = port_str.parse()
+                .map_err(|_| anyhow!("Invalid port: {}", port_str))?;
+
+            (bind_addr, port)
+        };
 
         // Create STOQ transport
         let transport_config = TransportConfig {
