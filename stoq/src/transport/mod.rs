@@ -5,6 +5,7 @@ use quinn::{self, TransportConfig as QuinnTransportConfig, VarInt};
 // Certificate types imported elsewhere
 use std::net::{SocketAddr, Ipv6Addr};
 use std::sync::Arc;
+use std::sync::Once;
 use std::time::Duration;
 use socket2;
 use anyhow::{Result, anyhow};
@@ -16,6 +17,9 @@ use serde::{Serialize, Deserialize};
 use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use std::collections::VecDeque;
 // Simplified memory management - no unsafe operations
+
+// Global initialization for crypto provider
+static CRYPTO_INIT: Once = Once::new();
 
 pub mod certificates;
 pub mod streams;
@@ -495,6 +499,14 @@ pub struct PerformanceStats {
 impl StoqTransport {
     /// Create a new STOQ transport using QUIC over IPv6
     pub async fn new(config: TransportConfig) -> Result<Self> {
+        // Initialize crypto provider once (globally)
+        CRYPTO_INIT.call_once(|| {
+            if let Err(e) = rustls::crypto::ring::default_provider().install_default() {
+                // Provider might already be installed, log but don't fail
+                debug!("Crypto provider initialization: {:?}", e);
+            }
+        });
+
         info!("Initializing STOQ transport on [{}]:{}", config.bind_address, config.port);
         info!("Transport config: zero_copy={}, pool_size={}, max_streams={}",
               config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams);
@@ -1315,12 +1327,11 @@ mod tests {
     
     #[tokio::test]
     async fn test_transport_creation() {
-        // Initialize crypto provider
-        if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
-            // Already installed, ignore error
-        }
-        
-        let config = TransportConfig::default();
+        // Crypto provider is now initialized automatically in StoqTransport::new()
+
+        let mut config = TransportConfig::default();
+        // Use dynamic port to avoid conflicts with other tests
+        config.port = 0; // Let OS assign an available port
         let transport = StoqTransport::new(config).await;
         assert!(transport.is_ok());
     }

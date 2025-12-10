@@ -202,7 +202,16 @@ impl NetworkIsolationManager {
         }
 
         // Create isolated STOQ transport for this network
+        // Use dynamic port to avoid conflicts in tests
+        #[cfg(not(test))]
         let transport_config = crate::config::TransportConfig::default();
+
+        #[cfg(test)]
+        let transport_config = {
+            let mut config = crate::config::TransportConfig::default();
+            config.port = 0; // Let OS assign an available port
+            config
+        };
 
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
@@ -398,9 +407,11 @@ impl Clone for NetworkStack {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::init_test_crypto;
 
     #[tokio::test]
     async fn test_create_isolated_networks() {
+        init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         // Create bank network
@@ -426,6 +437,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_packet_isolation() {
+        init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         let network1 = [1u8; 16];
@@ -458,6 +470,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_explicit_tunnels() {
+        init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         let network1 = [1u8; 16];
@@ -494,6 +507,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_network_removal() {
+        init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         let network1 = [1u8; 16];

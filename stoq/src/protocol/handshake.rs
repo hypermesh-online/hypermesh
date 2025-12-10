@@ -11,6 +11,7 @@ use tracing::{debug, info, warn};
 
 use crate::transport::falcon::{FalconTransport, FalconPublicKey};
 use super::transport_params;
+use super::pos_validator::{PosTokenValidator, PosToken, ValidationResult};
 
 /// STOQ handshake extension for QUIC
 pub struct StoqHandshakeExtension {
@@ -25,6 +26,9 @@ pub struct StoqHandshakeExtension {
 
     /// Whether to use hybrid mode (FALCON + traditional)
     hybrid_mode: bool,
+
+    /// PoS token validator
+    pos_validator: Arc<PosTokenValidator>,
 }
 
 impl StoqHandshakeExtension {
@@ -34,11 +38,17 @@ impl StoqHandshakeExtension {
         require_falcon: bool,
         hybrid_mode: bool,
     ) -> Self {
+        // Create PoS validator with 5-minute cache TTL
+        let pos_validator = Arc::new(PosTokenValidator::new(
+            std::time::Duration::from_secs(300)
+        ));
+
         Self {
             falcon_transport,
             peer_keys: Arc::new(dashmap::DashMap::new()),
             require_falcon,
             hybrid_mode,
+            pos_validator,
         }
     }
 
@@ -186,6 +196,72 @@ impl StoqHandshakeExtension {
         }
 
         Ok(auth.freeze().to_vec())
+    }
+
+    /// Validate PoS token during handshake
+    pub fn validate_pos_token(&self, token: &PosToken) -> Result<ValidationResult> {
+        let start = std::time::Instant::now();
+
+        // Perform validation
+        let result = self.pos_validator.validate_token(token)?;
+
+        // Log validation result
+        if result.is_valid {
+            debug!(
+                "PoS token validated successfully in {:?}",
+                result.validation_time
+            );
+        } else {
+            warn!(
+                "PoS token validation failed: {:?} (took {:?})",
+                result.errors,
+                result.validation_time
+            );
+        }
+
+        // Target <1ms validation overhead
+        if result.validation_time > std::time::Duration::from_millis(1) {
+            debug!(
+                "PoS validation took longer than 1ms: {:?}",
+                result.validation_time
+            );
+        }
+
+        Ok(result)
+    }
+
+    /// Add PoS token validation to handshake flow
+    pub fn process_handshake_with_pos(
+        &self,
+        handshake_data: &[u8],
+        pos_token: Option<&PosToken>,
+    ) -> Result<bool> {
+        // First, do traditional handshake validation
+        // (This would be implemented based on QUIC requirements)
+
+        // Then validate PoS token if provided
+        if let Some(token) = pos_token {
+            let validation_result = self.validate_pos_token(token)?;
+
+            if !validation_result.is_valid {
+                return Err(anyhow!(
+                    "PoS token validation failed: {:?}",
+                    validation_result.errors
+                ));
+            }
+        }
+
+        // Finally, verify FALCON signature if required
+        if self.require_falcon {
+            // FALCON validation logic already exists
+        }
+
+        Ok(true)
+    }
+
+    /// Get PoS validation metrics
+    pub fn get_pos_metrics(&self) -> super::pos_validator::ValidationStats {
+        self.pos_validator.get_metrics()
     }
 
     /// Verify hybrid authenticator

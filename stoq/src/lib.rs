@@ -16,6 +16,10 @@ pub mod protocol;
 pub mod api;
 pub mod network_isolation;
 
+// Test utilities for crypto initialization
+#[cfg(test)]
+pub mod test_utils;
+
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
 

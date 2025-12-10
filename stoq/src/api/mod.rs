@@ -14,6 +14,8 @@ use tracing::{info, debug, warn, error, instrument};
 
 use crate::transport::{StoqTransport, Connection, Endpoint};
 
+pub mod service_discovery;
+
 /// API request over STOQ protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRequest {
@@ -254,15 +256,35 @@ pub struct StoqApiClient {
     transport: Arc<StoqTransport>,
     /// Connection pool to services
     connections: Arc<RwLock<HashMap<String, Connection>>>,
+    /// Service discovery
+    service_discovery: Arc<service_discovery::ServiceDiscovery>,
 }
 
 impl StoqApiClient {
     /// Create new API client
     pub fn new(transport: Arc<StoqTransport>) -> Self {
+        // Create service discovery with 5-minute cache TTL
+        let service_discovery = Arc::new(service_discovery::ServiceDiscovery::new(
+            std::time::Duration::from_secs(300)
+        ));
+
         Self {
             transport,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            service_discovery,
         }
+    }
+
+    /// Set TrustChain DNS client for service discovery
+    pub fn set_trustchain_dns(&mut self, client: Arc<dyn service_discovery::TrustChainDnsClient>) {
+        // This would require making service_discovery mutable or using interior mutability
+        // For now, we'll log that TrustChain DNS integration is pending
+        info!("TrustChain DNS client configuration pending - requires mutable service discovery");
+    }
+
+    /// Get service discovery metrics
+    pub fn get_discovery_metrics(&self) -> service_discovery::DiscoveryStats {
+        self.service_discovery.get_metrics()
     }
 
     /// Make an API call
@@ -347,28 +369,21 @@ impl StoqApiClient {
         Ok(conn_clone)
     }
 
-    /// Resolve service name to endpoint (placeholder)
+    /// Resolve service name to endpoint using service discovery
     async fn resolve_service(&self, service: &str) -> Result<Endpoint> {
-        // TODO: Integrate with TrustChain DNS resolution
-        // For now, use hardcoded localhost endpoints
-        match service {
-            "trustchain" => Ok(Endpoint {
-                address: std::net::Ipv6Addr::LOCALHOST,
-                port: 9293,
-                server_name: Some("trustchain".to_string()),
-            }),
-            "hypermesh" => Ok(Endpoint {
-                address: std::net::Ipv6Addr::LOCALHOST,
-                port: 9292,
-                server_name: Some("hypermesh".to_string()),
-            }),
-            "caesar" => Ok(Endpoint {
-                address: std::net::Ipv6Addr::LOCALHOST,
-                port: 9294,
-                server_name: Some("caesar".to_string()),
-            }),
-            _ => Err(anyhow!("Unknown service: {}", service)),
-        }
+        // Use service discovery with fallback chain: DNS → Cache → Hardcoded
+        let service_endpoint = self.service_discovery.resolve(service)?;
+
+        // Log the discovery operation
+        debug!("Resolved service '{}' to [{}]:{} via service discovery",
+            service, service_endpoint.address, service_endpoint.port);
+
+        // Convert ServiceEndpoint to transport Endpoint
+        Ok(Endpoint {
+            address: service_endpoint.address,
+            port: service_endpoint.port,
+            server_name: service_endpoint.server_name,
+        })
     }
 }
 

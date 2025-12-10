@@ -13,6 +13,7 @@ use tracing::{debug, trace, warn};
 pub mod frames;
 pub mod parameters;
 pub mod handshake;
+pub mod pos_validator;
 
 use crate::extensions::{PacketToken, PacketShard, StoqProtocolExtension};
 use crate::transport::falcon::FalconSignature;
