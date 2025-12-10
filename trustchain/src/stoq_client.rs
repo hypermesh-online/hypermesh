@@ -272,6 +272,8 @@ impl TrustChainStoqClient {
             enable_zero_copy: true,
             max_datagram_size: 65507,
             congestion_control: stoq::transport::CongestionControl::Bbr2,
+            health_check_interval: 10,
+            connection_idle_timeout: 30,
             enable_memory_pool: true,
             memory_pool_size: 512,
             frame_batch_size: 32,

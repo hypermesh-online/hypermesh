@@ -1,0 +1,593 @@
+warning: use of deprecated associated function `transport::certificates::CertificateManager::generate_self_signed`: use CertificateManager::new with LocalhostTesting mode
+   --> stoq/src/transport/certificates.rs:855:15
+    |
+855 |         Self::generate_self_signed().await
+    |               ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `stoq` (lib) generated 1 warning
+warning: ambiguous glob re-exports
+  --> trustchain/src/consensus/mod.rs:18:9
+   |
+18 | pub use validator::*;
+   |         ^^^^^^^^^^^^ the name `ValidationMetrics` in the type namespace is first re-exported here
+19 | pub use block_matrix::*;
+20 | pub use hypermesh_client::*;
+   |         ------------------- but the name `ValidationMetrics` in the type namespace is also re-exported here
+   |
+   = note: `#[warn(ambiguous_glob_reexports)]` on by default
+
+warning: private item shadows public glob re-export
+  --> trustchain/src/ct/mod.rs:16:5
+   |
+16 | use crate::config::CTConfig;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `CTConfig` in the type namespace is supposed to be publicly re-exported here
+  --> trustchain/src/ct/mod.rs:32:9
+   |
+32 | pub use certificate_transparency::*;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but the private item here shadows it
+  --> trustchain/src/ct/mod.rs:16:5
+   |
+16 | use crate::config::CTConfig;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: ambiguous glob re-exports
+  --> trustchain/src/security/mod.rs:21:9
+   |
+21 | pub use monitoring::*;
+   |         ^^^^^^^^^^^^^ the name `AlertStatus` in the type namespace is first re-exported here
+22 | pub use byzantine::*;
+23 | pub use alerts::*;
+   |         --------- but the name `AlertStatus` in the type namespace is also re-exported here
+
+warning: use of deprecated struct `dns::dns_over_quic::DnsOverQuicClient`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:17:6
+   |
+17 | impl DnsOverQuicClient {
+   |      ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `dns::dns_over_quic::DnsOverQuicServer`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:41:6
+   |
+41 | impl DnsOverQuicServer {
+   |      ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `dns::dns_over_quic::DnsOverQuicServer::bind_addr`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:54:22
+   |
+54 |             address: self.bind_addr.ip().to_string(),
+   |                      ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `dns::dns_over_quic::DnsOverQuicServer::bind_addr`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:55:19
+   |
+55 |             port: self.bind_addr.port(),
+   |                   ^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+  --> trustchain/src/http3/server_simple.rs:74:21
+   |
+74 |             Ok(Some(mut resolver)) => {
+   |                     ----^^^^^^^^
+   |                     |
+   |                     help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> trustchain/src/http3/server_stoq.rs:112:21
+    |
+112 |             Ok(Some(mut resolver)) => {
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: use of deprecated field `dns::dns_over_quic::DnsOverQuicClient::server_id`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:22:16
+   |
+22 |         Self { server_id }
+   |                ^^^^^^^^^
+
+warning: use of deprecated field `dns::dns_over_quic::DnsOverQuicServer::bind_addr`: Use dns_over_stoq.rs for new implementations
+  --> trustchain/src/dns/dns_over_quic.rs:46:16
+   |
+46 |         Self { bind_addr }
+   |                ^^^^^^^^^
+
+warning: type `ProxyPerformanceMetrics` is more private than the item `ProxyConnection::performance_metrics`
+   --> trustchain/src/trust/hypermesh_integration.rs:228:5
+    |
+228 |     pub performance_metrics: ProxyPerformanceMetrics,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ProxyConnection::performance_metrics` is reachable at visibility `pub`
+    |
+note: but type `ProxyPerformanceMetrics` is only usable at visibility `pub(self)`
+   --> trustchain/src/trust/hypermesh_integration.rs:341:1
+    |
+341 | struct ProxyPerformanceMetrics;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `SecurityContext` is more private than the item `ProxyConnection::security_context`
+   --> trustchain/src/trust/hypermesh_integration.rs:229:5
+    |
+229 |     pub security_context: SecurityContext,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ProxyConnection::security_context` is reachable at visibility `pub`
+    |
+note: but type `SecurityContext` is only usable at visibility `pub(self)`
+   --> trustchain/src/trust/hypermesh_integration.rs:344:1
+    |
+344 | struct SecurityContext;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+   --> trustchain/src/consensus/hypermesh_client.rs:468:5
+    |
+468 |     async fn validate_certificate_request(
+    |     ^^^^^
+    |
+    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+    = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+    |
+468 ~     fn validate_certificate_request(
+469 |         &self,
+470 |         request: &CertificateRequest,
+471 |         requirements: &ConsensusRequirements,
+472 ~     ) -> impl std::future::Future<Output = Result<ConsensusValidationResult>> + Send;
+    |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+   --> trustchain/src/consensus/hypermesh_client.rs:475:5
+    |
+475 |     async fn validate_four_proofs(
+    |     ^^^^^
+    |
+    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+    |
+475 ~     fn validate_four_proofs(
+476 |         &self,
+...
+480 |         node_id: &str,
+481 ~     ) -> impl std::future::Future<Output = Result<ConsensusValidationResult>> + Send;
+    |
+
+warning: comparison is useless due to type limits
+   --> trustchain/src/monitoring/mod.rs:375:17
+    |
+375 |         assert!(info.uptime_seconds >= 0);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `trustchain` (lib test) generated 16 warnings (run `cargo fix --lib -p trustchain --tests` to apply 2 suggestions)
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/home/persist/repos/projects/web3/target/debug/deps/trustchain-398a11f69e8d0e75)
+
+running 215 tests
+test api::rate_limiter::tests::test_rate_limit_error ... ok
+test api::rate_limiter::tests::test_bulk_rate_limit ... ok
+test api::rate_limiter::tests::test_configurable_rate_limiter ... ok
+test api::rate_limiter::tests::test_clear_all ... ok
+test api::rate_limiter::tests::test_rate_limit_allow ... ok
+test api::rate_limiter::tests::test_multiple_clients ... ok
+test api::rate_limiter::tests::test_clear_client ... ok
+test api::rate_limiter::tests::test_rate_limit_exceed ... ok
+test api::tests::test_api_stats_default ... ok
+test api::rate_limiter::tests::test_rate_limiter_creation ... ok
+test api::validators::tests::test_invalid_domain ... ok
+test api::tests::test_health_response_serialization ... ok
+test api::validators::tests::test_invalid_ipv6 ... ok
+test api::rate_limiter::tests::test_remaining_tokens ... FAILED
+test api::tests::test_certificate_request_deserialization ... FAILED
+test api::validators::tests::test_valid_domain ... ok
+test api::validators::tests::test_valid_ipv6 ... ok
+test ca::stoq_ca_client::tests::test_ca_stoq_config_default ... ok
+test ca::stoq_ca_client::tests::test_certificate_request_serialization ... ok
+test ca::stoq_ca_client::tests::test_metrics_initialization ... ok
+test ca::certificate_authority::tests::test_ca_initialization ... ok
+test config::tests::test_default_config ... ok
+test config::tests::test_config_file_operations ... FAILED
+test config::tests::test_ipv6_only_validation ... ok
+test ca::tests::test_certificate_issuance ... FAILED
+test ca::security_integration::tests::test_security_dashboard_integration ... FAILED
+test ca::security_integration::tests::test_security_integrated_ca_creation ... FAILED
+test config::tests::test_port_conflict_detection ... ok
+test consensus::hypermesh_client::tests::test_client_config_creation ... ok
+test config::tests::test_production_config ... ok
+test ca::tests::test_ca_creation ... FAILED
+test consensus::proof::tests::test_work_proof_validation ... ok
+test consensus::real_validator::tests::test_crypto_verifier ... ok
+test ca::security_integration::tests::test_secure_certificate_issuance ... FAILED
+test ca::tests::test_certificate_validation ... FAILED
+test consensus::proof::tests::test_space_proof_validation ... ok
+test config::tests::test_config_serialization ... ok
+test consensus::hypermesh_client::tests::test_client_metrics ... FAILED
+test consensus::proof::tests::test_stake_proof_signature ... ok
+test consensus::proof::tests::test_time_proof_serialization ... FAILED
+test consensus::proof::tests::test_stake_proof_validation ... ok
+test consensus::hypermesh_client::tests::test_four_proof_set_creation ... ok
+test consensus::hypermesh_client::tests::test_production_config ... ok
+test consensus::proof::tests::test_time_proof_validation ... ok
+test crypto::falcon::tests::test_falcon_algorithm_parameters ... ok
+test crypto::falcon::tests::test_falcon_crypto_initialization ... ok
+test crypto::hybrid::tests::test_hybrid_crypto_initialization ... ok
+test crypto::kyber::tests::test_kyber_algorithm_parameters ... ok
+test crypto::hybrid::tests::test_security_assessments ... ok
+test crypto::kyber::tests::test_kyber_crypto_initialization ... ok
+test crypto::hybrid::tests::test_hybrid_encryption_decryption ... FAILED
+test crypto::kyber::tests::test_kyber_keypair_generation ... ok
+test crypto::kyber::tests::test_kyber_encrypt_decrypt_roundtrip ... FAILED
+test crypto::kyber::tests::test_kyber_keypair_validation ... ok
+test crypto::tests::test_algorithm_info ... ok
+test crypto::kyber::tests::test_multiple_keypairs ... ok
+test crypto::tests::test_kyber_encrypt_decrypt ... FAILED
+test crypto::tests::test_post_quantum_crypto_initialization ... ok
+test crypto::falcon::tests::test_falcon_keypair_generation ... ok
+test ct::certificate_transparency::tests::test_cryptographic_signing ... ok
+test ct::certificate_transparency::tests::test_ct_log_creation ... ok
+test ct::certificate_transparency::tests::test_tree_head_signing ... ok
+test ct::fingerprint_tracker::tests::test_certificate_tracking ... ok
+test ct::fingerprint_tracker::tests::test_disabled_tracker ... ok
+test ct::fingerprint_tracker::tests::test_domain_fingerprints ... FAILED
+test ct::fingerprint_tracker::tests::test_duplicate_detection ... ok
+test ct::fingerprint_tracker::tests::test_fingerprint_search ... ok
+test ct::fingerprint_tracker::tests::test_fingerprint_tracker_creation ... ok
+test ct::fingerprint_tracker::tests::test_revocation_marking ... ok
+test ct::fingerprint_tracker::tests::test_stats_tracking ... ok
+test crypto::certificate::tests::test_pq_certificate_manager_initialization ... ok
+test crypto::certificate::tests::test_ca_certificate_creation ... ok
+test ct::fingerprint_tracker::tests::test_suspicious_activity_detection ... ok
+test crypto::kyber::tests::test_large_data_encryption ... FAILED
+test crypto::hybrid::tests::test_hybrid_signature_creation_and_verification ... ok
+test crypto::tests::test_falcon_sign_verify ... ok
+test ct::merkle_log::tests::test_merkle_log_creation ... ok
+test crypto::certificate::tests::test_pq_csr_generation ... ok
+test ct::sct_manager::tests::test_sct_generation ... ok
+test crypto::falcon::tests::test_falcon_sign_verify_roundtrip ... ok
+test ct::sct_manager::tests::test_sct_manager_creation ... ok
+test ct::sct_manager::tests::test_sct_verification ... ok
+test ct::sct_manager::tests::test_sct_verification_invalid ... ok
+test ct::stoq_ct_client::tests::test_ct_stoq_config_default ... ok
+test ct::stoq_ct_client::tests::test_ct_submission_serialization ... ok
+test ct::stoq_ct_client::tests::test_metrics_initialization ... ok
+test ct::tests::test_certificate_logging ... FAILED
+test ct::sct_manager::tests::test_sct_serialization ... ok
+test ct::tests::test_certificate_verification ... FAILED
+test ct::tests::test_get_entries_range ... FAILED
+test ct::tests::test_inclusion_proof ... FAILED
+test dns::authoritative_server::tests::test_dns_server_creation ... ok
+test ct::tests::test_log_stats ... FAILED
+test dns::authoritative_server::tests::test_federated_network_registration ... ok
+test dns::cache::tests::test_cache_clear ... ok
+test dns::cache::tests::test_cache_creation ... ok
+test crypto::hybrid::tests::test_migration_signature ... ok
+test dns::cache::tests::test_cache_miss ... ok
+test dns::cache::tests::test_cache_removal ... ok
+test dns::cache::tests::test_cache_set_and_get ... ok
+test dns::cache::tests::test_cache_stats ... ok
+test dns::cache::tests::test_case_insensitive_keys ... ok
+test dns::cert_validator::tests::test_cache_clearing ... ok
+test dns::cert_validator::tests::test_configurable_validator ... ok
+test dns::cert_validator::tests::test_disabled_validator ... ok
+test dns::cert_validator::tests::test_localhost_validation ... ok
+test dns::cert_validator::tests::test_trustchain_domain_validation ... ok
+test dns::cert_validator::tests::test_unknown_domain_validation ... ok
+test dns::cert_validator::tests::test_validation_caching ... ok
+test dns::cert_validator::tests::test_validator_creation ... ok
+test dns::dns_over_stoq::tests::test_cache_key_generation ... ok
+test dns::dns_over_stoq::tests::test_dns_over_stoq_config_default ... ok
+test dns::dns_over_stoq::tests::test_metrics_initialization ... ok
+test dns::dns_over_stoq::tests::test_record_type_conversion ... ok
+test dns::production_zones::tests::test_domain_resolver ... ok
+test dns::production_zones::tests::test_federated_networks ... ok
+test dns::production_zones::tests::test_production_addresses ... ok
+test dns::production_zones::tests::test_zone_factory ... ok
+test dns::resolver::tests::test_failure_stats_update ... ok
+test dns::resolver::tests::test_record_conversion_cname ... ok
+test dns::resolver::tests::test_record_conversion_ipv6 ... ok
+test dns::resolver::tests::test_record_conversion_mx ... ok
+test dns::resolver::tests::test_resolver_creation ... ok
+test dns::resolver::tests::test_stats_initialization ... ok
+test dns::resolver::tests::test_stats_update ... FAILED
+test dns::stoq_transport::tests::test_dns_connection_creation ... ok
+test ca::security_integration::tests::test_mandatory_consensus_disabled ... ok
+test dns::stoq_transport::tests::test_transport_config ... ok
+test crypto::falcon::tests::test_falcon_keypair_validation ... ok
+test crypto::tests::test_falcon_keypair_generation ... ok
+test crypto::certificate::tests::test_pq_certificate_issuance_and_verification ... ok
+test crypto::falcon::tests::test_falcon_signature_sizes ... ok
+test dns::tests::test_dns_record_conversion ... ok
+test dns::tests::test_dns_resolver_creation ... ok
+test errors::tests::test_error_code_mapping ... ok
+test errors::tests::test_error_details_extraction ... ok
+test errors::tests::test_error_response_creation ... ok
+test errors::tests::test_security_error_codes ... ok
+test errors::tests::test_security_error_details ... ok
+test errors::tests::test_serialization ... ok
+test monitoring::export::tests::test_csv_exporter ... ok
+test monitoring::export::tests::test_json_exporter ... ok
+test monitoring::export::tests::test_plaintext_exporter ... ok
+test monitoring::export::tests::test_prometheus_exporter ... ok
+test monitoring::health::tests::test_component_health_update ... ok
+test monitoring::health::tests::test_health_check_creation ... ok
+test monitoring::health::tests::test_health_score_calculation ... ok
+test monitoring::metrics::tests::test_counters ... ok
+test monitoring::metrics::tests::test_metrics_recording ... ok
+test monitoring::metrics::tests::test_timing_statistics ... FAILED
+test monitoring::tests::test_metrics_recording ... ok
+test monitoring::tests::test_monitoring_system_creation ... ok
+test monitoring::tests::test_system_info ... ok
+test security::alerts::tests::test_acknowledge_alert ... ok
+test security::alerts::tests::test_alert_below_threshold ... ok
+test security::alerts::tests::test_alert_categorization ... ok
+test security::alerts::tests::test_alert_manager_creation ... ok
+test security::alerts::tests::test_generate_alert ... ok
+test security::alerts::tests::test_get_recent_alerts ... ok
+test security::alerts::tests::test_resolve_alert ... ok
+test security::byzantine::tests::test_byzantine_detector_creation ... ok
+test security::byzantine::tests::test_detection_summary ... ok
+test security::byzantine::tests::test_invalid_stake_proof ... ok
+test security::byzantine::tests::test_storage_falsification_detection ... ok
+test security::byzantine::tests::test_time_manipulation_detection ... ok
+test security::byzantine::tests::test_valid_consensus_proof ... ok
+test security::monitoring::tests::test_certificate_operation_tracking ... ok
+test security::monitoring::tests::test_dashboard_creation ... ok
+test security::monitoring::tests::test_monitoring_session ... ok
+test security::monitoring::tests::test_security_alert_handling ... ok
+test security::tests::test_mandatory_consensus_validation ... ok
+test security::tests::test_security_dashboard ... ok
+test security::tests::test_security_event_logging ... ok
+test security::tests::test_security_monitor_creation ... ok
+test stoq_client::tests::test_dns_query_serialization ... ok
+test stoq_client::tests::test_service_endpoint_creation ... ok
+test stoq_client::tests::test_service_type_string_conversion ... ok
+test dns::tests::test_trustchain_domain_detection ... ok
+test dns::tests::test_trustchain_domain_resolution ... FAILED
+test tests::test_production_vs_testing_config ... ok
+test dns::tests::test_dns_stats ... ok
+test crypto::falcon::tests::test_multiple_keypairs ... ok
+test dns::stoq_transport::tests::test_stoq_transport_creation ... ok
+test trust::hypermesh_integration::tests::test_alert_thresholds ... ok
+test trust::hypermesh_integration::tests::test_asset_id_creation ... ok
+test trust::hypermesh_integration::tests::test_byzantine_fault_types ... ok
+test trust::hypermesh_integration::tests::test_proxy_connection_types ... ok
+test trust::hypermesh_integration::tests::test_trust_levels ... ok
+test trust::hypermesh_integration::tests::test_trust_score_components ... ok
+test trust::hypermesh_integration::tests::test_trust_validator_creation ... ok
+test validation::tests::test_sanitize_input ... FAILED
+test validation::tests::test_validate_node_id ... ok
+test dns::tests::test_unknown_trustchain_domain ... FAILED
+test tests::test_secure_certificate_issuance ... FAILED
+test tests::test_trustchain_security_initialization ... FAILED
+test tests::test_security_dashboard ... FAILED
+test consensus::tests::test_consensus_proof_creation ... ok
+test consensus::real_validator::tests::test_real_consensus_validation ... ok
+test consensus::tests::test_consensus_proof_hash ... ok
+test consensus::tests::test_consensus_proof_serialization ... ok
+test consensus::tests::test_consensus_requirements_validation ... ok
+test ct::certificate_transparency::tests::test_certificate_addition ... ok
+test ct::merkle_log::tests::test_entry_addition ... ok
+test tests::test_consensus_validation ... FAILED
+test ca::certificate_authority::tests::test_certificate_issuance_with_consensus ... ok
+test ct::merkle_log::tests::test_log_capacity ... ok
+test ct::merkle_log::tests::test_consistency_proof ... ok
+test ct::merkle_log::tests::test_entry_retrieval ... ok
+test ct::merkle_log::tests::test_inclusion_proof ... ok
+test ct::merkle_log::tests::test_merkle_tree_update ... ok
+test api::rate_limiter::tests::test_rate_limit_refill ... ok
+test api::rate_limiter::tests::test_token_bucket_refill ... ok
+test dns::cache::tests::test_cache_cleanup ... ok
+test dns::cache::tests::test_cache_expiration ... ok
+test stoq_client::tests::test_stoq_client_creation ... ok
+
+failures:
+
+---- api::rate_limiter::tests::test_remaining_tokens stdout ----
+
+thread 'api::rate_limiter::tests::test_remaining_tokens' panicked at trustchain/src/api/rate_limiter.rs:434:9:
+assertion `left == right` failed
+  left: 8.000000046666667
+ right: 8.0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- api::tests::test_certificate_request_deserialization stdout ----
+
+thread 'api::tests::test_certificate_request_deserialization' panicked at trustchain/src/api/mod.rs:229:9:
+assertion failed: request.is_ok()
+
+---- config::tests::test_config_file_operations stdout ----
+
+thread 'config::tests::test_config_file_operations' panicked at trustchain/src/config.rs:476:60:
+called `Result::unwrap()` on an `Err` value: Unsupported config file format: /tmp/.tmpjGVIvn
+
+---- ca::tests::test_certificate_issuance stdout ----
+
+thread 'ca::tests::test_certificate_issuance' panicked at trustchain/src/ca/mod.rs:620:50:
+called `Result::unwrap()` on an `Err` value: Address already in use (os error 98)
+
+---- ca::security_integration::tests::test_security_dashboard_integration stdout ----
+
+thread 'ca::security_integration::tests::test_security_dashboard_integration' panicked at trustchain/src/ca/security_integration.rs:591:89:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- ca::security_integration::tests::test_security_integrated_ca_creation stdout ----
+
+thread 'ca::security_integration::tests::test_security_integrated_ca_creation' panicked at trustchain/src/ca/security_integration.rs:557:89:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- ca::tests::test_ca_creation stdout ----
+
+thread 'ca::tests::test_ca_creation' panicked at trustchain/src/ca/mod.rs:611:50:
+called `Result::unwrap()` on an `Err` value: Address already in use (os error 98)
+
+---- ca::security_integration::tests::test_secure_certificate_issuance stdout ----
+
+thread 'ca::security_integration::tests::test_secure_certificate_issuance' panicked at trustchain/src/ca/security_integration.rs:567:89:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- ca::tests::test_certificate_validation stdout ----
+
+thread 'ca::tests::test_certificate_validation' panicked at trustchain/src/ca/mod.rs:640:50:
+called `Result::unwrap()` on an `Err` value: Address already in use (os error 98)
+
+---- consensus::hypermesh_client::tests::test_client_metrics stdout ----
+
+thread 'consensus::hypermesh_client::tests::test_client_metrics' panicked at trustchain/src/consensus/hypermesh_client.rs:526:66:
+called `Result::unwrap()` on an `Err` value: Address already in use (os error 98)
+
+---- consensus::proof::tests::test_time_proof_serialization stdout ----
+
+thread 'consensus::proof::tests::test_time_proof_serialization' panicked at trustchain/src/consensus/proof.rs:626:9:
+assertion `left == right` failed
+  left: TimeProof { network_time_offset: 0ns, time_verification_timestamp: SystemTime { tv_sec: 1765396211, tv_nsec: 319417868 }, nonce: 10383299243593475756, proof_hash: [49, 134, 212, 107, 248, 211, 176, 252, 108, 248, 157, 87, 203, 155, 182, 105, 206, 119, 199, 195, 183, 179, 177, 239, 33, 203, 126, 87, 24, 231, 208, 21] }
+ right: TimeProof { network_time_offset: 0ns, time_verification_timestamp: SystemTime { tv_sec: 1765396211, tv_nsec: 319417000 }, nonce: 10383299243593475756, proof_hash: [49, 134, 212, 107, 248, 211, 176, 252, 108, 248, 157, 87, 203, 155, 182, 105, 206, 119, 199, 195, 183, 179, 177, 239, 33, 203, 126, 87, 24, 231, 208, 21] }
+
+---- crypto::hybrid::tests::test_hybrid_encryption_decryption stdout ----
+
+thread 'crypto::hybrid::tests::test_hybrid_encryption_decryption' panicked at trustchain/src/crypto/hybrid.rs:480:104:
+called `Result::unwrap()` on an `Err` value: Kyber decryption failed: Invalid Kyber-1024 ciphertext size: expected 1568, got 32
+
+---- crypto::kyber::tests::test_kyber_encrypt_decrypt_roundtrip stdout ----
+
+thread 'crypto::kyber::tests::test_kyber_encrypt_decrypt_roundtrip' panicked at trustchain/src/crypto/kyber.rs:431:80:
+called `Result::unwrap()` on an `Err` value: Kyber decryption failed: Invalid Kyber-1024 ciphertext size: expected 1568, got 32
+
+---- crypto::tests::test_kyber_encrypt_decrypt stdout ----
+
+thread 'crypto::tests::test_kyber_encrypt_decrypt' panicked at trustchain/src/crypto/mod.rs:495:89:
+called `Result::unwrap()` on an `Err` value: Kyber decryption failed: Invalid Kyber-1024 ciphertext size: expected 1568, got 32
+
+---- ct::fingerprint_tracker::tests::test_domain_fingerprints stdout ----
+
+thread 'ct::fingerprint_tracker::tests::test_domain_fingerprints' panicked at trustchain/src/ct/fingerprint_tracker.rs:578:9:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- crypto::kyber::tests::test_large_data_encryption stdout ----
+
+thread 'crypto::kyber::tests::test_large_data_encryption' panicked at trustchain/src/crypto/kyber.rs:474:80:
+called `Result::unwrap()` on an `Err` value: Kyber decryption failed: Invalid Kyber-1024 ciphertext size: expected 1568, got 32
+
+---- ct::tests::test_certificate_logging stdout ----
+
+thread 'ct::tests::test_certificate_logging' panicked at trustchain/src/ct/mod.rs:526:55:
+called `Result::unwrap()` on an `Err` value: CertificateTransparency(RealtimeFingerprinting { certificate_id: "unknown" })
+
+---- ct::tests::test_certificate_verification stdout ----
+
+thread 'ct::tests::test_certificate_verification' panicked at trustchain/src/ct/mod.rs:537:45:
+called `Result::unwrap()` on an `Err` value: CertificateTransparency(RealtimeFingerprinting { certificate_id: "unknown" })
+
+---- ct::tests::test_get_entries_range stdout ----
+
+thread 'ct::tests::test_get_entries_range' panicked at trustchain/src/ct/mod.rs:578:60:
+called `Result::unwrap()` on an `Err` value: CertificateTransparency(RealtimeFingerprinting { certificate_id: "unknown" })
+
+---- ct::tests::test_inclusion_proof stdout ----
+
+thread 'ct::tests::test_inclusion_proof' panicked at trustchain/src/ct/mod.rs:552:45:
+called `Result::unwrap()` on an `Err` value: CertificateTransparency(RealtimeFingerprinting { certificate_id: "unknown" })
+
+---- ct::tests::test_log_stats stdout ----
+
+thread 'ct::tests::test_log_stats' panicked at trustchain/src/ct/mod.rs:564:45:
+called `Result::unwrap()` on an `Err` value: CertificateTransparency(RealtimeFingerprinting { certificate_id: "unknown" })
+
+---- dns::resolver::tests::test_stats_update stdout ----
+
+thread 'dns::resolver::tests::test_stats_update' panicked at trustchain/src/dns/resolver.rs:357:9:
+assertion `left == right` failed
+  left: 140.0
+ right: 100.0
+
+---- monitoring::metrics::tests::test_timing_statistics stdout ----
+
+thread 'monitoring::metrics::tests::test_timing_statistics' panicked at trustchain/src/monitoring/metrics.rs:269:9:
+assertion `left == right` failed
+  left: 51
+ right: 50
+
+---- dns::tests::test_trustchain_domain_resolution stdout ----
+
+thread 'dns::tests::test_trustchain_domain_resolution' panicked at trustchain/src/dns/mod.rs:577:13:
+assertion `left == right` failed
+  left: 2001:db8:2::1
+ right: ::1
+
+---- validation::tests::test_sanitize_input stdout ----
+
+thread 'validation::tests::test_sanitize_input' panicked at trustchain/src/validation.rs:94:9:
+assertion `left == right` failed
+  left: "....etcpasswd"
+ right: "..etcpasswd"
+
+---- dns::tests::test_unknown_trustchain_domain stdout ----
+
+thread 'dns::tests::test_unknown_trustchain_domain' panicked at trustchain/src/dns/mod.rs:597:9:
+assertion `left == right` failed
+  left: NoError
+ right: NXDomain
+
+---- tests::test_secure_certificate_issuance stdout ----
+
+thread 'tests::test_secure_certificate_issuance' panicked at trustchain/src/lib.rs:427:62:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- tests::test_trustchain_security_initialization stdout ----
+
+thread 'tests::test_trustchain_security_initialization' panicked at trustchain/src/lib.rs:419:62:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- tests::test_security_dashboard stdout ----
+
+thread 'tests::test_security_dashboard' panicked at trustchain/src/lib.rs:446:62:
+called `Result::unwrap()` on an `Err` value: Internal { message: "Address already in use (os error 98)" }
+
+---- tests::test_consensus_validation stdout ----
+Error: Invalid node ID for production use
+
+
+failures:
+    api::rate_limiter::tests::test_remaining_tokens
+    api::tests::test_certificate_request_deserialization
+    ca::security_integration::tests::test_secure_certificate_issuance
+    ca::security_integration::tests::test_security_dashboard_integration
+    ca::security_integration::tests::test_security_integrated_ca_creation
+    ca::tests::test_ca_creation
+    ca::tests::test_certificate_issuance
+    ca::tests::test_certificate_validation
+    config::tests::test_config_file_operations
+    consensus::hypermesh_client::tests::test_client_metrics
+    consensus::proof::tests::test_time_proof_serialization
+    crypto::hybrid::tests::test_hybrid_encryption_decryption
+    crypto::kyber::tests::test_kyber_encrypt_decrypt_roundtrip
+    crypto::kyber::tests::test_large_data_encryption
+    crypto::tests::test_kyber_encrypt_decrypt
+    ct::fingerprint_tracker::tests::test_domain_fingerprints
+    ct::tests::test_certificate_logging
+    ct::tests::test_certificate_verification
+    ct::tests::test_get_entries_range
+    ct::tests::test_inclusion_proof
+    ct::tests::test_log_stats
+    dns::resolver::tests::test_stats_update
+    dns::tests::test_trustchain_domain_resolution
+    dns::tests::test_unknown_trustchain_domain
+    monitoring::metrics::tests::test_timing_statistics
+    tests::test_consensus_validation
+    tests::test_secure_certificate_issuance
+    tests::test_security_dashboard
+    tests::test_trustchain_security_initialization
+    validation::tests::test_sanitize_input
+
+test result: FAILED. 185 passed; 30 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.05s
+
+error: test failed, to rerun pass `--lib`

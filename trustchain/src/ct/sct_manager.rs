@@ -187,13 +187,13 @@ impl SCTManager {
                 reason: format!("Key generation failed: {}", e),
             })?;
 
-        // Convert to dalek keys (simplified key extraction)
-        // For now, generate a new random key since Document API is unclear
-        let signing_key = SigningKey::from_keypair_bytes(&[0u8; 64])
-            .map_err(|e| CryptoError::KeyGeneration {
-                algorithm: "Ed25519".to_string(),
-                reason: format!("Failed to create signing key: {}", e),
-            })?;
+        // Generate a proper Ed25519 key pair for CT log signing
+        // Create a random 32-byte secret key
+        use rand::Rng;
+        let mut secret_bytes = [0u8; 32];
+        rand::thread_rng().fill(&mut secret_bytes);
+
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
         let verifying_key = signing_key.verifying_key();
 
         Ok((signing_key, verifying_key))

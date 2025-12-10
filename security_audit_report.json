@@ -1,25 +1,25 @@
 {
-  "audit_timestamp": "2025-12-08T14:23:55.758972",
+  "audit_timestamp": "2025-12-09T18:20:45.653723",
   "project_root": "/home/persist/repos/projects/web3",
   "summary": {
-    "total_violations": 2475,
+    "total_violations": 2524,
     "critical": 26,
-    "high": 2416,
+    "high": 2465,
     "medium": 33,
     "low": 0,
-    "files_scanned": 767,
-    "total_lines": 295798
+    "files_scanned": 780,
+    "total_lines": 299790
   },
   "violation_types": {
     "mock_implementations": 5,
     "test_bypasses": 17,
-    "unwrap_calls": 2226,
+    "unwrap_calls": 2262,
     "placeholder_code": 4,
-    "missing_validation": 121,
+    "missing_validation": 133,
     "hardcoded_secrets": 0,
     "insecure_random": 54,
     "command_injection": 0,
-    "path_traversal": 15,
+    "path_traversal": 16,
     "unsafe_deserialization": 33
   },
   "violations": {
@@ -1484,7 +1484,7 @@
       },
       {
         "file": "blockmatrix/src/lib.rs",
-        "line": 302,
+        "line": 305,
         "type": "UNWRAP_PANIC",
         "code": "let system = system.unwrap();",
         "severity": "HIGH",
@@ -3004,7 +3004,7 @@
       },
       {
         "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
-        "line": 122,
+        "line": 228,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -3012,7 +3012,7 @@
       },
       {
         "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
-        "line": 147,
+        "line": 251,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -3020,7 +3020,7 @@
       },
       {
         "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
-        "line": 245,
+        "line": 276,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -3028,7 +3028,7 @@
       },
       {
         "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
-        "line": 274,
+        "line": 374,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -3036,7 +3036,79 @@
       },
       {
         "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
-        "line": 327,
+        "line": 403,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 456,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 498,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 570,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 625,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 659,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 714,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 769,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 800,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server.rs",
+        "line": 854,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -3097,6 +3169,62 @@
         "code": ".parse()",
         "severity": "HIGH",
         "description": "Parse without error handling"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 88,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 111,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 136,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 160,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 229,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 258,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/bin/blockmatrix-http3-server-simple.rs",
+        "line": 299,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
       },
       {
         "file": "blockmatrix/src/performance/mod.rs",
@@ -6004,17 +6132,49 @@
       },
       {
         "file": "blockmatrix/src/http3/router.rs",
-        "line": 88,
+        "line": 111,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
       {
+        "file": "blockmatrix/src/http3/server_simple.rs",
+        "line": 127,
+        "type": "UNWRAP_PANIC",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/http3/server_simple.rs",
+        "line": 127,
+        "type": "MISSING_VALIDATION",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "blockmatrix/src/http3/server_stoq.rs",
+        "line": 163,
+        "type": "UNWRAP_PANIC",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/http3/server_stoq.rs",
+        "line": 163,
+        "type": "MISSING_VALIDATION",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
         "file": "blockmatrix/src/http3/middleware.rs",
         "line": 52,
         "type": "UNWRAP_PANIC",
-        "code": "\"*\".parse().unwrap(),",
+        "code": "\"http://localhost:5173\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
@@ -6022,7 +6182,7 @@
         "file": "blockmatrix/src/http3/middleware.rs",
         "line": 52,
         "type": "MISSING_VALIDATION",
-        "code": "\"*\".parse().unwrap(),",
+        "code": "\"http://localhost:5173\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
@@ -6046,7 +6206,7 @@
         "file": "blockmatrix/src/http3/middleware.rs",
         "line": 60,
         "type": "UNWRAP_PANIC",
-        "code": "\"Content-Type, Authorization\".parse().unwrap(),",
+        "code": "\"Content-Type, Authorization, X-Request-ID\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
@@ -6054,13 +6214,45 @@
         "file": "blockmatrix/src/http3/middleware.rs",
         "line": 60,
         "type": "MISSING_VALIDATION",
-        "code": "\"Content-Type, Authorization\".parse().unwrap(),",
+        "code": "\"Content-Type, Authorization, X-Request-ID\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "blockmatrix/src/http3/middleware.rs",
+        "line": 64,
+        "type": "UNWRAP_PANIC",
+        "code": "\"3600\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/http3/middleware.rs",
+        "line": 64,
+        "type": "MISSING_VALIDATION",
+        "code": "\"3600\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "blockmatrix/src/http3/middleware.rs",
+        "line": 68,
+        "type": "UNWRAP_PANIC",
+        "code": "\"true\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "blockmatrix/src/http3/middleware.rs",
+        "line": 68,
+        "type": "MISSING_VALIDATION",
+        "code": "\"true\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
       {
         "file": "blockmatrix/src/http3/server.rs",
-        "line": 123,
+        "line": 134,
         "type": "UNWRAP_PANIC",
         "code": "request_id.parse().unwrap(),",
         "severity": "HIGH",
@@ -6068,7 +6260,7 @@
       },
       {
         "file": "blockmatrix/src/http3/server.rs",
-        "line": 123,
+        "line": 134,
         "type": "MISSING_VALIDATION",
         "code": "request_id.parse().unwrap(),",
         "severity": "HIGH",
@@ -13907,6 +14099,134 @@
         "description": "Unwrap() can cause panic in production"
       },
       {
+        "file": "gateway/tests/endpoint_validation.rs",
+        "line": 79,
+        "type": "UNWRAP_PANIC",
+        "code": "times.sort_by(|a, b| a.partial_cmp(b).unwrap());",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/tests/endpoint_validation.rs",
+        "line": 395,
+        "type": "PATH_TRAVERSAL",
+        "code": "\"certificate_pem\": \"-----BEGIN CERTIFICATE-----\\nMIIBkTCB+wIJAKHHIG...\\n-----END CERTIFICATE-----\",",
+        "severity": "HIGH",
+        "description": "Potential path traversal vulnerability"
+      },
+      {
+        "file": "gateway/src/router.rs",
+        "line": 259,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/router.rs",
+        "line": 273,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 86,
+        "type": "UNWRAP_PANIC",
+        "code": "listen_addr: \"[::]:8443\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 86,
+        "type": "MISSING_VALIDATION",
+        "code": "listen_addr: \"[::]:8443\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 87,
+        "type": "UNWRAP_PANIC",
+        "code": "trustchain_addr: \"[::1]:50053\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 87,
+        "type": "MISSING_VALIDATION",
+        "code": "trustchain_addr: \"[::1]:50053\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 88,
+        "type": "UNWRAP_PANIC",
+        "code": "blockmatrix_addr: \"[::1]:8446\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/config.rs",
+        "line": 88,
+        "type": "MISSING_VALIDATION",
+        "code": "blockmatrix_addr: \"[::1]:8446\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 28,
+        "type": "UNWRAP_PANIC",
+        "code": "HeaderValue::from_str(&self.config.allowed_origins[0]).unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 36,
+        "type": "UNWRAP_PANIC",
+        "code": "HeaderValue::from_str(&methods).unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 43,
+        "type": "UNWRAP_PANIC",
+        "code": "HeaderValue::from_str(&allowed_headers).unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 57,
+        "type": "UNWRAP_PANIC",
+        "code": "HeaderValue::from_str(&self.config.max_age.to_string()).unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 66,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap();",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "gateway/src/middleware.rs",
+        "line": 135,
+        "type": "UNWRAP_PANIC",
+        "code": "HeaderValue::from_str(&request_id.to_string()).unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
         "file": "hypermesh-ebpf/src/hypermesh_headers.rs",
         "line": 70,
         "type": "UNWRAP_PANIC",
@@ -16244,7 +16564,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 146,
+        "line": 163,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16252,7 +16572,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 167,
+        "line": 184,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16260,7 +16580,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 186,
+        "line": 203,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16268,7 +16588,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 208,
+        "line": 225,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16276,7 +16596,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 228,
+        "line": 245,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16284,7 +16604,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 248,
+        "line": 265,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16292,7 +16612,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 271,
+        "line": 288,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16300,7 +16620,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 289,
+        "line": 306,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16308,7 +16628,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 309,
+        "line": 326,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16316,7 +16636,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 334,
+        "line": 351,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16324,7 +16644,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 352,
+        "line": 369,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16332,7 +16652,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 385,
+        "line": 402,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16340,7 +16660,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 405,
+        "line": 422,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16348,7 +16668,7 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 424,
+        "line": 441,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16356,7 +16676,15 @@
       },
       {
         "file": "trustchain/src/bin/trustchain-http3-server.rs",
-        "line": 451,
+        "line": 468,
+        "type": "UNWRAP_PANIC",
+        "code": ".unwrap()",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/bin/trustchain-http3-server.rs",
+        "line": 496,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
@@ -16836,7 +17164,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 302,
+        "line": 321,
         "type": "UNWRAP_PANIC",
         "code": "\"2001:4860:4860::8888\".parse().unwrap(), // Google IPv6",
         "severity": "HIGH",
@@ -16844,7 +17172,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 302,
+        "line": 321,
         "type": "MISSING_VALIDATION",
         "code": "\"2001:4860:4860::8888\".parse().unwrap(), // Google IPv6",
         "severity": "HIGH",
@@ -16852,7 +17180,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 303,
+        "line": 322,
         "type": "UNWRAP_PANIC",
         "code": "\"2606:4700:4700::1111\".parse().unwrap(), // Cloudflare IPv6",
         "severity": "HIGH",
@@ -16860,7 +17188,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 303,
+        "line": 322,
         "type": "MISSING_VALIDATION",
         "code": "\"2606:4700:4700::1111\".parse().unwrap(), // Cloudflare IPv6",
         "severity": "HIGH",
@@ -16868,7 +17196,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 314,
+        "line": 333,
         "type": "UNWRAP_PANIC",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -16876,7 +17204,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 314,
+        "line": 333,
         "type": "MISSING_VALIDATION",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -16884,71 +17212,23 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 316,
+        "line": 335,
         "type": "UNWRAP_PANIC",
         "code": ").await.unwrap();",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 327,
-        "type": "UNWRAP_PANIC",
-        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
-        "severity": "HIGH",
-        "description": "Unwrap() can cause panic in production"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 327,
-        "type": "MISSING_VALIDATION",
-        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
-        "severity": "HIGH",
-        "description": "Parse without error handling"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 329,
-        "type": "UNWRAP_PANIC",
-        "code": ").await.unwrap();",
-        "severity": "HIGH",
-        "description": "Unwrap() can cause panic in production"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 344,
-        "type": "UNWRAP_PANIC",
-        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
-        "severity": "HIGH",
-        "description": "Unwrap() can cause panic in production"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 344,
-        "type": "MISSING_VALIDATION",
-        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
-        "severity": "HIGH",
-        "description": "Parse without error handling"
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
         "line": 346,
         "type": "UNWRAP_PANIC",
-        "code": ").await.unwrap();",
-        "severity": "HIGH",
-        "description": "Unwrap() can cause panic in production"
-      },
-      {
-        "file": "trustchain/src/dns/resolver.rs",
-        "line": 358,
-        "type": "UNWRAP_PANIC",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 358,
+        "line": 346,
         "type": "MISSING_VALIDATION",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -16956,7 +17236,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 360,
+        "line": 348,
         "type": "UNWRAP_PANIC",
         "code": ").await.unwrap();",
         "severity": "HIGH",
@@ -16964,7 +17244,55 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 362,
+        "line": 363,
+        "type": "UNWRAP_PANIC",
+        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 363,
+        "type": "MISSING_VALIDATION",
+        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 365,
+        "type": "UNWRAP_PANIC",
+        "code": ").await.unwrap();",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 377,
+        "type": "UNWRAP_PANIC",
+        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 377,
+        "type": "MISSING_VALIDATION",
+        "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 379,
+        "type": "UNWRAP_PANIC",
+        "code": ").await.unwrap();",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/dns/resolver.rs",
+        "line": 381,
         "type": "UNWRAP_PANIC",
         "code": "let name = Name::from_utf8(\"test.example.com\").unwrap();",
         "severity": "HIGH",
@@ -16972,7 +17300,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 370,
+        "line": 389,
         "type": "UNWRAP_PANIC",
         "code": "let dns_record = dns_record.unwrap();",
         "severity": "HIGH",
@@ -16980,7 +17308,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 385,
+        "line": 404,
         "type": "UNWRAP_PANIC",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -16988,7 +17316,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 385,
+        "line": 404,
         "type": "MISSING_VALIDATION",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -16996,7 +17324,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 387,
+        "line": 406,
         "type": "UNWRAP_PANIC",
         "code": ").await.unwrap();",
         "severity": "HIGH",
@@ -17004,7 +17332,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 389,
+        "line": 408,
         "type": "UNWRAP_PANIC",
         "code": "let name = Name::from_utf8(\"alias.example.com\").unwrap();",
         "severity": "HIGH",
@@ -17012,7 +17340,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 390,
+        "line": 409,
         "type": "UNWRAP_PANIC",
         "code": "let target = Name::from_utf8(\"target.example.com\").unwrap();",
         "severity": "HIGH",
@@ -17020,7 +17348,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 397,
+        "line": 416,
         "type": "UNWRAP_PANIC",
         "code": "let dns_record = dns_record.unwrap();",
         "severity": "HIGH",
@@ -17028,7 +17356,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 410,
+        "line": 429,
         "type": "UNWRAP_PANIC",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -17036,7 +17364,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 410,
+        "line": 429,
         "type": "MISSING_VALIDATION",
         "code": "vec![\"2001:4860:4860::8888\".parse().unwrap()],",
         "severity": "HIGH",
@@ -17044,7 +17372,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 412,
+        "line": 431,
         "type": "UNWRAP_PANIC",
         "code": ").await.unwrap();",
         "severity": "HIGH",
@@ -17052,7 +17380,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 414,
+        "line": 433,
         "type": "UNWRAP_PANIC",
         "code": "let name = Name::from_utf8(\"example.com\").unwrap();",
         "severity": "HIGH",
@@ -17060,7 +17388,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 415,
+        "line": 434,
         "type": "UNWRAP_PANIC",
         "code": "let exchange = Name::from_utf8(\"mail.example.com\").unwrap();",
         "severity": "HIGH",
@@ -17068,7 +17396,7 @@
       },
       {
         "file": "trustchain/src/dns/resolver.rs",
-        "line": 422,
+        "line": 441,
         "type": "UNWRAP_PANIC",
         "code": "let dns_record = dns_record.unwrap();",
         "severity": "HIGH",
@@ -17484,17 +17812,33 @@
       },
       {
         "file": "trustchain/src/api/stoq_api.rs",
-        "line": 364,
+        "line": 371,
         "type": "MISSING_VALIDATION",
-        "code": ".and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())",
+        "code": "let bind_addr: std::net::Ipv6Addr = addr_str.parse()",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
       {
         "file": "trustchain/src/api/stoq_api.rs",
-        "line": 369,
+        "line": 373,
         "type": "MISSING_VALIDATION",
-        "code": ".and_then(|p| p.parse().ok())",
+        "code": "let port: u16 = port_str.parse()",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/api/stoq_api.rs",
+        "line": 386,
+        "type": "MISSING_VALIDATION",
+        "code": "let bind_addr: std::net::Ipv6Addr = addr_str.parse()",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/api/stoq_api.rs",
+        "line": 388,
+        "type": "MISSING_VALIDATION",
+        "code": "let port: u16 = port_str.parse()",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
@@ -18364,17 +18708,49 @@
       },
       {
         "file": "trustchain/src/http3/router.rs",
-        "line": 88,
+        "line": 103,
         "type": "UNWRAP_PANIC",
         "code": ".unwrap()",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
       {
+        "file": "trustchain/src/http3/server_simple.rs",
+        "line": 127,
+        "type": "UNWRAP_PANIC",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/http3/server_simple.rs",
+        "line": 127,
+        "type": "MISSING_VALIDATION",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/http3/server_stoq.rs",
+        "line": 163,
+        "type": "UNWRAP_PANIC",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/http3/server_stoq.rs",
+        "line": 163,
+        "type": "MISSING_VALIDATION",
+        "code": "request_id.parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
         "file": "trustchain/src/http3/middleware.rs",
         "line": 52,
         "type": "UNWRAP_PANIC",
-        "code": "\"*\".parse().unwrap(),",
+        "code": "\"http://localhost:5173\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
@@ -18382,7 +18758,7 @@
         "file": "trustchain/src/http3/middleware.rs",
         "line": 52,
         "type": "MISSING_VALIDATION",
-        "code": "\"*\".parse().unwrap(),",
+        "code": "\"http://localhost:5173\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
@@ -18406,7 +18782,7 @@
         "file": "trustchain/src/http3/middleware.rs",
         "line": 60,
         "type": "UNWRAP_PANIC",
-        "code": "\"Content-Type, Authorization\".parse().unwrap(),",
+        "code": "\"Content-Type, Authorization, X-Request-ID\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Unwrap() can cause panic in production"
       },
@@ -18414,13 +18790,29 @@
         "file": "trustchain/src/http3/middleware.rs",
         "line": 60,
         "type": "MISSING_VALIDATION",
-        "code": "\"Content-Type, Authorization\".parse().unwrap(),",
+        "code": "\"Content-Type, Authorization, X-Request-ID\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Parse without error handling"
+      },
+      {
+        "file": "trustchain/src/http3/middleware.rs",
+        "line": 64,
+        "type": "UNWRAP_PANIC",
+        "code": "\"3600\".parse().unwrap(),",
+        "severity": "HIGH",
+        "description": "Unwrap() can cause panic in production"
+      },
+      {
+        "file": "trustchain/src/http3/middleware.rs",
+        "line": 64,
+        "type": "MISSING_VALIDATION",
+        "code": "\"3600\".parse().unwrap(),",
         "severity": "HIGH",
         "description": "Parse without error handling"
       },
       {
         "file": "trustchain/src/http3/server.rs",
-        "line": 123,
+        "line": 134,
         "type": "UNWRAP_PANIC",
         "code": "request_id.parse().unwrap(),",
         "severity": "HIGH",
@@ -18428,7 +18820,7 @@
       },
       {
         "file": "trustchain/src/http3/server.rs",
-        "line": 123,
+        "line": 134,
         "type": "MISSING_VALIDATION",
         "code": "request_id.parse().unwrap(),",
         "severity": "HIGH",

@@ -56,14 +56,14 @@ pub struct StressTestResults {
     pub network_usage: u64,
 }
 
-static CONNECTION_POOL: once_cell::sync::Lazy<ConnectionPool> = once_cell::sync::Lazy::new(|| {
-    ConnectionPool {
+lazy_static::lazy_static! {
+    static ref CONNECTION_POOL: ConnectionPool = ConnectionPool {
         connections: Arc::new(RwLock::new(Vec::new())),
         active_count: Arc::new(AtomicUsize::new(0)),
         total_created: Arc::new(AtomicU64::new(0)),
         failed_count: Arc::new(AtomicU64::new(0)),
-    }
-});
+    };
+}
 
 /// Create a batch of connections
 pub async fn create_connections(count: usize) -> Result<()> {

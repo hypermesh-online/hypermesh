@@ -48,26 +48,46 @@ pub async fn test_quantum_resistance() -> (bool, HashMap<String, f64>, Vec<Strin
     let mut errors = Vec::new();
     let mut passed = true;
 
-    // Validate quantum-resistant algorithms
-    let algorithms = vec![
-        ("falcon-1024", test_falcon_quantum_resistance()),
-        ("kyber-1024", test_kyber_quantum_resistance()),
-        ("sphincs+", test_sphincs_resistance()),
-    ];
-
-    for (algo, test_future) in algorithms {
-        match test_future.await {
-            Ok(resistance_score) => {
-                metrics.insert(format!("{}_resistance", algo), resistance_score);
-                if resistance_score < 0.95 {
-                    errors.push(format!("{} resistance below threshold: {}", algo, resistance_score));
-                    passed = false;
-                }
-            }
-            Err(e) => {
-                errors.push(format!("{} test failed: {}", algo, e));
+    // Validate quantum-resistant algorithms - call each individually
+    match test_falcon_quantum_resistance().await {
+        Ok(resistance_score) => {
+            metrics.insert("falcon-1024_resistance".to_string(), resistance_score);
+            if resistance_score < 0.95 {
+                errors.push(format!("falcon-1024 resistance below threshold: {}", resistance_score));
                 passed = false;
             }
+        }
+        Err(e) => {
+            errors.push(format!("falcon-1024 test failed: {}", e));
+            passed = false;
+        }
+    }
+
+    match test_kyber_quantum_resistance().await {
+        Ok(resistance_score) => {
+            metrics.insert("kyber-1024_resistance".to_string(), resistance_score);
+            if resistance_score < 0.95 {
+                errors.push(format!("kyber-1024 resistance below threshold: {}", resistance_score));
+                passed = false;
+            }
+        }
+        Err(e) => {
+            errors.push(format!("kyber-1024 test failed: {}", e));
+            passed = false;
+        }
+    }
+
+    match test_sphincs_resistance().await {
+        Ok(resistance_score) => {
+            metrics.insert("sphincs+_resistance".to_string(), resistance_score);
+            if resistance_score < 0.95 {
+                errors.push(format!("sphincs+ resistance below threshold: {}", resistance_score));
+                passed = false;
+            }
+        }
+        Err(e) => {
+            errors.push(format!("sphincs+ test failed: {}", e));
+            passed = false;
         }
     }
 

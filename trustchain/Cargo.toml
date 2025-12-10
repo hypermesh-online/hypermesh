@@ -144,8 +144,8 @@ path = "src/bin/validate-deployment.rs"
 name = "trustchain-http3-server"
 path = "src/bin/trustchain-http3-server.rs"
 
-[[bin]]
-name = "trustchain-http3-server-minimal"
-path = "src/bin/trustchain-http3-server-minimal.rs"
+[[bench]]
+name = "certificate_bench"
+harness = false
 
 # Profiles are managed at workspace level

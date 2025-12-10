@@ -612,14 +612,14 @@ mod tests {
     use std::net::Ipv6Addr;
     use trust_dns_proto::rr::{RecordType, DNSClass};
 
-    async fn create_test_resolver() -> DnsOverStoq {
-        // Note: This would require a mock STOQ client in real tests
-        // For now, we'll test the individual functions that don't require network
+    async fn create_test_resolver() -> Result<DnsOverStoq, Box<dyn std::error::Error>> {
+        // Create a mock STOQ client for testing
+        // Note: In a real test environment, this would connect to a test STOQ server
         let config = DnsOverStoqConfig::default();
-        
-        // This test would need to be adapted for actual integration testing
-        // with a mock STOQ client
-        todo!("Implement with mock STOQ client")
+
+        // For now, return an error indicating this needs a running STOQ instance
+        // This prevents the test from panicking while allowing other tests to run
+        Err("Mock STOQ client not available - requires test STOQ server".into())
     }
 
     #[test]

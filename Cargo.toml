@@ -22,7 +22,7 @@ futures = "0.3"
 # QUIC and networking
 quinn = "0.11"
 rustls = { version = "0.23", features = ["ring"] }
-rustls-pemfile = "2.0"
+rustls-pemfile = "2.2"
 rcgen = "0.13"
 socket2 = "0.5"
 bytes = { version = "1.6", features = ["serde"] }
@@ -234,6 +234,7 @@ sysinfo = { workspace = true }
 criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = { workspace = true }
+lazy_static = { workspace = true }
 
 [features]
 default = ["blockmatrix-full", "high-performance"]

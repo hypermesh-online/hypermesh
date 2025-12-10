@@ -62,6 +62,8 @@ impl Http3StoqServer {
             enable_memory_pool: true,
             frame_batch_size: 64,
             enable_cpu_affinity: false,
+            health_check_interval: 10,
+            connection_idle_timeout: 30,
             enable_large_send_offload: true,
             enable_falcon_crypto: false,
             falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,

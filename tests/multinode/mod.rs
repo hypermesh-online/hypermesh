@@ -223,6 +223,7 @@ pub enum NodeStatus {
 
 /// Node metrics
 #[derive(Debug, Default)]
+#[derive(Clone)]
 pub struct NodeMetrics {
     pub cpu_usage: f64,
     pub memory_usage: f64,

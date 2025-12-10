@@ -143,7 +143,8 @@ pub mod aws {
     }
 
     async fn launch_instances(region: &str, instance_type: &str) -> Result<Vec<String>> {
-        let user_data = include_str!("../../scripts/node_init.sh");
+        // TODO: Create scripts/node_init.sh or use inline script
+        let user_data = "#!/bin/bash\necho 'Node initialization placeholder'";
 
         let output = Command::new("aws")
             .args(&[

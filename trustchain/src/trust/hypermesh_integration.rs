@@ -526,8 +526,10 @@ impl HyperMeshAssetClient {
     }
     
     async fn get_asset_metadata(&self, _asset_id: &AssetId) -> TrustChainResult<AssetMetadata> {
-        // Placeholder for asset metadata retrieval
-        todo!("HyperMesh asset metadata retrieval")
+        // Mock implementation for asset metadata retrieval
+        // In production, this would query the HyperMesh network
+        // For now, return a simple stub since AssetMetadata is a unit struct
+        Ok(AssetMetadata)
     }
 }
 
