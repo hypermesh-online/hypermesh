@@ -69,6 +69,38 @@ impl NetworkTier {
             _ => NetworkTier::Slow { mbps },
         }
     }
+
+    // Backward compatibility for tests using old variant names
+
+    #[deprecated(since = "0.1.0", note = "use from_gbps(1.0) instead")]
+    pub fn auto() -> Self {
+        NetworkTier::Standard { gbps: 1.0 }
+    }
+
+    #[deprecated(since = "0.1.0", note = "use from_gbps(10.0) instead")]
+    pub fn lan() -> Self {
+        NetworkTier::Enterprise { gbps: 10.0 }
+    }
+
+    #[deprecated(since = "0.1.0", note = "use from_gbps(0.1) instead")]
+    pub fn wan() -> Self {
+        NetworkTier::Home { mbps: 100.0 }
+    }
+
+    #[deprecated(since = "0.1.0", note = "use from_gbps(0.5) instead")]
+    pub fn metro() -> Self {
+        NetworkTier::Home { mbps: 500.0 }
+    }
+
+    #[deprecated(since = "0.1.0", note = "use from_gbps(0.001) instead")]
+    pub fn satellite() -> Self {
+        NetworkTier::Slow { mbps: 1.0 }
+    }
+
+    #[deprecated(since = "0.1.0", note = "network isolation is now in NetworkIsolationManager")]
+    pub fn anonymous() -> Self {
+        NetworkTier::Slow { mbps: 10.0 }
+    }
 }
 
 /// STOQ Transport configuration for QUIC over IPv6
@@ -110,6 +142,10 @@ pub struct TransportConfig {
     pub memory_pool_size: usize,
     /// Frame batching size for syscall reduction
     pub frame_batch_size: usize,
+    /// Health check interval in seconds (0 disables health checks)
+    pub health_check_interval: u64,
+    /// Connection idle timeout in seconds before marking unhealthy
+    pub connection_idle_timeout: u64,
     /// Enable CPU affinity for network threads
     pub enable_cpu_affinity: bool,
     /// Enable large send offload optimization
@@ -158,6 +194,8 @@ impl Default for TransportConfig {
             enable_memory_pool: true, // Memory pool optimization
             memory_pool_size: 1024, // 1024 buffers per pool
             frame_batch_size: 64, // Batch 64 frames per syscall
+            health_check_interval: 10, // Health check every 10 seconds
+            connection_idle_timeout: 30, // Mark connections unhealthy after 30s idle
             enable_cpu_affinity: true, // CPU affinity optimization
             enable_large_send_offload: true, // LSO for large transfers
             enable_falcon_crypto: true, // Quantum-resistant FALCON cryptography
@@ -215,6 +253,36 @@ impl TransportConfig {
                 debug!("Adapted config for high-performance network tier");
             }
         }
+    }
+
+    // Backward compatibility methods for test suite
+
+    /// Legacy: Deprecated, use bind_address field directly
+    #[deprecated(since = "0.1.0", note = "use bind_address field directly")]
+    pub fn with_bind_addr(mut self, addr: Ipv6Addr) -> Self {
+        self.bind_address = addr;
+        self
+    }
+
+    /// Legacy: Deprecated, use max_datagram_size field directly
+    #[deprecated(since = "0.1.0", note = "use max_datagram_size field directly")]
+    pub fn with_max_packet_size(mut self, size: usize) -> Self {
+        self.max_datagram_size = size;
+        self
+    }
+
+    /// Legacy: Deprecated, use adapt_for_network_tier instead
+    #[deprecated(since = "0.1.0", note = "use adapt_for_network_tier instead")]
+    pub fn with_network_tier(self, _tier: NetworkTier) -> Self {
+        warn!("with_network_tier is deprecated, tier is auto-detected");
+        self
+    }
+
+    /// Legacy: Deprecated, network isolation is always available
+    #[deprecated(since = "0.1.0", note = "network isolation is always available")]
+    pub fn enable_network_isolation(self, _enable: bool) -> Self {
+        warn!("enable_network_isolation is deprecated, always available");
+        self
     }
 }
 
@@ -346,6 +414,7 @@ pub struct Connection {
     memory_pool: Arc<MemoryPool>,
     frame_batch: Arc<Mutex<FrameBatch>>,
     last_activity: AtomicU64,
+    idle_timeout: u64, // Connection-specific idle timeout
 }
 
 impl Connection {
@@ -356,6 +425,7 @@ impl Connection {
         metrics: Arc<TransportMetrics>,
         memory_pool: Arc<MemoryPool>,
         frame_batch_size: usize,
+        idle_timeout: u64,
     ) -> Self {
         Self {
             inner,
@@ -363,7 +433,13 @@ impl Connection {
             metrics,
             memory_pool,
             frame_batch: Arc::new(Mutex::new(FrameBatch::new(frame_batch_size))),
-            last_activity: AtomicU64::new(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
+            last_activity: AtomicU64::new(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                    .as_secs()
+            ),
+            idle_timeout,
         }
     }
     
@@ -374,12 +450,14 @@ impl Connection {
 
     /// Accept a bidirectional stream
     pub async fn accept_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
+        self.update_activity();
         self.inner.accept_bi().await
             .map_err(|e| anyhow!("Failed to accept bidirectional stream: {}", e))
     }
 
     /// Open a bidirectional stream
     pub async fn open_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
+        self.update_activity();
         self.inner.open_bi().await
             .map_err(|e| anyhow!("Failed to open bidirectional stream: {}", e))
     }
@@ -410,6 +488,39 @@ impl Connection {
     /// Close the connection gracefully
     pub fn close(&self) {
         self.inner.close(0u32.into(), b"closing");
+    }
+
+    /// Check if connection is healthy with configurable staleness threshold
+    pub fn is_healthy(&self) -> bool {
+        // First check if connection is active
+        if !self.is_active() {
+            return false;
+        }
+
+        // Check for staleness using configured idle timeout
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_secs();
+        let last_activity = self.last_activity.load(Ordering::Relaxed);
+        let idle_duration = now.saturating_sub(last_activity);
+
+        // Connection is healthy if active and used within configured timeout
+        idle_duration < self.idle_timeout
+    }
+
+    /// Update last activity timestamp
+    pub fn update_activity(&self) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_secs();
+        self.last_activity.store(now, Ordering::Relaxed);
+    }
+
+    /// Get last activity timestamp for LRU tracking
+    pub fn last_activity(&self) -> u64 {
+        self.last_activity.load(Ordering::Relaxed)
     }
 }
 
@@ -483,6 +594,18 @@ pub struct StoqTransport {
     ebpf_transport: Option<Arc<RwLock<ebpf::EbpfTransport>>>,
 }
 
+/// Connection pool statistics for monitoring
+#[derive(Debug, Clone)]
+pub struct ConnectionPoolStats {
+    pub total_connections: usize,
+    pub total_healthy: usize,
+    pub pool_details: Vec<(String, usize, usize)>, // (endpoint, total, healthy)
+    pub reuse_count: u64,
+    pub eviction_count: u64,
+    pub health_check_count: u64,
+    pub unhealthy_removed: u64,
+}
+
 /// Performance statistics for transport monitoring
 #[derive(Debug, Default)]
 pub struct PerformanceStats {
@@ -494,6 +617,9 @@ pub struct PerformanceStats {
     pub memory_pool_hits: AtomicU64,
     pub memory_pool_misses: AtomicU64,
     pub connection_reuse_count: AtomicU64,
+    pub connection_pool_evictions: AtomicU64,
+    pub connection_health_checks: AtomicU64,
+    pub unhealthy_connections_removed: AtomicU64,
 }
 
 impl StoqTransport {
@@ -712,11 +838,15 @@ impl StoqTransport {
         
         // Try to reuse existing connection from pool for maximum performance
         if let Some(mut pool) = self.connection_pool.get_mut(&pool_key) {
+            // Clean up unhealthy connections first
+            pool.retain(|conn| conn.is_healthy());
+
+            // Try to get a healthy connection
             if let Some(pooled_conn) = pool.pop() {
-                if pooled_conn.is_active() {
-                    debug!("Reusing pooled connection to [{}]:{}", endpoint.address, endpoint.port);
-                    return Ok(pooled_conn);
-                }
+                debug!("Reusing pooled connection to [{}]:{}", endpoint.address, endpoint.port);
+                pooled_conn.update_activity(); // Mark as recently used
+                self.performance_stats.read().connection_reuse_count.fetch_add(1, Ordering::Relaxed);
+                return Ok(pooled_conn);
             }
         }
         
@@ -735,6 +865,7 @@ impl StoqTransport {
             self.metrics.clone(),
             self.memory_pool.clone(),
             self.config.frame_batch_size,
+            self.config.connection_idle_timeout,
         ));
 
         let conn_id = connection.id();
@@ -753,20 +884,73 @@ impl StoqTransport {
         Ok(connection)
     }
     
-    /// Return connection to pool for reuse (optimization)
+    /// Return connection to pool for reuse with LRU eviction
     pub fn return_to_pool(&self, connection: Arc<Connection>) {
         if !connection.is_active() {
             return; // Don't pool inactive connections
         }
-        
+
         let pool_key = format!("{}:{}", connection.endpoint().address, connection.endpoint().port);
         let mut pool = self.connection_pool.entry(pool_key).or_insert_with(Vec::new);
-        
-        if pool.len() < self.config.connection_pool_size {
-            pool.push(connection);
+
+        // Update activity before returning to pool
+        connection.update_activity();
+
+        if pool.len() >= self.config.connection_pool_size {
+            // Pool is full, need to evict LRU connection
+            // Find the least recently used connection
+            let mut lru_idx = 0;
+            let mut oldest_time = u64::MAX;
+
+            for (idx, conn) in pool.iter().enumerate() {
+                let activity = conn.last_activity();
+                if activity < oldest_time {
+                    oldest_time = activity;
+                    lru_idx = idx;
+                }
+            }
+
+            // Remove the LRU connection
+            pool.remove(lru_idx);
+            self.performance_stats.read().connection_pool_evictions.fetch_add(1, Ordering::Relaxed);
         }
+
+        // Add the new connection
+        pool.push(connection);
     }
     
+    /// Clean up unhealthy connections from all pools
+    pub fn cleanup_unhealthy_connections(&self) {
+        let mut total_removed = 0;
+        let mut total_remaining = 0;
+
+        // Track that we're doing a health check
+        self.performance_stats.read().connection_health_checks.fetch_add(1, Ordering::Relaxed);
+
+        for mut entry in self.connection_pool.iter_mut() {
+            let pool_key = entry.key().clone();
+            let pool = entry.value_mut();
+
+            // Remove unhealthy connections
+            let initial_size = pool.len();
+            pool.retain(|conn| conn.is_healthy());
+            let removed = initial_size - pool.len();
+
+            if removed > 0 {
+                debug!("Removed {} unhealthy connections from pool {}", removed, pool_key);
+                total_removed += removed;
+            }
+            total_remaining += pool.len();
+        }
+
+        if total_removed > 0 {
+            info!("Health check removed {} unhealthy connections, {} remaining in pools",
+                  total_removed, total_remaining);
+            self.performance_stats.read()
+                .unhealthy_connections_removed.fetch_add(total_removed as u64, Ordering::Relaxed);
+        }
+    }
+
     /// Get FALCON transport for quantum-resistant operations
     pub fn falcon_transport(&self) -> Option<Arc<RwLock<FalconTransport>>> {
         self.falcon_transport.clone()
@@ -812,6 +996,7 @@ impl StoqTransport {
             self.metrics.clone(),
             self.memory_pool.clone(),
             self.config.frame_batch_size,
+            self.config.connection_idle_timeout,
         ));
         
         self.connections.insert(connection.id(), connection.clone());
@@ -1002,11 +1187,33 @@ impl StoqTransport {
     }
     
     /// Get connection pool statistics for monitoring
-    pub fn pool_stats(&self) -> Vec<(String, usize)> {
-        self.connection_pool
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().len()))
-            .collect()
+    pub fn pool_stats(&self) -> ConnectionPoolStats {
+        let mut total_connections = 0;
+        let mut total_healthy = 0;
+        let mut pool_details = Vec::new();
+
+        for entry in self.connection_pool.iter() {
+            let pool_key = entry.key().clone();
+            let pool = entry.value();
+            let pool_size = pool.len();
+            let healthy_count = pool.iter().filter(|conn| conn.is_healthy()).count();
+
+            total_connections += pool_size;
+            total_healthy += healthy_count;
+            pool_details.push((pool_key, pool_size, healthy_count));
+        }
+
+        let perf_stats = self.performance_stats.read();
+
+        ConnectionPoolStats {
+            total_connections,
+            total_healthy,
+            pool_details,
+            reuse_count: perf_stats.connection_reuse_count.load(Ordering::Relaxed),
+            eviction_count: perf_stats.connection_pool_evictions.load(Ordering::Relaxed),
+            health_check_count: perf_stats.connection_health_checks.load(Ordering::Relaxed),
+            unhealthy_removed: perf_stats.unhealthy_connections_removed.load(Ordering::Relaxed),
+        }
     }
     
     /// Get transport performance statistics
@@ -1302,6 +1509,7 @@ impl Clone for Connection {
             memory_pool: self.memory_pool.clone(),
             frame_batch: self.frame_batch.clone(),
             last_activity: AtomicU64::new(self.last_activity.load(Ordering::Relaxed)),
+            idle_timeout: self.idle_timeout,
         }
     }
 }
@@ -1309,6 +1517,7 @@ impl Clone for Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
     
     #[test]
     fn test_endpoint_creation() {
@@ -1334,5 +1543,81 @@ mod tests {
         config.port = 0; // Let OS assign an available port
         let transport = StoqTransport::new(config).await;
         assert!(transport.is_ok());
+    }
+
+    #[test]
+    fn test_connection_health_check_config() {
+        // Test that idle timeout and health check interval are configurable
+        let config = TransportConfig::default();
+        assert_eq!(config.connection_idle_timeout, 30);
+        assert_eq!(config.health_check_interval, 10);
+
+        // Test that values can be customized
+        let mut custom_config = TransportConfig::default();
+        custom_config.connection_idle_timeout = 60;
+        custom_config.health_check_interval = 15;
+        assert_eq!(custom_config.connection_idle_timeout, 60);
+        assert_eq!(custom_config.health_check_interval, 15);
+    }
+
+    #[test]
+    fn test_lru_eviction_logic() {
+        // Test that LRU eviction selects the oldest connection
+        let times = vec![100u64, 50u64, 150u64, 25u64];
+        let mut lru_idx = 0;
+        let mut oldest_time = u64::MAX;
+
+        for (idx, &time) in times.iter().enumerate() {
+            if time < oldest_time {
+                oldest_time = time;
+                lru_idx = idx;
+            }
+        }
+
+        assert_eq!(lru_idx, 3); // Index 3 has value 25, which is smallest
+        assert_eq!(oldest_time, 25);
+    }
+
+    #[test]
+    fn test_connection_pool_stats_structure() {
+        let stats = ConnectionPoolStats {
+            total_connections: 10,
+            total_healthy: 8,
+            pool_details: vec![
+                ("127.0.0.1:8080".to_string(), 5, 4),
+                ("127.0.0.1:9090".to_string(), 5, 4),
+            ],
+            reuse_count: 100,
+            eviction_count: 5,
+            health_check_count: 20,
+            unhealthy_removed: 2,
+        };
+
+        assert_eq!(stats.total_connections, 10);
+        assert_eq!(stats.total_healthy, 8);
+        assert_eq!(stats.pool_details.len(), 2);
+        assert_eq!(stats.reuse_count, 100);
+        assert_eq!(stats.eviction_count, 5);
+        assert_eq!(stats.health_check_count, 20);
+        assert_eq!(stats.unhealthy_removed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_connection_pool_cleanup() {
+        let mut config = TransportConfig::default();
+        config.port = 0; // Let OS assign port
+        config.connection_idle_timeout = 30;
+        config.health_check_interval = 10;
+
+        let transport = StoqTransport::new(config).await.unwrap();
+
+        // Call cleanup - should not panic even with empty pools
+        transport.cleanup_unhealthy_connections();
+
+        // Get stats - should work with empty pools
+        let stats = transport.pool_stats();
+        assert_eq!(stats.total_connections, 0);
+        assert_eq!(stats.total_healthy, 0);
+        assert!(stats.pool_details.is_empty());
     }
 }

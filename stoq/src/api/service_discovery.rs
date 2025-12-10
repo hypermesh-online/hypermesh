@@ -227,9 +227,15 @@ impl ServiceDiscovery {
                         self.metrics.dns_resolutions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                         // Use the highest priority (lowest number) endpoint
-                        let best_endpoint = endpoints.into_iter()
-                            .min_by_key(|e| e.metadata.priority)
-                            .unwrap();
+                        // Safety: endpoints is non-empty (checked above), so min_by_key always returns Some
+                        let best_endpoint = match endpoints.into_iter().min_by_key(|e| e.metadata.priority) {
+                            Some(endpoint) => endpoint,
+                            None => {
+                                // This should never happen since we verified endpoints is non-empty
+                                warn!("Unexpected: min_by_key returned None for non-empty endpoints");
+                                return Err(anyhow!("Failed to select best endpoint"));
+                            }
+                        };
 
                         // Cache the result
                         let cached = CachedService {
@@ -322,6 +328,12 @@ impl ServiceDiscovery {
             .keys()
             .cloned()
             .collect()
+    }
+
+    /// Backward compatibility: resolve_service -> resolve
+    #[deprecated(since = "0.1.0", note = "use resolve instead")]
+    pub fn resolve_service(&self, name: &str) -> Result<ServiceEndpoint> {
+        self.resolve(name)
     }
 }
 

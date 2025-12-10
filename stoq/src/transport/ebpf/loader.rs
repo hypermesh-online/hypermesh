@@ -83,14 +83,20 @@ impl EbpfLoader {
             return Ok(());
         }
 
+        // Convert paths to strings with proper error handling
+        let source_str = source.to_str()
+            .ok_or_else(|| anyhow!("Invalid UTF-8 in source path: {:?}", source))?;
+        let output_str = output.to_str()
+            .ok_or_else(|| anyhow!("Invalid UTF-8 in output path: {:?}", output))?;
+
         let status = Command::new("clang")
             .args(&[
                 "-O2",
                 "-target", "bpf",
                 "-c",
-                source.to_str().unwrap(),
+                source_str,
                 "-o",
-                output.to_str().unwrap(),
+                output_str,
                 "-I/usr/include",
                 "-I/usr/include/bpf",
                 "-D__TARGET_ARCH_x86",
@@ -147,8 +153,11 @@ impl EbpfLoader {
         }
 
         // Use bpftool if available for verification
+        let program_path_str = program_path.to_str()
+            .ok_or_else(|| anyhow!("Invalid UTF-8 in program path: {:?}", program_path))?;
+
         if let Ok(output) = Command::new("bpftool")
-            .args(&["prog", "load", program_path.to_str().unwrap(), "/sys/fs/bpf/test_verify"])
+            .args(&["prog", "load", program_path_str, "/sys/fs/bpf/test_verify"])
             .output()
         {
             if !output.status.success() {

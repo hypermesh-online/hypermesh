@@ -45,11 +45,10 @@ x509-parser = { workspace = true }
 hex = { workspace = true }
 base64 = { workspace = true }
 webpki-roots = { workspace = true }
-rsa = { workspace = true }
 rand = { workspace = true }
 
 # Post-quantum cryptography
-pqcrypto = { workspace = true }
+# Only need FALCON, not the full pqcrypto suite (avoids unmaintained dilithium/kyber warnings)
 pqcrypto-falcon = { workspace = true }
 pqcrypto-traits = { workspace = true }
 

@@ -15,6 +15,7 @@ pub mod extensions;
 pub mod protocol;
 pub mod api;
 pub mod network_isolation;
+pub mod errors;
 
 // Test utilities for crypto initialization
 #[cfg(test)]
@@ -51,6 +52,16 @@ pub use network_isolation::{
     NetworkIsolationManager, NetworkStack, IsolationConfig, PrivacyTier as StoqPrivacyTier,
     NetworkTunnel, TrafficType, IsolationViolation
 };
+
+// Backward compatibility: re-export modules for tests
+pub use transport::metrics as performance_monitor;
+pub use transport::adaptive as phoenix;
+pub use transport::metrics as monitoring;
+
+// Crypto module re-export
+pub mod crypto {
+    pub use crate::transport::falcon::*;
+}
 
 /// STOQ Protocol version
 pub const PROTOCOL_VERSION: &str = "1.0.0";

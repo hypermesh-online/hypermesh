@@ -20,8 +20,6 @@ use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
 use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
-use rsa::{RsaPrivateKey, pkcs8::EncodePrivateKey};
-use rand::rngs::OsRng;
 
 // Import STOQ ALPN protocol identifier
 use crate::protocol::STOQ_ALPN;
@@ -74,6 +72,18 @@ impl CertificateConfig {
             common_name,
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             trustchain_endpoint: Some("quic://trust.hypermesh.online:8443".to_string()),
+        }
+    }
+
+    /// Localhost testing configuration with self-signed certificates
+    pub fn localhost_testing(node_id: String, common_name: String, ipv6_addresses: Vec<Ipv6Addr>) -> Self {
+        Self {
+            mode: CertificateMode::LocalhostTesting,
+            node_id,
+            ipv6_addresses,
+            common_name,
+            rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
+            trustchain_endpoint: None,
         }
     }
 }
@@ -466,11 +476,14 @@ impl TrustChainClient {
 
     /// Generate cryptographically secure private key (SECURITY FIX)
     fn generate_real_private_key(&self) -> Result<Vec<u8>> {
-        // SECURITY FIX: Use real RSA private key generation
-        let mut rng = OsRng;
-        let private_key = RsaPrivateKey::new(&mut rng, 2048)?;
-        let private_key_der = private_key.to_pkcs8_der()?;
-        Ok(private_key_der.as_bytes().to_vec())
+        // SECURITY FIX: Use rcgen for key generation (avoids RSA crate vulnerability)
+        // Generate a self-signed certificate with rcgen to get a private key
+        let subject_alt_names = vec!["localhost".to_string()];
+        let cert = generate_simple_self_signed(subject_alt_names)?;
+
+        // Extract the private key in DER format
+        let private_key_der = cert.key_pair.serialize_der();
+        Ok(private_key_der)
     }
 
     /// SECURITY: Validate certificate structure and basic constraints
@@ -823,6 +836,23 @@ impl CertificateManager {
         let mut hasher = Sha256::new();
         hasher.update(cert_der);
         hasher.finalize().into()
+    }
+
+    /// Backward compatibility: generate_self_signed for tests
+    #[deprecated(since = "0.1.0", note = "use CertificateManager::new with LocalhostTesting mode")]
+    pub async fn generate_self_signed() -> Result<Self> {
+        let config = CertificateConfig::localhost_testing(
+            "test-node".to_string(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        Self::new(config).await
+    }
+
+    /// Backward compatibility: new_self_signed for tests
+    #[deprecated(since = "0.1.0", note = "use CertificateManager::new with LocalhostTesting mode")]
+    pub async fn new_self_signed() -> Result<Self> {
+        Self::generate_self_signed().await
     }
 }
 
