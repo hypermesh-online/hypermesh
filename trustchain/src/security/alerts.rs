@@ -267,7 +267,11 @@ impl SecurityAlertManager {
         if let Some(alert) = active_alerts.get_mut(alert_id) {
             alert.status = AlertStatus::Acknowledged;
             alert.metadata.insert("acknowledged_by".to_string(), operator.to_string());
-            alert.metadata.insert("acknowledged_at".to_string(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs().to_string())
+                .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
+            alert.metadata.insert("acknowledged_at".to_string(), timestamp);
             
             info!("Alert acknowledged: {} by {}", alert_id, operator);
             Ok(())
@@ -287,7 +291,11 @@ impl SecurityAlertManager {
             
             alert.status = AlertStatus::Resolved;
             alert.metadata.insert("resolution_note".to_string(), resolution_note.to_string());
-            alert.metadata.insert("resolved_at".to_string(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs().to_string())
+                .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
+            alert.metadata.insert("resolved_at".to_string(), timestamp);
             alert.metadata.insert("resolution_time_seconds".to_string(), resolution_time.as_secs().to_string());
             
             // Update resolution time statistics
@@ -367,7 +375,11 @@ impl SecurityAlertManager {
         for alert_id in alerts_to_resolve {
             if let Some(alert) = active_alerts.get_mut(&alert_id) {
                 alert.status = AlertStatus::AutoResolved;
-                alert.metadata.insert("auto_resolved_at".to_string(), now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
+                let timestamp = now
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs().to_string())
+                    .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
+                alert.metadata.insert("auto_resolved_at".to_string(), timestamp);
                 debug!("Auto-resolved alert: {}", alert_id);
             }
         }

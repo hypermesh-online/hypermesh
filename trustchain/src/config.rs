@@ -113,8 +113,8 @@ impl Default for DnsConfig {
             port: 53, // Traditional DNS port for compatibility
             dns_port: None, // IPv6-only, no traditional DNS
             upstream_resolvers: vec![
-                "2001:4860:4860::8888".parse().unwrap(), // Google IPv6
-                "2606:4700:4700::1111".parse().unwrap(), // Cloudflare IPv6
+                Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888), // Google IPv6
+                Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111), // Cloudflare IPv6
             ],
             cache_ttl: Duration::from_secs(300),
             enable_cert_validation: true,
@@ -139,8 +139,8 @@ impl DnsConfig {
             port: 53,
             dns_port: None,
             upstream_resolvers: vec![
-                "2001:4860:4860::8888".parse().unwrap(),
-                "2606:4700:4700::1111".parse().unwrap(),
+                Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888), // Google IPv6
+                Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111), // Cloudflare IPv6
             ],
             cache_ttl: Duration::from_secs(600),
             enable_cert_validation: true,

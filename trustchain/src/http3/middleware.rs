@@ -1,6 +1,6 @@
-use http::{Request, Response};
+use http::{Request, Response, header::HeaderValue};
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use uuid::Uuid;
 
 pub struct RequestLogger;
@@ -47,20 +47,22 @@ impl RequestLogger {
 
 pub fn add_cors_headers<B>(response: &mut Response<B>) {
     let headers = response.headers_mut();
+
+    // Safe: All header values are valid static strings that cannot fail
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        "http://localhost:5173".parse().unwrap(),
+        HeaderValue::from_static("http://localhost:5173"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_METHODS,
-        "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap(),
+        HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_HEADERS,
-        "Content-Type, Authorization, X-Request-ID".parse().unwrap(),
+        HeaderValue::from_static("Content-Type, Authorization, X-Request-ID"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_MAX_AGE,
-        "3600".parse().unwrap(),
+        HeaderValue::from_static("3600"),
     );
 }

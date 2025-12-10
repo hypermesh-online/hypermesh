@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use http::{Method, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
-use tracing::{info, Level};
+use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use trustchain::ca::TrustChainCA;
@@ -122,6 +122,30 @@ struct AuthCertificateResponse {
     permissions: Vec<String>,
 }
 
+/// Helper to build JSON response with proper error handling
+fn build_json_response<T: Serialize>(data: T, request_id: String) -> Response<Vec<u8>> {
+    match serde_json::to_vec(&ApiResponse::success(data, request_id)) {
+        Ok(body) => Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "application/json")
+            .body(body)
+            .unwrap_or_else(|e| {
+                error!("Failed to build response: {}", e);
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(vec![])
+                    .unwrap_or_default()
+            }),
+        Err(e) => {
+            error!("Failed to serialize response: {}", e);
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(vec![])
+                .unwrap_or_default()
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize rustls crypto provider
@@ -151,16 +175,7 @@ async fn main() -> Result<()> {
                     endpoints_available: 15,
                 };
 
-                let body = serde_json::to_vec(&ApiResponse::success(
-                    response,
-                    uuid::Uuid::new_v4().to_string(),
-                )).unwrap_or_default();
-
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("content-type", "application/json")
-                    .body(body)
-                    .unwrap()
+                build_json_response(response, uuid::Uuid::new_v4().to_string())
             }
         })
         .get("/api/v1/trustchain/status", |_req| async move {
@@ -172,16 +187,7 @@ async fn main() -> Result<()> {
                 dns_zones: 32,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .get("/api/v1/trustchain/metrics", |_req| async move {
             let response = MetricsResponse {
@@ -191,16 +197,7 @@ async fn main() -> Result<()> {
                 error_rate: 0.001,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         // Certificate Management endpoints
         .get("/api/v1/trustchain/certificates", |_req| async move {
@@ -213,16 +210,7 @@ async fn main() -> Result<()> {
                 },
             ];
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                certificates,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(certificates, uuid::Uuid::new_v4().to_string())
         })
         .post("/api/v1/trustchain/certificates/issue", |req| async move {
             // In production, this would parse the request body and issue a real certificate
@@ -233,16 +221,7 @@ async fn main() -> Result<()> {
                 expires_at: chrono::Utc::now().timestamp() + 86400 * 365,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .post("/api/v1/trustchain/certificates/validate", |_req| async move {
             let response = ValidationResponse {
@@ -253,21 +232,12 @@ async fn main() -> Result<()> {
                 not_after: chrono::Utc::now().timestamp() + 86400 * 364,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .get("/api/v1/trustchain/certificates/{id}", |req| async move {
             // Extract certificate ID from path
             let path = req.uri().path();
-            let cert_id = path.split('/').last().unwrap_or("unknown");
+            let cert_id = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
 
             let response = CertificateResponse {
                 certificate_id: cert_id.to_string(),
@@ -276,16 +246,7 @@ async fn main() -> Result<()> {
                 expires_at: chrono::Utc::now().timestamp() + 86400 * 364,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .post("/api/v1/trustchain/certificates/revoke", |_req| async move {
             let response = serde_json::json!({
@@ -294,16 +255,7 @@ async fn main() -> Result<()> {
                 "reason": "key_compromise"
             });
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         // DNS-as-Asset endpoints
         .post("/api/v1/trustchain/dns/resolve", |_req| async move {
@@ -314,16 +266,7 @@ async fn main() -> Result<()> {
                 ttl: 300,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .get("/api/v1/trustchain/dns/zones", |_req| async move {
             let zones = vec![
@@ -339,16 +282,7 @@ async fn main() -> Result<()> {
                 }),
             ];
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                zones,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(zones, uuid::Uuid::new_v4().to_string())
         })
         .post("/api/v1/trustchain/dns/register", |_req| async move {
             let response = DnsRegisterResponse {
@@ -357,20 +291,11 @@ async fn main() -> Result<()> {
                 blockchain_height: 12346,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .get("/api/v1/trustchain/dns/record/{domain}", |req| async move {
             let path = req.uri().path();
-            let domain = path.split('/').last().unwrap_or("unknown");
+            let domain = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
 
             let response = serde_json::json!({
                 "domain": domain,
@@ -390,16 +315,7 @@ async fn main() -> Result<()> {
                 "asset_id": "asset_dns_123"
             });
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         // Consensus endpoints
         .get("/api/v1/trustchain/consensus/status", |_req| async move {
@@ -410,16 +326,7 @@ async fn main() -> Result<()> {
                 finality_threshold: 0.67,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .post("/api/v1/trustchain/consensus/validate", |_req| async move {
             let response = serde_json::json!({
@@ -429,20 +336,11 @@ async fn main() -> Result<()> {
                 "timestamp": chrono::Utc::now().timestamp()
             });
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
         .get("/api/v1/trustchain/consensus/proofs/{asset_id}", |req| async move {
             let path = req.uri().path();
-            let asset_id = path.split('/').last().unwrap_or("unknown");
+            let asset_id = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
 
             let response = ProofValidationResponse {
                 asset_id: asset_id.to_string(),
@@ -456,16 +354,7 @@ async fn main() -> Result<()> {
                 consensus_achieved: true,
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         })
 
         // 10. Authentication endpoint
@@ -484,16 +373,7 @@ async fn main() -> Result<()> {
                 ],
             };
 
-            let body = serde_json::to_vec(&ApiResponse::success(
-                response,
-                uuid::Uuid::new_v4().to_string(),
-            )).unwrap_or_default();
-
-            Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(body)
-                .unwrap()
+            build_json_response(response, uuid::Uuid::new_v4().to_string())
         });
 
     // Start server on IPv6 localhost port 50053 using STOQ transport
