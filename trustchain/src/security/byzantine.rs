@@ -512,7 +512,11 @@ impl ByzantineDetector {
             })
             .collect();
 
-        suspicious_nodes.sort_by(|a, b| b.confidence_score.partial_cmp(&a.confidence_score).unwrap());
+        suspicious_nodes.sort_by(|a, b| {
+            b.confidence_score
+                .partial_cmp(&a.confidence_score)
+                .unwrap_or(std::cmp::Ordering::Equal)  // Handle NaN gracefully
+        });
         suspicious_nodes.truncate(5);
 
         Ok(ByzantineDetectionSummary {

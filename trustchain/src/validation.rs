@@ -4,6 +4,12 @@
 use anyhow::{Result, anyhow};
 use regex::Regex;
 use std::net::Ipv6Addr;
+use once_cell::sync::Lazy;
+
+// Compile regex once at startup (safe: static regex pattern)
+static NODE_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^[a-zA-Z0-9-]+$").expect("Invalid node ID regex pattern")
+});
 
 /// Validate node ID format
 pub fn validate_node_id(node_id: &str) -> Result<()> {
@@ -16,8 +22,7 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
     }
 
     // Must be alphanumeric with hyphens
-    let re = Regex::new(r"^[a-zA-Z0-9-]+$").unwrap();
-    if !re.is_match(node_id) {
+    if !NODE_ID_REGEX.is_match(node_id) {
         return Err(anyhow!("Invalid node ID format"));
     }
 
