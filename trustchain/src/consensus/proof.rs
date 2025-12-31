@@ -57,7 +57,12 @@ async fn generate_storage_commitment(storage_path: &str) -> Result<String> {
     // Generate cryptographic commitment to storage
     let mut hasher = Sha256::new();
     hasher.update(storage_path.as_bytes());
-    hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_le_bytes());
+
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| anyhow!("System time error: {}", e))?
+        .as_secs();
+    hasher.update(&timestamp.to_le_bytes());
 
     Ok(format!("{:x}", hasher.finalize()))
 }
@@ -81,7 +86,12 @@ async fn generate_work_challenges() -> Result<Vec<String>> {
     for i in 0..3 {
         let mut hasher = Sha256::new();
         hasher.update(&(i as u32).to_le_bytes());
-        hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_le_bytes());
+
+        let timestamp_nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|e| anyhow!("System time error: {}", e))?
+            .as_nanos();
+        hasher.update(&timestamp_nanos.to_le_bytes());
         hasher.update(&rand::thread_rng().gen::<u64>().to_le_bytes());
 
         challenges.push(format!("{:x}", hasher.finalize()));
@@ -157,10 +167,16 @@ impl StakeProof {
 
     pub fn sign(&self) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(format!("{}-{}-{}", 
-            self.stake_holder_id, 
-            self.stake_amount, 
-            self.stake_timestamp.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
+
+        let timestamp = self.stake_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        hasher.update(format!("{}-{}-{}",
+            self.stake_holder_id,
+            self.stake_amount,
+            timestamp
         ));
         format!("{:x}", hasher.finalize())
     }
@@ -227,7 +243,12 @@ impl TimeProof {
         let proof_hash = {
             let mut hasher = Sha256::new();
             hasher.update(&network_time_offset.as_micros().to_le_bytes());
-            hasher.update(&time_verification_timestamp.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros().to_le_bytes());
+
+            let timestamp_micros = time_verification_timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_micros())
+                .unwrap_or(0);
+            hasher.update(&timestamp_micros.to_le_bytes());
             hasher.update(&nonce.to_le_bytes());
             hasher.finalize().to_vec()
         };
@@ -261,19 +282,23 @@ impl TimeProof {
     /// Serialize for network transmission
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        
+
         // Serialize network_time_offset
         bytes.extend_from_slice(&self.network_time_offset.as_micros().to_le_bytes());
-        
+
         // Serialize time_verification_timestamp
-        bytes.extend_from_slice(&self.time_verification_timestamp.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros().to_le_bytes());
-        
+        let timestamp_micros = self.time_verification_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_micros())
+            .unwrap_or(0);
+        bytes.extend_from_slice(&timestamp_micros.to_le_bytes());
+
         // Serialize nonce
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
-        
+
         // Serialize proof_hash
         bytes.extend_from_slice(&self.proof_hash);
-        
+
         bytes
     }
 
@@ -316,9 +341,14 @@ impl Proof for TimeProof {
         // Validate proof hash
         let mut hasher = Sha256::new();
         hasher.update(&self.network_time_offset.as_micros().to_le_bytes());
-        hasher.update(&self.time_verification_timestamp.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros().to_le_bytes());
+
+        let timestamp_micros = self.time_verification_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_micros())
+            .unwrap_or(0);
+        hasher.update(&timestamp_micros.to_le_bytes());
         hasher.update(&self.nonce.to_le_bytes());
-        
+
         let expected_hash = hasher.finalize().to_vec();
         expected_hash == self.proof_hash
     }
@@ -326,8 +356,18 @@ impl Proof for TimeProof {
 
 impl PartialEq for TimeProof {
     fn eq(&self, other: &Self) -> bool {
+        // Compare timestamps at microsecond precision (serialization granularity)
+        let self_micros = self.time_verification_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_micros())
+            .unwrap_or(0);
+        let other_micros = other.time_verification_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_micros())
+            .unwrap_or(0);
+
         self.network_time_offset == other.network_time_offset &&
-        self.time_verification_timestamp == other.time_verification_timestamp &&
+        self_micros == other_micros &&
         self.nonce == other.nonce &&
         self.proof_hash == other.proof_hash
     }

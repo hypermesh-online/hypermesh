@@ -69,7 +69,8 @@ async fn main() -> Result<()> {
         .get_matches();
 
     // Initialize logging
-    let log_level = matches.get_one::<String>("log-level").unwrap();
+    let log_level = matches.get_one::<String>("log-level")
+        .ok_or_else(|| anyhow!("Log level argument missing"))?;
     let log_filter = match log_level.as_str() {
         "trace" => "trace",
         "debug" => "debug",
@@ -89,14 +90,18 @@ async fn main() -> Result<()> {
     info!("Starting HyperMesh Consensus Server v0.1.0");
 
     // Parse configuration
-    let bind_address = matches.get_one::<String>("bind").unwrap().to_string();
+    let bind_address = matches.get_one::<String>("bind")
+        .ok_or_else(|| anyhow!("Bind address argument missing"))?
+        .to_string();
     let port: u16 = matches.get_one::<String>("port")
-        .unwrap()
+        .ok_or_else(|| anyhow!("Port argument missing"))?
         .parse()
         .map_err(|e| anyhow!("Invalid port: {}", e))?;
-    let node_id = matches.get_one::<String>("node-id").unwrap().to_string();
+    let node_id = matches.get_one::<String>("node-id")
+        .ok_or_else(|| anyhow!("Node ID argument missing"))?
+        .to_string();
     let max_validations: usize = matches.get_one::<String>("max-validations")
-        .unwrap()
+        .ok_or_else(|| anyhow!("Max validations argument missing"))?
         .parse()
         .map_err(|e| anyhow!("Invalid max-validations: {}", e))?;
     let enable_cache = matches.contains_id("cache");

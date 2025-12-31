@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "text/plain")
                 .body(Vec::new())
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Health endpoint
         .get("/api/v1/blockmatrix/health", move |_req| {
@@ -108,7 +108,7 @@ async fn main() -> Result<()> {
                     .status(StatusCode::OK)
                     .header("content-type", "application/json")
                     .body(body)
-                    .unwrap()
+                    .unwrap_or_else(|_| Response::new(Vec::new()))
             }
         })
         // Status endpoint (blockmatrix path)
@@ -133,7 +133,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Status endpoint (hypermesh path for compatibility)
         .get("/api/v1/hypermesh/system/status", |_req| async move {
@@ -157,7 +157,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // List assets endpoint
         .get("/api/v1/blockmatrix/assets", |_req| async move {
@@ -226,7 +226,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Allocate asset endpoint
         .post("/api/v1/blockmatrix/assets/allocate", |_req| async move {
@@ -255,7 +255,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Get specific asset endpoint
         .get("/api/v1/blockmatrix/assets/{asset_id}", |req| async move {
@@ -296,7 +296,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         });
 
     // Start server on IPv6 localhost port 8446 using standard HTTP/3

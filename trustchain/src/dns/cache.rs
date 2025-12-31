@@ -41,7 +41,11 @@ impl CacheEntry {
     }
 
     fn is_expired(&self) -> bool {
-        self.created_at.elapsed().unwrap_or(Duration::ZERO).as_secs() > self.ttl as u64
+        // If system time went backwards, consider it not expired (defensive)
+        match self.created_at.elapsed() {
+            Ok(elapsed) => elapsed.as_secs() > self.ttl as u64,
+            Err(_) => false, // Time error - assume not expired to avoid cache poisoning
+        }
     }
 
     fn access(&mut self) -> DnsResponse {

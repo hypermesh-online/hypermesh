@@ -3,6 +3,7 @@
 //! Validates deployment readiness and security compliance.
 //! Prevents deployment of systems with security theater.
 
+use anyhow::{Result, anyhow};
 use clap::{Arg, ArgAction, Command, value_parser};
 use std::path::PathBuf;
 use tracing::{info, error};
@@ -43,8 +44,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .get_matches();
 
-    let source_path = matches.get_one::<PathBuf>("source-path").unwrap();
-    let _output_format = matches.get_one::<String>("output-format").unwrap();
+    let source_path = matches.get_one::<PathBuf>("source-path")
+        .ok_or_else(|| anyhow!("Source path argument missing"))?;
+    let _output_format = matches.get_one::<String>("output-format")
+        .ok_or_else(|| anyhow!("Output format argument missing"))?;
     let _strict_mode = matches.get_flag("strict");
 
     if !source_path.exists() {

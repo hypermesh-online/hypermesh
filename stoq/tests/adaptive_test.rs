@@ -12,7 +12,7 @@ use tracing::{info, debug};
 /// Test that configuration changes affect live connections
 #[tokio::test]
 async fn test_live_connection_adaptation() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     // Create transport with initial config
     let mut config = TransportConfig::default();
@@ -88,7 +88,7 @@ async fn test_live_connection_adaptation() {
 /// Test automatic network tier detection
 #[tokio::test]
 async fn test_tier_detection() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let config = TransportConfig::default();
     let transport = StoqTransport::new(config).await.unwrap();
@@ -147,7 +147,7 @@ async fn test_tier_detection() {
 /// Test hysteresis prevents parameter thrashing
 #[tokio::test]
 async fn test_hysteresis() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let config = TransportConfig::default();
     let transport = StoqTransport::new(config).await.unwrap();
@@ -199,7 +199,7 @@ async fn test_hysteresis() {
 /// Test that adaptation can be disabled
 #[tokio::test]
 async fn test_disable_adaptation() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let config = TransportConfig::default();
     let transport = StoqTransport::new(config).await.unwrap();
@@ -247,7 +247,7 @@ async fn test_disable_adaptation() {
 /// Test connection-specific tier setting
 #[tokio::test]
 async fn test_manual_tier_setting() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let config = TransportConfig::default();
     let transport = StoqTransport::new(config).await.unwrap();
@@ -291,12 +291,12 @@ async fn test_manual_tier_setting() {
 /// Integration test simulating real network changes
 #[tokio::test]
 async fn test_real_network_simulation() {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let mut config = TransportConfig::default();
     config.bind_address = Ipv6Addr::UNSPECIFIED;
 
-    let mut transport = StoqTransport::new(config.clone()).await.unwrap();
+    let transport = StoqTransport::new(config.clone()).await.unwrap();
 
     transport.start_adaptation().await;
 
@@ -364,7 +364,7 @@ async fn test_real_network_simulation() {
 async fn test_adaptation_overhead() {
     use std::time::Instant;
 
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init();
 
     let config = TransportConfig::default();
     let transport = StoqTransport::new(config).await.unwrap();

@@ -225,7 +225,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "text/plain")
                 .body(Vec::new())
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Health endpoint
         .get("/api/v1/blockmatrix/health", move |_req| {
@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
                     .status(StatusCode::OK)
                     .header("content-type", "application/json")
                     .body(body)
-                    .unwrap()
+                    .unwrap_or_else(|_| Response::new(Vec::new()))
             }
         })
         // Status endpoint
@@ -273,7 +273,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // List assets endpoint
         .get("/api/v1/blockmatrix/assets", |_req| async move {
@@ -371,7 +371,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Allocate asset endpoint
         .post("/api/v1/blockmatrix/assets/allocate", |req| async move {
@@ -400,7 +400,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Get specific asset endpoint
         .get("/api/v1/blockmatrix/assets/{asset_id}", |req| async move {
@@ -453,7 +453,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
 
         // NEW WEEK 1 ENDPOINTS
@@ -495,7 +495,7 @@ async fn main() -> Result<()> {
                     .status(StatusCode::OK)
                     .header("content-type", "application/json")
                     .body(body)
-                    .unwrap()
+                    .unwrap_or_else(|_| Response::new(Vec::new()))
             }
         })
 
@@ -567,7 +567,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
 
         // 4. HyperMesh Allocations endpoint
@@ -622,7 +622,7 @@ async fn main() -> Result<()> {
                     .status(StatusCode::OK)
                     .header("content-type", "application/json")
                     .body(body)
-                    .unwrap()
+                    .unwrap_or_else(|_| Response::new(Vec::new()))
             }
         })
 
@@ -656,7 +656,7 @@ async fn main() -> Result<()> {
                         .status(StatusCode::OK)
                         .header("content-type", "application/json")
                         .body(body)
-                        .unwrap()
+                        .unwrap_or_else(|_| Response::new(Vec::new()))
                 }
             }
         })
@@ -711,7 +711,7 @@ async fn main() -> Result<()> {
                         .status(StatusCode::OK)
                         .header("content-type", "application/json")
                         .body(body)
-                        .unwrap()
+                        .unwrap_or_else(|_| Response::new(Vec::new()))
                 }
             }
         })
@@ -766,7 +766,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         })
 
         // 8. STOQ Performance Metrics endpoint
@@ -797,7 +797,7 @@ async fn main() -> Result<()> {
                         .status(StatusCode::OK)
                         .header("content-type", "application/json")
                         .body(body)
-                        .unwrap()
+                        .unwrap_or_else(|_| Response::new(Vec::new()))
                 }
             }
         })
@@ -851,7 +851,7 @@ async fn main() -> Result<()> {
                 .status(StatusCode::OK)
                 .header("content-type", "application/json")
                 .body(body)
-                .unwrap()
+                .unwrap_or_else(|_| Response::new(Vec::new()))
         });
 
     // Start server on IPv6 localhost port 8446 using STOQ transport

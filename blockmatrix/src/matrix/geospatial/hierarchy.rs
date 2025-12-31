@@ -109,7 +109,11 @@ impl GeographicBounds {
     }
 
     /// Get the center point of these bounds
-    pub fn center(&self) -> GpsCoordinate {
+    ///
+    /// # Errors
+    ///
+    /// Returns `GpsError` if calculated center coordinates are invalid.
+    pub fn center(&self) -> Result<GpsCoordinate, GpsError> {
         let lat = (self.min_latitude + self.max_latitude) / 2.0;
 
         // Handle date line crossing for longitude
@@ -126,8 +130,7 @@ impl GeographicBounds {
             (self.min_longitude + self.max_longitude) / 2.0
         };
 
-        // Safe to unwrap as we know values are valid
-        GpsCoordinate::at_sea_level(lat, lon).unwrap()
+        GpsCoordinate::at_sea_level(lat, lon)
     }
 }
 
@@ -338,14 +341,20 @@ impl GeographicHierarchy {
 
     /// Populate with default geographic data
     fn populate_defaults(&mut self) {
-        // Add global zone
+        // Add global zone - these bounds are always valid
+        let global_bounds = match GeographicBounds::new(-90.0, 90.0, -180.0, 180.0) {
+            Ok(bounds) => bounds,
+            Err(_) => return, // Should never happen with valid coordinates
+        };
         let global = GeographicZone::new(
             "global".to_string(),
             "Global".to_string(),
             GeographicLevel::Global,
-            GeographicBounds::new(-90.0, 90.0, -180.0, 180.0).unwrap(),
+            global_bounds,
         );
-        self.add_zone(global).unwrap();
+        if let Err(_) = self.add_zone(global) {
+            return; // If global fails, can't continue
+        }
 
         // Add continents
         self.add_continent("north_america", "North America", 15.0, 72.0, -168.0, -52.0);
@@ -381,40 +390,52 @@ impl GeographicHierarchy {
     /// Helper to add continent
     fn add_continent(&mut self, id: &str, name: &str, min_lat: f64, max_lat: f64,
                      min_lon: f64, max_lon: f64) {
+        let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
+            Ok(b) => b,
+            Err(_) => return, // Skip invalid bounds
+        };
         let mut zone = GeographicZone::new(
             id.to_string(),
             name.to_string(),
             GeographicLevel::Continent,
-            GeographicBounds::new(min_lat, max_lat, min_lon, max_lon).unwrap(),
+            bounds,
         );
         zone.set_parent("global".to_string());
-        self.add_zone(zone).unwrap();
+        let _ = self.add_zone(zone); // Ignore errors in default population
     }
 
     /// Helper to add country
     fn add_country(&mut self, id: &str, name: &str, continent: &str,
                    min_lat: f64, max_lat: f64, min_lon: f64, max_lon: f64) {
+        let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
+            Ok(b) => b,
+            Err(_) => return, // Skip invalid bounds
+        };
         let mut zone = GeographicZone::new(
             id.to_string(),
             name.to_string(),
             GeographicLevel::Country,
-            GeographicBounds::new(min_lat, max_lat, min_lon, max_lon).unwrap(),
+            bounds,
         );
         zone.set_parent(continent.to_string());
-        self.add_zone(zone).unwrap();
+        let _ = self.add_zone(zone); // Ignore errors in default population
     }
 
     /// Helper to add city
     fn add_city(&mut self, id: &str, name: &str, country: &str,
                 min_lat: f64, max_lat: f64, min_lon: f64, max_lon: f64) {
+        let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
+            Ok(b) => b,
+            Err(_) => return, // Skip invalid bounds
+        };
         let mut zone = GeographicZone::new(
             id.to_string(),
             name.to_string(),
             GeographicLevel::City,
-            GeographicBounds::new(min_lat, max_lat, min_lon, max_lon).unwrap(),
+            bounds,
         );
         zone.set_parent(country.to_string());
-        self.add_zone(zone).unwrap();
+        let _ = self.add_zone(zone); // Ignore errors in default population
     }
 
     /// Get total number of zones
@@ -482,13 +503,13 @@ mod tests {
     #[test]
     fn test_bounds_center() {
         let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).unwrap();
-        let center = bounds.center();
+        let center = bounds.center().unwrap();
         assert_eq!(center.latitude, 45.0);
         assert_eq!(center.longitude, -75.0);
 
         // Date line crossing
         let bounds2 = GeographicBounds::new(-10.0, 10.0, 170.0, -170.0).unwrap();
-        let center2 = bounds2.center();
+        let center2 = bounds2.center().unwrap();
         assert_eq!(center2.latitude, 0.0);
         assert_eq!(center2.longitude, 180.0);
     }

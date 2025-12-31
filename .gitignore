@@ -5,3 +5,12 @@ logs/
 *.lock
 *.log
 .DS_Store
+
+# Environment and secrets
+.env
+.env.local
+.env.production
+*.key
+*.pem
+certs/*.crt
+certs/*.key

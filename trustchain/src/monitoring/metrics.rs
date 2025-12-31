@@ -184,8 +184,9 @@ impl Metrics {
                 let mut sorted = samples.clone();
                 sorted.sort_unstable();
 
-                let min = *sorted.first().unwrap();
-                let max = *sorted.last().unwrap();
+                // Safe unwraps: already checked !is_empty()
+                let min = sorted.first().copied().unwrap_or(0);
+                let max = sorted.last().copied().unwrap_or(0);
                 let avg = samples.iter().sum::<u64>() as f64 / samples.len() as f64;
                 let median = sorted[samples.len() / 2];
                 let p95_idx = ((samples.len() as f64 * 0.95) as usize).min(samples.len() - 1);

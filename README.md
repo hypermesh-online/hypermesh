@@ -61,6 +61,7 @@ Unlike traditional linear blockchains (Bitcoin, Ethereum), Block-MATRIX uses a *
 - [Architecture Overview](./docs/ARCHITECTURE.md)
 - [Deployment Guide](./docs/DEPLOYMENT.md)
 - [Development Setup](./docs/DEVELOPMENT.md)
+- [Security Configuration](./SECURITY_CONFIGURATION.md) - **Environment variables and secret management**
 - [Component Documentation](./docs/components/)
 - [API Reference](./docs/guides/api-reference.md)
 

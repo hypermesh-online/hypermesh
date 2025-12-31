@@ -277,7 +277,9 @@ impl NetworkTopology {
             })
             .collect();
 
-        nodes_with_distance.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        nodes_with_distance.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
         nodes_with_distance.truncate(count);
 
         nodes_with_distance.into_iter()
@@ -421,7 +423,11 @@ impl NetworkTopology {
 
         while let Some(current_id) = queue.pop_front() {
             if let Some(current_node) = self.nodes.get(&current_id) {
-                let current_distance = *distances.get(&current_id).unwrap();
+                // Safe: we only add to queue if distance is known
+                let current_distance = match distances.get(&current_id) {
+                    Some(&dist) => dist,
+                    None => continue, // Skip if distance unknown
+                };
 
                 for peer_id in &current_node.peers {
                     if !distances.contains_key(peer_id) {

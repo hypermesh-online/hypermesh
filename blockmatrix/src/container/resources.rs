@@ -370,7 +370,11 @@ impl ResourceManager for CgroupResourceManager {
         let history = self.usage_history.read().await;
         if let Some(container_history) = history.get(id) {
             if container_history.len() >= 2 {
-                let current = container_history.last().unwrap();
+                // Safe: len() >= 2 guarantees last() and penultimate exist
+                let current = container_history.last()
+                    .ok_or_else(|| ContainerError::Resource {
+                        message: format!("Missing usage history for container {:?}", id)
+                    })?;
                 let previous = &container_history[container_history.len() - 2];
                 
                 // Calculate memory growth rate
