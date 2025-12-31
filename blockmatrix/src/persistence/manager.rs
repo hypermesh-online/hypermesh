@@ -219,7 +219,9 @@ impl PersistenceManager {
         let storage_dir = if config.storage_dir.starts_with("~") {
             let home = dirs::home_dir()
                 .ok_or_else(|| PersistenceError::InvalidPath("Cannot determine home directory".to_string()))?;
-            home.join(config.storage_dir.strip_prefix("~").unwrap())
+            let relative_path = config.storage_dir.strip_prefix("~")
+                .map_err(|_| PersistenceError::InvalidPath("Invalid home directory path".to_string()))?;
+            home.join(relative_path)
         } else {
             config.storage_dir.clone()
         };
@@ -291,7 +293,9 @@ impl PersistenceManager {
             .join("matrix")
             .join("coordinates.bin");
 
-        std::fs::create_dir_all(state_file.parent().unwrap())?;
+        let parent_dir = state_file.parent()
+            .ok_or_else(|| PersistenceError::InvalidPath("Invalid state file path".to_string()))?;
+        std::fs::create_dir_all(parent_dir)?;
         std::fs::write(&state_file, serialized)?;
 
         info!("Saved matrix state ({} neighbors, {} cache entries)",
@@ -530,9 +534,11 @@ impl PersistenceManager {
     /// Get storage directory
     fn get_storage_dir(&self) -> PathBuf {
         if self.config.storage_dir.starts_with("~") {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join(self.config.storage_dir.strip_prefix("~").unwrap())
+            let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+            // Safe: we already checked it starts with "~" above
+            let relative = self.config.storage_dir.strip_prefix("~")
+                .unwrap_or_else(|_| &self.config.storage_dir);
+            home.join(relative)
         } else {
             self.config.storage_dir.clone()
         }

@@ -12,6 +12,37 @@ use parking_lot::RwLock;
 use tracing::{debug, info, warn};
 use serde::{Serialize, Deserialize};
 
+/// Service type enumeration for discovery
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ServiceType {
+    /// Caesar wallet/exchange service
+    Caesar,
+    /// BlockMatrix coordination service
+    BlockMatrix,
+    /// TrustChain CA service
+    TrustChain,
+    /// Catalog VM service
+    Catalog,
+    /// STOQ transport service
+    Stoq,
+    /// HyperMesh dashboard
+    HyperMesh,
+}
+
+impl std::fmt::Display for ServiceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ServiceType::Caesar => "caesar",
+            ServiceType::BlockMatrix => "blockmatrix",
+            ServiceType::TrustChain => "trustchain",
+            ServiceType::Catalog => "catalog",
+            ServiceType::Stoq => "stoq",
+            ServiceType::HyperMesh => "hypermesh",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Service endpoint information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEndpoint {

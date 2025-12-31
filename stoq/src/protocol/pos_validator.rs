@@ -12,6 +12,52 @@ use tracing::{debug, warn, info};
 use bytes::Bytes;
 use serde::{Serialize, Deserialize};
 
+/// Backward compatibility alias for old test API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofData<T = ()> {
+    pub storage_commitment: Vec<u8>,
+    pub location: String,
+    pub size_bytes: u64,
+    pub merkle_root: Vec<u8>,
+    pub stake_amount: u64,
+    pub owner_pubkey: Vec<u8>,
+    pub lock_period_blocks: u64,
+    pub delegation_proof: Vec<u8>,
+    pub computation_hash: Vec<u8>,
+    pub difficulty_target: u64,
+    pub resource_type: String,
+    pub nonce: u64,
+    pub timestamp: SystemTime,
+    pub vdf_proof: Vec<u8>,
+    pub chain_height: u64,
+    pub previous_block: Vec<u8>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl Default for ProofData {
+    fn default() -> Self {
+        Self {
+            storage_commitment: Vec::new(),
+            location: String::new(),
+            size_bytes: 0,
+            merkle_root: Vec::new(),
+            stake_amount: 0,
+            owner_pubkey: Vec::new(),
+            lock_period_blocks: 0,
+            delegation_proof: Vec::new(),
+            computation_hash: Vec::new(),
+            difficulty_target: 0,
+            resource_type: String::new(),
+            nonce: 0,
+            timestamp: SystemTime::UNIX_EPOCH,
+            vdf_proof: Vec::new(),
+            chain_height: 0,
+            previous_block: Vec::new(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
 /// Proof of State token structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PosToken {
@@ -35,6 +81,10 @@ pub struct PosToken {
 
     /// Token expiry time
     pub expires_at: SystemTime,
+
+    /// Backward compatibility: issuer public key
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_pubkey: Option<Vec<u8>>,
 }
 
 /// Proof of Space component
@@ -408,6 +458,7 @@ mod tests {
     fn create_test_token() -> PosToken {
         PosToken {
             id: vec![1, 2, 3, 4],
+            issuer_pubkey: Some(vec![20, 21, 22, 23]),
             proof_of_space: ProofOfSpace {
                 commitment_hash: vec![5, 6, 7, 8],
                 matrix_position: (1, 2, 3),

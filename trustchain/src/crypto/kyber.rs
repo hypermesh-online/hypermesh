@@ -140,7 +140,7 @@ impl KyberCrypto {
             })?;
         
         // Perform Kyber-1024 key encapsulation
-        let (ciphertext_kem, shared_secret) = kyber1024::encapsulate(&public_key_native);
+        let (shared_secret, ciphertext_kem) = kyber1024::encapsulate(&public_key_native);
         
         // Use shared secret as AES key for symmetric encryption
         let symmetric_key = self.derive_symmetric_key(shared_secret.as_bytes());

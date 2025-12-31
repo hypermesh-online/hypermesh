@@ -145,7 +145,12 @@ impl MerkleLog {
             })?;
 
         // Simplified proof - just return root hash
-        let proof_hashes = vec![self.merkle_root.unwrap()];
+        let root_hash = self.merkle_root
+            .ok_or_else(|| CTError::MerkleTree {
+                operation: "generate_inclusion_proof".to_string(),
+                reason: "Merkle root not initialized".to_string(),
+            })?;
+        let proof_hashes = vec![root_hash];
 
         debug!("Generated simplified inclusion proof for entry {}: {} hashes", 
                entry.sequence_number, proof_hashes.len());
@@ -200,7 +205,11 @@ impl MerkleLog {
             old_hasher.update(&entry.leaf_hash);
         }
         let old_root = old_hasher.finalize().into();
-        let new_root = self.merkle_root.unwrap();
+        let new_root = self.merkle_root
+            .ok_or_else(|| CTError::MerkleTree {
+                operation: "generate_consistency_proof".to_string(),
+                reason: "Merkle root not initialized".to_string(),
+            })?;
         
         if old_root == new_root {
             // Trees are identical

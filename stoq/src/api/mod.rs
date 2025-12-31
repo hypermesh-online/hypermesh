@@ -16,6 +16,9 @@ use crate::transport::{StoqTransport, Connection, Endpoint};
 
 pub mod service_discovery;
 
+// Re-exports for backward compatibility
+pub use service_discovery::{ServiceType, ServiceEndpoint, ServiceDiscovery, ServiceMetadata};
+
 /// API request over STOQ protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRequest {

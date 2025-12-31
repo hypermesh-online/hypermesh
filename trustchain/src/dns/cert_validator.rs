@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use tracing::{debug, warn, error};
 
-use crate::errors::{DnsError, Result as TrustChainResult};
+use crate::errors::{DnsError, TrustChainError, Result as TrustChainResult};
 
 /// Certificate validator for DNS domains
 pub struct CertificateValidator {
@@ -273,7 +273,11 @@ impl ConfigurableCertificateValidator {
         }
 
         error!("Certificate validation failed for {} after {} attempts", domain, attempts);
-        Err(last_error.unwrap())
+        Err(last_error.unwrap_or_else(|| {
+            TrustChainError::DnsResolver(DnsError::CertificateValidationFailed {
+                domain: domain.to_string(),
+            })
+        }))
     }
 
     /// Get validation statistics

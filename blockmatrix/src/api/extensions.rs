@@ -139,7 +139,10 @@ impl ApiHandler for GetExtensionHandler {
             .await
             .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {}", id)))?;
 
-        Ok(json_response(req.id, serde_json::to_value(info).unwrap()))
+        let value = serde_json::to_value(info)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize extension info: {}", e)))?;
+
+        Ok(json_response(req.id, value))
     }
 }
 
@@ -320,7 +323,10 @@ impl ApiHandler for HandleExtensionRequestHandler {
                 ApiError::HandlerError(format!("Failed to handle request: {}", e))
             })?;
 
-        Ok(json_response(req.id, serde_json::to_value(response).unwrap()))
+        let value = serde_json::to_value(response)
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize response: {}", e)))?;
+
+        Ok(json_response(req.id, value))
     }
 }
 

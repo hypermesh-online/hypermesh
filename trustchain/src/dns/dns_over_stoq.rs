@@ -96,12 +96,14 @@ impl Default for DnsOverStoqConfig {
             dns_servers: vec![
                 ServiceEndpoint::new(
                     ServiceType::Dns,
-                    "2001:4860:4860::8888".parse().unwrap(), // Google DNS
+                    // Google DNS - literal IPv6 address is valid, parse is safe
+                    Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888),
                     853
                 ).with_service_name("dns.google".to_string()),
                 ServiceEndpoint::new(
                     ServiceType::Dns,
-                    "2001:4860:4860::8844".parse().unwrap(), // Google DNS Secondary
+                    // Google DNS Secondary - literal IPv6 address
+                    Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8844),
                     853
                 ).with_service_name("dns.google".to_string()),
             ],
@@ -163,12 +165,12 @@ impl DnsOverStoq {
                     return Ok(response);
                 }
                 Err(e) => {
-                    last_error = Some(e);
                     if attempt < self.config.max_retries {
-                        warn!("DNS query attempt {} failed for {}, retrying: {}", 
-                              attempt + 1, query.name, last_error.as_ref().unwrap());
+                        warn!("DNS query attempt {} failed for {}, retrying: {}",
+                              attempt + 1, query.name, e);
                         tokio::time::sleep(self.config.retry_delay).await;
                     }
+                    last_error = Some(e);
                 }
             }
         }

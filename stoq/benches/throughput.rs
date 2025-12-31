@@ -227,8 +227,7 @@ fn benchmark_data_handling(c: &mut Criterion) {
             
             // Simulate packet processing for adaptive network tiers
             let packet_size = 1500; // Ethernet MTU
-            let packets_for_adaptive network tiers
-            
+
             let start = Instant::now();
             
             // Simulate processing packets at adaptive network tiers rate
