@@ -45,7 +45,7 @@ pub struct PrivacyViolation {
     pub details: ViolationDetails,
 
     /// Response taken
-    pub response: Option<super::config::EnforcementAction>,
+    pub response: Option<super::types::EnforcementAction>,
 
     /// Resolution status
     pub resolution_status: ResolutionStatus,

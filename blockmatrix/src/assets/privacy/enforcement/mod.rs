@@ -10,19 +10,25 @@ use super::{PrivacyAllocationResult, allocation_types::PrivacyAllocationType};
 
 // Module declarations
 pub mod config;
+pub mod types;
 pub mod violations;
 pub mod analysis;
 
 // Re-exports for convenience
 pub use config::{
     PrivacyEnforcementConfig, RealtimeMonitoringConfig, ViolationResponseConfig,
-    PatternAnalysisConfig, RiskThresholdConfig, EnforcementAction, AccessRestriction,
+    PatternAnalysisConfig, RiskThresholdConfig, AnomalyDetectionConfig,
+    ViolationNotificationConfig,
+};
+
+pub use types::{
+    EnforcementAction, AccessRestriction,
     AutoResponseTrigger, TriggerCondition, DataExposureRiskLevel, DataCollectionSettings,
-    EscalationRule, ViolationNotificationConfig, NotificationChannel, NotificationChannelType,
+    EscalationRule, NotificationChannel, NotificationChannelType,
     NotificationThrottling, RecoveryProcedures, AutoRecoveryConfig, RecoveryStrategy,
     ManualRecoveryProcedure, RecoveryValidationStep, RecoveryStep, RecoveryStepType,
     ValidationCriteria, ValidationType, PatternAnalysisAlgorithm, AlgorithmType,
-    AnomalyDetectionConfig, FalsePositiveReduction, AnomalyCategory, RiskLevelThresholds,
+    FalsePositiveReduction, AnomalyCategory, RiskLevelThresholds,
 };
 
 pub use violations::{
