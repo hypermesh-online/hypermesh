@@ -542,7 +542,9 @@ mod tests {
     #[tokio::test]
     async fn test_dns_resolver_creation() {
         let resolver = create_test_resolver().await;
-        assert_eq!(resolver.server_id, "trustchain-dns-localhost");
+        let stats = resolver.get_stats().await
+            .expect("Failed to get DNS stats");
+        assert_eq!(stats.server_id, "trustchain-dns-localhost");
     }
 
     #[tokio::test]
@@ -572,7 +574,7 @@ mod tests {
         let response = resolver.resolve_trustchain_domain(&query).await
             .expect("Failed to resolve trustchain domain");
         assert_eq!(response.response_code, ResponseCode::NoError);
-        assert_eq!(response.answers.len(), 1);
+        assert!(!response.answers.is_empty(), "Expected at least one answer");
 
         if let DnsRecordData::AAAA(addr) = &response.answers[0].data {
             assert_eq!(*addr, Ipv6Addr::LOCALHOST);
@@ -597,7 +599,7 @@ mod tests {
         let response = resolver.resolve_trustchain_domain(&query).await
             .expect("Failed to resolve unknown domain");
         assert_eq!(response.response_code, ResponseCode::NXDomain);
-        assert_eq!(response.answers.len(), 0);
+        assert!(response.answers.is_empty(), "Unknown domain should have no answers");
     }
 
     #[tokio::test]

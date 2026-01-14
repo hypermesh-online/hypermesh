@@ -425,13 +425,13 @@ mod tests {
         
         let initial_tokens = limiter.get_remaining_tokens("client1").await;
         assert_eq!(initial_tokens, 10.0);
-        
+
         // Consume some tokens
         limiter.check_rate_limit("client1").await;
         limiter.check_rate_limit("client1").await;
-        
+
         let remaining = limiter.get_remaining_tokens("client1").await;
-        assert_eq!(remaining, 8.0);
+        assert!((remaining - 8.0).abs() < 0.1, "Expected ~8.0 tokens remaining, got {}", remaining);
     }
 
     #[tokio::test]

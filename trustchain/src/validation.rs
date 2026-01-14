@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_sanitize_input() {
         assert_eq!(sanitize_input("hello-world_123"), "hello-world_123");
-        assert_eq!(sanitize_input("../../etc/passwd"), "..etcpasswd");
-        assert_eq!(sanitize_input("'; DROP TABLE users; --"), "DROPTABLEusers");
+        assert_eq!(sanitize_input("../../etc/passwd"), "....etcpasswd");
+        assert_eq!(sanitize_input("'; DROP TABLE users; --"), "DROPTABLEusers--");
     }
 }

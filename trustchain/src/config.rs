@@ -470,8 +470,11 @@ impl TrustChainConfig {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<()> {
-        // Validate port conflicts
-        let mut ports = vec![self.ca.port, self.ct.port, self.dns.quic_port, self.api.port];
+        // Validate port conflicts (skip port 0 which means OS-assigned)
+        let mut ports: Vec<u16> = vec![self.ca.port, self.ct.port, self.dns.quic_port, self.api.port]
+            .into_iter()
+            .filter(|&p| p != 0)
+            .collect();
         ports.sort();
         for window in ports.windows(2) {
             if window[0] == window[1] {
@@ -501,7 +504,10 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = TrustChainConfig::default();
-        assert!(config.validate().is_ok());
+        match config.validate() {
+            Ok(_) => {},
+            Err(e) => panic!("Config validation failed: {}", e),
+        }
     }
 
     #[test]
