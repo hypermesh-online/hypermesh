@@ -23,7 +23,17 @@ impl NodeId {
     /// Create a new random node ID
     pub fn random() -> Self {
         let mut id = [0u8; 32];
-        getrandom::getrandom(&mut id).unwrap();
+        // Use system time as fallback if getrandom fails
+        if getrandom::getrandom(&mut id).is_err() {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            for (i, byte) in id.iter_mut().enumerate() {
+                *byte = ((nanos >> (i * 8)) & 0xFF) as u8;
+            }
+        }
         Self { id }
     }
 
@@ -678,8 +688,8 @@ mod getrandom {
         use std::time::{SystemTime, UNIX_EPOCH};
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
 
         for (i, byte) in buf.iter_mut().enumerate() {
             *byte = ((nanos >> (i * 8)) & 0xFF) as u8;

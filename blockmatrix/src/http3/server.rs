@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use h3::{quic, server::Connection};
 use h3_quinn::quinn;
 use http::{Request, Response, StatusCode};
@@ -69,20 +69,22 @@ async fn handle_connection(
 
     loop {
         match h3_conn.accept().await {
-            Ok(Some(mut request)) => {
-                match request.resolve().await {
-                    Ok((req, mut stream)) => {
-                        let router = router.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = handle_request(req, &mut stream, router).await {
-                                error!("Request handling error: {}", e);
-                            }
-                        });
+            Ok(Some(resolver)) => {
+                let router = router.clone();
+                tokio::spawn(async move {
+                    // Resolve the request
+                    let (req, mut stream) = match resolver.resolve_request().await {
+                        Ok(resolved) => resolved,
+                        Err(e) => {
+                            error!("Error resolving request: {}", e);
+                            return;
+                        }
+                    };
+
+                    if let Err(e) = handle_request(req, &mut stream, router).await {
+                        error!("Request handling error: {}", e);
                     }
-                    Err(e) => {
-                        error!("Error resolving request: {}", e);
-                    }
-                }
+                });
             }
             Ok(None) => {
                 // Connection closed
@@ -98,22 +100,32 @@ async fn handle_connection(
     Ok(())
 }
 
-async fn handle_request<T, S>(
+async fn handle_request(
     req: Request<()>,
-    stream: &mut S,
+    stream: &mut h3::server::RequestStream<h3_quinn::BidiStream<bytes::Bytes>, bytes::Bytes>,
     router: Arc<Router>,
-) -> Result<()>
-where
-    T: quic::RecvStream,
-    S: h3::server::RequestStream<T, Bytes>,
-{
+) -> Result<()> {
     let start_time = std::time::Instant::now();
     let request_id = RequestLogger::generate_request_id();
 
     // Read request body
     let mut body_bytes = Vec::new();
-    while let Some(data) = stream.recv_data().await? {
-        body_bytes.extend_from_slice(&data);
+    loop {
+        match stream.recv_data().await {
+            Ok(Some(mut data)) => {
+                // data is impl Buf, extract bytes from it
+                while data.has_remaining() {
+                    let chunk = data.chunk();
+                    body_bytes.extend_from_slice(chunk);
+                    let len = chunk.len();
+                    data.advance(len);
+                }
+            }
+            Ok(None) => break, // End of stream
+            Err(e) => {
+                return Err(e.into());
+            }
+        }
     }
 
     // Create request with body

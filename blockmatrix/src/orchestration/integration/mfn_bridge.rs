@@ -559,17 +559,16 @@ impl MfnBridge {
         
         // Simulate CPE ML prediction (validated: 1.2ms average)
         tokio::time::sleep(Duration::from_millis(1)).await;
-        
+
         // Simulate context prediction
-        let predictions = if !context_history.is_empty() {
-            let last_context = context_history.last().unwrap();
+        let predictions = if let Some(last_context) = context_history.last() {
             let mut predicted = last_context.clone();
-            
+
             // Apply simple trend prediction
             for i in 0..predicted.len() {
                 predicted[i] = (predicted[i] * 1.1).min(1.0);
             }
-            
+
             predicted
         } else {
             vec![0.5, 0.6, 0.7, 0.8, 0.9]

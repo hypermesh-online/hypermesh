@@ -109,7 +109,7 @@ async fn handle_connection(
     loop {
         // Accept incoming request
         match h3_conn.accept().await {
-            Ok(Some(mut resolver)) => {
+            Ok(Some(resolver)) => {
                 let router = router.clone();
 
                 // Spawn task to handle request

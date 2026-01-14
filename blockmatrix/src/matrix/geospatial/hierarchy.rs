@@ -330,8 +330,15 @@ impl GeographicHierarchy {
 
         // Build path ensuring parent-child relationships
         for zone in zones {
-            if path.is_empty() ||
-               path.last().unwrap().child_ids.contains(&zone.id) {
+            let should_add = if path.is_empty() {
+                true
+            } else if let Some(last_zone) = path.last() {
+                last_zone.child_ids.contains(&zone.id)
+            } else {
+                false
+            };
+
+            if should_add {
                 path.push(zone);
             }
         }

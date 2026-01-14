@@ -224,7 +224,7 @@ impl GeographicLoadBalancer {
             .min_by(|a, b| {
                 let dist_a = source.euclidean_distance(&a.coordinate);
                 let dist_b = source.euclidean_distance(&b.coordinate);
-                dist_a.partial_cmp(&dist_b).unwrap()
+                dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|n| n.coordinate)
     }
@@ -244,7 +244,7 @@ impl GeographicLoadBalancer {
             if !zone_nodes.is_empty() {
                 // Select least loaded node in zone
                 let selected = zone_nodes.iter()
-                    .min_by(|a, b| a.current_load.partial_cmp(&b.current_load).unwrap())
+                    .min_by(|a, b| a.current_load.partial_cmp(&b.current_load).unwrap_or(std::cmp::Ordering::Equal))
                     .map(|n| n.coordinate);
                 return selected;
             }
@@ -267,7 +267,7 @@ impl GeographicLoadBalancer {
                 let dist_b = source.euclidean_distance(&b.coordinate);
                 let score_b = dist_b * (1.0 + b.avg_response_time / 1000.0);
 
-                score_a.partial_cmp(&score_b).unwrap()
+                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|n| n.coordinate)
     }

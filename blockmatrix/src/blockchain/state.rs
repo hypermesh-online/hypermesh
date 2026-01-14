@@ -181,7 +181,15 @@ impl ChainStateManager {
 
         // Determine index range
         let start_index = query.from_index.unwrap_or(0);
-        let end_index = query.to_index.unwrap_or(u64::MAX);
+
+        // If no end_index specified and no limit, scan from cache to determine max index
+        let max_index = if query.to_index.is_none() && query.limit.is_none() {
+            let cache = self.block_cache.read().await;
+            cache.keys().max().copied().unwrap_or(start_index + 1000)
+        } else {
+            query.to_index.unwrap_or(start_index + 1000)
+        };
+        let end_index = max_index;
 
         // Load blocks from cache and disk
         let cache = self.block_cache.read().await;

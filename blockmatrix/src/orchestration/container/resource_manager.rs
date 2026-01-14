@@ -286,18 +286,21 @@ impl IfrResourceManager {
 
         match self.mfn_bridge.execute_operation(operation).await? {
             crate::orchestration::integration::mfn_bridge::LayerResponse::IfkResult { found, resource_data, .. } => {
-                if found && resource_data.is_some() {
-                    // Parse resource data to extract suitable nodes
-                    let data = resource_data.unwrap();
-                    let mut suitable_nodes = Vec::new();
-                    
-                    // Simulate node discovery based on resource data
-                    // In a real implementation, this would query the actual resource registry
-                    for i in 1..=3 {
-                        suitable_nodes.push(format!("node-{}", i));
+                if found {
+                    if let Some(data) = resource_data {
+                        // Parse resource data to extract suitable nodes
+                        let mut suitable_nodes = Vec::new();
+
+                        // Simulate node discovery based on resource data
+                        // In a real implementation, this would query the actual resource registry
+                        for i in 1..=3 {
+                            suitable_nodes.push(format!("node-{}", i));
+                        }
+
+                        Ok(suitable_nodes)
+                    } else {
+                        Ok(Vec::new())
                     }
-                    
-                    Ok(suitable_nodes)
                 } else {
                     Ok(Vec::new())
                 }

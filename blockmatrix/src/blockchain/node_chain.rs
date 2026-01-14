@@ -137,6 +137,13 @@ impl NodeBlockchain {
             return Err(format!("Block {} already exists", block.index));
         }
 
+        // Get previous block for time calculation before inserting new block
+        let prev_block = if block.index > 0 {
+            blocks.get(&(block.index - 1)).cloned()
+        } else {
+            None
+        };
+
         // Update indices
         blocks.insert(block.index, block.clone());
         hash_index.insert(block.hash.clone(), block.index);
@@ -150,26 +157,19 @@ impl NodeBlockchain {
         // Update statistics
         stats.total_blocks += 1;
         stats.total_data_size += block.size();
-        self.update_avg_block_time(&mut stats, &block).await;
+
+        // Update average block time using the previous block we already have
+        if let Some(prev_block) = prev_block {
+            let time_diff = block.timestamp - prev_block.timestamp;
+            let diff_ms = time_diff.num_milliseconds() as f64;
+            let n = block.index as f64;
+            stats.avg_block_time_ms = (stats.avg_block_time_ms * (n - 1.0) + diff_ms) / n;
+        }
 
         Ok(())
     }
 
-    /// Update average block time statistic
-    async fn update_avg_block_time(&self, stats: &mut ChainStats, new_block: &Block) {
-        if new_block.index > 0 {
-            let blocks = self.blocks.read().await;
-            if let Some(prev_block) = blocks.get(&(new_block.index - 1)) {
-                let time_diff = new_block.timestamp - prev_block.timestamp;
-                let diff_ms = time_diff.num_milliseconds() as f64;
-
-                // Calculate running average
-                let n = new_block.index as f64;
-                stats.avg_block_time_ms =
-                    (stats.avg_block_time_ms * (n - 1.0) + diff_ms) / n;
-            }
-        }
-    }
+    // Removed: update_avg_block_time - logic moved inline to avoid deadlock
 
     /// Get a block by index
     pub async fn get_block(&self, index: u64) -> Option<Block> {

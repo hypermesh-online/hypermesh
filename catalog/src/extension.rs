@@ -145,7 +145,12 @@ impl CatalogExtension {
 
                 assets
                     .get(&asset_id)
-                    .map(|asset| serde_json::to_value(asset).unwrap())
+                    .map(|asset| {
+                        serde_json::to_value(asset).map_err(|e| ExtensionError::RuntimeError {
+                            message: format!("Failed to serialize asset: {}", e),
+                        })
+                    })
+                    .transpose()?
                     .ok_or_else(|| ExtensionError::RuntimeError {
                         message: "Asset not found".to_string(),
                     })
@@ -176,16 +181,22 @@ impl CatalogExtension {
 #[async_trait]
 impl HyperMeshExtension for CatalogExtension {
     fn metadata(&self) -> ExtensionMetadata {
+        // Parse versions with fallback (should never fail with hardcoded valid versions)
+        let version = Version::parse("1.0.0")
+            .unwrap_or_else(|_| Version::new(1, 0, 0));
+        let hypermesh_version = Version::parse("1.0.0")
+            .unwrap_or_else(|_| Version::new(1, 0, 0));
+
         ExtensionMetadata {
             id: "catalog".to_string(),
             name: "HyperMesh Catalog".to_string(),
-            version: Version::parse("1.0.0").unwrap(),
+            version,
             description: "Decentralized asset library and package manager for HyperMesh".to_string(),
             author: "HyperMesh Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://hypermesh.online/catalog".to_string()),
             category: ExtensionCategory::AssetLibrary,
-            hypermesh_version: Version::parse("1.0.0").unwrap(),
+            hypermesh_version,
             dependencies: vec![],
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
@@ -627,10 +638,16 @@ impl AssetLibraryExtension for CatalogExtension {
     async fn update_package(&self, package_id: &str, version: Option<Version>) -> ExtensionResult<UpdateResult> {
         info!("Updating package: {} to version: {:?}", package_id, version);
 
+        let from_version = Version::parse("1.0.0")
+            .unwrap_or_else(|_| Version::new(1, 0, 0));
+        let to_version = version.unwrap_or_else(|| {
+            Version::parse("2.0.0").unwrap_or_else(|_| Version::new(2, 0, 0))
+        });
+
         Ok(UpdateResult {
             package_id: package_id.to_string(),
-            from_version: Version::parse("1.0.0").unwrap(),
-            to_version: version.unwrap_or_else(|| Version::parse("2.0.0").unwrap()),
+            from_version,
+            to_version,
             update_time: std::time::Duration::from_secs(2),
         })
     }

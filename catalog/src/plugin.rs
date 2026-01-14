@@ -62,16 +62,22 @@ impl CatalogPlugin {
 #[async_trait]
 impl HyperMeshExtension for CatalogPlugin {
     fn metadata(&self) -> ExtensionMetadata {
+        // Parse versions with fallback (should never fail with hardcoded valid versions)
+        let version = semver::Version::parse(PLUGIN_VERSION)
+            .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+        let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
+            .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+
         ExtensionMetadata {
             id: "catalog".to_string(),
             name: "HyperMesh Catalog Extension".to_string(),
-            version: semver::Version::parse(PLUGIN_VERSION).unwrap(),
+            version,
             description: "Decentralized asset library and VM runtime for HyperMesh".to_string(),
             author: "HyperMesh Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://hypermesh.online/catalog".to_string()),
             category: ExtensionCategory::AssetLibrary,
-            hypermesh_version: semver::Version::parse(REQUIRED_HYPERMESH_VERSION).unwrap(),
+            hypermesh_version,
             dependencies: vec![],
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
@@ -194,10 +200,16 @@ impl HyperMeshExtension for CatalogPlugin {
                     }
                 })?;
 
+                let data = serde_json::to_value(packages).map_err(|e| {
+                    ExtensionError::RuntimeError {
+                        message: format!("Failed to serialize packages: {}", e),
+                    }
+                })?;
+
                 Ok(ExtensionResponse {
                     request_id: request.id,
                     success: true,
-                    data: Some(serde_json::to_value(packages).unwrap()),
+                    data: Some(data),
                     error: None,
                 })
             }
@@ -213,10 +225,16 @@ impl HyperMeshExtension for CatalogPlugin {
                     }
                 })?;
 
+                let data = serde_json::to_value(result).map_err(|e| {
+                    ExtensionError::RuntimeError {
+                        message: format!("Failed to serialize result: {}", e),
+                    }
+                })?;
+
                 Ok(ExtensionResponse {
                     request_id: request.id,
                     success: true,
-                    data: Some(serde_json::to_value(result).unwrap()),
+                    data: Some(data),
                     error: None,
                 })
             }
@@ -399,16 +417,22 @@ pub unsafe extern "C" fn hypermesh_extension_destroy(ptr: *mut c_void) {
 /// This can be used by the loader to check compatibility before loading.
 #[no_mangle]
 pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
+    // Parse versions with fallback (should never fail with hardcoded valid versions)
+    let version = semver::Version::parse(PLUGIN_VERSION)
+        .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+    let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
+        .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+
     let metadata = ExtensionMetadata {
         id: "catalog".to_string(),
         name: "HyperMesh Catalog Extension".to_string(),
-        version: semver::Version::parse(PLUGIN_VERSION).unwrap(),
+        version,
         description: "Decentralized asset library and VM runtime for HyperMesh".to_string(),
         author: "HyperMesh Team".to_string(),
         license: "MIT".to_string(),
         homepage: Some("https://hypermesh.online/catalog".to_string()),
         category: ExtensionCategory::AssetLibrary,
-        hypermesh_version: semver::Version::parse(REQUIRED_HYPERMESH_VERSION).unwrap(),
+        hypermesh_version,
         dependencies: vec![],
         required_capabilities: HashSet::from([
             ExtensionCapability::AssetManagement,
@@ -424,7 +448,7 @@ pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
         config_schema: None,
     };
 
-    let json = serde_json::to_string(&metadata).unwrap();
+    let json = serde_json::to_string(&metadata).unwrap_or_else(|_| "{}".to_string());
     json.as_ptr()
 }
 

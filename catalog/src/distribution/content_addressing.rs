@@ -301,13 +301,14 @@ impl ContentChunker {
 
         for (i, chunk_data) in data.chunks(self.chunk_size).enumerate() {
             let compressed_data = self.compress(chunk_data)?;
+            let compressed_size = compressed_data.len();
 
             let chunk = Chunk {
                 index: i,
                 data: compressed_data,
                 hash: ContentAddress::from_data(chunk_data),
                 size: chunk_data.len(),
-                compressed_size: compressed_data.len(),
+                compressed_size,
                 compression: self.compression,
             };
 
