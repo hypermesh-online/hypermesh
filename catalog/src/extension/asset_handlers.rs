@@ -765,7 +765,8 @@ mod tests {
             tags: vec!["test".to_string()],
         };
 
-        let asset_id = handler.create_asset(spec).await.unwrap();
+        let asset_id = handler.create_asset(spec).await
+            .expect("VM asset creation should succeed with valid spec");
         assert!(!asset_id.is_nil());
     }
 
@@ -788,7 +789,8 @@ mod tests {
             tags: vec!["library".to_string()],
         };
 
-        let asset_id = handler.create_asset(spec).await.unwrap();
+        let asset_id = handler.create_asset(spec).await
+            .expect("Library asset creation should succeed with valid spec");
         assert!(!asset_id.is_nil());
     }
 

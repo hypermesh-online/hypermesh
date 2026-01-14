@@ -535,8 +535,8 @@ mod tests {
         config.bind_address = Ipv6Addr::LOCALHOST;
         config.port = 0; // Use random available port for testing
         config.enable_cert_validation = false; // Disable for testing
-        
-        DnsResolver::new(config).await.unwrap()
+
+        DnsResolver::new(config).await.expect("Failed to create test DNS resolver")
     }
 
     #[tokio::test]
@@ -569,10 +569,11 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve_trustchain_domain(&query).await.unwrap();
+        let response = resolver.resolve_trustchain_domain(&query).await
+            .expect("Failed to resolve trustchain domain");
         assert_eq!(response.response_code, ResponseCode::NoError);
         assert_eq!(response.answers.len(), 1);
-        
+
         if let DnsRecordData::AAAA(addr) = &response.answers[0].data {
             assert_eq!(*addr, Ipv6Addr::LOCALHOST);
         } else {
@@ -593,7 +594,8 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve_trustchain_domain(&query).await.unwrap();
+        let response = resolver.resolve_trustchain_domain(&query).await
+            .expect("Failed to resolve unknown domain");
         assert_eq!(response.response_code, ResponseCode::NXDomain);
         assert_eq!(response.answers.len(), 0);
     }
@@ -601,8 +603,9 @@ mod tests {
     #[tokio::test]
     async fn test_dns_stats() {
         let resolver = create_test_resolver().await;
-        let stats = resolver.get_stats().await.unwrap();
-        
+        let stats = resolver.get_stats().await
+            .expect("Failed to get DNS stats");
+
         assert_eq!(stats.server_id, "trustchain-dns-localhost");
         assert_eq!(stats.queries_processed, 0);
     }
@@ -610,7 +613,7 @@ mod tests {
     #[tokio::test]
     async fn test_dns_record_conversion() {
         let resolver = create_test_resolver().await;
-        
+
         let dns_record = DnsRecord {
             name: "test.example.com".to_string(),
             record_type: RecordType::AAAA,
@@ -619,7 +622,8 @@ mod tests {
             data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
         };
 
-        let trust_dns_record = resolver.dns_record_to_trust_dns(&dns_record).unwrap();
+        let trust_dns_record = resolver.dns_record_to_trust_dns(&dns_record)
+            .expect("Failed to convert DNS record to trust-dns format");
         assert_eq!(trust_dns_record.record_type(), RecordType::AAAA);
         assert_eq!(trust_dns_record.ttl(), 300);
     }

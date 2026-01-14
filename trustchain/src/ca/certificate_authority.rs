@@ -456,8 +456,9 @@ mod tests {
     #[tokio::test]
     async fn test_ca_initialization() {
         let config = CAConfiguration::default();
-        let ca = TrustChainCA::new(config).await.unwrap();
-        
+        let ca = TrustChainCA::new(config).await
+            .expect("Failed to initialize CA");
+
         let metrics = ca.get_metrics().await;
         assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 0);
     }
@@ -467,7 +468,8 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_issuance_with_consensus() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfiguration::default();
-        let ca = TrustChainCA::new(config).await.unwrap();
+        let ca = TrustChainCA::new(config).await
+            .expect("Failed to create CA");
 
         let request = CertificateRequest {
             common_name: "test.production.com".to_string(),
@@ -481,10 +483,11 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate(request).await.unwrap();
+        let issued_cert = ca.issue_certificate(request).await
+            .expect("Failed to issue certificate");
         assert_eq!(issued_cert.common_name, "test.production.com");
         assert!(!issued_cert.serial_number.is_empty());
-        
+
         // Verify metrics updated
         let metrics = ca.get_metrics().await;
         assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 1);

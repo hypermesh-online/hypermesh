@@ -553,8 +553,9 @@ mod tests {
     async fn test_security_integrated_ca_creation() {
         let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
-        
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
+
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+            .expect("Failed to create security-integrated CA");
         assert!(integrated_ca.config.mandatory_consensus);
         assert!(integrated_ca.config.mandatory_security_validation);
     }
@@ -563,9 +564,10 @@ mod tests {
     async fn test_secure_certificate_issuance() {
         let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
-        
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
-        
+
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+            .expect("Failed to create security-integrated CA");
+
         let request = CertificateRequest {
             common_name: "secure.test.com".to_string(),
             san_entries: vec!["secure.test.com".to_string()],
@@ -574,12 +576,12 @@ mod tests {
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: SystemTime::now(),
         };
-        
+
         let result = integrated_ca.issue_certificate_secure(request).await;
         // Should succeed with valid consensus proof
         assert!(result.is_ok());
-        
-        let cert = result.unwrap();
+
+        let cert = result.expect("Failed to issue secure certificate");
         assert_eq!(cert.common_name, "secure.test.com");
     }
 
@@ -587,11 +589,13 @@ mod tests {
     async fn test_security_dashboard_integration() {
         let ca_config = CAConfig::default();
         let security_config = SecurityIntegrationConfig::default();
-        
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
-        
-        let dashboard = integrated_ca.get_security_dashboard().await.unwrap();
-        
+
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+            .expect("Failed to create security-integrated CA");
+
+        let dashboard = integrated_ca.get_security_dashboard().await
+            .expect("Failed to get security dashboard");
+
         // Should have valid dashboard data
         assert!(dashboard.consensus_status.enabled);
         // Other assertions depend on the actual operations performed
@@ -602,9 +606,10 @@ mod tests {
         let ca_config = CAConfig::default();
         let mut security_config = SecurityIntegrationConfig::default();
         security_config.mandatory_consensus = false;
-        
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await.unwrap();
-        
+
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+            .expect("Failed to create CA with consensus disabled");
+
         // Should still work but with reduced security
         assert!(!integrated_ca.config.mandatory_consensus);
     }

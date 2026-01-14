@@ -27,48 +27,128 @@ pub enum StoqError {
 /// Transport layer errors
 #[derive(Debug)]
 pub enum TransportError {
-    /// Connection failed
-    ConnectionFailed(String),
+    /// Connection failed with remote endpoint
+    ConnectionFailed {
+        remote: String,
+        reason: String,
+    },
 
-    /// Connection closed
-    ConnectionClosed(String),
+    /// Connection closed unexpectedly
+    ConnectionClosed {
+        remote: String,
+        reason: String,
+    },
 
-    /// Stream error
-    StreamError(String),
+    /// Stream operation failed
+    StreamError {
+        stream_id: Option<u64>,
+        operation: String,
+        reason: String,
+    },
 
     /// Endpoint binding failed
-    BindFailed(String),
+    BindFailed {
+        address: String,
+        port: u16,
+        reason: String,
+    },
 
     /// Configuration error
-    ConfigError(String),
+    ConfigError {
+        parameter: String,
+        reason: String,
+    },
 
     /// I/O error
     Io(io::Error),
 
     /// QUIC protocol error
-    QuicError(String),
+    QuicError {
+        error_code: Option<u64>,
+        reason: String,
+    },
+
+    /// Connection pool exhausted
+    PoolExhausted {
+        max_connections: usize,
+    },
+
+    /// Endpoint not reachable
+    EndpointUnreachable {
+        remote: String,
+    },
 }
 
 /// Protocol layer errors
 #[derive(Debug)]
 pub enum ProtocolError {
-    /// PoS validation failed
-    ValidationFailed(String),
+    /// PoS validation failed with detailed proof errors
+    ValidationFailed {
+        token_id: Vec<u8>,
+        errors: Vec<String>,
+    },
 
     /// Token expired
-    TokenExpired,
+    TokenExpired {
+        token_id: Vec<u8>,
+        expired_at: u64,
+        current_time: u64,
+    },
 
-    /// Invalid proof
-    InvalidProof(String),
+    /// Invalid proof component
+    InvalidProof {
+        proof_type: ProofType,
+        reason: String,
+    },
 
     /// Service not found
-    ServiceNotFound(String),
+    ServiceNotFound {
+        service_name: String,
+    },
 
     /// Service discovery failed
-    DiscoveryFailed(String),
+    DiscoveryFailed {
+        service_name: String,
+        reason: String,
+    },
 
     /// Cache error
-    CacheError(String),
+    CacheError {
+        operation: String,
+        reason: String,
+    },
+
+    /// Frame decoding failed
+    FrameDecodeFailed {
+        frame_type: Option<u64>,
+        reason: String,
+    },
+
+    /// Frame encoding failed
+    FrameEncodeFailed {
+        frame_type: String,
+        reason: String,
+    },
+
+    /// Shard reassembly failed
+    ShardReassemblyFailed {
+        shard_id: u32,
+        reason: String,
+    },
+
+    /// Token replay attack detected
+    TokenReplayDetected {
+        token_hash: [u8; 32],
+    },
+}
+
+/// Proof type for protocol errors
+#[derive(Debug, Clone, Copy)]
+pub enum ProofType {
+    Space,
+    Stake,
+    Work,
+    Time,
 }
 
 /// Network layer errors
@@ -144,13 +224,34 @@ impl fmt::Display for StoqError {
 impl fmt::Display for TransportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TransportError::ConnectionFailed(s) => write!(f, "Connection failed: {}", s),
-            TransportError::ConnectionClosed(s) => write!(f, "Connection closed: {}", s),
-            TransportError::StreamError(s) => write!(f, "Stream error: {}", s),
-            TransportError::BindFailed(s) => write!(f, "Bind failed: {}", s),
-            TransportError::ConfigError(s) => write!(f, "Config error: {}", s),
-            TransportError::Io(e) => write!(f, "I/O error: {}", e),
-            TransportError::QuicError(s) => write!(f, "QUIC error: {}", s),
+            TransportError::ConnectionFailed { remote, reason } =>
+                write!(f, "Connection to {} failed: {}", remote, reason),
+            TransportError::ConnectionClosed { remote, reason } =>
+                write!(f, "Connection to {} closed: {}", remote, reason),
+            TransportError::StreamError { stream_id, operation, reason } => {
+                if let Some(id) = stream_id {
+                    write!(f, "Stream {} {} failed: {}", id, operation, reason)
+                } else {
+                    write!(f, "Stream {} failed: {}", operation, reason)
+                }
+            }
+            TransportError::BindFailed { address, port, reason } =>
+                write!(f, "Failed to bind to [{}]:{}: {}", address, port, reason),
+            TransportError::ConfigError { parameter, reason } =>
+                write!(f, "Config error for '{}': {}", parameter, reason),
+            TransportError::Io(e) =>
+                write!(f, "I/O error: {}", e),
+            TransportError::QuicError { error_code, reason } => {
+                if let Some(code) = error_code {
+                    write!(f, "QUIC error {}: {}", code, reason)
+                } else {
+                    write!(f, "QUIC error: {}", reason)
+                }
+            }
+            TransportError::PoolExhausted { max_connections } =>
+                write!(f, "Connection pool exhausted (max: {})", max_connections),
+            TransportError::EndpointUnreachable { remote } =>
+                write!(f, "Endpoint {} is unreachable", remote),
         }
     }
 }
@@ -158,12 +259,42 @@ impl fmt::Display for TransportError {
 impl fmt::Display for ProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ProtocolError::ValidationFailed(s) => write!(f, "Validation failed: {}", s),
-            ProtocolError::TokenExpired => write!(f, "Token expired"),
-            ProtocolError::InvalidProof(s) => write!(f, "Invalid proof: {}", s),
-            ProtocolError::ServiceNotFound(s) => write!(f, "Service not found: {}", s),
-            ProtocolError::DiscoveryFailed(s) => write!(f, "Discovery failed: {}", s),
-            ProtocolError::CacheError(s) => write!(f, "Cache error: {}", s),
+            ProtocolError::ValidationFailed { token_id, errors } =>
+                write!(f, "Token {:?} validation failed: {}", token_id, errors.join(", ")),
+            ProtocolError::TokenExpired { token_id, expired_at, current_time } =>
+                write!(f, "Token {:?} expired at {} (current: {})", token_id, expired_at, current_time),
+            ProtocolError::InvalidProof { proof_type, reason } =>
+                write!(f, "Invalid {:?} proof: {}", proof_type, reason),
+            ProtocolError::ServiceNotFound { service_name } =>
+                write!(f, "Service '{}' not found", service_name),
+            ProtocolError::DiscoveryFailed { service_name, reason } =>
+                write!(f, "Discovery of '{}' failed: {}", service_name, reason),
+            ProtocolError::CacheError { operation, reason } =>
+                write!(f, "Cache {} error: {}", operation, reason),
+            ProtocolError::FrameDecodeFailed { frame_type, reason } => {
+                if let Some(ft) = frame_type {
+                    write!(f, "Frame type 0x{:x} decode failed: {}", ft, reason)
+                } else {
+                    write!(f, "Frame decode failed: {}", reason)
+                }
+            }
+            ProtocolError::FrameEncodeFailed { frame_type, reason } =>
+                write!(f, "Frame {} encode failed: {}", frame_type, reason),
+            ProtocolError::ShardReassemblyFailed { shard_id, reason } =>
+                write!(f, "Shard {} reassembly failed: {}", shard_id, reason),
+            ProtocolError::TokenReplayDetected { token_hash } =>
+                write!(f, "Token replay attack detected: {:?}", token_hash),
+        }
+    }
+}
+
+impl fmt::Display for ProofType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProofType::Space => write!(f, "ProofOfSpace"),
+            ProofType::Stake => write!(f, "ProofOfStake"),
+            ProofType::Work => write!(f, "ProofOfWork"),
+            ProofType::Time => write!(f, "ProofOfTime"),
         }
     }
 }
@@ -221,25 +352,60 @@ impl From<io::Error> for StoqError {
 
 impl From<quinn::ConnectionError> for StoqError {
     fn from(err: quinn::ConnectionError) -> Self {
-        StoqError::Transport(TransportError::QuicError(err.to_string()))
+        let error_code = match &err {
+            quinn::ConnectionError::VersionMismatch => Some(0x01),
+            quinn::ConnectionError::TransportError(_) => Some(0x02),
+            quinn::ConnectionError::ConnectionClosed(_) => Some(0x03),
+            quinn::ConnectionError::ApplicationClosed(_) => Some(0x04),
+            quinn::ConnectionError::Reset => Some(0x05),
+            quinn::ConnectionError::TimedOut => Some(0x06),
+            quinn::ConnectionError::LocallyClosed => Some(0x07),
+            _ => None,
+        };
+
+        StoqError::Transport(TransportError::QuicError {
+            error_code,
+            reason: err.to_string(),
+        })
     }
 }
 
 impl From<quinn::ConnectError> for StoqError {
     fn from(err: quinn::ConnectError) -> Self {
-        StoqError::Transport(TransportError::ConnectionFailed(err.to_string()))
+        let remote = match &err {
+            quinn::ConnectError::EndpointStopping => "endpoint-stopping".to_string(),
+            quinn::ConnectError::TooManyConnections => "too-many-connections".to_string(),
+            quinn::ConnectError::InvalidRemoteAddress(_) => "invalid-address".to_string(),
+            quinn::ConnectError::InvalidServerName(_) => "invalid-server-name".to_string(),
+            quinn::ConnectError::NoDefaultClientConfig => "no-default-config".to_string(),
+            quinn::ConnectError::UnsupportedVersion => "unsupported-version".to_string(),
+            _ => "unknown".to_string(),
+        };
+
+        StoqError::Transport(TransportError::ConnectionFailed {
+            remote,
+            reason: err.to_string(),
+        })
     }
 }
 
 impl From<quinn::ReadError> for StoqError {
     fn from(err: quinn::ReadError) -> Self {
-        StoqError::Transport(TransportError::StreamError(err.to_string()))
+        StoqError::Transport(TransportError::StreamError {
+            stream_id: None,
+            operation: "read".to_string(),
+            reason: err.to_string(),
+        })
     }
 }
 
 impl From<quinn::WriteError> for StoqError {
     fn from(err: quinn::WriteError) -> Self {
-        StoqError::Transport(TransportError::StreamError(err.to_string()))
+        StoqError::Transport(TransportError::StreamError {
+            stream_id: None,
+            operation: "write".to_string(),
+            reason: err.to_string(),
+        })
     }
 }
 
@@ -265,7 +431,10 @@ impl From<anyhow::Error> for StoqError {
         }
 
         // Default to transport error for unknown anyhow errors
-        StoqError::Transport(TransportError::ConfigError(err.to_string()))
+        StoqError::Transport(TransportError::ConfigError {
+            parameter: "unknown".to_string(),
+            reason: err.to_string(),
+        })
     }
 }
 
@@ -308,11 +477,18 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        let err = StoqError::Transport(TransportError::ConnectionFailed("test".to_string()));
-        assert!(err.to_string().contains("Connection failed"));
+        let err = StoqError::Transport(TransportError::ConnectionFailed {
+            remote: "[::1]:9292".to_string(),
+            reason: "timeout".to_string(),
+        });
+        assert!(err.to_string().contains("Connection to [::1]:9292 failed"));
 
-        let err = StoqError::Protocol(ProtocolError::TokenExpired);
-        assert!(err.to_string().contains("Token expired"));
+        let err = StoqError::Protocol(ProtocolError::TokenExpired {
+            token_id: vec![1, 2, 3],
+            expired_at: 100,
+            current_time: 200,
+        });
+        assert!(err.to_string().contains("expired"));
 
         let err = StoqError::Network(NetworkError::NetworkLimitReached);
         assert!(err.to_string().contains("Network limit reached"));
@@ -323,5 +499,29 @@ mod tests {
         let io_err = io::Error::new(io::ErrorKind::Other, "test");
         let stoq_err: StoqError = io_err.into();
         assert!(matches!(stoq_err, StoqError::Transport(TransportError::Io(_))));
+    }
+
+    #[test]
+    fn test_transport_error_context() {
+        let err = TransportError::StreamError {
+            stream_id: Some(42),
+            operation: "read".to_string(),
+            reason: "connection reset".to_string(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("Stream 42"));
+        assert!(msg.contains("read"));
+        assert!(msg.contains("connection reset"));
+    }
+
+    #[test]
+    fn test_protocol_error_proof_type() {
+        let err = ProtocolError::InvalidProof {
+            proof_type: ProofType::Stake,
+            reason: "insufficient stake".to_string(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("ProofOfStake"));
+        assert!(msg.contains("insufficient stake"));
     }
 }

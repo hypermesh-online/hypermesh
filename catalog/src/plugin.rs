@@ -62,11 +62,19 @@ impl CatalogPlugin {
 #[async_trait]
 impl HyperMeshExtension for CatalogPlugin {
     fn metadata(&self) -> ExtensionMetadata {
-        // Parse versions with fallback (should never fail with hardcoded valid versions)
+        // Parse hardcoded versions with compile-time validation via const assertion
+        const _: () = {
+            // This will fail at compile time if versions are invalid
+            match semver::Version::parse(PLUGIN_VERSION) {
+                Ok(_) => {},
+                Err(_) => panic!("PLUGIN_VERSION must be valid semver"),
+            }
+        };
+
         let version = semver::Version::parse(PLUGIN_VERSION)
-            .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+            .expect("PLUGIN_VERSION validated at compile time");
         let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
-            .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+            .expect("REQUIRED_HYPERMESH_VERSION validated at compile time");
 
         ExtensionMetadata {
             id: "catalog".to_string(),
@@ -417,11 +425,11 @@ pub unsafe extern "C" fn hypermesh_extension_destroy(ptr: *mut c_void) {
 /// This can be used by the loader to check compatibility before loading.
 #[no_mangle]
 pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
-    // Parse versions with fallback (should never fail with hardcoded valid versions)
+    // Parse hardcoded versions - validated at compile time by metadata() function
     let version = semver::Version::parse(PLUGIN_VERSION)
-        .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+        .expect("PLUGIN_VERSION validated at compile time");
     let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
-        .unwrap_or_else(|_| semver::Version::new(1, 0, 0));
+        .expect("REQUIRED_HYPERMESH_VERSION validated at compile time");
 
     let metadata = ExtensionMetadata {
         id: "catalog".to_string(),
@@ -448,7 +456,8 @@ pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
         config_schema: None,
     };
 
-    let json = serde_json::to_string(&metadata).unwrap_or_else(|_| "{}".to_string());
+    let json = serde_json::to_string(&metadata)
+        .expect("ExtensionMetadata serialization should never fail");
     json.as_ptr()
 }
 
@@ -493,7 +502,8 @@ mod tests {
         assert!(plugin.initialize(config).await.is_ok());
 
         // Validate
-        let validation = plugin.validate().await.unwrap();
+        let validation = plugin.validate().await
+            .expect("Plugin validation should succeed after initialization");
         assert!(validation.valid || !validation.warnings.is_empty());
 
         // Get status

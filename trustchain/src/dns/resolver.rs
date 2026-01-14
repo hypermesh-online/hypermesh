@@ -318,8 +318,10 @@ mod tests {
     #[tokio::test]
     async fn test_resolver_creation() {
         let upstream_resolvers = vec![
-            "2001:4860:4860::8888".parse().unwrap(), // Google IPv6
-            "2606:4700:4700::1111".parse().unwrap(), // Cloudflare IPv6
+            "2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address"),
+            "2606:4700:4700::1111".parse()
+                .expect("Failed to parse Cloudflare IPv6 address"),
         ];
         let trustchain_domains = vec!["hypermesh".to_string(), "caesar".to_string()];
 
@@ -330,9 +332,10 @@ mod tests {
     #[tokio::test]
     async fn test_stats_initialization() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
         let stats = resolver.get_stats().await;
         assert_eq!(stats.queries_processed, 0);
@@ -343,9 +346,10 @@ mod tests {
     #[tokio::test]
     async fn test_stats_update() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
         resolver.update_stats(false, 150.0).await;
         resolver.update_stats(true, 50.0).await;
@@ -360,9 +364,10 @@ mod tests {
     #[tokio::test]
     async fn test_failure_stats_update() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
         resolver.update_stats_failure().await;
 
@@ -374,19 +379,19 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_ipv6() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("test.example.com").unwrap();
+        let name = Name::from_utf8("test.example.com")
+            .expect("Failed to parse domain name");
         let ipv6_addr = Ipv6Addr::LOCALHOST;
         use trust_dns_proto::rr::rdata::AAAA;
         let trust_dns_record = Record::from_rdata(name, 300, RData::AAAA(AAAA::from(ipv6_addr)));
 
-        let dns_record = resolver.convert_record(&trust_dns_record);
-        assert!(dns_record.is_some());
-
-        let dns_record = dns_record.unwrap();
+        let dns_record = resolver.convert_record(&trust_dns_record)
+            .expect("Failed to convert AAAA record");
         assert_eq!(dns_record.name, "test.example.com");
         assert_eq!(dns_record.record_type, RecordType::AAAA);
         assert_eq!(dns_record.ttl, 300);
@@ -401,19 +406,20 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_cname() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("alias.example.com").unwrap();
-        let target = Name::from_utf8("target.example.com").unwrap();
+        let name = Name::from_utf8("alias.example.com")
+            .expect("Failed to parse alias domain");
+        let target = Name::from_utf8("target.example.com")
+            .expect("Failed to parse target domain");
         use trust_dns_proto::rr::rdata::CNAME;
         let trust_dns_record = Record::from_rdata(name, 300, RData::CNAME(CNAME(target)));
 
-        let dns_record = resolver.convert_record(&trust_dns_record);
-        assert!(dns_record.is_some());
-
-        let dns_record = dns_record.unwrap();
+        let dns_record = resolver.convert_record(&trust_dns_record)
+            .expect("Failed to convert CNAME record");
         assert_eq!(dns_record.record_type, RecordType::CNAME);
 
         if let DnsRecordData::CNAME(target) = dns_record.data {
@@ -426,19 +432,20 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_mx() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse().unwrap()],
+            vec!["2001:4860:4860::8888".parse()
+                .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.unwrap();
+        ).await.expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("example.com").unwrap();
-        let exchange = Name::from_utf8("mail.example.com").unwrap();
+        let name = Name::from_utf8("example.com")
+            .expect("Failed to parse domain name");
+        let exchange = Name::from_utf8("mail.example.com")
+            .expect("Failed to parse mail exchange domain");
         let mx_data = trust_dns_proto::rr::rdata::MX::new(10, exchange);
         let trust_dns_record = Record::from_rdata(name, 300, RData::MX(mx_data));
 
-        let dns_record = resolver.convert_record(&trust_dns_record);
-        assert!(dns_record.is_some());
-
-        let dns_record = dns_record.unwrap();
+        let dns_record = resolver.convert_record(&trust_dns_record)
+            .expect("Failed to convert MX record");
         assert_eq!(dns_record.record_type, RecordType::MX);
 
         if let DnsRecordData::MX { priority, exchange } = dns_record.data {

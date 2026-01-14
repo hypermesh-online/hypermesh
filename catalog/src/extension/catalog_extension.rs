@@ -92,13 +92,15 @@ impl CatalogExtension {
         let metadata = ExtensionMetadata {
             id: "catalog".to_string(),
             name: "HyperMesh Catalog".to_string(),
-            version: Version::parse("0.1.0").unwrap(),
+            version: Version::parse("0.1.0")
+                .expect("Hardcoded extension version must be valid semver"),
             description: "Decentralized asset library and package manager for HyperMesh".to_string(),
             author: "HyperMesh Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://catalog.hypermesh.online".to_string()),
             category: ExtensionCategory::AssetLibrary,
-            hypermesh_version: Version::parse("1.0.0").unwrap(),
+            hypermesh_version: Version::parse("1.0.0")
+                .expect("Hardcoded HyperMesh version must be valid semver"),
             dependencies: vec![],
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
@@ -362,11 +364,24 @@ impl HyperMeshExtension for CatalogExtension {
                 if let Some(catalog) = &self.catalog {
                     if let Ok(query) = serde_json::from_value::<SearchQuery>(request.params) {
                         match catalog.search_assets(&query).await {
-                            Ok(results) => ExtensionResponse {
-                                request_id: request.id,
-                                success: true,
-                                data: Some(serde_json::to_value(results).unwrap()),
-                                error: None,
+                            Ok(results) => {
+                                let data = match serde_json::to_value(results) {
+                                    Ok(v) => Some(v),
+                                    Err(e) => {
+                                        return Ok(ExtensionResponse {
+                                            request_id: request.id,
+                                            success: false,
+                                            data: None,
+                                            error: Some(format!("Failed to serialize search results: {}", e)),
+                                        });
+                                    }
+                                };
+                                ExtensionResponse {
+                                    request_id: request.id,
+                                    success: true,
+                                    data,
+                                    error: None,
+                                }
                             },
                             Err(e) => ExtensionResponse {
                                 request_id: request.id,
@@ -471,11 +486,24 @@ impl HyperMeshExtension for CatalogExtension {
                 if let Some(sharing_manager) = &self.sharing_manager {
                     if let Some(query) = request.params.get("query").and_then(|v| v.as_str()) {
                         match sharing_manager.search_packages(query).await {
-                            Ok(results) => ExtensionResponse {
-                                request_id: request.id,
-                                success: true,
-                                data: Some(serde_json::to_value(results).unwrap()),
-                                error: None,
+                            Ok(results) => {
+                                let data = match serde_json::to_value(results) {
+                                    Ok(v) => Some(v),
+                                    Err(e) => {
+                                        return Ok(ExtensionResponse {
+                                            request_id: request.id,
+                                            success: false,
+                                            data: None,
+                                            error: Some(format!("Failed to serialize search results: {}", e)),
+                                        });
+                                    }
+                                };
+                                ExtensionResponse {
+                                    request_id: request.id,
+                                    success: true,
+                                    data,
+                                    error: None,
+                                }
                             },
                             Err(e) => ExtensionResponse {
                                 request_id: request.id,
@@ -506,10 +534,21 @@ impl HyperMeshExtension for CatalogExtension {
                 // Get sharing statistics
                 if let Some(sharing_manager) = &self.sharing_manager {
                     let stats = sharing_manager.get_stats().await;
+                    let data = match serde_json::to_value(stats) {
+                        Ok(v) => Some(v),
+                        Err(e) => {
+                            return Ok(ExtensionResponse {
+                                request_id: request.id,
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to serialize sharing stats: {}", e)),
+                            });
+                        }
+                    };
                     ExtensionResponse {
                         request_id: request.id,
                         success: true,
-                        data: Some(serde_json::to_value(stats).unwrap()),
+                        data,
                         error: None,
                     }
                 } else {

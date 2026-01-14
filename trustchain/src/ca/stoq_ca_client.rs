@@ -665,8 +665,10 @@ mod tests {
             consensus_proof: None,
         };
 
-        let serialized = bincode::serialize(&request).unwrap();
-        let deserialized: StoqCertificateRequest = bincode::deserialize(&serialized).unwrap();
+        let serialized = bincode::serialize(&request)
+            .expect("Failed to serialize certificate request");
+        let deserialized: StoqCertificateRequest = bincode::deserialize(&serialized)
+            .expect("Failed to deserialize certificate request");
 
         assert_eq!(request.common_name, deserialized.common_name);
         assert_eq!(request.san_list, deserialized.san_list);

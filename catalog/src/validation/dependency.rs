@@ -191,9 +191,12 @@ impl DependencyGraph {
                         return Some(cycle);
                     }
                 } else if rec_stack.contains(neighbor) {
-                    // Found a cycle
-                    let cycle_start = path.iter().position(|n| n == neighbor).unwrap();
-                    return Some(path[cycle_start..].to_vec());
+                    // Found a cycle - neighbor must be in path since it's in rec_stack
+                    if let Some(cycle_start) = path.iter().position(|n| n == neighbor) {
+                        return Some(path[cycle_start..].to_vec());
+                    }
+                    // Defensive: if position not found, return full path
+                    return Some(path.clone());
                 }
             }
         }

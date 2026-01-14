@@ -478,7 +478,8 @@ mod tests {
     #[tokio::test]
     async fn test_federated_network_registration() {
         let config = AuthoritativeDnsConfig::default();
-        let server = AuthoritativeDnsServer::new(config).await.unwrap();
+        let server = AuthoritativeDnsServer::new(config).await
+            .expect("Failed to create authoritative DNS server");
 
         let network = FederatedNetwork {
             network_id: "test-network".to_string(),

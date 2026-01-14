@@ -726,13 +726,15 @@ mod tests {
     #[tokio::test]
     async fn test_production_ca_rejects_testing_proofs() {
         let config = ProductionCAConfiguration::default();
-        let ca = ProductionTrustChainCA::new(config).await.unwrap();
-        
+        let ca = ProductionTrustChainCA::new(config).await
+            .expect("Failed to create production CA");
+
         // Create a default testing proof (should be rejected)
         let testing_proof = ConsensusProof::default_for_testing();
-        
+
         // This should return true (testing proof detected)
-        let is_testing = ca.detect_testing_proof(&testing_proof).await.unwrap();
+        let is_testing = ca.detect_testing_proof(&testing_proof).await
+            .expect("Failed to detect testing proof");
         assert!(is_testing, "Production CA should detect and reject testing proofs");
     }
 

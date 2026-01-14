@@ -297,31 +297,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_validator_creation() {
-        let validator = CertificateValidator::new(true).await.unwrap();
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 0);
     }
 
     #[tokio::test]
     async fn test_disabled_validator() {
-        let validator = CertificateValidator::new(false).await.unwrap();
-        
+        let validator = CertificateValidator::new(false).await
+            .expect("Failed to create disabled validator");
+
         // Validation should always succeed when disabled
         let result = validator.validate_domain_certificate("example.com").await;
         assert!(result.is_ok());
-        
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 0);
     }
 
     #[tokio::test]
     async fn test_localhost_validation() {
-        let validator = CertificateValidator::new(true).await.unwrap();
-        
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
+
         // Localhost should be valid
         let result = validator.validate_domain_certificate("localhost").await;
         assert!(result.is_ok());
-        
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 1);
         assert_eq!(stats.validations_passed, 1);
@@ -329,15 +332,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_trustchain_domain_validation() {
-        let validator = CertificateValidator::new(true).await.unwrap();
-        
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
+
         // TrustChain domains should be valid
         let domains = ["hypermesh", "caesar", "trust", "assets"];
         for domain in &domains {
             let result = validator.validate_domain_certificate(domain).await;
             assert!(result.is_ok(), "Domain {} should be valid", domain);
         }
-        
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, domains.len() as u64);
         assert_eq!(stats.validations_passed, domains.len() as u64);
@@ -345,14 +349,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_caching() {
-        let validator = CertificateValidator::new(true).await.unwrap();
-        
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
+
         // First validation
-        validator.validate_domain_certificate("localhost").await.unwrap();
-        
+        validator.validate_domain_certificate("localhost").await
+            .expect("First validation failed");
+
         // Second validation should hit cache
-        validator.validate_domain_certificate("localhost").await.unwrap();
-        
+        validator.validate_domain_certificate("localhost").await
+            .expect("Second validation failed");
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 1); // Only one actual validation
         assert_eq!(stats.cache_hits, 1); // One cache hit
@@ -360,17 +367,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_clearing() {
-        let validator = CertificateValidator::new(true).await.unwrap();
-        
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
+
         // Perform validation to populate cache
-        validator.validate_domain_certificate("localhost").await.unwrap();
-        
+        validator.validate_domain_certificate("localhost").await
+            .expect("Initial validation failed");
+
         // Clear cache
-        validator.clear_cache().await.unwrap();
-        
+        validator.clear_cache().await
+            .expect("Failed to clear cache");
+
         // Next validation should not hit cache
-        validator.validate_domain_certificate("localhost").await.unwrap();
-        
+        validator.validate_domain_certificate("localhost").await
+            .expect("Post-clear validation failed");
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 2); // Two actual validations
         assert_eq!(stats.cache_hits, 0); // No cache hits after clear
@@ -383,9 +394,10 @@ mod tests {
             retry_attempts: 2,
             ..Default::default()
         };
-        
-        let validator = ConfigurableCertificateValidator::new(config).await.unwrap();
-        
+
+        let validator = ConfigurableCertificateValidator::new(config).await
+            .expect("Failed to create configurable validator");
+
         // Test validation
         let result = validator.validate_domain_certificate("localhost").await;
         assert!(result.is_ok());
@@ -393,12 +405,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_unknown_domain_validation() {
-        let validator = CertificateValidator::new(true).await.unwrap();
-        
+        let validator = CertificateValidator::new(true).await
+            .expect("Failed to create certificate validator");
+
         // Unknown domain should fail validation (not implemented)
         let result = validator.validate_domain_certificate("unknown.example.org").await;
         assert!(result.is_err());
-        
+
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 1);
         assert_eq!(stats.validations_passed, 0);

@@ -608,17 +608,20 @@ mod tests {
     #[tokio::test]
     async fn test_ca_creation() {
         let config = CAConfig::default();
-        let ca = TrustChainCA::new(config).await.unwrap();
-        
-        let ca_cert = ca.get_ca_certificate().await.unwrap();
+        let ca = TrustChainCA::new(config).await
+            .expect("Failed to create CA");
+
+        let ca_cert = ca.get_ca_certificate().await
+            .expect("Failed to get CA certificate");
         assert!(!ca_cert.is_empty());
     }
 
     #[tokio::test]
     async fn test_certificate_issuance() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::default();
-        let ca = TrustChainCA::new(config).await.unwrap();
-        
+        let ca = TrustChainCA::new(config).await
+            .expect("Failed to create CA");
+
         let request = CertificateRequest {
             common_name: "test.localhost".to_string(),
             san_entries: vec!["test.localhost".to_string()],
@@ -627,8 +630,9 @@ mod tests {
             consensus_proof: ConsensusProof::generate_from_network("test_node_001").await?,
             timestamp: SystemTime::now(),
         };
-        
-        let issued_cert = ca.issue_certificate(request).await.unwrap();
+
+        let issued_cert = ca.issue_certificate(request).await
+            .expect("Failed to issue certificate");
         assert_eq!(issued_cert.common_name, "test.localhost");
         assert!(matches!(issued_cert.status, CertificateStatus::Valid));
         Ok(())
@@ -637,8 +641,9 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_validation() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::default();
-        let ca = TrustChainCA::new(config).await.unwrap();
-        
+        let ca = TrustChainCA::new(config).await
+            .expect("Failed to create CA");
+
         let request = CertificateRequest {
             common_name: "test.localhost".to_string(),
             san_entries: vec!["test.localhost".to_string()],
@@ -647,9 +652,11 @@ mod tests {
             consensus_proof: ConsensusProof::generate_from_network("test_node_001").await?,
             timestamp: SystemTime::now(),
         };
-        
-        let issued_cert = ca.issue_certificate(request).await.unwrap();
-        let is_valid = ca.validate_certificate_chain(&issued_cert.certificate_der).await.unwrap();
+
+        let issued_cert = ca.issue_certificate(request).await
+            .expect("Failed to issue certificate");
+        let is_valid = ca.validate_certificate_chain(&issued_cert.certificate_der).await
+            .expect("Failed to validate certificate chain");
         assert!(is_valid);
         Ok(())
     }
