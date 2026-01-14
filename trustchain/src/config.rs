@@ -53,7 +53,7 @@ impl Default for CTConfig {
         Self {
             log_id: "trustchain-ct-localhost".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
-            port: 6962, // Standard CT log port
+            port: 6962, // Standard CT log port (use testing() method for port 0)
             max_entries_per_shard: 1_000_000,
             merkle_update_interval: Duration::from_secs(60),
             storage_path: "/tmp/trustchain_ct".to_string(),
@@ -64,6 +64,20 @@ impl Default for CTConfig {
 }
 
 impl CTConfig {
+    /// Testing CT configuration with OS-assigned random port
+    pub fn testing() -> Self {
+        Self {
+            log_id: "trustchain-ct-test".to_string(),
+            bind_address: Ipv6Addr::LOCALHOST,
+            port: 0, // OS-assigned random port to avoid conflicts
+            max_entries_per_shard: 1_000_000,
+            merkle_update_interval: Duration::from_secs(60),
+            storage_path: "/tmp/trustchain_ct".to_string(),
+            enable_realtime_fingerprinting: false, // Disabled for testing
+            consensus_requirements: ConsensusRequirements::localhost_testing(),
+        }
+    }
+
     /// Production CT configuration
     pub fn production() -> Self {
         Self {
@@ -109,8 +123,8 @@ impl Default for DnsConfig {
         Self {
             server_id: "trustchain-dns-localhost".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
-            quic_port: 8853, // DNS-over-QUIC port
-            port: 53, // Traditional DNS port for compatibility
+            quic_port: 8853, // DNS-over-QUIC port (use testing() method for port 0)
+            port: 53, // Traditional DNS port for compatibility (use testing() method for port 0)
             dns_port: None, // IPv6-only, no traditional DNS
             upstream_resolvers: vec![
                 Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888), // Google IPv6
@@ -130,6 +144,30 @@ impl Default for DnsConfig {
 }
 
 impl DnsConfig {
+    /// Testing DNS configuration with OS-assigned random ports
+    pub fn testing() -> Self {
+        Self {
+            server_id: "trustchain-dns-test".to_string(),
+            bind_address: Ipv6Addr::LOCALHOST,
+            quic_port: 0, // OS-assigned random port to avoid conflicts
+            port: 0, // OS-assigned random port to avoid conflicts
+            dns_port: None,
+            upstream_resolvers: vec![
+                Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888), // Google IPv6
+                Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111), // Cloudflare IPv6
+            ],
+            cache_ttl: Duration::from_secs(300),
+            enable_cert_validation: false, // Disabled for testing
+            trustchain_domains: vec![
+                "hypermesh".to_string(),
+                "caesar".to_string(),
+                "trust".to_string(),
+                "assets".to_string(),
+            ],
+            consensus_requirements: ConsensusRequirements::localhost_testing(),
+        }
+    }
+
     /// Production DNS configuration
     pub fn production() -> Self {
         Self {
@@ -181,7 +219,7 @@ impl Default for ApiConfig {
         Self {
             server_id: "trustchain-api-localhost".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
-            port: 8080,
+            port: 8080, // Standard API port (use testing() method for port 0)
             enable_tls: false, // Disabled for localhost testing
             rate_limit_per_minute: 60,
             max_body_size: 1024 * 1024, // 1MB
@@ -192,6 +230,20 @@ impl Default for ApiConfig {
 }
 
 impl ApiConfig {
+    /// Testing API configuration with OS-assigned random port
+    pub fn testing() -> Self {
+        Self {
+            server_id: "trustchain-api-test".to_string(),
+            bind_address: Ipv6Addr::LOCALHOST,
+            port: 0, // OS-assigned random port to avoid conflicts
+            enable_tls: false,
+            rate_limit_per_minute: 1000, // Higher limit for tests
+            max_body_size: 1024 * 1024,
+            cors_origins: vec!["*".to_string()],
+            consensus_requirements: ConsensusRequirements::localhost_testing(),
+        }
+    }
+
     /// Production API configuration
     pub fn production() -> Self {
         Self {
@@ -345,13 +397,13 @@ impl Default for TrustChainConfig {
 }
 
 impl TrustChainConfig {
-    /// Configuration for localhost testing
+    /// Configuration for localhost testing with OS-assigned random ports
     pub fn localhost_testing() -> Self {
         Self {
-            ca: CAConfig::default(),
-            ct: CTConfig::default(),
-            dns: DnsConfig::default(),
-            api: ApiConfig::default(),
+            ca: CAConfig::testing(),
+            ct: CTConfig::testing(),
+            dns: DnsConfig::testing(),
+            api: ApiConfig::testing(),
             network: NetworkConfig::default(),
             logging: LoggingConfig::default(),
         }

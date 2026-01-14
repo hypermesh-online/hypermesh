@@ -95,7 +95,7 @@ impl Default for CAConfig {
         Self {
             ca_id: "trustchain-ca-localhost".to_string(),
             bind_address: std::net::Ipv6Addr::LOCALHOST,
-            port: 8443,
+            port: 8443, // Standard CA port (use testing() method for port 0)
             cert_validity_days: 1, // 24 hour certificates
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             mode: CAMode::LocalhostTesting,
@@ -106,6 +106,20 @@ impl Default for CAConfig {
 }
 
 impl CAConfig {
+    /// Testing configuration with OS-assigned random port
+    pub fn testing() -> Self {
+        Self {
+            ca_id: "trustchain-ca-test".to_string(),
+            bind_address: std::net::Ipv6Addr::LOCALHOST,
+            port: 0, // OS-assigned random port to avoid conflicts
+            cert_validity_days: 1,
+            rotation_interval: Duration::from_secs(24 * 60 * 60),
+            mode: CAMode::LocalhostTesting,
+            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            hypermesh_client_config: HyperMeshClientConfig::localhost_testing(),
+        }
+    }
+
     /// Production configuration for trust.hypermesh.online
     pub fn production() -> Self {
         Self {
