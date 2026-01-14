@@ -431,9 +431,15 @@ impl ShardedDataAccess {
     fn generate_session_id(&self, asset_id: &AssetId) -> String {
         let mut hasher = Sha256::new();
         hasher.update(asset_id.uuid.as_bytes());
-        hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_le_bytes());
+
+        let time_nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+
+        hasher.update(&time_nanos.to_le_bytes());
         hasher.update(&fastrand::u64(..).to_le_bytes());
-        
+
         let hash = hasher.finalize();
         hex::encode(&hash[..16])
     }

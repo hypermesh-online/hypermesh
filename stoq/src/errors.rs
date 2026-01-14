@@ -264,7 +264,7 @@ impl fmt::Display for ProtocolError {
             ProtocolError::TokenExpired { token_id, expired_at, current_time } =>
                 write!(f, "Token {:?} expired at {} (current: {})", token_id, expired_at, current_time),
             ProtocolError::InvalidProof { proof_type, reason } =>
-                write!(f, "Invalid {:?} proof: {}", proof_type, reason),
+                write!(f, "Invalid {} proof: {}", proof_type, reason),
             ProtocolError::ServiceNotFound { service_name } =>
                 write!(f, "Service '{}' not found", service_name),
             ProtocolError::DiscoveryFailed { service_name, reason } =>
@@ -374,7 +374,6 @@ impl From<quinn::ConnectError> for StoqError {
     fn from(err: quinn::ConnectError) -> Self {
         let remote = match &err {
             quinn::ConnectError::EndpointStopping => "endpoint-stopping".to_string(),
-            quinn::ConnectError::TooManyConnections => "too-many-connections".to_string(),
             quinn::ConnectError::InvalidRemoteAddress(_) => "invalid-address".to_string(),
             quinn::ConnectError::InvalidServerName(_) => "invalid-server-name".to_string(),
             quinn::ConnectError::NoDefaultClientConfig => "no-default-config".to_string(),

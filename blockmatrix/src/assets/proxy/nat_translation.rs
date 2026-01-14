@@ -738,9 +738,16 @@ impl NATTranslator {
         // TODO: Generate based on actual node characteristics
         // For now, use a hash of current time and hostname
         let mut hasher = Sha256::new();
-        hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_le_bytes());
+
+        // Use system time with fallback to zero
+        let time_secs = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        hasher.update(&time_secs.to_le_bytes());
         hasher.update(b"hypermesh-node");
-        
+
         let result = hasher.finalize();
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&result[..8]);

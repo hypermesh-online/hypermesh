@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use anyhow::Result;
+use crate::assets::pipeline::PipelineError;
 
 use crate::matrix::MatrixCoordinate;
 use crate::assets::pipeline::Shard;
@@ -123,7 +124,10 @@ impl DeduplicationEngine {
 
         // O(1) bucket lookup
         let mut buckets = self.buckets.write().await;
-        let bucket = buckets.get_mut(&bucket_id).unwrap(); // Pre-created, always exists
+        let bucket = buckets.get_mut(&bucket_id)
+            .ok_or_else(|| anyhow::anyhow!(
+                "Bucket {:?} not found - deduplication engine may not be properly initialized", bucket_id
+            ))?;
 
         // Record metrics
         let mut metrics = self.metrics.write().await;
@@ -135,7 +139,10 @@ impl DeduplicationEngine {
             metrics.cache_hits += 1;
 
             // Record deduplication
-            let metadata = bucket.record_deduplication(&shard_hash, shard_size).unwrap();
+            let metadata = bucket.record_deduplication(&shard_hash, shard_size)
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Failed to record deduplication for shard - hash may not exist in bucket"
+                ))?;
 
             DeduplicationResult {
                 deduplicated: true,

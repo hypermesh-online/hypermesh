@@ -93,6 +93,9 @@ pub enum PipelineError {
     #[error("Distribution failed: {0}")]
     DistributionFailed(String),
 
+    #[error("Deduplication failed: {0}")]
+    DeduplicationFailed(String),
+
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 

@@ -343,16 +343,16 @@ impl CpuAssetAdapter {
             .filter(|(_, core)| {
                 matches!(core.status, CoreStatus::Available) &&
                 core.current_frequency_mhz >= cpu_req.min_frequency_mhz.unwrap_or(0) &&
-                (cpu_req.architecture.is_none() || 
-                 cpu_req.architecture.as_ref().unwrap() == "x86_64") // Assume x86_64
+                (cpu_req.architecture.as_ref().map(|arch| arch == "x86_64").unwrap_or(true))
             })
             .map(|(core_id, _)| *core_id)
             .collect();
-        
+
         // Sort by NUMA node if preference specified
         available_cores.sort_by_key(|core_id| {
-            let core = cores.get(core_id).unwrap();
-            core.numa_node
+            cores.get(core_id)
+                .map(|core| core.numa_node)
+                .unwrap_or(0)
         });
         
         // Check if we have enough cores
@@ -367,12 +367,18 @@ impl CpuAssetAdapter {
         
         // Allocate the requested number of cores
         for &core_id in available_cores.iter().take(cpu_req.cores as usize) {
-            let core = cores.get_mut(&core_id).unwrap();
-            core.status = CoreStatus::Allocated;
-            core.allocated_to = Some(asset_id.clone());
-            
-            core_allocations.insert(core_id, asset_id.clone());
-            allocated_cores.push(core_id);
+            if let Some(core) = cores.get_mut(&core_id) {
+                core.status = CoreStatus::Allocated;
+                core.allocated_to = Some(asset_id.clone());
+
+                core_allocations.insert(core_id, asset_id.clone());
+                allocated_cores.push(core_id);
+            } else {
+                // This should never happen due to filtering above, but handle gracefully
+                return Err(AssetError::AllocationFailed {
+                    reason: format!("Core {} disappeared during allocation", core_id)
+                });
+            }
         }
         
         Ok(allocated_cores)

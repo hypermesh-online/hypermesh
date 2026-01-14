@@ -16,6 +16,7 @@ pub mod protocol;
 pub mod api;
 pub mod network_isolation;
 pub mod errors;
+pub mod error_utils;
 
 // Test utilities for crypto initialization
 #[cfg(test)]

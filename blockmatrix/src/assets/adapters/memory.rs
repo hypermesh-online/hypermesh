@@ -402,8 +402,8 @@ impl AssetAdapter for MemoryAssetAdapter {
         }
         
         // Allocate memory from appropriate pool
-        let pool_id = if memory_req.numa_node.is_some() {
-            format!("numa_{}", memory_req.numa_node.unwrap())
+        let pool_id = if let Some(numa_node) = memory_req.numa_node {
+            format!("numa_{}", numa_node)
         } else {
             "default".to_string()
         };

@@ -382,7 +382,9 @@ impl EntityBlockchain {
 
         // Create new block
         let block_index = self.chain.len() as u64;
-        let previous_hash = self.chain.last().unwrap().hash;
+        let previous_hash = self.chain.last()
+            .ok_or_else(|| "Cannot add block to empty chain - genesis block missing".to_string())?
+            .hash;
         
         let block = EntityBlock {
             index: block_index,

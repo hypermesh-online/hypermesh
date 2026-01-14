@@ -19,12 +19,14 @@ pub mod node_chain;
 pub mod validation;
 pub mod propagation;
 pub mod state;
+pub mod errors;
 
 pub use block::Block;
 pub use node_chain::{NodeBlockchain, ChainStats};
 pub use validation::{ChainValidator, ValidationRules};
 pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult};
 pub use state::{ChainStateManager, ChainSnapshot, BlockQuery, SortOrder, StorageStats};
+pub use errors::{BlockchainError, StateError, PropagationError, Result};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use std::path::Path;
@@ -33,7 +35,7 @@ use std::path::Path;
 pub async fn create_node_blockchain(
     node_coordinate: MatrixCoordinate,
     storage_path: impl AsRef<Path>,
-) -> Result<(NodeBlockchain, ChainStateManager, BlockPropagator), String> {
+) -> std::result::Result<(NodeBlockchain, ChainStateManager, BlockPropagator), String> {
     // Create the blockchain
     let blockchain = NodeBlockchain::new(node_coordinate.clone());
 

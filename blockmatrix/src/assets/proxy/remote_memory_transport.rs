@@ -252,7 +252,12 @@ impl RemoteMemoryTransport {
                 message: format!("Failed to acquire connection permit: {}", e),
             })?;
 
-        let connection = self.endpoint.connect(address.parse().unwrap(), "hypermesh-memory")
+        let socket_addr = address.parse()
+            .map_err(|e| AssetError::NetworkError {
+                message: format!("Invalid socket address '{}': {}", address, e),
+            })?;
+
+        let connection = self.endpoint.connect(socket_addr, "hypermesh-memory")
             .map_err(|e| AssetError::NetworkError {
                 message: format!("Failed to connect: {}", e),
             })?

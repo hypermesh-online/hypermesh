@@ -671,8 +671,14 @@ impl CrossChainValidationManager {
         let mut hasher = Sha256::new();
         hasher.update(validator.source_network.as_bytes());
         hasher.update(validator.asset_identifier.to_hex_string().as_bytes());
-        hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_le_bytes());
-        
+
+        let time_nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+
+        hasher.update(&time_nanos.to_le_bytes());
+
         let result = hasher.finalize();
         hex::encode(result)
     }

@@ -236,10 +236,12 @@ impl ProxyForwarder {
             })?;
         
         // Generate connection ID
-        let connection_id = format!("conn_{}_{}", 
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos(),
-            fastrand::u32(..)
-        );
+        let time_nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+
+        let connection_id = format!("conn_{}_{}", time_nanos, fastrand::u32(..));
         
         // Track connection
         self.track_connection(&connection_id, proxy_addr, destination, &request_type).await;

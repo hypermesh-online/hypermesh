@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{AssetId, AssetResult, AssetError, ProxyNodeInfo};
+use crate::assets::ProxyAddress;
 use super::trust_integration::{TrustChainIntegration, CertificateValidator, TrustChain, ChainValidationStatus};
 
 /// Trust level for proxy nodes
@@ -336,7 +337,12 @@ impl ProxySelector {
         scored_proxies.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Return best proxy
-        Ok(scored_proxies.into_iter().next().unwrap().0)
+        scored_proxies.into_iter()
+            .next()
+            .map(|(proxy, _)| proxy)
+            .ok_or_else(|| AssetError::AllocationFailed {
+                reason: "No suitable proxy nodes available for selection".to_string()
+            })
     }
 
     /// Calculate proxy score based on multiple factors
