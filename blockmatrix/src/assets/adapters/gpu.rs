@@ -974,39 +974,8 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyLevel::Private,
-            // ConsensusProof::new expects: (stake, time, space, work)
-            consensus_proof: ConsensusProof::new(
-                StakeProof {
-                    stake_holder: "test-holder".to_string(),
-                    stake_holder_id: "test-holder-id".to_string(),
-                    stake_amount: 500,
-                    stake_timestamp: SystemTime::now(),
-                },
-                TimeProof {
-                    network_time_offset: Duration::from_secs(2),
-                    time_verification_timestamp: SystemTime::now(),
-                    nonce: 42,
-                    proof_hash: vec![5, 6, 7, 8],
-                },
-                SpaceProof {
-                    node_id: "test-node".to_string(),
-                    storage_path: "/test/gpu".to_string(),
-                    total_size: 8 * 1024 * 1024 * 1024,
-                    total_storage: 16 * 1024 * 1024 * 1024,
-                    file_hash: "test_gpu_hash".to_string(),
-                    proof_timestamp: SystemTime::now(),
-                },
-                WorkProof {
-                    owner_id: "test-worker".to_string(),
-                    workload_id: "test-workload".to_string(),
-                    pid: 12345,
-                    computational_power: 1000,
-                    workload_type: WorkloadType::Compute,
-                    work_state: WorkState::Completed,
-                    work_challenges: vec!["gpu_challenge".to_string()],
-                    proof_timestamp: SystemTime::now(),
-                },
-            ),
+            // Use default test proofs that pass validation (proper hash generation)
+            consensus_proof: ConsensusProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),
             duration_limit: Some(Duration::from_secs(3600)),
             tags: HashMap::new(),

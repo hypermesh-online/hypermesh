@@ -109,9 +109,9 @@ mod tests {
     async fn test_get_all_adapters() {
         let registry = AdapterRegistry::new().await;
         let adapters = registry.get_all_adapters();
-        
-        assert_eq!(adapters.len(), 6);
-        
+
+        assert_eq!(adapters.len(), 7);
+
         // Verify all asset types are represented
         let asset_types: Vec<AssetType> = adapters.iter().map(|(t, _)| t.clone()).collect();
         assert!(asset_types.contains(&AssetType::Memory));
@@ -120,5 +120,6 @@ mod tests {
         assert!(asset_types.contains(&AssetType::Storage));
         assert!(asset_types.contains(&AssetType::Network));
         assert!(asset_types.contains(&AssetType::Container));
+        assert!(asset_types.contains(&AssetType::Economic));
     }
 }
