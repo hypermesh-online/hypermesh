@@ -741,7 +741,7 @@ mod tests {
     use std::collections::HashMap;
     use std::time::Duration;
     
-    async fn create_test_memory_request() -> AssetAllocationRequest {
+    fn create_test_memory_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
             asset_type: AssetType::Memory,
             requested_resources: crate::assets::core::ResourceRequirements {
@@ -761,39 +761,39 @@ mod tests {
             tags: HashMap::new(),
         }
     }
-    
+
     #[tokio::test]
     async fn test_memory_adapter_creation() {
         let adapter = MemoryAssetAdapter::new().await;
         assert_eq!(adapter.asset_type(), AssetType::Memory);
         assert!(adapter.total_memory > 0);
     }
-    
+
     #[tokio::test]
     async fn test_memory_allocation() {
         let adapter = MemoryAssetAdapter::new().await;
-        let request = create_test_memory_request().await;
-        
+        let request = create_test_memory_request();
+
         let allocation = adapter.allocate_asset(&request).await.unwrap();
         assert_eq!(allocation.asset_id.asset_type, AssetType::Memory);
         assert!(allocation.status.proxy_address.is_some());
-        
+
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
     }
-    
+
     #[tokio::test]
     async fn test_proxy_address_resolution() {
         let adapter = MemoryAssetAdapter::new().await;
-        let request = create_test_memory_request().await;
-        
+        let request = create_test_memory_request();
+
         let allocation = adapter.allocate_asset(&request).await.unwrap();
         let proxy_addr = allocation.status.proxy_address.unwrap();
-        
+
         // Test proxy address resolution
         let resolved_asset_id = adapter.resolve_proxy_address(&proxy_addr).await.unwrap();
         assert_eq!(resolved_asset_id, allocation.asset_id);
-        
+
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
     }
     

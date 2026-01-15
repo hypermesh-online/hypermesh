@@ -961,7 +961,7 @@ mod tests {
     use std::time::Duration;
     use std::collections::HashMap;
     
-    async fn create_test_gpu_request() -> AssetAllocationRequest {
+    fn create_test_gpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
             asset_type: AssetType::Gpu,
             requested_resources: crate::assets::core::ResourceRequirements {
@@ -981,22 +981,22 @@ mod tests {
             tags: HashMap::new(),
         }
     }
-    
+
     #[tokio::test]
     async fn test_gpu_adapter_creation() {
         let adapter = GpuAssetAdapter::new().await;
         assert_eq!(adapter.asset_type(), AssetType::Gpu);
         assert!(adapter.total_devices > 0);
     }
-    
+
     #[tokio::test]
     async fn test_gpu_allocation() {
         let adapter = GpuAssetAdapter::new().await;
-        let request = create_test_gpu_request().await;
-        
+        let request = create_test_gpu_request();
+
         let allocation = adapter.allocate_asset(&request).await.unwrap();
         assert_eq!(allocation.asset_id.asset_type, AssetType::Gpu);
-        
+
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
     }

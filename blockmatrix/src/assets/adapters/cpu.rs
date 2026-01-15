@@ -846,7 +846,7 @@ mod tests {
     use std::time::Duration;
     use std::collections::HashMap;
     
-    async fn create_test_cpu_request() -> AssetAllocationRequest {
+    fn create_test_cpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
             asset_type: AssetType::Cpu,
             requested_resources: crate::assets::core::ResourceRequirements {
@@ -877,11 +877,11 @@ mod tests {
     #[tokio::test]
     async fn test_cpu_allocation() {
         let adapter = CpuAssetAdapter::new().await;
-        let request = create_test_cpu_request().await;
-        
+        let request = create_test_cpu_request();
+
         let allocation = adapter.allocate_asset(&request).await.unwrap();
         assert_eq!(allocation.asset_id.asset_type, AssetType::Cpu);
-        
+
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
     }
@@ -900,10 +900,17 @@ mod tests {
     async fn test_cpu_capabilities() {
         let adapter = CpuAssetAdapter::new().await;
         let capabilities = adapter.get_capabilities();
-        
+
         assert_eq!(capabilities.asset_type, AssetType::Cpu);
         assert!(capabilities.supports_proxy_addressing);
         assert!(capabilities.features.contains(&"frequency_scaling".to_string()));
         assert!(capabilities.features.contains(&"process_isolation".to_string()));
+    }
+
+    #[test]
+    fn test_consensus_proof_creation() {
+        // Test that ConsensusProof::new_for_testing() doesn't hang
+        let proof = ConsensusProof::new_for_testing();
+        assert!(proof.validate());
     }
 }
