@@ -149,7 +149,7 @@ impl AssetLibrary {
             .for_each_concurrent(self.config.max_concurrent_ops, |batch| async move {
                 for package in batch {
                     if let Err(e) = self.add_package(package.clone()).await {
-                        eprintln!("Failed to load package {}: {}", package.id(), e);
+                        eprintln!("Failed to load package {}: {}", package.id, e);
                     }
                 }
             })
@@ -178,7 +178,7 @@ impl AssetLibrary {
     /// Create package summary from full package
     fn create_summary(package: &LibraryAssetPackage) -> PackageSummary {
         PackageSummary {
-            id: package.id().to_string(),
+            id: package.id.to_string(),
             name: package.name.clone(),
             version: package.version().clone(),
             description: package.description().clone(),
@@ -439,7 +439,7 @@ mod tests {
 
         // Create test package
         let package = create_test_package();
-        let package_id = package.id().to_string();
+        let package_id = package.id.to_string();
 
         // Add package
         library.add_package(package).await.unwrap();
@@ -461,7 +461,7 @@ mod tests {
         // Add test packages
         for i in 0..5 {
             let mut package = create_test_package();
-            package.id() = Arc::from(format!("test-{}", i));
+            package.id = Arc::from(format!("test-{}", i));
             package.name = format!("Package {}", i);
             library.add_package(package).await.unwrap();
         }

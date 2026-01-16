@@ -201,12 +201,16 @@ impl AssetPackageManager {
             // Create installation record
             let installed = InstalledPackage {
                 id: Arc::clone(&pkg_id),
-                version: Arc::clone(&pkg.metadata.version),
+                version: pkg.metadata.as_ref()
+                    .map(|m| Arc::clone(&m.version))
+                    .unwrap_or_else(|| Arc::from(pkg.version.as_str())),
                 installed_at: chrono::Utc::now().timestamp(),
-                dependencies: pkg.spec.dependencies
-                    .iter()
-                    .map(|d| Arc::clone(&d.name))
-                    .collect(),
+                dependencies: pkg.spec.as_ref()
+                    .map(|s| s.dependencies
+                        .iter()
+                        .map(|d| Arc::clone(&d.name))
+                        .collect())
+                    .unwrap_or_else(Vec::new),
                 dependents: HashSet::new(),
                 source: if &pkg_id == package_id {
                     InstallSource::Library

@@ -361,7 +361,7 @@ impl PackageCache {
                     // Move evicted to L2
                     drop(l1);
                     let mut l2 = self.l2_cache.write().await;
-                    l2.insert(Arc::from(evicted.package.id().as_ref()), evicted.package);
+                    l2.insert(Arc::clone(&evicted.package.id), evicted.package);
                 }
 
                 return Ok(Some(package));
@@ -381,13 +381,13 @@ impl PackageCache {
             drop(l1);
             let mut l2 = self.l2_cache.write().await;
 
-            let evicted_key = Arc::from(evicted.package.id().as_ref());
+            let evicted_key = Arc::clone(&evicted.package.id);
             if let Some(l2_evicted) = l2.insert(evicted_key.clone(), evicted.package) {
                 // Move L2 evicted to L3 if available
                 drop(l2);
                 if let Some(l3) = &self.l3_cache {
                     let mut l3 = l3.write().await;
-                    l3.insert(Arc::from(l2_evicted.package.id().as_ref()), l2_evicted.package).await?;
+                    l3.insert(Arc::clone(&l2_evicted.package.id), l2_evicted.package).await?;
                 }
             }
         }

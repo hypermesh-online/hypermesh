@@ -135,7 +135,7 @@ impl LibraryIndex {
 
     /// Index a package for search
     pub async fn index_package(&self, package: &LibraryAssetPackage) -> Result<()> {
-        let package_id = Arc::clone(&package.id());
+        let package_id = Arc::clone(&package.id);
 
         // Add to all packages set
         {
@@ -569,7 +569,7 @@ mod tests {
         let index = LibraryIndex::new();
 
         let package = create_test_package();
-        let package_id = Arc::clone(&package.id());
+        let package_id = Arc::clone(&package.id);
 
         index.index_package(&package).await.unwrap();
 

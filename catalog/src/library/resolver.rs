@@ -209,14 +209,16 @@ impl DependencyResolver {
         };
 
         // Add initial dependencies to pending
-        for dep in package.spec.dependencies.iter() {
-            if !dep.optional {
-                context.pending.push_back(PendingPackage {
-                    name: Arc::clone(&dep.name),
-                    constraint: Arc::clone(&dep.version_constraint),
-                    parent: Some(Arc::clone(&package.id())),
-                    depth: 1,
-                });
+        if let Some(spec) = &package.spec {
+            for dep in spec.dependencies.iter() {
+                if !dep.optional {
+                    context.pending.push_back(PendingPackage {
+                        name: Arc::clone(&dep.name),
+                        constraint: Arc::clone(&dep.version_constraint),
+                        parent: Some(Arc::clone(&package.id)),
+                        depth: 1,
+                    });
+                }
             }
         }
 
@@ -310,26 +312,32 @@ impl DependencyResolver {
         context.resolved.insert(
             Arc::clone(&package.id()),
             ResolvedPackage {
-                name: Arc::clone(&package.id()),
-                version: Arc::clone(&package.metadata().version),
+                name: Arc::clone(&package.id),
+                version: package.metadata.as_ref()
+                    .map(|m| Arc::clone(&m.version))
+                    .unwrap_or_else(|| Arc::from(package.version.as_str())),
                 source: Arc::from("library"),
-                dependencies: package.spec.dependencies
-                    .iter()
-                    .map(|d| Arc::clone(&d.name))
-                    .collect(),
+                dependencies: package.spec.as_ref()
+                    .map(|s| s.dependencies
+                        .iter()
+                        .map(|d| Arc::clone(&d.name))
+                        .collect())
+                    .unwrap_or_else(Vec::new),
                 depth: pending.depth,
             }
         );
 
         // Add transitive dependencies to pending
-        for dep in package.spec.dependencies.iter() {
-            if !dep.optional && !context.visited.contains(&dep.name) {
-                context.pending.push_back(PendingPackage {
-                    name: Arc::clone(&dep.name),
-                    constraint: Arc::clone(&dep.version_constraint),
-                    parent: Some(Arc::clone(&package.id())),
-                    depth: pending.depth + 1,
-                });
+        if let Some(spec) = &package.spec {
+            for dep in spec.dependencies.iter() {
+                if !dep.optional && !context.visited.contains(&dep.name) {
+                    context.pending.push_back(PendingPackage {
+                        name: Arc::clone(&dep.name),
+                        constraint: Arc::clone(&dep.version_constraint),
+                        parent: Some(Arc::clone(&package.id)),
+                        depth: pending.depth + 1,
+                    });
+                }
             }
         }
 
