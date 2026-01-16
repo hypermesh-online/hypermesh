@@ -90,6 +90,16 @@ impl ConsensusProof {
     pub fn new_for_testing() -> Self {
         use std::time::Duration;
 
+        // Create space proof with proper total_size
+        let mut space_proof = SpaceProof::new(
+            "test_node_001".to_string(),  // node_id
+            "test_storage_path".to_string(),  // storage_path
+            100 * 1024 * 1024 * 1024  // 100GB total_storage
+        );
+        // Set total_size to a non-zero value (50GB used)
+        space_proof.total_size = 50 * 1024 * 1024 * 1024;
+        space_proof.file_hash = "test_hash_1234567890".to_string();
+
         Self {
             stake_proof: StakeProof::new(
                 "test_stake_holder".to_string(),
@@ -97,11 +107,7 @@ impl ConsensusProof {
                 10000  // Sufficient stake amount for validation
             ),
             time_proof: TimeProof::new(Duration::from_secs(1)),  // Valid time offset
-            space_proof: SpaceProof::new(
-                "test_node_001".to_string(),  // node_id
-                "test_storage_path".to_string(),  // storage_path
-                100 * 1024 * 1024 * 1024  // 100GB total_storage
-            ),
+            space_proof,
             work_proof: WorkProof::new(
                 "test_owner".to_string(),
                 "test_workload_001".to_string(),
@@ -350,6 +356,21 @@ mod tests {
 
         assert!(proof.validate_with_requirements(&requirements));
         Ok(())
+    }
+
+    #[test]
+    fn test_new_for_testing_creates_valid_proof() {
+        // Test that new_for_testing creates a valid proof that passes validation
+        let proof = ConsensusProof::new_for_testing();
+
+        // Check that all components have valid values
+        assert!(proof.space_proof.total_size > 0, "Space proof should have non-zero total_size");
+        assert!(proof.stake_proof.stake_amount >= 50, "Stake proof should have sufficient amount for CPU validation");
+        assert!(proof.work_proof.computational_power >= 16, "Work proof should have sufficient computational power for CPU");
+        assert!(proof.time_proof.nonce > 0, "Time proof should have non-zero nonce");
+
+        // Validate the overall proof
+        assert!(proof.validate(), "Test proof should pass validation");
     }
 
     #[tokio::test]
