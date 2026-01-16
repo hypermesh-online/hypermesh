@@ -146,7 +146,9 @@ impl LibraryIndex {
         // Index by name
         {
             let mut name_index = self.name_index.write().await;
-            let name_key = package.metadata().name.to_lowercase();
+            let name_key = package.metadata.as_ref()
+                .map(|m| m.name.to_lowercase())
+                .unwrap_or_else(|| package.name.to_lowercase());
             name_index
                 .entry(name_key)
                 .or_insert_with(HashSet::new)
@@ -156,11 +158,13 @@ impl LibraryIndex {
         // Index by tags
         {
             let mut tag_index = self.tag_index.write().await;
-            for tag in package.metadata().tags.iter() {
-                tag_index
-                    .entry(Arc::clone(tag))
-                    .or_insert_with(HashSet::new)
-                    .insert(Arc::clone(&package_id));
+            if let Some(metadata) = &package.metadata {
+                for tag in metadata.tags.iter() {
+                    tag_index
+                        .entry(Arc::clone(tag))
+                        .or_insert_with(HashSet::new)
+                        .insert(Arc::clone(&package_id));
+                }
             }
         }
 

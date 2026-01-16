@@ -5,7 +5,7 @@
 use super::types::*;
 use super::asset_library::AssetLibrary;
 use super::resolver::DependencyResolver;
-use super::{LibraryConfig, ValidationResult, DependencyResolution};
+use super::{LibraryConfig, LibraryInterface, ValidationResult, DependencyResolution};
 
 use anyhow::{Result, Context, bail};
 use std::sync::Arc;
@@ -324,7 +324,7 @@ impl AssetPackageManager {
         };
 
         // Check if update is needed
-        if latest_package.metadata().version.as_ref() == current_version {
+        if latest_package.metadata.as_ref().map(|m| m.version.as_ref()).unwrap_or("") == current_version {
             result.warnings.push(format!(
                 "Package {} is already at latest version {}",
                 package_id, current_version
@@ -354,7 +354,7 @@ impl AssetPackageManager {
                 "Updated {} from {} to {}",
                 package_id,
                 current_version,
-                latest_package.metadata().version
+                latest_package.metadata.as_ref().map(|m| m.version.as_ref()).unwrap_or("<unknown>")
             ));
         }
 

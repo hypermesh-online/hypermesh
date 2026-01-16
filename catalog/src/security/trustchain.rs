@@ -151,11 +151,12 @@ struct IssueCertificateResponse {
 impl TrustChainIntegration {
     /// Create new TrustChain integration
     pub async fn new(config: TrustChainConfig) -> Result<Self> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .danger_accept_invalid_certs(false) // Always validate TLS
-            .build()
-            .context("Failed to build HTTP client")?;
+        // HTTP removed - STOQ-only transport
+        // let client = reqwest::Client::builder()
+        //     .timeout(std::time::Duration::from_secs(30))
+        //     .danger_accept_invalid_certs(false) // Always validate TLS
+        //     .build()
+        //     .context("Failed to build HTTP client")?;
 
         let integration = Self {
             config,

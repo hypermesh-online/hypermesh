@@ -154,7 +154,7 @@ impl HyperMeshClient {
     /// Execute asset on HyperMesh infrastructure
     pub async fn execute_asset(
         &self,
-        asset_id: &crate::consensus::AssetId,
+        asset_id: &blockmatrix::assets::core::AssetId,
         resource_requirements: Vec<HyperMeshResource>,
     ) -> Result<CatalogExecutionContext> {
         // Generate execution ID

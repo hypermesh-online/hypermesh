@@ -88,11 +88,28 @@ impl ConsensusProof {
     /// Create a testing proof (non-test builds, for API placeholder usage only)
     /// TODO: Replace all calls to this method with generate_from_network()
     pub fn new_for_testing() -> Self {
+        use std::time::Duration;
+
         Self {
-            stake_proof: StakeProof::default(),
-            time_proof: TimeProof::default(),
-            space_proof: SpaceProof::default(),
-            work_proof: WorkProof::default(),
+            stake_proof: StakeProof::new(
+                "test_stake_holder".to_string(),
+                "test_node_001".to_string(),
+                10000  // Sufficient stake amount for validation
+            ),
+            time_proof: TimeProof::new(Duration::from_secs(1)),  // Valid time offset
+            space_proof: SpaceProof::new(
+                "test_node_001".to_string(),  // node_id
+                "test_storage_path".to_string(),  // storage_path
+                100 * 1024 * 1024 * 1024  // 100GB total_storage
+            ),
+            work_proof: WorkProof::new(
+                "test_owner".to_string(),
+                "test_workload_001".to_string(),
+                1234,  // PID
+                1000,  // Valid computational power (>16 for CPU validation)
+                WorkloadType::Compute,  // General computation
+                WorkState::Running
+            ),
         }
     }
 

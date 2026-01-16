@@ -14,7 +14,7 @@ use anyhow::Result;
 use blockmatrix::extensions::{
     HyperMeshExtension, AssetLibraryExtension, ExtensionMetadata, ExtensionCategory,
     ExtensionCapability, ExtensionConfig, ExtensionResult, ExtensionError,
-    ExtensionRequest, ExtensionResponse, ExtensionStatus, ExtensionState as ExtState,
+    ExtensionRequest, ExtensionResponse, ExtensionStatus, ExtensionState, ExtensionStateData,
     ExtensionHealth, ValidationReport, ValidationError, ValidationWarning,
     AssetExtensionHandler, AssetPackage, PackageFilter, InstallOptions, InstallResult,
     UpdateResult, SearchOptions, AssetPackageSpec, PublishResult, VerificationResult,
@@ -25,7 +25,7 @@ use blockmatrix::assets::core::{AssetManager, AssetId, AssetType};
 
 use crate::{
     Catalog, CatalogConfig, CatalogBuilder,
-    library::{LibraryManager, LibraryConfig},
+    library::{AssetLibrary, LibraryConfig},
     hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig},
     registry::{AssetRegistry, SearchQuery, SearchResults},
     validation::{AssetValidator, ValidationResult},
@@ -49,7 +49,7 @@ pub struct CatalogExtension {
     catalog: Option<Arc<Catalog>>,
 
     /// Library manager for asset packages
-    library_manager: Arc<RwLock<LibraryManager>>,
+    library_manager: Arc<RwLock<AssetLibrary>>,
 
     /// HyperMesh asset registry bridge
     asset_registry: Arc<HyperMeshAssetRegistry>,
@@ -139,7 +139,7 @@ impl CatalogExtension {
         };
 
         let library_manager = Arc::new(RwLock::new(
-            LibraryManager::new(library_config)
+            AssetLibrary::new(library_config)
         ));
 
         let bridge_config = BridgeConfig::default();
@@ -643,7 +643,7 @@ impl HyperMeshExtension for CatalogExtension {
     }
 
     /// Export extension state for migration or backup
-    async fn export_state(&self) -> ExtensionResult<ExtState> {
+    async fn export_state(&self) -> ExtensionResult<ExtensionStateData> {
         self.increment_requests().await;
 
         // Serialize current state
@@ -656,7 +656,7 @@ impl HyperMeshExtension for CatalogExtension {
             }
         });
 
-        Ok(ExtState {
+        Ok(ExtensionStateData {
             version: 1,
             metadata: self.metadata.clone(),
             state_data: state_data.to_string().into_bytes(),
@@ -812,7 +812,7 @@ impl AssetLibraryExtension for CatalogExtension {
     }
 
     /// Publish a new package to the library
-    async fn publish_package(&self, package: AssetPackageSpec, proof: hypermesh::consensus::proof_of_state_integration::ConsensusProof) -> ExtensionResult<PublishResult> {
+    async fn publish_package(&self, package: AssetPackageSpec, proof: blockmatrix::assets::core::ConsensusProof) -> ExtensionResult<PublishResult> {
         self.increment_requests().await;
         self.start_operation().await;
 

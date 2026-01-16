@@ -488,10 +488,8 @@ impl MdnsDiscovery {
 }
 
 // Helper for parsing IPv6 addresses
-impl Ipv6Addr {
-    fn from_str(s: &str) -> Result<Self> {
-        s.parse().context("Invalid IPv6 address")
-    }
+fn parse_ipv6_addr(s: &str) -> Result<Ipv6Addr> {
+    s.parse().context("Invalid IPv6 address")
 }
 
 // Make PeerDiscovery cloneable for background tasks

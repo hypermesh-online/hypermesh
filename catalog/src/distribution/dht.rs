@@ -675,11 +675,9 @@ impl ValueStore {
     }
 }
 
-// Helper methods for AssetPackageId
-impl AssetPackageId {
-    fn as_bytes(&self) -> &[u8] {
-        self.as_bytes()
-    }
+// Helper function for AssetPackageId
+fn asset_package_id_as_bytes(id: &AssetPackageId) -> &[u8] {
+    id.as_ref().as_bytes()
 }
 
 // For testing/compilation - implement getrandom

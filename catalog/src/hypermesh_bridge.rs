@@ -234,21 +234,18 @@ impl HyperMeshAssetRegistry {
 
         if let Some(req_value) = spec.requirements.get("memory") {
             if let Some(mem_str) = req_value.as_str() {
-                requirements.memory = Some(blockmatrix::assets::core::MemoryRequirements {
-                    size_bytes: self.parse_memory_string(mem_str)?,
-                    memory_type: blockmatrix::assets::core::MemoryType::Ram,
-                    speed_mhz: None,
+                requirements.memory = Some(blockmatrix::extensions::MemoryRequirement {
+                    min_bytes: self.parse_memory_string(mem_str)?,
+                    max_bytes: None,
                 });
             }
         }
 
         if let Some(req_value) = spec.requirements.get("storage") {
             if let Some(storage_str) = req_value.as_str() {
-                requirements.storage = Some(blockmatrix::assets::core::StorageRequirements {
-                    size_bytes: self.parse_memory_string(storage_str)?,
-                    storage_type: blockmatrix::assets::core::StorageType::Ssd,
-                    iops: None,
-                    bandwidth_mbps: None,
+                requirements.storage = Some(blockmatrix::extensions::StorageRequirement {
+                    min_bytes: self.parse_memory_string(storage_str)?,
+                    storage_type: Some("ssd".to_string()),
                 });
             }
         }
@@ -322,41 +319,24 @@ impl HyperMeshAssetRegistry {
 
     /// Convert library package to asset package format
     fn library_package_to_asset_package(&self, lib_package: LibraryAssetPackage) -> Result<AssetPackage> {
-        // This is a placeholder - implement proper conversion based on actual types
+        use blockmatrix::extensions::AssetPackage;
+        use semver::Version;
+
         Ok(AssetPackage {
-            spec: AssetSpec {
-                metadata: AssetMetadata {
-                    name: lib_package.name,
-                    version: lib_package.version(),
-                    description: lib_package.description(),
-                    author: None,
-                    license: None,
-                    tags: vec![],
-                    created_at: Utc::now().to_rfc3339(),
-                    updated_at: Utc::now().to_rfc3339(),
-                },
-                spec: AssetSpecification {
-                    asset_type: lib_package.asset_type(),
-                    format: AssetFormat::Raw,
-                    requirements: HashMap::new(),
-                    capabilities: HashMap::new(),
-                    configuration: HashMap::new(),
-                },
-                dependencies: vec![],
-                files: vec![],
-            },
-            content: AssetContent {
-                main_content: lib_package.content,
-                file_contents: HashMap::new(),
-                binary_contents: HashMap::new(),
-            },
-            validation: AssetValidation {
-                hash_algorithm: "sha256".to_string(),
-                content_hash: lib_package.hash,
-                signature: None,
-                verified: false,
-            },
-            package_hash: lib_package.hash.clone(),
+            id: lib_package.id.clone(),
+            name: lib_package.name.clone(),
+            version: Version::parse(&lib_package.version.to_string()).unwrap_or(Version::new(1, 0, 0)),
+            description: lib_package.description.clone().unwrap_or_default(),
+            author: lib_package.author.clone().unwrap_or_default(),
+            license: lib_package.license.clone().unwrap_or_default(),
+            asset_types: vec![],  // Extract from metadata if available
+            size_bytes: lib_package.content.len() as u64,
+            install_count: 0,
+            rating: 0.0,
+            dependencies: vec![],  // Convert from lib_package.dependencies if available
+            signature: None,
+            distribution_hash: lib_package.hash.clone(),
+            metadata: HashMap::new(),
         })
     }
 

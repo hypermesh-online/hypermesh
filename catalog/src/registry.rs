@@ -726,6 +726,8 @@ impl AssetRegistry {
 }
 */
 
+// HTTP-based registry client removed - STOQ-only transport
+/*
 /// HTTP-based registry client implementation
 pub struct HttpRegistryClient {
     /// Remote registry configuration
@@ -741,7 +743,7 @@ impl HttpRegistryClient {
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Catalog-Registry/1.0")
             .build()?;
-        
+
         Ok(Self { config, client })
     }
 }
@@ -835,6 +837,7 @@ impl RegistryClient for HttpRegistryClient {
         Ok(response.status().is_success())
     }
 }
+*/ // End of HTTP client implementation removal
 
 #[cfg(test)]
 mod tests {

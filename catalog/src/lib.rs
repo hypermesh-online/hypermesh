@@ -192,10 +192,10 @@ impl Catalog {
         // Validate the asset package
         let validation_result = self.asset_validator.validate(&package).await?;
         
-        if !validation_result.is_valid {
+        if !validation_result.passed {
             return Err(anyhow::anyhow!(
-                "Asset validation failed: {:?}", 
-                validation_result.summary.categories_failed
+                "Asset validation failed: {} issues found",
+                validation_result.summary.total_issues
             ));
         }
         

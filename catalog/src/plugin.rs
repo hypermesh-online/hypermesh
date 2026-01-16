@@ -11,14 +11,14 @@ use tokio::sync::RwLock;
 
 // Import HyperMesh extension types
 use blockmatrix::extensions::{
-    AssetExtensionHandler, AssetType, ExtensionCapability, ExtensionCategory,
+    AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
-    ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStatus,
+    ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStateData, ExtensionStatus,
     HyperMeshExtension, ResourceLimits, ValidationReport,
 };
+use blockmatrix::assets::core::AssetType;
 
 use crate::extension::{CatalogExtension, CatalogExtensionConfig};
-use crate::assets::AssetManager as CatalogAssetManager;
 
 /// Plugin version matching HyperMesh requirements
 pub const PLUGIN_VERSION: &str = "1.0.0";
@@ -350,7 +350,7 @@ impl HyperMeshExtension for CatalogPlugin {
             }
         })?;
 
-        Ok(ExtensionState {
+        Ok(ExtensionStateData {
             version: 1,
             metadata: self.metadata(),
             state_data,
