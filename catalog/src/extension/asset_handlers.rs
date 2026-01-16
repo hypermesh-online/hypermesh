@@ -67,7 +67,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
         // Generate new asset ID
-        let asset_id = AssetId::new_v4();
+        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
 
         // Extract VM configuration from metadata
         let language = spec.metadata.get("language")
@@ -291,7 +291,7 @@ impl AssetExtensionHandler for LibraryHandler {
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new_v4();
+        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
 
         let package = LibraryPackage {
             id: asset_id.clone(),
@@ -390,7 +390,7 @@ impl AssetExtensionHandler for LibraryHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: package.size_bytes,
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -462,11 +462,11 @@ impl DatasetHandler {
 #[async_trait]
 impl AssetExtensionHandler for DatasetHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::Dataset
+        AssetType::Library
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new_v4();
+        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
 
         let dataset = Dataset {
             id: asset_id.clone(),
@@ -615,11 +615,11 @@ impl TemplateHandler {
 #[async_trait]
 impl AssetExtensionHandler for TemplateHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::Template
+        AssetType::Container
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new_v4();
+        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
 
         let template = Template {
             id: asset_id.clone(),
@@ -711,7 +711,7 @@ impl AssetExtensionHandler for TemplateHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: 1024, // Templates are typically small
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -782,7 +782,7 @@ mod tests {
                 ("version".to_string(), serde_json::json!("1.0.0")),
                 ("language".to_string(), serde_json::json!("julia")),
             ]),
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
             allocation: None,
             consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
             parent_id: None,

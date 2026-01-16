@@ -114,8 +114,8 @@ impl CatalogExtension {
             provided_assets: vec![
                 AssetType::VirtualMachine,
                 AssetType::Library,
-                AssetType::Dataset,
-                AssetType::Template,
+                AssetType::Library,
+                AssetType::Container,
             ],
             certificate_fingerprint: config.certificate_fingerprint.clone(),
             config_schema: Some(serde_json::json!({
@@ -158,11 +158,11 @@ impl CatalogExtension {
             Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>
         );
         asset_handlers.insert(
-            AssetType::Dataset,
+            AssetType::Library,
             Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>
         );
         asset_handlers.insert(
-            AssetType::Template,
+            AssetType::Container,
             Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>
         );
 
@@ -332,11 +332,11 @@ impl HyperMeshExtension for CatalogExtension {
             Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>
         );
         handlers.insert(
-            AssetType::Dataset,
+            AssetType::Library,
             Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>
         );
         handlers.insert(
-            AssetType::Template,
+            AssetType::Container,
             Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>
         );
 

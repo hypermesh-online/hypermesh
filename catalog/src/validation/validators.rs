@@ -45,7 +45,7 @@ impl TypeValidator for JuliaValidator {
         let mut linting_issues = Vec::new();
 
         // Check for Julia syntax errors
-        if let Some(code) = &asset.metadata.get("code") {
+        if let Some(code) = &asset.metadata().custom_fields.get("code") {
             let code_str = code.as_str().unwrap_or("");
 
             // Check for balanced parentheses
@@ -195,7 +195,7 @@ impl TypeValidator for LuaValidator {
         let mut linting_issues = Vec::new();
 
         // Check for Lua syntax errors
-        if let Some(code) = &asset.metadata.get("code") {
+        if let Some(code) = &asset.metadata().custom_fields.get("code") {
             let code_str = code.as_str().unwrap_or("");
 
             // Check for balanced do-end blocks

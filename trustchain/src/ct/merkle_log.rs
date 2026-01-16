@@ -84,13 +84,16 @@ impl MerkleLog {
         // Add to entries and pending queue
         self.entries.push(entry.clone());
         self.pending_entries.push_back(entry.clone());
-        
+
         // Mark tree as dirty
         self.tree_dirty = true;
-        
+
         // Update statistics
         self.stats.entry_count += 1;
         self.stats.pending_count += 1;
+
+        // Update merkle tree immediately after adding entry
+        self.update_merkle_tree().await?;
 
         debug!("Added entry {} to merkle log {}", entry.sequence_number, self.log_id);
         Ok(entry)

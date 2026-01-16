@@ -202,8 +202,9 @@ impl AssetLibrary {
 
     /// Convert AssetPackage to LibraryAssetPackage
     fn convert_to_library_package(&self, id: String, package: crate::assets::AssetPackage) -> Result<LibraryAssetPackage> {
-        let asset_type = AssetType::from_str(&package.spec.spec.asset_type)
-            .unwrap_or(AssetType::Custom);
+        // Use library's AssetType, not blockmatrix's
+        let asset_type = super::types::AssetType::from_str(&package.spec.spec.asset_type)
+            .unwrap_or(super::types::AssetType::Custom);
 
         Ok(LibraryAssetPackage {
             id: Arc::from(id.as_str()),

@@ -3,6 +3,9 @@
 //! This module provides the dynamic loading entry point and plugin implementation
 //! that allows Catalog to be loaded as an extension in HyperMesh.
 
+// Allow unsafe code for FFI plugin entry points - required for dynamic loading
+#![allow(unsafe_code)]
+
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
@@ -14,7 +17,8 @@ use blockmatrix::extensions::{
     AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
     ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStateData, ExtensionStatus,
-    HyperMeshExtension, ResourceLimits, ValidationReport,
+    HyperMeshExtension, AssetLibraryExtension, ResourceLimits, ValidationReport,
+    PackageFilter,
 };
 use blockmatrix::assets::core::AssetType;
 
@@ -45,7 +49,7 @@ impl CatalogPlugin {
     /// Create new catalog plugin instance
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(CatalogExtension::new())),
+            inner: Arc::new(RwLock::new(CatalogExtension::new(CatalogExtensionConfig::default()))),
             config: ExtensionConfig {
                 settings: serde_json::Value::Null,
                 resource_limits: ResourceLimits::default(),
@@ -99,10 +103,6 @@ impl HyperMeshExtension for CatalogPlugin {
                 AssetType::VirtualMachine,
                 AssetType::Container,
                 AssetType::Library,
-                AssetType::DataSet,
-                AssetType::Model,
-                AssetType::Algorithm,
-                AssetType::Template,
             ],
             certificate_fingerprint: Some("SHA256:catalog_cert_fingerprint".to_string()),
             config_schema: Some(serde_json::json!({
@@ -135,26 +135,36 @@ impl HyperMeshExtension for CatalogPlugin {
         // Extract catalog-specific configuration
         let catalog_config = if let Some(settings) = self.config.settings.as_object() {
             CatalogExtensionConfig {
-                storage_path: settings.get("storage_path")
+                library_path: settings.get("storage_path")
                     .and_then(|v| v.as_str())
                     .map(|s| s.into())
                     .unwrap_or_else(|| "./catalog_storage".into()),
-                cache_size_mb: settings.get("cache_size")
+                cache_size: settings.get("cache_size")
                     .and_then(|v| v.as_u64())
-                    .unwrap_or(1024) as usize,
-                p2p_enabled: settings.get("p2p_enabled")
+                    .map(|mb| mb * 1024 * 1024)
+                    .unwrap_or(1024 * 1024 * 1024),
+                max_package_size: 10 * 1024 * 1024 * 1024, // 10GB
+                enable_p2p: settings.get("p2p_enabled")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true),
-                consensus_required: true,
-                max_asset_size: 10 * 1024 * 1024 * 1024, // 10GB
+                consensus_validation: true,
+                hypermesh_address: "catalog.hypermesh.online".to_string(),
+                trustchain_cert_path: None,
+                certificate_fingerprint: None,
+                max_memory_usage: 2 * 1024 * 1024 * 1024, // 2GB
+                max_concurrent_ops: 100,
+                debug_mode: false,
+                indexing: Default::default(),
+                security: Default::default(),
+                performance: Default::default(),
             }
         } else {
             CatalogExtensionConfig::default()
         };
 
-        // Initialize the catalog extension
+        // Initialize the catalog extension with ExtensionConfig, not CatalogExtensionConfig
         let mut inner = self.inner.write().await;
-        inner.initialize(catalog_config).await.map_err(|e| {
+        inner.initialize(self.config.clone()).await.map_err(|e| {
             ExtensionError::InitializationFailed {
                 reason: format!("Catalog initialization failed: {}", e),
             }
@@ -165,233 +175,47 @@ impl HyperMeshExtension for CatalogPlugin {
     }
 
     async fn register_assets(&self) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>> {
+        // Return asset handlers through the HyperMeshExtension trait
         let inner = self.inner.read().await;
-
-        // Get asset handlers from catalog extension
-        let handlers = inner.get_asset_handlers().await.map_err(|e| {
-            ExtensionError::RuntimeError {
-                message: format!("Failed to get asset handlers: {}", e),
-            }
-        })?;
-
-        // Convert catalog handlers to HyperMesh handlers
-        let mut hypermesh_handlers = HashMap::new();
-        for (asset_type, handler) in handlers {
-            hypermesh_handlers.insert(asset_type, handler as Box<dyn AssetExtensionHandler>);
-        }
-
-        Ok(hypermesh_handlers)
+        inner.register_assets().await
     }
 
     async fn extend_manager(&self, asset_manager: Arc<blockmatrix::assets::core::AssetManager>) -> ExtensionResult<()> {
         let mut inner = self.inner.write().await;
-
-        // Integrate with HyperMesh asset manager
-        inner.integrate_with_hypermesh(asset_manager).await.map_err(|e| {
-            ExtensionError::RuntimeError {
-                message: format!("Failed to integrate with AssetManager: {}", e),
-            }
-        })?;
-
-        Ok(())
+        inner.extend_manager(asset_manager).await
     }
 
     async fn handle_request(&self, request: ExtensionRequest) -> ExtensionResult<ExtensionResponse> {
         let inner = self.inner.read().await;
 
-        // Route requests to catalog extension
-        match request.method.as_str() {
-            "list_packages" => {
-                let packages = inner.list_packages(request.params).await.map_err(|e| {
-                    ExtensionError::RuntimeError {
-                        message: format!("Failed to list packages: {}", e),
-                    }
-                })?;
-
-                let data = serde_json::to_value(packages).map_err(|e| {
-                    ExtensionError::RuntimeError {
-                        message: format!("Failed to serialize packages: {}", e),
-                    }
-                })?;
-
-                Ok(ExtensionResponse {
-                    request_id: request.id,
-                    success: true,
-                    data: Some(data),
-                    error: None,
-                })
-            }
-            "install_package" => {
-                let package_id = request.params["package_id"].as_str()
-                    .ok_or_else(|| ExtensionError::RuntimeError {
-                        message: "Missing package_id parameter".to_string(),
-                    })?;
-
-                let result = inner.install_package(package_id, request.consensus_proof).await.map_err(|e| {
-                    ExtensionError::RuntimeError {
-                        message: format!("Failed to install package: {}", e),
-                    }
-                })?;
-
-                let data = serde_json::to_value(result).map_err(|e| {
-                    ExtensionError::RuntimeError {
-                        message: format!("Failed to serialize result: {}", e),
-                    }
-                })?;
-
-                Ok(ExtensionResponse {
-                    request_id: request.id,
-                    success: true,
-                    data: Some(data),
-                    error: None,
-                })
-            }
-            "execute_vm" => {
-                let code = request.params["code"].as_str()
-                    .ok_or_else(|| ExtensionError::RuntimeError {
-                        message: "Missing code parameter".to_string(),
-                    })?;
-
-                let result = inner.execute_vm(code, request.params["inputs"].clone()).await.map_err(|e| {
-                    ExtensionError::RuntimeError {
-                        message: format!("VM execution failed: {}", e),
-                    }
-                })?;
-
-                Ok(ExtensionResponse {
-                    request_id: request.id,
-                    success: true,
-                    data: Some(result),
-                    error: None,
-                })
-            }
-            _ => {
-                Ok(ExtensionResponse {
-                    request_id: request.id,
-                    success: false,
-                    data: None,
-                    error: Some(format!("Unknown method: {}", request.method)),
-                })
-            }
-        }
+        // Delegate request handling to inner extension
+        inner.handle_request(request).await
     }
 
     async fn status(&self) -> ExtensionStatus {
         let inner = self.inner.read().await;
-        inner.get_status().await.unwrap_or(ExtensionStatus {
-            state: ExtensionState::Error("Unable to get status".to_string()),
-            health: blockmatrix::extensions::ExtensionHealth::Unhealthy("Status unavailable".to_string()),
-            resource_usage: blockmatrix::extensions::ResourceUsageReport {
-                cpu_usage: 0.0,
-                memory_usage: 0,
-                network_bytes: 0,
-                storage_bytes: 0,
-            },
-            active_operations: 0,
-            total_requests: 0,
-            error_count: 0,
-            uptime: std::time::Duration::from_secs(0),
-        })
+        inner.status().await
     }
 
     async fn validate(&self) -> ExtensionResult<ValidationReport> {
         let inner = self.inner.read().await;
-
-        // Perform validation checks
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-
-        // Check initialization
-        if !self.initialized {
-            errors.push(blockmatrix::extensions::ValidationError {
-                code: "NOT_INITIALIZED".to_string(),
-                message: "Extension not initialized".to_string(),
-                context: None,
-            });
-        }
-
-        // Check capabilities
-        for cap in &self.metadata().required_capabilities {
-            if !self.config.granted_capabilities.contains(cap) {
-                warnings.push(blockmatrix::extensions::ValidationWarning {
-                    code: "CAPABILITY_NOT_GRANTED".to_string(),
-                    message: format!("Required capability not granted: {:?}", cap),
-                    context: None,
-                });
-            }
-        }
-
-        // Validate internal catalog state
-        if let Err(e) = inner.validate_internal().await {
-            errors.push(blockmatrix::extensions::ValidationError {
-                code: "INTERNAL_VALIDATION_FAILED".to_string(),
-                message: format!("Internal validation failed: {}", e),
-                context: None,
-            });
-        }
-
-        Ok(ValidationReport {
-            valid: errors.is_empty(),
-            certificate_valid: Some(true), // TODO: Implement actual certificate validation
-            dependencies_satisfied: true,
-            resource_compliance: true,
-            security_compliance: warnings.is_empty(),
-            errors,
-            warnings,
-        })
+        inner.validate().await
     }
 
     async fn export_state(&self) -> ExtensionResult<ExtensionStateData> {
         let inner = self.inner.read().await;
-
-        let state_data = inner.export_state().await.map_err(|e| {
-            ExtensionError::RuntimeError {
-                message: format!("Failed to export state: {}", e),
-            }
-        })?;
-
-        Ok(ExtensionStateData {
-            version: 1,
-            metadata: self.metadata(),
-            state_data,
-            checksum: "TODO_CALCULATE_CHECKSUM".to_string(),
-            exported_at: std::time::SystemTime::now(),
-        })
+        inner.export_state().await
     }
 
     async fn import_state(&mut self, state: ExtensionStateData) -> ExtensionResult<()> {
-        if state.version != 1 {
-            return Err(ExtensionError::VersionIncompatible {
-                extension: "catalog".to_string(),
-                required: "1".to_string(),
-                found: state.version.to_string(),
-            });
-        }
-
         let mut inner = self.inner.write().await;
-        inner.import_state(state.state_data).await.map_err(|e| {
-            ExtensionError::RuntimeError {
-                message: format!("Failed to import state: {}", e),
-            }
-        })?;
-
-        Ok(())
+        inner.import_state(state).await
     }
 
     async fn shutdown(&mut self) -> ExtensionResult<()> {
-        if !self.initialized {
-            return Ok(());
-        }
-
         let mut inner = self.inner.write().await;
-        inner.shutdown().await.map_err(|e| {
-            ExtensionError::RuntimeError {
-                message: format!("Failed to shutdown: {}", e),
-            }
-        })?;
-
         self.initialized = false;
-        Ok(())
+        inner.shutdown().await
     }
 }
 

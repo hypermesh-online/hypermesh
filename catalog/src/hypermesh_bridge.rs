@@ -204,13 +204,16 @@ impl HyperMeshAssetRegistry {
     /// Convert Catalog asset type to HyperMesh AssetType
     fn map_asset_type(&self, catalog_type: &str) -> AssetType {
         match catalog_type {
-            "compute" => AssetType::Cpu,
+            "compute" | "cpu" => AssetType::Cpu,
             "gpu" => AssetType::Gpu,
             "memory" => AssetType::Memory,
             "storage" => AssetType::Storage,
             "network" => AssetType::Network,
             "container" => AssetType::Container,
-            _ => AssetType::Custom(catalog_type.to_string()),
+            "vm" | "virtual_machine" => AssetType::VirtualMachine,
+            "library" | "lib" => AssetType::Library,
+            "economic" | "token" | "wallet" => AssetType::Economic,
+            _ => AssetType::Library, // Default to Library for unknown types
         }
     }
 

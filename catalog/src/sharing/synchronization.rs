@@ -631,7 +631,7 @@ impl SyncManager {
     async fn get_packages_since(&self, since: SystemTime) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
         Ok(packages.values()
-            .filter(|p| p.metadata.timestamp > since)
+            .filter(|p| p.metadata().timestamp > since)
             .cloned()
             .collect())
     }
@@ -639,7 +639,7 @@ impl SyncManager {
     async fn get_packages_by_category(&self, categories: Vec<String>) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
         Ok(packages.values()
-            .filter(|p| categories.contains(&p.metadata.category))
+            .filter(|p| categories.contains(&p.metadata().category))
             .cloned()
             .collect())
     }
@@ -647,7 +647,7 @@ impl SyncManager {
     async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
         Ok(packages.values()
-            .filter(|p| p.metadata.priority >= min_priority)
+            .filter(|p| p.metadata().priority >= min_priority)
             .cloned()
             .collect())
     }

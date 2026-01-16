@@ -551,7 +551,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_security_integrated_ca_creation() {
-        let ca_config = CAConfig::default();
+        let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
@@ -562,7 +562,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_secure_certificate_issuance() {
-        let ca_config = CAConfig::default();
+        let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
@@ -587,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_security_dashboard_integration() {
-        let ca_config = CAConfig::default();
+        let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
@@ -603,7 +603,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mandatory_consensus_disabled() {
-        let ca_config = CAConfig::default();
+        let ca_config = CAConfig::testing(); // Use testing config with random port
         let mut security_config = SecurityIntegrationConfig::default();
         security_config.mandatory_consensus = false;
 

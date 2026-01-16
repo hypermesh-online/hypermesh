@@ -119,7 +119,7 @@ impl StaticSecurityScanner {
         let mut vulnerabilities = Vec::new();
 
         // Check dependencies for known vulnerabilities
-        if let Some(deps) = asset.metadata.get("dependencies") {
+        if let Some(deps) = asset.metadata().custom_fields.get("dependencies") {
             if let Some(deps_map) = deps.as_object() {
                 for (name, version) in deps_map {
                     // Simulated vulnerability database check
@@ -207,7 +207,7 @@ impl SecurityScanner for StaticSecurityScanner {
         vulnerabilities.extend(self.check_vulnerabilities(asset));
 
         // Scan code for security issues
-        if let Some(code) = asset.metadata.get("code") {
+        if let Some(code) = asset.metadata().custom_fields.get("code") {
             if let Some(code_str) = code.as_str() {
                 // Scan for various injection types
                 injection_risks.extend(self.scan_sql_injection(code_str));

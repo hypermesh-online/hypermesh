@@ -477,10 +477,12 @@ impl DiscoveryService {
         keywords.extend(metadata.name.split_whitespace().map(|s| s.to_lowercase()));
 
         // Extract from description
-        keywords.extend(metadata.description.split_whitespace()
-            .filter(|s| s.len() > 3)
-            .map(|s| s.to_lowercase())
-            .take(20));
+        if let Some(desc) = &metadata.description {
+            keywords.extend(desc.split_whitespace()
+                .filter(|s| s.len() > 3)
+                .map(|s| s.to_lowercase())
+                .take(20));
+        }
 
         // Add tags
         keywords.extend(metadata.tags.clone());
@@ -501,7 +503,7 @@ impl DiscoveryService {
         }
 
         // Check description
-        if entry.metadata.description.to_lowercase().contains(&query_lower) {
+        if entry.metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
             return true;
         }
 
@@ -543,7 +545,7 @@ impl DiscoveryService {
         }
 
         // Description match
-        if metadata.description.to_lowercase().contains(&query_lower) {
+        if metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
             score += 0.2;
         }
 
@@ -632,7 +634,7 @@ impl DiscoveryService {
             return (true, highlights);
         }
 
-        if entry.metadata.description.to_lowercase().contains(&query_lower) {
+        if entry.metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
             // Extract matching portion
             let desc = &entry.metadata.description;
             if let Some(start) = desc.to_lowercase().find(&query_lower) {

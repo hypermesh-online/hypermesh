@@ -621,7 +621,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ca_creation() {
-        let config = CAConfig::default();
+        let config = CAConfig::testing(); // Use testing config with random port
         let ca = TrustChainCA::new(config).await
             .expect("Failed to create CA");
 
@@ -632,7 +632,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_certificate_issuance() -> Result<(), Box<dyn std::error::Error>> {
-        let config = CAConfig::default();
+        let config = CAConfig::testing(); // Use testing config with random port
         let ca = TrustChainCA::new(config).await
             .expect("Failed to create CA");
 
@@ -654,7 +654,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_certificate_validation() -> Result<(), Box<dyn std::error::Error>> {
-        let config = CAConfig::default();
+        let config = CAConfig::testing(); // Use testing config with random port
         let ca = TrustChainCA::new(config).await
             .expect("Failed to create CA");
 

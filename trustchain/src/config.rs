@@ -539,7 +539,9 @@ mod tests {
     #[test]
     fn test_port_conflict_detection() {
         let mut config = TrustChainConfig::localhost_testing();
-        config.api.port = config.ca.port; // Create port conflict
+        // Set both ports to same non-zero value to create conflict
+        config.api.port = 8443;
+        config.ca.port = 8443;
         assert!(config.validate().is_err());
     }
 

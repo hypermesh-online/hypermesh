@@ -209,10 +209,14 @@ impl FingerprintTracker {
             status
         };
 
-        // Update domain tracking
+        // Update domain tracking (only add if not already present)
         self.domain_tracking.entry(domain.clone())
-            .or_insert_with(Vec::new)
-            .push(fingerprint);
+            .and_modify(|fingerprints| {
+                if !fingerprints.contains(&fingerprint) {
+                    fingerprints.push(fingerprint);
+                }
+            })
+            .or_insert_with(|| vec![fingerprint]);
 
         // Add to recent fingerprints
         self.add_to_recent_fingerprints(fingerprint, common_name).await;
@@ -411,11 +415,20 @@ impl FingerprintTracker {
     }
 
     fn extract_domain(&self, common_name: &str) -> String {
-        // Simple domain extraction - in production, this would be more sophisticated
-        if let Some(domain) = common_name.strip_prefix("*.") {
-            domain.to_string()
+        // Extract base domain from common name
+        let name = if let Some(domain) = common_name.strip_prefix("*.") {
+            domain
         } else {
-            common_name.to_string()
+            common_name
+        };
+
+        // Extract base domain (e.g., "test1.example.com" -> "example.com")
+        let parts: Vec<&str> = name.split('.').collect();
+        if parts.len() >= 2 {
+            // Take last two parts for domain (example.com)
+            format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1])
+        } else {
+            name.to_string()
         }
     }
 
