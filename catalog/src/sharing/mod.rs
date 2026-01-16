@@ -285,12 +285,12 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        let asset_id = package.metadata.id.clone();
+        let asset_id = package.metadata().id.clone();
 
         // Register with discovery service
         self.discovery_service.register_package(
             &asset_id,
-            &package.metadata,
+            &package.metadata(),
             permission.clone(),
         ).await?;
 
@@ -446,7 +446,7 @@ impl SharingManager {
 
             // Update stats
             let mut stats = self.stats.write().await;
-            stats.bandwidth_consumed += package.metadata.size as u64;
+            stats.bandwidth_consumed += package.metadata().size as u64;
 
             Ok(package)
         } else {

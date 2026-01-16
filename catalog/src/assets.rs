@@ -709,6 +709,73 @@ impl AssetPackage {
             self.validation.security_results.security_score
         )
     }
+
+    // Convenience methods for backward compatibility with flat field access
+
+    /// Get package ID (maps to metadata.name for catalog)
+    pub fn id(&self) -> &str {
+        &self.spec.metadata.name
+    }
+
+    /// Get package version
+    pub fn version(&self) -> &str {
+        &self.spec.metadata.version
+    }
+
+    /// Get asset type
+    pub fn asset_type(&self) -> &str {
+        &self.spec.spec.asset_type
+    }
+
+    /// Get metadata reference
+    pub fn metadata(&self) -> &AssetMetadata {
+        &self.spec.metadata
+    }
+
+    /// Get description
+    pub fn description(&self) -> Option<&str> {
+        self.spec.metadata.description.as_deref()
+    }
+
+    /// Get tags
+    pub fn tags(&self) -> &[String] {
+        &self.spec.metadata.tags
+    }
+
+    /// Get author
+    pub fn author(&self) -> Option<&str> {
+        self.spec.metadata.author.as_deref()
+    }
+
+    /// Get license
+    pub fn license(&self) -> Option<&str> {
+        self.spec.metadata.license.as_deref()
+    }
+
+    /// Get dependencies
+    pub fn dependencies(&self) -> &[AssetDependency] {
+        &self.spec.spec.dependencies
+    }
+
+    /// Get security configuration
+    pub fn security(&self) -> &AssetSecurity {
+        &self.spec.spec.security
+    }
+
+    /// Get resource requirements
+    pub fn resources(&self) -> &AssetResources {
+        &self.spec.spec.resources
+    }
+
+    /// Get execution configuration
+    pub fn execution(&self) -> &AssetExecution {
+        &self.spec.spec.execution
+    }
+
+    /// Check if validation passed
+    pub fn is_valid(&self) -> bool {
+        self.validation.is_valid
+    }
 }
 
 #[cfg(test)]

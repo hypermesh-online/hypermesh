@@ -174,7 +174,7 @@ impl DocumentationGenerator {
 
 ## Overview
 
-- **Version**: {{asset.version}}
+- **Version**: {{asset.version()}}
 - **Type**: {{asset.type}}
 {{#if asset.author}}- **Author**: {{asset.author}}{{/if}}
 {{#if asset.license}}- **License**: {{asset.license}}{{/if}}
@@ -211,7 +211,7 @@ catalog install {{asset.name}}
 <body>
 <h1>{{asset.name}}</h1>
 <p>{{asset.description}}</p>
-<p>Version: {{asset.version}}</p>
+<p>Version: {{asset.version()}}</p>
 </body>
 </html>"#;
         

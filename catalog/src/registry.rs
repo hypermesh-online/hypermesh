@@ -366,13 +366,13 @@ impl AssetRegistry {
         tokio::fs::create_dir_all(&cache_dir).await?;
 
         // Get HyperMesh AssetManager instance
-        let asset_manager = Arc::new(hypermesh::assets::core::AssetManager::new());
+        let asset_manager = Arc::new(blockmatrix::assets::core::AssetManager::new());
 
         // Configure bridge for HyperMesh integration
         let bridge_config = BridgeConfig {
             enable_consensus: config.verification.verify_signatures,
             minimum_stake: 1000,
-            default_privacy: hypermesh::assets::core::PrivacyLevel::Private,
+            default_privacy: blockmatrix::assets::core::PrivacyLevel::Private,
             enable_zero_copy: true,
             catalog_cache_size: 10000,
         };

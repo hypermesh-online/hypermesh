@@ -224,7 +224,7 @@ impl HyperMeshAssetRegistry {
         // Parse requirements from spec
         if let Some(req_value) = spec.requirements.get("cpu") {
             if let Some(cpu_str) = req_value.as_str() {
-                requirements.cpu = Some(hypermesh::assets::core::CpuRequirements {
+                requirements.cpu = Some(blockmatrix::assets::core::CpuRequirements {
                     cores: cpu_str.parse().unwrap_or(1.0),
                     architecture: None,
                     features: vec![],
@@ -234,9 +234,9 @@ impl HyperMeshAssetRegistry {
 
         if let Some(req_value) = spec.requirements.get("memory") {
             if let Some(mem_str) = req_value.as_str() {
-                requirements.memory = Some(hypermesh::assets::core::MemoryRequirements {
+                requirements.memory = Some(blockmatrix::assets::core::MemoryRequirements {
                     size_bytes: self.parse_memory_string(mem_str)?,
-                    memory_type: hypermesh::assets::core::MemoryType::Ram,
+                    memory_type: blockmatrix::assets::core::MemoryType::Ram,
                     speed_mhz: None,
                 });
             }
@@ -244,9 +244,9 @@ impl HyperMeshAssetRegistry {
 
         if let Some(req_value) = spec.requirements.get("storage") {
             if let Some(storage_str) = req_value.as_str() {
-                requirements.storage = Some(hypermesh::assets::core::StorageRequirements {
+                requirements.storage = Some(blockmatrix::assets::core::StorageRequirements {
                     size_bytes: self.parse_memory_string(storage_str)?,
-                    storage_type: hypermesh::assets::core::StorageType::Ssd,
+                    storage_type: blockmatrix::assets::core::StorageType::Ssd,
                     iops: None,
                     bandwidth_mbps: None,
                 });
@@ -327,8 +327,8 @@ impl HyperMeshAssetRegistry {
             spec: AssetSpec {
                 metadata: AssetMetadata {
                     name: lib_package.name,
-                    version: lib_package.version,
-                    description: lib_package.description,
+                    version: lib_package.version(),
+                    description: lib_package.description(),
                     author: None,
                     license: None,
                     tags: vec![],
@@ -336,7 +336,7 @@ impl HyperMeshAssetRegistry {
                     updated_at: Utc::now().to_rfc3339(),
                 },
                 spec: AssetSpecification {
-                    asset_type: lib_package.asset_type,
+                    asset_type: lib_package.asset_type(),
                     format: AssetFormat::Raw,
                     requirements: HashMap::new(),
                     capabilities: HashMap::new(),

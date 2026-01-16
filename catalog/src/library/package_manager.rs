@@ -324,7 +324,7 @@ impl AssetPackageManager {
         };
 
         // Check if update is needed
-        if latest_package.metadata.version.as_ref() == current_version {
+        if latest_package.metadata().version.as_ref() == current_version {
             result.warnings.push(format!(
                 "Package {} is already at latest version {}",
                 package_id, current_version
@@ -354,7 +354,7 @@ impl AssetPackageManager {
                 "Updated {} from {} to {}",
                 package_id,
                 current_version,
-                latest_package.metadata.version
+                latest_package.metadata().version
             ));
         }
 
@@ -370,8 +370,8 @@ impl AssetPackageManager {
         let mut packages: Vec<InstalledPackageInfo> = installed
             .values()
             .map(|pkg| InstalledPackageInfo {
-                id: pkg.id.to_string(),
-                version: pkg.version.to_string(),
+                id: pkg.id().to_string(),
+                version: pkg.id().to_string(),
                 installed_at: pkg.installed_at,
                 dependencies: pkg.dependencies.iter().map(|d| d.to_string()).collect(),
                 dependents: pkg.dependents.iter().map(|d| d.to_string()).collect(),
@@ -416,7 +416,7 @@ impl AssetPackageManager {
                 pkg.dependents.is_empty() &&
                 matches!(pkg.source, InstallSource::Dependency(_))
             })
-            .map(|pkg| pkg.id.to_string())
+            .map(|pkg| pkg.id().to_string())
             .collect()
     }
 

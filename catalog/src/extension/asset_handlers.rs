@@ -175,9 +175,9 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: instance.resources.storage_mb * 1024 * 1024,
             metadata: metadata_map,
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
             allocation: None,
-            consensus_status: hypermesh::extensions::ConsensusStatus {
+            consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -328,7 +328,7 @@ impl AssetExtensionHandler for LibraryHandler {
 
         if let Some(metadata) = update.metadata {
             if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
-                package.version = version.to_string();
+                package.version() = version.to_string();
             }
         }
 
@@ -377,9 +377,9 @@ impl AssetExtensionHandler for LibraryHandler {
             })?;
 
         let mut metadata_map = HashMap::new();
-        metadata_map.insert("version".to_string(), serde_json::json!(package.version));
+        metadata_map.insert("version".to_string(), serde_json::json!(package.version()));
         metadata_map.insert("language".to_string(), serde_json::json!(package.language));
-        metadata_map.insert("dependencies".to_string(), serde_json::json!(package.dependencies));
+        metadata_map.insert("dependencies".to_string(), serde_json::json!(package.dependencies()));
 
         Ok(AssetMetadata {
             id: id.clone(),
@@ -390,9 +390,9 @@ impl AssetExtensionHandler for LibraryHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: package.size_bytes,
             metadata: metadata_map,
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
             allocation: None,
-            consensus_status: hypermesh::extensions::ConsensusStatus {
+            consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -558,9 +558,9 @@ impl AssetExtensionHandler for DatasetHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: dataset.size_bytes,
             metadata: metadata_map,
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
             allocation: None,
-            consensus_status: hypermesh::extensions::ConsensusStatus {
+            consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -711,9 +711,9 @@ impl AssetExtensionHandler for TemplateHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: 1024, // Templates are typically small
             metadata: metadata_map,
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
             allocation: None,
-            consensus_status: hypermesh::extensions::ConsensusStatus {
+            consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -758,9 +758,9 @@ mod tests {
                 ("language".to_string(), serde_json::json!("julia")),
                 ("version".to_string(), serde_json::json!("1.9.0")),
             ]),
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
             allocation: None,
-            consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
+            consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
             parent_id: None,
             tags: vec!["test".to_string()],
         };
@@ -782,9 +782,9 @@ mod tests {
                 ("version".to_string(), serde_json::json!("1.0.0")),
                 ("language".to_string(), serde_json::json!("julia")),
             ]),
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Public,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Public,
             allocation: None,
-            consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
+            consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
             parent_id: None,
             tags: vec!["library".to_string()],
         };

@@ -361,7 +361,7 @@ impl PackageCache {
                     // Move evicted to L2
                     drop(l1);
                     let mut l2 = self.l2_cache.write().await;
-                    l2.insert(Arc::from(evicted.package.id.as_ref()), evicted.package);
+                    l2.insert(Arc::from(evicted.package.id().as_ref()), evicted.package);
                 }
 
                 return Ok(Some(package));
@@ -381,13 +381,13 @@ impl PackageCache {
             drop(l1);
             let mut l2 = self.l2_cache.write().await;
 
-            let evicted_key = Arc::from(evicted.package.id.as_ref());
+            let evicted_key = Arc::from(evicted.package.id().as_ref());
             if let Some(l2_evicted) = l2.insert(evicted_key.clone(), evicted.package) {
                 // Move L2 evicted to L3 if available
                 drop(l2);
                 if let Some(l3) = &self.l3_cache {
                     let mut l3 = l3.write().await;
-                    l3.insert(Arc::from(l2_evicted.package.id.as_ref()), l2_evicted.package).await?;
+                    l3.insert(Arc::from(l2_evicted.package.id().as_ref()), l2_evicted.package).await?;
                 }
             }
         }
@@ -448,9 +448,9 @@ impl PackageCache {
 /// Estimate package size in bytes for cache management
 fn estimate_package_size(package: &LibraryAssetPackage) -> usize {
     // Rough estimation based on content
-    let metadata_size = package.metadata.name.len() +
-                       package.metadata.version.len() +
-                       package.metadata.description.as_ref().map_or(0, |d| d.len());
+    let metadata_size = package.metadata().name.len() +
+                       package.metadata().version.len() +
+                       package.metadata().description.as_ref().map_or(0, |d| d.len());
 
     let content_size = package.content_refs.total_size as usize;
 

@@ -50,7 +50,7 @@ impl CatalogPlugin {
                 settings: serde_json::Value::Null,
                 resource_limits: ResourceLimits::default(),
                 granted_capabilities: HashSet::new(),
-                privacy_level: hypermesh::assets::core::PrivacyLevel::Private,
+                privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
                 debug_mode: false,
             },
             initialized: false,
@@ -183,7 +183,7 @@ impl HyperMeshExtension for CatalogPlugin {
         Ok(hypermesh_handlers)
     }
 
-    async fn extend_manager(&self, asset_manager: Arc<hypermesh::assets::core::AssetManager>) -> ExtensionResult<()> {
+    async fn extend_manager(&self, asset_manager: Arc<blockmatrix::assets::core::AssetManager>) -> ExtensionResult<()> {
         let mut inner = self.inner.write().await;
 
         // Integrate with HyperMesh asset manager
@@ -280,8 +280,8 @@ impl HyperMeshExtension for CatalogPlugin {
         let inner = self.inner.read().await;
         inner.get_status().await.unwrap_or(ExtensionStatus {
             state: ExtensionState::Error("Unable to get status".to_string()),
-            health: hypermesh::extensions::ExtensionHealth::Unhealthy("Status unavailable".to_string()),
-            resource_usage: hypermesh::extensions::ResourceUsageReport {
+            health: blockmatrix::extensions::ExtensionHealth::Unhealthy("Status unavailable".to_string()),
+            resource_usage: blockmatrix::extensions::ResourceUsageReport {
                 cpu_usage: 0.0,
                 memory_usage: 0,
                 network_bytes: 0,
@@ -303,7 +303,7 @@ impl HyperMeshExtension for CatalogPlugin {
 
         // Check initialization
         if !self.initialized {
-            errors.push(hypermesh::extensions::ValidationError {
+            errors.push(blockmatrix::extensions::ValidationError {
                 code: "NOT_INITIALIZED".to_string(),
                 message: "Extension not initialized".to_string(),
                 context: None,
@@ -313,7 +313,7 @@ impl HyperMeshExtension for CatalogPlugin {
         // Check capabilities
         for cap in &self.metadata().required_capabilities {
             if !self.config.granted_capabilities.contains(cap) {
-                warnings.push(hypermesh::extensions::ValidationWarning {
+                warnings.push(blockmatrix::extensions::ValidationWarning {
                     code: "CAPABILITY_NOT_GRANTED".to_string(),
                     message: format!("Required capability not granted: {:?}", cap),
                     context: None,
@@ -323,7 +323,7 @@ impl HyperMeshExtension for CatalogPlugin {
 
         // Validate internal catalog state
         if let Err(e) = inner.validate_internal().await {
-            errors.push(hypermesh::extensions::ValidationError {
+            errors.push(blockmatrix::extensions::ValidationError {
                 code: "INTERNAL_VALIDATION_FAILED".to_string(),
                 message: format!("Internal validation failed: {}", e),
                 context: None,
@@ -495,7 +495,7 @@ mod tests {
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::VMExecution,
             ]),
-            privacy_level: hypermesh::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
             debug_mode: true,
         };
 

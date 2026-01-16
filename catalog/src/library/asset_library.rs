@@ -149,7 +149,7 @@ impl AssetLibrary {
             .for_each_concurrent(self.config.max_concurrent_ops, |batch| async move {
                 for package in batch {
                     if let Err(e) = self.add_package(package.clone()).await {
-                        eprintln!("Failed to load package {}: {}", package.id, e);
+                        eprintln!("Failed to load package {}: {}", package.id(), e);
                     }
                 }
             })
@@ -178,16 +178,16 @@ impl AssetLibrary {
     /// Create package summary from full package
     fn create_summary(package: &LibraryAssetPackage) -> PackageSummary {
         PackageSummary {
-            id: package.id.to_string(),
+            id: package.id().to_string(),
             name: package.name.clone(),
-            version: package.version.clone(),
-            description: package.description.clone(),
-            tags: package.metadata.as_ref()
+            version: package.version().clone(),
+            description: package.description().clone(),
+            tags: package.metadata().as_ref()
                 .map(|m| m.tags.iter().map(|t| t.to_string()).collect())
                 .unwrap_or_default(),
-            asset_type: package.asset_type.clone(),
+            asset_type: package.asset_type().clone(),
             size: package.size,
-            last_modified: package.metadata.as_ref()
+            last_modified: package.metadata().as_ref()
                 .map(|m| m.modified)
                 .unwrap_or(0),
         }
@@ -318,7 +318,7 @@ impl LibraryInterface for AssetLibrary {
             });
         }
 
-        if package.version.is_empty() {
+        if package.version().is_empty() {
             errors.push(super::ValidationError {
                 code: "MISSING_VERSION".to_string(),
                 message: "Package version is required".to_string(),
@@ -368,10 +368,10 @@ impl LibraryInterface for AssetLibrary {
                 // Check if dependency exists in library
                 if let Some(dep_package) = self.get_package_internal(&dep.name).await? {
                     // Check version constraint (simplified)
-                    if dep_package.version == dep.version_constraint.as_ref() {
+                    if dep_package.version() == dep.version_constraint.as_ref() {
                         resolved.push(super::ResolvedDependency {
                             name: dep.name.to_string(),
-                            version: dep_package.version.clone(),
+                            version: dep_package.version().clone(),
                             source: "library".to_string(),
                             dependencies: vec![], // Would recurse in full implementation
                         });
@@ -380,7 +380,7 @@ impl LibraryInterface for AssetLibrary {
                             name: dep.name.to_string(),
                             versions: vec![
                                 dep.version_constraint.to_string(),
-                                dep_package.version.clone(),
+                                dep_package.version().clone(),
                             ],
                             reason: "Version mismatch".to_string(),
                         });
@@ -439,7 +439,7 @@ mod tests {
 
         // Create test package
         let package = create_test_package();
-        let package_id = package.id.to_string();
+        let package_id = package.id().to_string();
 
         // Add package
         library.add_package(package).await.unwrap();
@@ -461,7 +461,7 @@ mod tests {
         // Add test packages
         for i in 0..5 {
             let mut package = create_test_package();
-            package.id = Arc::from(format!("test-{}", i));
+            package.id() = Arc::from(format!("test-{}", i));
             package.name = format!("Package {}", i);
             library.add_package(package).await.unwrap();
         }

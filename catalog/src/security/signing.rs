@@ -210,9 +210,9 @@ impl PackageSigner {
 
         let signable = SignablePackage {
             id: package.get_package_id(),
-            name: &package.metadata.name,
-            version: &package.metadata.version,
-            description: &package.metadata.description,
+            name: &package.metadata().name,
+            version: &package.metadata().version,
+            description: &package.metadata().description,
             main_content: &package.content.main_content,
             file_count: package.content.file_contents.len(),
             binary_count: package.content.binary_contents.len(),
@@ -447,9 +447,9 @@ impl SignatureVerifier {
 
         let signable = SignablePackage {
             id: package.get_package_id(),
-            name: &package.metadata.name,
-            version: &package.metadata.version,
-            description: &package.metadata.description,
+            name: &package.metadata().name,
+            version: &package.metadata().version,
+            description: &package.metadata().description,
             main_content: &package.content.main_content,
             file_count: package.content.file_contents.len(),
             binary_count: package.content.binary_contents.len(),

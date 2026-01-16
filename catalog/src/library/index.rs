@@ -135,7 +135,7 @@ impl LibraryIndex {
 
     /// Index a package for search
     pub async fn index_package(&self, package: &LibraryAssetPackage) -> Result<()> {
-        let package_id = Arc::clone(&package.id);
+        let package_id = Arc::clone(&package.id());
 
         // Add to all packages set
         {
@@ -146,7 +146,7 @@ impl LibraryIndex {
         // Index by name
         {
             let mut name_index = self.name_index.write().await;
-            let name_key = package.metadata.name.to_lowercase();
+            let name_key = package.metadata().name.to_lowercase();
             name_index
                 .entry(name_key)
                 .or_insert_with(HashSet::new)
@@ -156,7 +156,7 @@ impl LibraryIndex {
         // Index by tags
         {
             let mut tag_index = self.tag_index.write().await;
-            for tag in package.metadata.tags.iter() {
+            for tag in package.metadata().tags.iter() {
                 tag_index
                     .entry(Arc::clone(tag))
                     .or_insert_with(HashSet::new)
@@ -174,7 +174,7 @@ impl LibraryIndex {
         }
 
         // Index by author
-        if let Some(author) = &package.metadata.author {
+        if let Some(author) = &package.metadata().author {
             let mut author_index = self.author_index.write().await;
             author_index
                 .entry(Arc::clone(author))
@@ -185,7 +185,7 @@ impl LibraryIndex {
         // Index by keywords
         {
             let mut keyword_index = self.keyword_index.write().await;
-            for keyword in package.metadata.keywords.iter() {
+            for keyword in package.metadata().keywords.iter() {
                 keyword_index
                     .entry(Arc::clone(keyword))
                     .or_insert_with(HashSet::new)
@@ -197,9 +197,9 @@ impl LibraryIndex {
         {
             let mut version_index = self.version_index.write().await;
             version_index
-                .entry(Arc::clone(&package.metadata.name))
+                .entry(Arc::clone(&package.metadata().name))
                 .or_insert_with(BTreeMap::new)
-                .insert(Arc::clone(&package.metadata.version), Arc::clone(&package_id));
+                .insert(Arc::clone(&package.metadata().version), Arc::clone(&package_id));
         }
 
         // Index for text search
@@ -207,15 +207,15 @@ impl LibraryIndex {
             let mut text_index = self.text_index.write().await;
 
             // Index name
-            text_index.index_text(&package.metadata.name, Arc::clone(&package_id));
+            text_index.index_text(&package.metadata().name, Arc::clone(&package_id));
 
             // Index description
-            if let Some(desc) = &package.metadata.description {
+            if let Some(desc) = &package.metadata().description {
                 text_index.index_text(desc, Arc::clone(&package_id));
             }
 
             // Index keywords
-            for keyword in package.metadata.keywords.iter() {
+            for keyword in package.metadata().keywords.iter() {
                 text_index.index_text(keyword, Arc::clone(&package_id));
             }
         }
@@ -565,7 +565,7 @@ mod tests {
         let index = LibraryIndex::new();
 
         let package = create_test_package();
-        let package_id = Arc::clone(&package.id);
+        let package_id = Arc::clone(&package.id());
 
         index.index_package(&package).await.unwrap();
 

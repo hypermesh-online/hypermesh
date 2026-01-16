@@ -29,8 +29,8 @@ pub struct TrustChainIntegration {
     config: TrustChainConfig,
     /// Certificate cache
     cert_cache: Arc<RwLock<CertificateCache>>,
-    /// HTTP client for TrustChain API
-    client: reqwest::Client,
+    /// HTTP client for TrustChain API (STOQ-only transport, reqwest removed)
+    // client: reqwest::Client,
     /// Cached CA root certificate
     ca_root_cert: Arc<RwLock<Option<CACertificate>>>,
 }

@@ -49,7 +49,7 @@ impl DependencyResolver {
     pub async fn resolve(&self, asset: &AssetPackage) -> Result<DependencyGraph> {
         let mut graph = DependencyGraph::new();
         let mut visited = HashSet::new();
-        let mut stack = vec![asset.id.to_string()];
+        let mut stack = vec![asset.id().to_string()];
 
         while let Some(current) = stack.pop() {
             if visited.contains(&current) {
@@ -63,7 +63,7 @@ impl DependencyResolver {
             // Add node to graph
             graph.add_node(DependencyNode {
                 asset_id: current.clone(),
-                version: asset.version.clone(),
+                version: asset.version().clone(),
                 dependencies: deps.clone(),
                 resolved_version: None,
             });

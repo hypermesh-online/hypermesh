@@ -219,7 +219,7 @@ impl SecurityScanner for StaticSecurityScanner {
                     malware.push(MalwareDetection {
                         malware_type: "Ransomware".to_string(),
                         confidence: 90,
-                        affected_files: vec![asset.id.to_string()],
+                        affected_files: vec![asset.id().to_string()],
                         signature: "RANSOMWARE_PATTERN_001".to_string(),
                         risk_level: RiskLevel::Critical,
                     });
@@ -231,7 +231,7 @@ impl SecurityScanner for StaticSecurityScanner {
                         rule_id: "no-hardcoded-credentials".to_string(),
                         description: "Hardcoded credentials detected".to_string(),
                         location: CodeLocation {
-                            file: asset.id.to_string(),
+                            file: asset.id().to_string(),
                             line: None,
                             column: None,
                             snippet: None,

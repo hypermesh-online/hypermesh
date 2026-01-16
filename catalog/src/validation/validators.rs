@@ -59,7 +59,7 @@ impl TypeValidator for JuliaValidator {
                             errors.push(SyntaxError {
                                 message: "Unmatched closing parenthesis".to_string(),
                                 location: CodeLocation {
-                                    file: asset.id.to_string(),
+                                    file: asset.id().to_string(),
                                     line: Some((i / 80) as u32 + 1),
                                     column: Some((i % 80) as u32 + 1),
                                     snippet: None,
@@ -77,7 +77,7 @@ impl TypeValidator for JuliaValidator {
                 errors.push(SyntaxError {
                     message: "Unclosed parenthesis".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -92,7 +92,7 @@ impl TypeValidator for JuliaValidator {
                 errors.push(SyntaxError {
                     message: "Function definition missing 'end'".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -108,7 +108,7 @@ impl TypeValidator for JuliaValidator {
                     rule: "no-double-spaces".to_string(),
                     description: "Avoid multiple consecutive spaces".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -123,7 +123,7 @@ impl TypeValidator for JuliaValidator {
                     practice: "avoid-eval".to_string(),
                     description: "Avoid using eval() for security reasons".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -139,7 +139,7 @@ impl TypeValidator for JuliaValidator {
                     rule_id: "file-too-large".to_string(),
                     message: "File exceeds recommended size".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -206,7 +206,7 @@ impl TypeValidator for LuaValidator {
                 errors.push(SyntaxError {
                     message: format!("Mismatched do-end blocks: {} do, {} end", do_count, end_count),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -221,7 +221,7 @@ impl TypeValidator for LuaValidator {
                 errors.push(SyntaxError {
                     message: "Function definition missing 'end'".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -237,7 +237,7 @@ impl TypeValidator for LuaValidator {
                     rule: "no-tabs".to_string(),
                     description: "Use spaces instead of tabs".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -252,7 +252,7 @@ impl TypeValidator for LuaValidator {
                     practice: "avoid-global-access".to_string(),
                     description: "Avoid direct global table access".to_string(),
                     location: CodeLocation {
-                        file: asset.id.to_string(),
+                        file: asset.id().to_string(),
                         line: None,
                         column: None,
                         snippet: None,
@@ -270,7 +270,7 @@ impl TypeValidator for LuaValidator {
                         rule_id: "line-too-long".to_string(),
                         message: format!("Line {} exceeds 120 characters", i + 1),
                         location: CodeLocation {
-                            file: asset.id.to_string(),
+                            file: asset.id().to_string(),
                             line: Some((i + 1) as u32),
                             column: Some(120),
                             snippet: Some(line.to_string()),

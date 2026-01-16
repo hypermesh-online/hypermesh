@@ -138,8 +138,8 @@ impl AssetValidator {
         Ok(ValidationResult {
             passed,
             timestamp: Utc::now(),
-            asset_id: asset.id.to_string(),
-            version: asset.version.clone(),
+            asset_id: asset.id().to_string(),
+            version: asset.version().clone(),
             security: security_result,
             syntax: syntax_result,
             performance: performance_result,

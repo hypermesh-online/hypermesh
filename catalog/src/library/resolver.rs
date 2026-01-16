@@ -214,7 +214,7 @@ impl DependencyResolver {
                 context.pending.push_back(PendingPackage {
                     name: Arc::clone(&dep.name),
                     constraint: Arc::clone(&dep.version_constraint),
-                    parent: Some(Arc::clone(&package.id)),
+                    parent: Some(Arc::clone(&package.id())),
                     depth: 1,
                 });
             }
@@ -268,7 +268,7 @@ impl DependencyResolver {
             .values()
             .map(|pkg| ResolvedDependency {
                 name: pkg.name.to_string(),
-                version: pkg.version.to_string(),
+                version: pkg.id().to_string(),
                 source: pkg.source.to_string(),
                 dependencies: self.build_dependency_tree(&pkg.name, &context.resolved),
             })
@@ -298,20 +298,20 @@ impl DependencyResolver {
 
         // Check version constraint
         let constraint = self.constraint_parser.parse(&pending.constraint)?;
-        if !self.constraint_parser.satisfies(&package.metadata.version, &constraint) {
+        if !self.constraint_parser.satisfies(&package.metadata().version, &constraint) {
             bail!(
                 "Version {} does not satisfy constraint {}",
-                package.metadata.version,
+                package.metadata().version,
                 pending.constraint
             );
         }
 
         // Add to resolved
         context.resolved.insert(
-            Arc::clone(&package.id),
+            Arc::clone(&package.id()),
             ResolvedPackage {
-                name: Arc::clone(&package.id),
-                version: Arc::clone(&package.metadata.version),
+                name: Arc::clone(&package.id()),
+                version: Arc::clone(&package.metadata().version),
                 source: Arc::from("library"),
                 dependencies: package.spec.dependencies
                     .iter()
@@ -327,7 +327,7 @@ impl DependencyResolver {
                 context.pending.push_back(PendingPackage {
                     name: Arc::clone(&dep.name),
                     constraint: Arc::clone(&dep.version_constraint),
-                    parent: Some(Arc::clone(&package.id)),
+                    parent: Some(Arc::clone(&package.id())),
                     depth: pending.depth + 1,
                 });
             }
@@ -345,7 +345,7 @@ impl DependencyResolver {
         let mut tree = Vec::new();
 
         if let Some(package) = resolved.get(package_name) {
-            for dep_name in &package.dependencies {
+            for dep_name in &package.dependencies() {
                 if let Some(dep) = resolved.get(dep_name) {
                     tree.push(ResolvedDependency {
                         name: dep.name.to_string(),
@@ -375,8 +375,8 @@ impl DependencyResolver {
         // For now, just get the package and check if it satisfies
         if let Some(package) = library.get_package(name).await? {
             let parsed_constraint = self.constraint_parser.parse(constraint)?;
-            if self.constraint_parser.satisfies(&package.metadata.version, &parsed_constraint) {
-                return Ok(Some(package.metadata.version.to_string()));
+            if self.constraint_parser.satisfies(&package.metadata().version, &parsed_constraint) {
+                return Ok(Some(package.metadata().version.to_string()));
             }
         }
 
