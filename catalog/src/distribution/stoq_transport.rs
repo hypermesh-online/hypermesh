@@ -4,12 +4,11 @@ use anyhow::{Result, Context};
 use std::sync::Arc;
 use std::net::{SocketAddr, Ipv6Addr};
 use tokio::sync::{RwLock, mpsc};
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use bytes::{Bytes, BytesMut};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::Duration;
-// Import quinn types for stream operations
-use quinn::{SendStream, RecvStream};
 
 use crate::assets::{AssetPackage, AssetPackageId};
 use super::{DistributionConfig, PackageManager};
@@ -282,12 +281,16 @@ impl StoqTransportLayer {
         let request_data = bincode::serialize(&request)?;
         self.bandwidth_manager.limit_upload(request_data.len()).await?;
 
-        // Send request using quinn SendStream methods
-        send.write_all(&request_data).await?;
-        send.finish()?;
+        // Send request using AsyncWriteExt
+        send.write_all(&request_data).await
+            .context("Failed to write request data")?;
+        send.finish().await
+            .context("Failed to finish sending")?;
 
-        // Receive response using quinn RecvStream methods
-        let response_data = recv.read_to_end(10 * 1024 * 1024).await?;
+        // Receive response using AsyncReadExt
+        let mut response_data = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
+        recv.read_to_end(&mut response_data).await
+            .context("Failed to read response data")?;
 
         // Apply bandwidth limiting for download
         self.bandwidth_manager.limit_download(response_data.len()).await?;
@@ -340,8 +343,9 @@ impl StoqTransportLayer {
             match connection.accept_bi().await {
                 Ok((mut send, mut recv)) => {
                     // Receive request
-                    let request_data = match recv.read_to_end(10 * 1024 * 1024).await {
-                        Ok(data) => data,
+                    let mut request_data = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
+                    let request_data = match recv.read_to_end(&mut request_data).await {
+                        Ok(_) => request_data,
                         Err(e) => {
                             tracing::warn!("Failed to receive request: {}", e);
                             break;
@@ -376,7 +380,7 @@ impl StoqTransportLayer {
                     if let Err(e) = send.write_all(&response_data).await {
                         tracing::warn!("Failed to send response: {}", e);
                     }
-                    let _ = send.finish();
+                    let _ = send.finish().await;
                 }
                 Err(e) => {
                     tracing::debug!("Connection closed: {}", e);
@@ -462,12 +466,12 @@ impl StoqTransportLayer {
 
 impl ConnectionPool {
     /// Add a connection to the pool
-    async fn add_connection(&self, node_id: NodeId, connection: stoq::Connection) -> Result<()> {
+    async fn add_connection(&self, node_id: NodeId, connection: Arc<stoq::Connection>) -> Result<()> {
         let mut pools = self.pools.write().await;
         let pool = pools.entry(node_id).or_insert_with(Vec::new);
 
         if pool.len() < self.max_per_peer {
-            pool.push(Arc::new(connection));
+            pool.push(connection);
         }
 
         Ok(())
@@ -653,17 +657,39 @@ mod stoq {
 
     pub struct SendStream;
 
-    impl SendStream {
-        pub async fn send(&mut self, _data: Bytes) -> Result<()> {
-            Ok(())
+    impl tokio::io::AsyncWrite for SendStream {
+        fn poll_write(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+            buf: &[u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
         }
     }
 
     pub struct RecvStream;
 
-    impl RecvStream {
-        pub async fn recv(&mut self) -> Result<Option<Bytes>> {
-            Ok(None)
+    impl tokio::io::AsyncRead for RecvStream {
+        fn poll_read(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+            _buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
         }
     }
 

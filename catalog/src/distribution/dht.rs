@@ -14,7 +14,7 @@ use crate::assets::AssetPackageId;
 use super::stoq_transport::{StoqTransportLayer, RequestType, ResponseData, PackageAnnouncement};
 
 /// Node ID in the DHT network (256-bit)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId {
     id: [u8; 32],
 }

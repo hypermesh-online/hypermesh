@@ -175,6 +175,74 @@ impl AssetLibrary {
         Ok(())
     }
 
+    /// List all packages in the library
+    pub async fn list_packages(&self) -> Vec<Arc<LibraryAssetPackage>> {
+        let packages = self.packages.read().await;
+        packages.values().cloned().collect()
+    }
+
+    /// Get a specific package by ID
+    pub async fn get_package(&self, id: &str) -> Option<Arc<LibraryAssetPackage>> {
+        let packages = self.packages.read().await;
+        let id_arc: Arc<str> = Arc::from(id);
+        packages.get(&id_arc).cloned()
+    }
+
+    /// Install a package (alias for add_package)
+    pub async fn install_package(&self, package: LibraryAssetPackage) -> Result<()> {
+        self.add_package(package).await
+    }
+
+    /// Uninstall a package (alias for remove_package)
+    pub async fn uninstall_package(&self, id: &str) -> Result<bool> {
+        self.remove_package(id).await
+    }
+
+    /// Update an existing package
+    pub async fn update_package(&self, package: LibraryAssetPackage) -> Result<()> {
+        // Remove old version if exists
+        self.remove_package(&package.id).await?;
+        // Add new version
+        self.add_package(package).await
+    }
+
+    /// Search for packages matching query
+    pub async fn search_packages(&self, query: &str) -> Vec<Arc<LibraryAssetPackage>> {
+        // Simple search implementation - can be enhanced
+        let packages = self.packages.read().await;
+        packages.values()
+            .filter(|pkg| {
+                pkg.name.to_lowercase().contains(&query.to_lowercase()) ||
+                pkg.description.as_ref().map(|d| d.to_lowercase().contains(&query.to_lowercase())).unwrap_or(false)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Publish a package (alias for add_package with validation)
+    pub async fn publish_package(&self, package: LibraryAssetPackage) -> Result<()> {
+        // Basic validation before publishing
+        if package.name.is_empty() {
+            anyhow::bail!("Package name cannot be empty");
+        }
+        if package.version.is_empty() {
+            anyhow::bail!("Package version cannot be empty");
+        }
+        self.add_package(package).await
+    }
+
+    /// Verify package integrity
+    pub async fn verify_package(&self, id: &str) -> Result<bool> {
+        let package = self.get_package(id).await
+            .ok_or_else(|| anyhow::anyhow!("Package not found"))?;
+
+        // Basic hash verification
+        let current_hash = &package.hash;
+        // In a full implementation, we'd recompute the hash and compare
+        // For now, just check that hash exists and is non-empty
+        Ok(!current_hash.is_empty())
+    }
+
     /// Create package summary from full package
     fn create_summary(package: &LibraryAssetPackage) -> PackageSummary {
         PackageSummary {
@@ -215,6 +283,10 @@ impl AssetLibrary {
             size: package.content.main_content.len() as u64,
             hash: package.package_hash.clone(),
             content: package.content.main_content.clone(),
+            metadata: None, // TODO: Convert from AssetPackage metadata
+            spec: None, // TODO: Convert from AssetPackage spec
+            content_refs: None, // TODO: Convert from AssetPackage content refs
+            validation: None, // TODO: Set validation status
         })
     }
 }

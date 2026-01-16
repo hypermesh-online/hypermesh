@@ -42,6 +42,61 @@ pub struct LibraryAssetPackage {
     pub validation: Option<ValidationStatus>,
 }
 
+impl LibraryAssetPackage {
+    /// Get package version
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    /// Get package metadata (returns own metadata fields)
+    pub fn metadata(&self) -> PackageMetadataView {
+        PackageMetadataView {
+            name: &self.name,
+            version: &self.version,
+            description: self.description.as_deref(),
+            asset_type: &self.asset_type,
+            size: self.size,
+            hash: &self.hash,
+        }
+    }
+
+    /// Get package ID
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Get package dependencies
+    pub fn dependencies(&self) -> &[PackageDependency] {
+        self.spec
+            .as_ref()
+            .map(|s| s.dependencies.as_ref())
+            .unwrap_or(&[])
+    }
+
+    /// Get package author
+    pub fn author(&self) -> Option<&str> {
+        self.metadata.as_ref()
+            .and_then(|m| m.author.as_ref().map(|a| a.as_ref()))
+    }
+
+    /// Get package license
+    pub fn license(&self) -> Option<&str> {
+        self.metadata.as_ref()
+            .and_then(|m| m.license.as_ref().map(|l| l.as_ref()))
+    }
+}
+
+/// View into package metadata for borrowing
+#[derive(Debug, Clone, Copy)]
+pub struct PackageMetadataView<'a> {
+    pub name: &'a str,
+    pub version: &'a str,
+    pub description: Option<&'a str>,
+    pub asset_type: &'a str,
+    pub size: u64,
+    pub hash: &'a str,
+}
+
 /// Package metadata optimized for fast access
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageMetadata {
@@ -83,7 +138,7 @@ pub struct PackageSpec {
 }
 
 /// Asset types supported by the library
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum AssetType {
     /// Julia program
     JuliaProgram,
@@ -97,6 +152,10 @@ pub enum AssetType {
     MLModel,
     /// Data processing pipeline
     DataPipeline,
+    /// Dataset
+    Dataset,
+    /// Template
+    Template,
     /// Generic binary
     Binary,
     /// Custom asset type
@@ -113,6 +172,8 @@ impl AssetType {
             AssetType::Container => "container",
             AssetType::MLModel => "ml_model",
             AssetType::DataPipeline => "data_pipeline",
+            AssetType::Dataset => "dataset",
+            AssetType::Template => "template",
             AssetType::Binary => "binary",
             AssetType::Custom => "custom",
         }
@@ -127,6 +188,8 @@ impl AssetType {
             "container" => Some(AssetType::Container),
             "ml_model" | "ml-model" => Some(AssetType::MLModel),
             "data_pipeline" | "data-pipeline" => Some(AssetType::DataPipeline),
+            "dataset" => Some(AssetType::Dataset),
+            "template" => Some(AssetType::Template),
             "binary" => Some(AssetType::Binary),
             "custom" => Some(AssetType::Custom),
             _ => None,
