@@ -374,8 +374,8 @@ impl AssetPackageManager {
         let mut packages: Vec<InstalledPackageInfo> = installed
             .values()
             .map(|pkg| InstalledPackageInfo {
-                id: pkg.id().to_string(),
-                version: pkg.id().to_string(),
+                id: pkg.id.to_string(),
+                version: pkg.version.to_string(),
                 installed_at: pkg.installed_at,
                 dependencies: pkg.dependencies.iter().map(|d| d.to_string()).collect(),
                 dependents: pkg.dependents.iter().map(|d| d.to_string()).collect(),

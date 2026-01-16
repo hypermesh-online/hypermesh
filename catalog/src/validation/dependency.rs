@@ -63,7 +63,7 @@ impl DependencyResolver {
             // Add node to graph
             graph.add_node(DependencyNode {
                 asset_id: current.clone(),
-                version: asset.version().clone(),
+                version: asset.version().to_string(),
                 dependencies: deps.clone(),
                 resolved_version: None,
             });

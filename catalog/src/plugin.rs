@@ -341,7 +341,7 @@ impl HyperMeshExtension for CatalogPlugin {
         })
     }
 
-    async fn export_state(&self) -> ExtensionResult<ExtensionState> {
+    async fn export_state(&self) -> ExtensionResult<ExtensionStateData> {
         let inner = self.inner.read().await;
 
         let state_data = inner.export_state().await.map_err(|e| {
@@ -359,7 +359,7 @@ impl HyperMeshExtension for CatalogPlugin {
         })
     }
 
-    async fn import_state(&mut self, state: ExtensionState) -> ExtensionResult<()> {
+    async fn import_state(&mut self, state: ExtensionStateData) -> ExtensionResult<()> {
         if state.version != 1 {
             return Err(ExtensionError::VersionIncompatible {
                 extension: "catalog".to_string(),

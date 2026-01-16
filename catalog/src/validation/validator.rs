@@ -139,7 +139,7 @@ impl AssetValidator {
             passed,
             timestamp: Utc::now(),
             asset_id: asset.id().to_string(),
-            version: asset.version().clone(),
+            version: asset.version().to_string(),
             security: security_result,
             syntax: syntax_result,
             performance: performance_result,
@@ -150,7 +150,7 @@ impl AssetValidator {
 
     /// Validate asset syntax
     async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
-        if let Some(validator) = self.type_validators.get(&asset.asset_type) {
+        if let Some(validator) = self.type_validators.get(&asset.asset_type()) {
             validator.validate_syntax(asset).await
         } else {
             // No specific validator, return default result

@@ -192,12 +192,12 @@ impl HyperMeshAssetRegistry {
 
         Ok(AssetAllocationRequest {
             asset_type: self.map_asset_type(&package.spec.spec.asset_type),
-            resource_requirements: requirements,
+            requested_resources: requirements,
             privacy_level: self.config.default_privacy.clone(),
             consensus_proof: consensus,
-            user_id: package.spec.metadata.author.clone().unwrap_or_default(),
-            allocation_id: Uuid::new_v4().to_string(),
-            duration: None,
+            certificate_fingerprint: package.spec.metadata.author.clone().unwrap_or_default(),
+            duration_limit: None,
+            tags: HashMap::new(),
         })
     }
 

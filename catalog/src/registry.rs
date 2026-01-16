@@ -582,6 +582,7 @@ impl AssetRegistry {
         Ok(())
     }
     */
+}
 
 #[async_trait::async_trait]
 impl AssetDiscovery for AssetRegistry {
@@ -875,5 +876,4 @@ mod tests {
         let results = registry.search(&query).await.unwrap();
         assert_eq!(results.total_count, 0);
     }
-}
 }

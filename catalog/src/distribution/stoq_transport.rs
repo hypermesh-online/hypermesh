@@ -8,6 +8,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::Duration;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 use crate::assets::{AssetPackage, AssetPackageId};
 use super::{DistributionConfig, PackageManager};
@@ -247,10 +248,13 @@ impl StoqTransportLayer {
         // Generate node ID from peer address
         let node_id = NodeId::from_address(&peer_addr);
 
+        // Wrap connection in Arc for sharing
+        let connection = Arc::new(connection);
+
         // Store connection
         {
             let mut connections = self.connections.write().await;
-            connections.insert(node_id.clone(), Arc::new(connection));
+            connections.insert(node_id.clone(), connection.clone());
         }
 
         // Add to connection pool
@@ -267,8 +271,8 @@ impl StoqTransportLayer {
     ) -> Result<ResponseData> {
         let connection = self.get_connection(peer_id).await?;
 
-        // Open a new stream
-        let mut stream = connection
+        // Open a bidirectional stream
+        let (mut send, mut recv) = connection
             .open_bi()
             .await
             .context("Failed to open stream")?;
@@ -277,12 +281,12 @@ impl StoqTransportLayer {
         let request_data = bincode::serialize(&request)?;
         self.bandwidth_manager.limit_upload(request_data.len()).await?;
 
-        // Send request
-        stream.send(Bytes::from(request_data)).await?;
+        // Send request using quinn SendStream methods
+        send.write_all(&request_data).await?;
+        send.finish().await?;
 
-        // Receive response
-        let response_data = stream.recv().await?
-            .ok_or_else(|| anyhow::anyhow!("No response received"))?;
+        // Receive response using quinn RecvStream methods
+        let response_data = recv.read_to_end(10 * 1024 * 1024).await?;
 
         // Apply bandwidth limiting for download
         self.bandwidth_manager.limit_download(response_data.len()).await?;
@@ -333,11 +337,10 @@ impl StoqTransportLayer {
     ) {
         loop {
             match connection.accept_bi().await {
-                Ok((send, mut recv)) => {
+                Ok((mut send, mut recv)) => {
                     // Receive request
-                    let request_data = match recv.recv().await {
-                        Ok(Some(data)) => data,
-                        Ok(None) => break,
+                    let request_data = match recv.read_to_end(10 * 1024 * 1024).await {
+                        Ok(data) => data,
                         Err(e) => {
                             tracing::warn!("Failed to receive request: {}", e);
                             break;
@@ -369,9 +372,10 @@ impl StoqTransportLayer {
                         }
                     };
 
-                    if let Err(e) = send.send(Bytes::from(response_data)).await {
+                    if let Err(e) = send.write_all(&response_data).await {
                         tracing::warn!("Failed to send response: {}", e);
                     }
+                    let _ = send.finish().await;
                 }
                 Err(e) => {
                     tracing::debug!("Connection closed: {}", e);

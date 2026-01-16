@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, Ipv6Addr};
 use std::time::{Duration, SystemTime};
+use std::str::FromStr;
 
 use super::{
     stoq_transport::StoqTransportLayer,

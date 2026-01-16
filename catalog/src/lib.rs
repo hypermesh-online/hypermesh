@@ -130,7 +130,7 @@ impl Catalog {
         // Initialize components
         let asset_registry = Arc::new(registry::AssetRegistry::new(config.registry).await?);
         let template_generator = Arc::new(template::CatalogTemplateGenerator::new(config.template)?);
-        let asset_validator = Arc::new(validation::AssetValidator::new(config.validation));
+        let asset_validator = Arc::new(validation::AssetValidator::with_config(config.validation));
         let documentation_generator = Arc::new(documentation::DocumentationGenerator::new(config.documentation)?);
         let version_manager = Arc::new(versioning::VersionManager::new());
 
@@ -188,25 +188,25 @@ impl Catalog {
     }
     
     /// Publish an asset package
-    pub async fn publish_asset(&self, package: AssetPackage) -> Result<AssetId> {
+    pub async fn publish_asset(&self, package: AssetPackage) -> Result<assets::AssetPackageId> {
         // Validate the asset package
         let validation_result = self.asset_validator.validate(&package).await?;
-        
+
         if !validation_result.passed {
             return Err(anyhow::anyhow!(
                 "Asset validation failed: {} issues found",
                 validation_result.summary.total_issues
             ));
         }
-        
+
         // Publish to registry
         let package_id = self.asset_registry.publish(package).await?;
-        
+
         Ok(package_id)
     }
-    
+
     /// Install an asset package
-    pub async fn install_asset(&self, id: &AssetId) -> Result<AssetPackage> {
+    pub async fn install_asset(&self, id: &assets::AssetPackageId) -> Result<AssetPackage> {
         self.asset_registry.install(id).await
     }
     

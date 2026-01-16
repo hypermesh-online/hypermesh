@@ -64,7 +64,7 @@ pub struct CatalogExtension {
     config: CatalogExtensionConfig,
 
     /// Current extension state
-    state: Arc<RwLock<ExtState>>,
+    state: Arc<RwLock<ExtensionStateData>>,
 
     /// Extension health status
     health: Arc<RwLock<ExtensionHealth>>,
@@ -666,7 +666,7 @@ impl HyperMeshExtension for CatalogExtension {
     }
 
     /// Import previously exported state
-    async fn import_state(&mut self, _state: ExtState) -> ExtensionResult<()> {
+    async fn import_state(&mut self, _state: ExtensionStateData) -> ExtensionResult<()> {
         self.increment_requests().await;
 
         // In a real implementation, this would deserialize and restore state

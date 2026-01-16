@@ -23,6 +23,8 @@ pub use protocols::{SharingProtocol, SharePermission, BandwidthAllocation};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
+use crate::assets::AssetPackageId;
+use uuid::Uuid;
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -285,7 +287,7 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        let asset_id = AssetPackageId::new();
+        let asset_id = Uuid::new_v4();
 
         // Register with discovery service
         self.discovery_service.register_package(
@@ -446,7 +448,8 @@ impl SharingManager {
 
             // Update stats
             let mut stats = self.stats.write().await;
-            stats.bandwidth_consumed += package.metadata().size as u64;
+            // TODO: Calculate actual package size from content
+            stats.bandwidth_consumed += 1024; // Placeholder size
 
             Ok(package)
         } else {
@@ -498,7 +501,9 @@ impl SharingManager {
 
         // Check storage capacity
         let current_usage = self.mirror_manager.get_storage_usage().await?;
-        if current_usage + metadata.size as u64 > self.config.max_mirror_storage {
+        // TODO: Calculate actual metadata size
+        let metadata_size = 1024u64; // Placeholder size
+        if current_usage + metadata_size > self.config.max_mirror_storage {
             return Ok(false);
         }
 

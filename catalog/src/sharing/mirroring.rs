@@ -198,8 +198,10 @@ impl MirrorManager {
         }
 
         // Select mirror nodes
+        // TODO: Calculate actual metadata size
+        let metadata_size = 1024u64; // Placeholder size
         let selected_nodes = self.select_mirror_nodes(
-            metadata.size as u64,
+            metadata_size,
             self.replication_factor,
         ).await?;
 
