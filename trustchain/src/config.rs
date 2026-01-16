@@ -528,9 +528,12 @@ mod tests {
     #[test]
     fn test_config_file_operations() {
         let config = TrustChainConfig::localhost_testing();
-        
-        // Test TOML
-        let toml_file = NamedTempFile::new().unwrap();
+
+        // Test TOML (use Builder to add .toml suffix)
+        let toml_file = tempfile::Builder::new()
+            .suffix(".toml")
+            .tempfile()
+            .unwrap();
         config.to_file(toml_file.path().to_str().unwrap()).unwrap();
         let loaded_config = TrustChainConfig::from_file(toml_file.path().to_str().unwrap()).unwrap();
         assert_eq!(config.ca.ca_id, loaded_config.ca.ca_id);
