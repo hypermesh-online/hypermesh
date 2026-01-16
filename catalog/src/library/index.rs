@@ -178,49 +178,57 @@ impl LibraryIndex {
         }
 
         // Index by author
-        if let Some(author) = &package.metadata().author {
-            let mut author_index = self.author_index.write().await;
-            author_index
-                .entry(Arc::clone(author))
-                .or_insert_with(HashSet::new)
-                .insert(Arc::clone(&package_id));
+        if let Some(metadata) = &package.metadata {
+            if let Some(author) = &metadata.author {
+                let mut author_index = self.author_index.write().await;
+                author_index
+                    .entry(Arc::clone(author))
+                    .or_insert_with(HashSet::new)
+                    .insert(Arc::clone(&package_id));
+            }
         }
 
         // Index by keywords
         {
             let mut keyword_index = self.keyword_index.write().await;
-            for keyword in package.metadata().keywords.iter() {
-                keyword_index
-                    .entry(Arc::clone(keyword))
-                    .or_insert_with(HashSet::new)
-                    .insert(Arc::clone(&package_id));
+            if let Some(metadata) = &package.metadata {
+                for keyword in metadata.keywords.iter() {
+                    keyword_index
+                        .entry(Arc::clone(keyword))
+                        .or_insert_with(HashSet::new)
+                        .insert(Arc::clone(&package_id));
+                }
             }
         }
 
         // Index by version
         {
             let mut version_index = self.version_index.write().await;
-            version_index
-                .entry(Arc::clone(&package.metadata().name))
-                .or_insert_with(BTreeMap::new)
-                .insert(Arc::clone(&package.metadata().version), Arc::clone(&package_id));
+            if let Some(metadata) = &package.metadata {
+                version_index
+                    .entry(Arc::clone(&metadata.name))
+                    .or_insert_with(BTreeMap::new)
+                    .insert(Arc::clone(&metadata.version), Arc::clone(&package_id));
+            }
         }
 
         // Index for text search
         {
             let mut text_index = self.text_index.write().await;
 
-            // Index name
-            text_index.index_text(&package.metadata().name, Arc::clone(&package_id));
+            if let Some(metadata) = &package.metadata {
+                // Index name
+                text_index.index_text(&metadata.name, Arc::clone(&package_id));
 
-            // Index description
-            if let Some(desc) = &package.metadata().description {
-                text_index.index_text(desc, Arc::clone(&package_id));
-            }
+                // Index description
+                if let Some(desc) = &metadata.description {
+                    text_index.index_text(desc, Arc::clone(&package_id));
+                }
 
-            // Index keywords
-            for keyword in package.metadata().keywords.iter() {
-                text_index.index_text(keyword, Arc::clone(&package_id));
+                // Index keywords
+                for keyword in metadata.keywords.iter() {
+                    text_index.index_text(keyword, Arc::clone(&package_id));
+                }
             }
         }
 

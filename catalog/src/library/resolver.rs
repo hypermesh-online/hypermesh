@@ -300,10 +300,13 @@ impl DependencyResolver {
 
         // Check version constraint
         let constraint = self.constraint_parser.parse(&pending.constraint)?;
-        if !self.constraint_parser.satisfies(&package.metadata().version, &constraint) {
+        let package_version = package.metadata.as_ref()
+            .map(|m| m.version.as_ref())
+            .unwrap_or(&package.version);
+        if !self.constraint_parser.satisfies(package_version, &constraint) {
             bail!(
                 "Version {} does not satisfy constraint {}",
-                package.metadata().version,
+                package_version,
                 pending.constraint
             );
         }
@@ -383,8 +386,11 @@ impl DependencyResolver {
         // For now, just get the package and check if it satisfies
         if let Some(package) = library.get_package(name).await? {
             let parsed_constraint = self.constraint_parser.parse(constraint)?;
-            if self.constraint_parser.satisfies(&package.metadata().version, &parsed_constraint) {
-                return Ok(Some(package.metadata().version.to_string()));
+            let package_version = package.metadata.as_ref()
+                .map(|m| m.version.as_ref())
+                .unwrap_or(&package.version);
+            if self.constraint_parser.satisfies(package_version, &parsed_constraint) {
+                return Ok(Some(package_version.to_string()));
             }
         }
 
