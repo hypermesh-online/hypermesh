@@ -285,7 +285,7 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        let asset_id = package.metadata().id.clone();
+        let asset_id = AssetPackageId::new();
 
         // Register with discovery service
         self.discovery_service.register_package(

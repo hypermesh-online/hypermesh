@@ -245,9 +245,9 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if peer.available_packages.contains(&package.metadata().id) {
+            if peer.available_packages.contains(&package.id()) {
                 // Check if peer has older version
-                if self.needs_update(&package.metadata().id, &peer.node_id).await? {
+                if self.needs_update(&package.id(), &peer.node_id).await? {
                     self.send_package_update(&package, &peer.node_id).await?;
                     synced_count += 1;
                 }
@@ -271,7 +271,7 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if !peer.available_packages.contains(&package.metadata().id) {
+            if !peer.available_packages.contains(&package.id()) {
                 self.send_package(&package, &peer.node_id).await?;
                 synced_count += 1;
             }
@@ -290,7 +290,7 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if !peer.available_packages.contains(&package.metadata().id) {
+            if !peer.available_packages.contains(&package.id()) {
                 self.send_package(&package, &peer.node_id).await?;
                 synced_count += 1;
             }
@@ -459,13 +459,13 @@ impl SyncManager {
 
         // Apply additions
         for package in delta.additions {
-            package_index.insert(package.metadata().id.clone(), package);
+            package_index.insert(package.id().clone(), package);
             packages_synced += 1;
         }
 
         // Apply updates
         for package in delta.updates {
-            package_index.insert(package.metadata().id.clone(), package);
+            package_index.insert(package.id().clone(), package);
             packages_synced += 1;
         }
 
@@ -581,7 +581,7 @@ impl SyncManager {
 
     fn hash_package(&self, package: &AssetPackage) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(package.metadata().id.to_string().as_bytes());
+        hasher.update(package.id().to_string().as_bytes());
         hasher.update(package.metadata().version.as_bytes());
         format!("{:x}", hasher.finalize())
     }
