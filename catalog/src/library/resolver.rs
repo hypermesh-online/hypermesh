@@ -313,7 +313,7 @@ impl DependencyResolver {
 
         // Add to resolved
         context.resolved.insert(
-            Arc::clone(&package.id()),
+            Arc::clone(&package.id),
             ResolvedPackage {
                 name: Arc::clone(&package.id),
                 version: package.metadata.as_ref()

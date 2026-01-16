@@ -180,14 +180,14 @@ impl AssetLibrary {
         PackageSummary {
             id: package.id.to_string(),
             name: package.name.clone(),
-            version: package.version().clone(),
-            description: package.description().clone(),
-            tags: package.metadata().as_ref()
+            version: package.version.clone(),
+            description: package.description.clone(),
+            tags: package.metadata.as_ref()
                 .map(|m| m.tags.iter().map(|t| t.to_string()).collect())
                 .unwrap_or_default(),
-            asset_type: package.asset_type().clone(),
+            asset_type: package.asset_type.clone(),
             size: package.size,
-            last_modified: package.metadata().as_ref()
+            last_modified: package.metadata.as_ref()
                 .map(|m| m.modified)
                 .unwrap_or(0),
         }

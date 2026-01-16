@@ -8,7 +8,8 @@ use bytes::{Bytes, BytesMut};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+// Import quinn types for stream operations
+use quinn::{SendStream, RecvStream};
 
 use crate::assets::{AssetPackage, AssetPackageId};
 use super::{DistributionConfig, PackageManager};
@@ -283,7 +284,7 @@ impl StoqTransportLayer {
 
         // Send request using quinn SendStream methods
         send.write_all(&request_data).await?;
-        send.finish().await?;
+        send.finish()?;
 
         // Receive response using quinn RecvStream methods
         let response_data = recv.read_to_end(10 * 1024 * 1024).await?;
@@ -375,7 +376,7 @@ impl StoqTransportLayer {
                     if let Err(e) = send.write_all(&response_data).await {
                         tracing::warn!("Failed to send response: {}", e);
                     }
-                    let _ = send.finish().await;
+                    let _ = send.finish();
                 }
                 Err(e) => {
                     tracing::debug!("Connection closed: {}", e);
