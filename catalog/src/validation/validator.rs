@@ -1,13 +1,15 @@
 //! Asset Validator
 //!
 //! Main validator implementation that orchestrates all validation components.
+//! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
 use anyhow::{Result, Context};
 use chrono::Utc;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use crate::assets::AssetPackage;
+// Use BlockMatrix Assets directly from extensions
+use blockmatrix::extensions::AssetPackage;
 use super::config::{ValidationConfig, SecuritySeverity};
 use super::dependency::{DependencyResolver, VersionConflict};
 use super::results::{
@@ -138,8 +140,10 @@ impl AssetValidator {
         Ok(ValidationResult {
             passed,
             timestamp: Utc::now(),
-            asset_id: asset.id().to_string(),
-            version: asset.version().to_string(),
+            // BlockMatrix AssetPackage has .id field directly
+            asset_id: asset.id.clone(),
+            // BlockMatrix AssetPackage has .version field (semver::Version)
+            version: asset.version.to_string(),
             security: security_result,
             syntax: syntax_result,
             performance: performance_result,
@@ -148,9 +152,14 @@ impl AssetValidator {
         })
     }
 
-    /// Validate asset syntax
+    /// Validate asset syntax from BlockMatrix Asset
     async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
-        if let Some(validator) = self.type_validators.get(&asset.asset_type()) {
+        // Extract asset type from metadata or asset_types field
+        let asset_type = asset.asset_types.first()
+            .map(|t| format!("{:?}", t).to_lowercase())
+            .unwrap_or_default();
+
+        if let Some(validator) = self.type_validators.get(&asset_type) {
             validator.validate_syntax(asset).await
         } else {
             // No specific validator, return default result

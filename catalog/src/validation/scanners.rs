@@ -1,12 +1,14 @@
 //! Security Scanners
 //!
 //! Security scanning implementations for asset validation.
+//! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::assets::AssetPackage;
+// Use BlockMatrix Assets directly from extensions
+use blockmatrix::extensions::AssetPackage;
 use super::traits::SecurityScanner;
 use super::results::{
     SecurityValidationResult, Vulnerability, MalwareDetection,
@@ -114,24 +116,35 @@ impl StaticSecurityScanner {
         risks
     }
 
-    /// Check for known vulnerabilities
+    /// Check for known vulnerabilities in BlockMatrix Asset
     fn check_vulnerabilities(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
         let mut vulnerabilities = Vec::new();
 
-        // Check dependencies for known vulnerabilities
-        if let Some(deps) = asset.metadata().custom_fields.get("dependencies") {
-            if let Some(deps_map) = deps.as_object() {
-                for (name, version) in deps_map {
-                    // Simulated vulnerability database check
-                    if name == "vulnerable-package" {
-                        vulnerabilities.push(Vulnerability {
-                            cve: Some("CVE-2024-0001".to_string()),
-                            description: format!("Known vulnerability in {} {}", name, version),
-                            severity: SecuritySeverity::High,
-                            component: name.to_string(),
-                            fix_available: true,
-                            fix_version: Some("2.0.0".to_string()),
-                        });
+        // Check dependencies for known vulnerabilities from BlockMatrix Asset metadata
+        // Note: Simulated check for demonstration purposes
+        // In production, this would query a real vulnerability database
+
+        // Check for dependencies in asset metadata
+        if let Some(deps) = asset.metadata.get("dependencies") {
+            if let Some(deps_array) = deps.as_array() {
+                for dep in deps_array {
+                    if let Some(dep_obj) = dep.as_object() {
+                        if let (Some(name), Some(version)) = (dep_obj.get("name"), dep_obj.get("version")) {
+                            let name_str = name.as_str().unwrap_or("");
+                            let version_str = version.as_str().unwrap_or("");
+
+                            // Simulated vulnerability database check
+                            if name_str == "vulnerable-package" {
+                                vulnerabilities.push(Vulnerability {
+                                    cve: Some("CVE-2024-0001".to_string()),
+                                    description: format!("Known vulnerability in {} {}", name_str, version_str),
+                                    severity: SecuritySeverity::High,
+                                    component: name_str.to_string(),
+                                    fix_available: true,
+                                    fix_version: Some("2.0.0".to_string()),
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -206,8 +219,8 @@ impl SecurityScanner for StaticSecurityScanner {
         // Check for vulnerabilities
         vulnerabilities.extend(self.check_vulnerabilities(asset));
 
-        // Scan code for security issues
-        if let Some(code) = asset.metadata().custom_fields.get("code") {
+        // Scan code for security issues from BlockMatrix Asset metadata
+        if let Some(code) = asset.metadata.get("code") {
             if let Some(code_str) = code.as_str() {
                 // Scan for various injection types
                 injection_risks.extend(self.scan_sql_injection(code_str));
@@ -219,7 +232,7 @@ impl SecurityScanner for StaticSecurityScanner {
                     malware.push(MalwareDetection {
                         malware_type: "Ransomware".to_string(),
                         confidence: 90,
-                        affected_files: vec![asset.id().to_string()],
+                        affected_files: vec![asset.id.clone()],
                         signature: "RANSOMWARE_PATTERN_001".to_string(),
                         risk_level: RiskLevel::Critical,
                     });
@@ -231,7 +244,7 @@ impl SecurityScanner for StaticSecurityScanner {
                         rule_id: "no-hardcoded-credentials".to_string(),
                         description: "Hardcoded credentials detected".to_string(),
                         location: CodeLocation {
-                            file: asset.id().to_string(),
+                            file: asset.id.clone(),
                             line: None,
                             column: None,
                             snippet: None,

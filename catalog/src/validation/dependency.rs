@@ -1,12 +1,14 @@
 //! Dependency Resolution
 //!
 //! Dependency resolution and validation for assets.
+//! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
 use anyhow::{Result, Context};
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
-use crate::assets::AssetPackage;
+// Use BlockMatrix Assets directly from extensions
+use blockmatrix::extensions::AssetPackage;
 
 /// Dependency information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,11 +47,12 @@ impl DependencyResolver {
         Self
     }
 
-    /// Resolve asset dependencies
+    /// Resolve asset dependencies from BlockMatrix Asset
     pub async fn resolve(&self, asset: &AssetPackage) -> Result<DependencyGraph> {
         let mut graph = DependencyGraph::new();
         let mut visited = HashSet::new();
-        let mut stack = vec![asset.id().to_string()];
+        // BlockMatrix AssetPackage has .id field directly
+        let mut stack = vec![asset.id.clone()];
 
         while let Some(current) = stack.pop() {
             if visited.contains(&current) {
@@ -63,7 +66,8 @@ impl DependencyResolver {
             // Add node to graph
             graph.add_node(DependencyNode {
                 asset_id: current.clone(),
-                version: asset.version().to_string(),
+                // BlockMatrix AssetPackage has .version field (semver::Version)
+                version: asset.version.to_string(),
                 dependencies: deps.clone(),
                 resolved_version: None,
             });
