@@ -1,6 +1,7 @@
 //! Asset Package Manager
 //!
 //! Handles package lifecycle operations including installation, updates, and removal.
+//! MIGRATION: Now integrates with CatalogRegistry for type storage/retrieval.
 
 use super::types::*;
 use super::asset_library::AssetLibrary;
@@ -11,6 +12,10 @@ use anyhow::{Result, Context, bail};
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
+
+// Import Asset Registry
+use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+use blockmatrix::assets::PrivacyLevel;
 
 /// Package operation results
 #[derive(Debug, Clone)]
@@ -33,6 +38,8 @@ pub struct AssetPackageManager {
     library: Arc<AssetLibrary>,
     /// Dependency resolver
     resolver: Arc<DependencyResolver>,
+    /// Catalog registry for type storage
+    registry: Arc<CatalogRegistry>,
     /// Installed packages tracking
     installed: Arc<RwLock<HashMap<Arc<str>, InstalledPackage>>>,
     /// Installation locks to prevent concurrent installs
@@ -103,9 +110,35 @@ impl AssetPackageManager {
     pub fn new(library: Arc<AssetLibrary>, config: PackageManagerConfig) -> Self {
         let resolver = Arc::new(DependencyResolver::new());
 
+        // Initialize registry with default configuration
+        let registry = Arc::new(CatalogRegistry::new(
+            PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
         Self {
             library,
             resolver,
+            registry,
+            installed: Arc::new(RwLock::new(HashMap::new())),
+            install_locks: Arc::new(RwLock::new(HashSet::new())),
+            config,
+        }
+    }
+
+    /// Create a new package manager with custom registry
+    pub fn with_registry(
+        library: Arc<AssetLibrary>,
+        registry: Arc<CatalogRegistry>,
+        config: PackageManagerConfig,
+    ) -> Self {
+        let resolver = Arc::new(DependencyResolver::new());
+
+        Self {
+            library,
+            resolver,
+            registry,
             installed: Arc::new(RwLock::new(HashMap::new())),
             install_locks: Arc::new(RwLock::new(HashSet::new())),
             config,
@@ -145,7 +178,7 @@ impl AssetPackageManager {
         };
 
         // Get package from library
-        let package = match self.library.get_package(package_id).await? {
+        let package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
             None => {
                 result.errors.push(format!("Package {} not found", package_id));
@@ -182,7 +215,7 @@ impl AssetPackageManager {
 
             // Add resolved dependencies to install list
             for dep in dep_resolution.resolved {
-                if let Some(dep_package) = self.library.get_package(&dep.name).await? {
+                if let Some(dep_package) = self.library.get_package(&dep.name).await {
                     packages_to_install.push((Arc::from(dep.name.as_str()), dep_package));
                 }
             }
@@ -212,7 +245,7 @@ impl AssetPackageManager {
                         .collect())
                     .unwrap_or_else(Vec::new),
                 dependents: HashSet::new(),
-                source: if &pkg_id == package_id {
+                source: if pkg_id.as_ref() == package_id {
                     InstallSource::Library
                 } else {
                     InstallSource::Dependency(Arc::from(package_id))
@@ -319,7 +352,7 @@ impl AssetPackageManager {
         };
 
         // Get latest version from library
-        let latest_package = match self.library.get_package(package_id).await? {
+        let latest_package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
             None => {
                 result.errors.push(format!("Package {} not found in library", package_id));
@@ -389,7 +422,7 @@ impl AssetPackageManager {
 
     /// Check package dependencies
     pub async fn check_dependencies(&self, package_id: &str) -> Result<DependencyCheckResult> {
-        let package = match self.library.get_package(package_id).await? {
+        let package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
             None => bail!("Package {} not found", package_id),
         };
@@ -420,7 +453,7 @@ impl AssetPackageManager {
                 pkg.dependents.is_empty() &&
                 matches!(pkg.source, InstallSource::Dependency(_))
             })
-            .map(|pkg| pkg.id().to_string())
+            .map(|pkg| pkg.id.to_string())
             .collect()
     }
 
@@ -517,7 +550,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_package_manager_creation() {
-        let library = Arc::new(AssetLibrary::new(LibraryConfig::default()));
+        let library = Arc::new(AssetLibrary::new());
         let manager = AssetPackageManager::new(library, PackageManagerConfig::default());
 
         let installed = manager.list_installed().await.unwrap();
@@ -526,7 +559,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_install_and_uninstall() {
-        let library = Arc::new(AssetLibrary::new(LibraryConfig::default()));
+        let library = Arc::new(AssetLibrary::new());
 
         // Add a test package to the library
         let package = create_test_package("test-pkg");
@@ -556,18 +589,25 @@ mod tests {
     fn create_test_package(id: &str) -> LibraryAssetPackage {
         LibraryAssetPackage {
             id: Arc::from(id),
-            metadata: PackageMetadata {
+            name: id.to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("Test package".to_string()),
+            asset_type: "julia".to_string(),
+            size: 100,
+            hash: "test-hash".to_string(),
+            content: "println(\"test\")".to_string(),
+            metadata: Some(PackageMetadata {
                 name: Arc::from(id),
                 version: Arc::from("1.0.0"),
-                description: None,
-                author: None,
-                license: None,
+                description: Some(Arc::from("Test package")),
+                author: Some(Arc::from("test-author")),
+                license: Some(Arc::from("MIT")),
                 tags: Arc::new([]),
                 keywords: Arc::new([]),
                 created: 0,
                 modified: 0,
-            },
-            spec: PackageSpec {
+            }),
+            spec: Some(PackageSpec {
                 asset_type: AssetType::JuliaProgram,
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
@@ -586,20 +626,19 @@ mod tests {
                 },
                 dependencies: Arc::new([]),
                 environment: Arc::new(HashMap::new()),
-            },
-            content_refs: ContentReferences {
+            }),
+            content_refs: Some(ContentReferences {
                 main_ref: ContentRef {
                     path: Arc::from("main.jl"),
-                    hash: Arc::from("hash"),
+                    hash: Arc::from("test-hash"),
                     size: 100,
                     content_type: ContentType::Source,
                 },
                 file_refs: Arc::new([]),
                 binary_refs: Arc::new([]),
                 total_size: 100,
-            },
+            }),
             validation: None,
-            hash: Arc::from("hash"),
         }
     }
 }

@@ -525,18 +525,25 @@ mod tests {
     fn create_test_package(id: &str) -> LibraryAssetPackage {
         LibraryAssetPackage {
             id: Arc::from(id),
-            metadata: PackageMetadata {
+            name: id.to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("Test package".to_string()),
+            asset_type: "julia".to_string(),
+            size: 100,
+            hash: "test-hash".to_string(),
+            content: "println(\"test\")".to_string(),
+            metadata: Some(PackageMetadata {
                 name: Arc::from(id),
                 version: Arc::from("1.0.0"),
-                description: None,
-                author: None,
-                license: None,
+                description: Some(Arc::from("Test package")),
+                author: Some(Arc::from("test-author")),
+                license: Some(Arc::from("MIT")),
                 tags: Arc::new([]),
                 keywords: Arc::new([]),
                 created: 0,
                 modified: 0,
-            },
-            spec: PackageSpec {
+            }),
+            spec: Some(PackageSpec {
                 asset_type: AssetType::JuliaProgram,
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
@@ -555,20 +562,19 @@ mod tests {
                 },
                 dependencies: Arc::new([]),
                 environment: Arc::new(HashMap::new()),
-            },
-            content_refs: ContentReferences {
+            }),
+            content_refs: Some(ContentReferences {
                 main_ref: ContentRef {
                     path: Arc::from("main.jl"),
-                    hash: Arc::from("hash"),
+                    hash: Arc::from("test-hash"),
                     size: 100,
                     content_type: ContentType::Source,
                 },
                 file_refs: Arc::new([]),
                 binary_refs: Arc::new([]),
                 total_size: 100,
-            },
+            }),
             validation: None,
-            hash: Arc::from("hash"),
         }
     }
 }

@@ -596,7 +596,14 @@ mod tests {
     fn create_test_package() -> LibraryAssetPackage {
         LibraryAssetPackage {
             id: Arc::from("test-pkg"),
-            metadata: PackageMetadata {
+            name: "test-package".to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("A test package".to_string()),
+            asset_type: "julia".to_string(),
+            size: 100,
+            hash: "test-hash".to_string(),
+            content: "println(\"test\")".to_string(),
+            metadata: Some(PackageMetadata {
                 name: Arc::from("test-package"),
                 version: Arc::from("1.0.0"),
                 description: Some(Arc::from("A test package")),
@@ -606,8 +613,8 @@ mod tests {
                 keywords: Arc::new([Arc::from("test"), Arc::from("example")]),
                 created: 0,
                 modified: 0,
-            },
-            spec: PackageSpec {
+            }),
+            spec: Some(PackageSpec {
                 asset_type: AssetType::JuliaProgram,
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
@@ -626,20 +633,19 @@ mod tests {
                 },
                 dependencies: Arc::new([]),
                 environment: Arc::new(HashMap::new()),
-            },
-            content_refs: ContentReferences {
+            }),
+            content_refs: Some(ContentReferences {
                 main_ref: ContentRef {
                     path: Arc::from("main.jl"),
-                    hash: Arc::from("hash"),
+                    hash: Arc::from("test-hash"),
                     size: 100,
                     content_type: ContentType::Source,
                 },
                 file_refs: Arc::new([]),
                 binary_refs: Arc::new([]),
                 total_size: 100,
-            },
+            }),
             validation: None,
-            hash: Arc::from("hash"),
         }
     }
 }
