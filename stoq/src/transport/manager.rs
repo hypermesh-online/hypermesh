@@ -155,6 +155,11 @@ impl StoqTransport {
         let socket = if let SocketAddr::V6(_) = socket_addr {
             let socket2_sock = socket2::Socket::from(socket);
 
+            // Enable SO_REUSEADDR to allow quick rebinding in tests
+            if let Err(e) = socket2_sock.set_reuse_address(true) {
+                warn!("Could not set SO_REUSEADDR (continuing anyway): {}", e);
+            }
+
             // IPv6-only flag
             if let Err(e) = socket2_sock.set_only_v6(true) {
                 warn!("Could not set IPv6-only socket option (continuing anyway): {}", e);

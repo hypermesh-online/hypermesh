@@ -142,9 +142,15 @@ pub struct TransportConfig {
 
 impl Default for TransportConfig {
     fn default() -> Self {
+        // Use port 0 (OS-assigned) for tests to avoid binding conflicts
+        #[cfg(test)]
+        let port = 0;
+        #[cfg(not(test))]
+        let port = crate::DEFAULT_PORT;
+
         Self {
             bind_address: std::net::Ipv6Addr::LOCALHOST, // Default to localhost for testing
-            port: crate::DEFAULT_PORT,
+            port,
             max_connections: Some(100), // Limited for DoS protection
             connection_timeout: Duration::from_secs(5), // Reduced for performance
             enable_migration: true,

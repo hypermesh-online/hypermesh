@@ -274,8 +274,9 @@ impl SecurityManager {
         // Initialize reputation system
         let reputation = Arc::new(ReputationSystem::new().await?);
 
-        // Initialize policy engine
-        let policy_engine = Arc::new(PolicyEngine::new(config.default_trust_policy));
+        // Initialize policy engine - clone the trust policy before moving config
+        let default_trust_policy = config.default_trust_policy.clone();
+        let policy_engine = Arc::new(PolicyEngine::new(default_trust_policy));
 
         Ok(Self {
             trustchain,
@@ -324,7 +325,7 @@ impl SecurityManager {
             reputation_score: None,
             policy_result: PolicyResult {
                 allowed: false,
-                trust_level: self.config.default_trust_policy,
+                trust_level: self.config.default_trust_policy.clone(),
                 violations: vec![],
                 recommendations: vec![],
             },

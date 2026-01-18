@@ -1,7 +1,6 @@
 //! Package Mirroring and Replication Module
 //!
-//! Handles automatic mirroring of popular packages, replication strategies,
-//! and geographic distribution for optimal access.
+//! Migrated to use BlockMatrix instruction-based retrieval
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
@@ -12,6 +11,8 @@ use std::time::{Duration, SystemTime};
 use std::cmp::Ordering;
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
+use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator};
+use crate::registry::CatalogRegistry;
 use super::topology::NodeLocation;
 
 /// Mirror strategy configuration
@@ -163,24 +164,35 @@ impl Eq for MirrorCandidate {}
 pub struct MirrorManager {
     max_storage: u64,
     replication_factor: u32,
+    registry: Arc<CatalogRegistry>,
     mirror_nodes: Arc<RwLock<HashMap<String, MirrorNode>>>,
     package_mirrors: Arc<RwLock<HashMap<AssetId, MirrorStatus>>>,
     popularity_metrics: Arc<RwLock<HashMap<AssetId, PopularityMetrics>>>,
     mirror_queue: Arc<RwLock<BinaryHeap<MirrorCandidate>>>,
     replication_config: Arc<ReplicationConfig>,
+    instruction_generator: Arc<InstructionGenerator>,
 }
 
 impl MirrorManager {
-    /// Create new mirror manager
-    pub async fn new(max_storage: u64, replication_factor: u32) -> Result<Self> {
+    /// Create new mirror manager with registry integration
+    pub async fn new(
+        max_storage: u64,
+        replication_factor: u32,
+        registry: Arc<CatalogRegistry>,
+    ) -> Result<Self> {
+        let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
+        let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
+
         Ok(Self {
             max_storage,
             replication_factor,
+            registry,
             mirror_nodes: Arc::new(RwLock::new(HashMap::new())),
             package_mirrors: Arc::new(RwLock::new(HashMap::new())),
             popularity_metrics: Arc::new(RwLock::new(HashMap::new())),
             mirror_queue: Arc::new(RwLock::new(BinaryHeap::new())),
             replication_config: Arc::new(ReplicationConfig::default()),
+            instruction_generator,
         })
     }
 
@@ -529,7 +541,8 @@ impl MirrorManager {
         let mut nodes = self.mirror_nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
             node.mirrored_packages.insert(asset_id.clone());
-            node.storage_used += metadata.size as u64;
+            // Use size_bytes field from AssetMetadata
+            node.storage_used += metadata.size_bytes;
             Ok(())
         } else {
             Err(anyhow::anyhow!("Node not found"))
@@ -711,13 +724,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_mirror_manager_creation() {
-        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3).await;
+        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+
+        let registry = Arc::new(CatalogRegistry::new(
+            blockmatrix::assets::PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
+        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry).await;
         assert!(manager.is_ok());
     }
 
     #[tokio::test]
     async fn test_node_selection() {
-        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3).await.unwrap();
+        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+
+        let registry = Arc::new(CatalogRegistry::new(
+            blockmatrix::assets::PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
+        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry).await.unwrap();
         let nodes = manager.select_mirror_nodes(1024 * 1024, 3).await;
         assert!(nodes.is_ok());
     }

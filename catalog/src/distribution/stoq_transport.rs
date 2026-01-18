@@ -1,4 +1,6 @@
 //! STOQ Transport Layer Integration for P2P Distribution
+//!
+//! Uses STOQ for instruction-based retrieval patterns
 
 use anyhow::{Result, Context};
 use std::sync::Arc;
@@ -284,8 +286,9 @@ impl StoqTransportLayer {
         // Send request using AsyncWriteExt
         send.write_all(&request_data).await
             .context("Failed to write request data")?;
-        send.finish().await
-            .context("Failed to finish sending")?;
+        // Shutdown the send stream (STOQ's SendStream doesn't have finish(), use shutdown)
+        send.shutdown().await
+            .context("Failed to shutdown send stream")?;
 
         // Receive response using AsyncReadExt
         let mut response_data = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
@@ -380,7 +383,7 @@ impl StoqTransportLayer {
                     if let Err(e) = send.write_all(&response_data).await {
                         tracing::warn!("Failed to send response: {}", e);
                     }
-                    let _ = send.finish().await;
+                    let _ = send.shutdown().await;
                 }
                 Err(e) => {
                     tracing::debug!("Connection closed: {}", e);

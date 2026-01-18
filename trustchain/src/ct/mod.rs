@@ -517,10 +517,9 @@ mod tests {
 
     async fn create_test_ct() -> (CertificateTransparency, TempDir) {
         let temp_dir = TempDir::new().unwrap();
-        let mut config = CTConfig::default();
+        let mut config = CTConfig::testing(); // Use testing config with port 0
         config.storage_path = temp_dir.path().to_str().unwrap().to_string();
-        config.enable_realtime_fingerprinting = false; // Disable for testing
-        
+
         let ct = CertificateTransparency::new(config).await.unwrap();
         (ct, temp_dir)
     }

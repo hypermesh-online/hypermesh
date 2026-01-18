@@ -455,8 +455,8 @@ mod tests {
     #[tokio::test]
     async fn test_consensus_validation() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
-        
-        let consensus_proof = ConsensusProof::generate_from_network("test_node_001").await?;
+
+        let consensus_proof = ConsensusProof::new_for_testing();
         let result = trustchain.validate_consensus_proof(&consensus_proof, "test_operation").await.unwrap();
 
         // Should complete validation (result depends on proof validity)

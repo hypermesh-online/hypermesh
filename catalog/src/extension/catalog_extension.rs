@@ -132,10 +132,13 @@ impl CatalogExtension {
 
         // Initialize components
         let library_config = LibraryConfig {
-            storage_path: config.library_path.clone(),
-            cache_size: config.cache_size,
-            enable_p2p_distribution: config.enable_p2p,
-            consensus_validation: config.consensus_validation,
+            enable_cache: true,
+            l1_cache_size: 100,
+            l2_cache_size: config.cache_size,
+            l3_cache_path: Some(config.library_path.clone()),
+            enable_zero_copy: true,
+            max_concurrent_ops: 100,
+            enable_metrics: true,
         };
 
         let library_manager = Arc::new(RwLock::new(
@@ -174,7 +177,7 @@ impl CatalogExtension {
             sharing_manager: None,
             asset_handlers,
             config,
-            state: Arc::new(RwLock::new(ExtState::Initializing)),
+            state: Arc::new(RwLock::new(ExtensionState::Initializing)),
             health: Arc::new(RwLock::new(ExtensionHealth::Healthy)),
             resource_usage: Arc::new(RwLock::new(ResourceUsageReport {
                 cpu_usage: 0.0,
@@ -245,7 +248,7 @@ impl HyperMeshExtension for CatalogExtension {
         // Update state
         {
             let mut state = self.state.write().await;
-            *state = ExtState::Initializing;
+            *state = ExtensionState::Initializing;
         }
 
         // Parse extension-specific settings
@@ -298,14 +301,14 @@ impl HyperMeshExtension for CatalogExtension {
                 // Update state to running
                 {
                     let mut state = self.state.write().await;
-                    *state = ExtState::Running;
+                    *state = ExtensionState::Running;
                 }
 
                 Ok(())
             }
             Err(e) => {
                 let mut state = self.state.write().await;
-                *state = ExtState::Error(format!("Initialization failed: {}", e));
+                *state = ExtensionState::Error(format!("Initialization failed: {}", e));
 
                 Err(ExtensionError::InitializationFailed {
                     reason: e.to_string()
@@ -680,7 +683,7 @@ impl HyperMeshExtension for CatalogExtension {
         // Update state
         {
             let mut state = self.state.write().await;
-            *state = ExtState::ShuttingDown;
+            *state = ExtensionState::ShuttingDown;
         }
 
         // Wait for active operations to complete
@@ -698,7 +701,7 @@ impl HyperMeshExtension for CatalogExtension {
         // Update final state
         {
             let mut state = self.state.write().await;
-            *state = ExtState::Stopped;
+            *state = ExtensionState::Stopped;
         }
 
         Ok(())

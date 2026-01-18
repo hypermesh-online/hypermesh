@@ -1,6 +1,6 @@
 //! Package Manager for P2P Distribution
 //!
-//! Handles package storage, chunking, and peer-to-peer transfers
+//! Migrated to use BlockMatrix retrieval and Asset Registry
 
 use anyhow::{Result, Context};
 use std::sync::Arc;
@@ -10,6 +10,9 @@ use std::path::{Path, PathBuf};
 use futures::stream::{self, StreamExt};
 
 use crate::assets::{AssetPackage, AssetPackageId};
+use blockmatrix::assets::AssetId;
+use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator};
+use crate::registry::CatalogRegistry;
 use super::{
     ContentStore, ContentAddress,
     content_addressing::{MerkleTree, ContentChunker, CompressionType, Chunk},
@@ -19,6 +22,8 @@ use super::{
 
 /// Package manager for handling package storage and transfers
 pub struct PackageManager {
+    /// Catalog registry for asset discovery
+    registry: Arc<CatalogRegistry>,
     /// Content store for chunks
     content_store: Arc<ContentStore>,
     /// Storage directory
@@ -33,6 +38,8 @@ pub struct PackageManager {
     upload_semaphore: Arc<Semaphore>,
     /// Content chunker
     chunker: ContentChunker,
+    /// Instruction generator for IBR
+    instruction_generator: Arc<InstructionGenerator>,
 }
 
 /// Chunk cache for efficient retrieval
@@ -50,6 +57,7 @@ struct ChunkCache {
 impl PackageManager {
     /// Create a new package manager
     pub async fn new(
+        registry: Arc<CatalogRegistry>,
         content_store: Arc<ContentStore>,
         storage_dir: PathBuf,
     ) -> Result<Self> {
@@ -57,7 +65,12 @@ impl PackageManager {
         tokio::fs::create_dir_all(&storage_dir).await
             .context("Failed to create storage directory")?;
 
+        // Create instruction generator for IBR
+        let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
+        let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
+
         Ok(Self {
+            registry,
             content_store,
             storage_dir,
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
@@ -65,6 +78,7 @@ impl PackageManager {
             download_semaphore: Arc::new(Semaphore::new(10)), // Max 10 concurrent downloads
             upload_semaphore: Arc::new(Semaphore::new(10)),   // Max 10 concurrent uploads
             chunker: ContentChunker::new(1024 * 1024, CompressionType::Zstd), // 1MB chunks with Zstd
+            instruction_generator,
         })
     }
 
@@ -114,8 +128,8 @@ impl PackageManager {
 
         // Store metadata
         let metadata = PackageMetadata {
-            name: package.spec.metadata.name.clone(),
-            version: package.spec.metadata.version.clone(),
+            name: package.metadata().name.clone(),
+            version: package.metadata().version.clone(),
             size: package_data.len() as u64,
             chunk_count: chunks.len(),
             chunk_size: 1024 * 1024,
@@ -139,7 +153,7 @@ impl PackageManager {
         Ok(content_addresses)
     }
 
-    /// Download a package from peers
+    /// Download a package from peers using instruction-based retrieval
     pub async fn download_from_peers(
         &self,
         package_id: &AssetPackageId,
@@ -271,12 +285,13 @@ impl PackageManager {
             let chunk_data = chunk_map.remove(&i)
                 .ok_or_else(|| anyhow::anyhow!("Missing chunk {}", i))?;
 
+            let data_len = chunk_data.data.len();
             chunks.push(Chunk {
                 index: chunk_data.index,
                 data: chunk_data.data,
                 hash: ContentAddress::from_hex(&chunk_data.hash)?,
-                size: chunk_data.data.len(),
-                compressed_size: chunk_data.data.len(),
+                size: data_len,
+                compressed_size: data_len,
                 compression: CompressionType::Zstd,
             });
         }

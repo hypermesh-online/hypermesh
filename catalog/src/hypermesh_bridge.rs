@@ -310,9 +310,9 @@ impl HyperMeshAssetRegistry {
     /// Install an asset package from HyperMesh
     pub async fn install(&self, id: &AssetPackageId) -> Result<AssetPackage> {
         // First check if package exists in library
-        if let Some(package) = self.asset_library.get_package(&id.to_string()).await? {
+        if let Some(package) = self.asset_library.get_package(&id.to_string()).await {
             // Convert from library package format
-            return self.library_package_to_asset_package(package);
+            return self.library_package_to_asset_package((*package).clone());
         }
 
         // If not found locally, this would normally query other HyperMesh nodes
@@ -330,8 +330,8 @@ impl HyperMeshAssetRegistry {
             name: lib_package.name.clone(),
             version: Version::parse(&lib_package.version.to_string()).unwrap_or(Version::new(1, 0, 0)),
             description: lib_package.description.clone().unwrap_or_default(),
-            author: lib_package.author.clone().unwrap_or_default(),
-            license: lib_package.license.clone().unwrap_or_default(),
+            author: lib_package.author().map(|s| s.to_string()).unwrap_or_default(),
+            license: lib_package.license().map(|s| s.to_string()).unwrap_or_default(),
             asset_types: vec![],  // Extract from metadata if available
             size_bytes: lib_package.content.len() as u64,
             install_count: 0,
@@ -619,7 +619,7 @@ impl HyperMeshAssetRegistry {
         let stats = self.get_package_stats(&package_id).await?;
 
         // Fetch package info from library for complete data
-        let package_info = self.asset_library.get_package(&package_id.to_string()).await?
+        let package_info = self.asset_library.get_package(&package_id.to_string()).await
             .ok_or_else(|| anyhow::anyhow!("Package not found in library"))?;
 
         Ok(AssetIndexEntry {

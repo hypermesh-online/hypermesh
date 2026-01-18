@@ -202,7 +202,8 @@ impl TrustChainIntegration {
             not_after: chrono::Utc::now() + chrono::Duration::days(365),
             san_entries: vec![],
             chain: vec![],
-            certificate_bytes: vec![],
+            raw_bytes: vec![],
+            pqc_signature: None,
         };
 
         let mut ca_root = self.ca_root_cert.write().await;
@@ -259,9 +260,11 @@ impl TrustChainIntegration {
             valid: true,
             validation: CertificateValidation {
                 valid: true,
-                reason: None,
-                timestamp: chrono::Utc::now(),
-                validated_by: "local".to_string(),
+                validated_at: chrono::Utc::now(),
+                chain_valid: true,
+                revoked: false,
+                errors: vec![],
+                warnings: vec![],
             },
             certificate_info: None,
         };
@@ -318,7 +321,8 @@ impl TrustChainIntegration {
                 not_after: chrono::Utc::now() + chrono::Duration::days(365),
                 san_entries: vec![],
                 chain: vec![],
-                certificate_bytes: vec![],
+                raw_bytes: vec![],
+                pqc_signature: None,
             },
             private_key: "placeholder-private-key".to_string(),
             chain: vec![],

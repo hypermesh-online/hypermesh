@@ -31,6 +31,15 @@ pub struct AssetPackage {
     pub updated_at: DateTime<Utc>,
 }
 
+impl AssetPackage {
+    /// Get package size in bytes (estimated)
+    pub fn size(&self) -> u64 {
+        self.content.main_content.len() as u64
+            + self.content.file_contents.values().map(|c| c.len()).sum::<usize>() as u64
+            + self.content.binary_contents.values().map(|c| c.len()).sum::<usize>() as u64
+    }
+}
+
 /// Asset specification following YAML schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetSpec {
@@ -72,6 +81,9 @@ pub struct AssetMetadata {
     pub updated: Option<DateTime<Utc>>,
 }
 
+// AssetMetadata helper methods removed to avoid field/method conflicts
+// Access fields directly: metadata.updated, metadata.created, etc.
+
 /// Asset specification details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetSpecification {
@@ -92,6 +104,27 @@ pub struct AssetSpecification {
     pub environment: HashMap<String, String>,
     /// Configuration schema for runtime parameters
     pub config_schema: Option<serde_json::Value>,
+}
+
+impl AssetSpecification {
+    /// Get resource requirements (compatibility method for BlockMatrix integration)
+    pub fn requirements(&self) -> ResourceRequirements {
+        ResourceRequirements {
+            cpu_limit: self.resources.cpu_limit.clone(),
+            memory_limit: self.resources.memory_limit.clone(),
+            storage: self.resources.storage_required.clone(),
+            gpu_required: self.resources.gpu_required,
+        }
+    }
+}
+
+/// Resource requirements (compatibility struct for BlockMatrix)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceRequirements {
+    pub cpu_limit: String,
+    pub memory_limit: String,
+    pub storage: Option<String>,
+    pub gpu_required: bool,
 }
 
 /// Asset content definition
@@ -499,7 +532,21 @@ pub struct DependencyValidationResults {
     /// Dependency conflicts
     pub conflicts: Vec<DependencyConflict>,
     /// Validation timestamp
+    #[serde(default)]
     pub validated_at: DateTime<Utc>,
+}
+
+impl Default for DependencyValidationResults {
+    fn default() -> Self {
+        Self {
+            dependencies_valid: false,
+            total_dependencies: 0,
+            valid_dependencies: 0,
+            invalid_dependencies: Vec::new(),
+            conflicts: Vec::new(),
+            validated_at: Utc::now(),
+        }
+    }
 }
 
 /// Invalid dependency information
