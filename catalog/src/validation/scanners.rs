@@ -7,8 +7,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-// Use BlockMatrix Assets directly from extensions
-use blockmatrix::extensions::AssetPackage;
+// Use local Catalog AssetPackage
+use crate::assets::AssetPackage;
 use super::traits::SecurityScanner;
 use super::results::{
     SecurityValidationResult, Vulnerability, MalwareDetection,
@@ -232,7 +232,7 @@ impl SecurityScanner for StaticSecurityScanner {
                     malware.push(MalwareDetection {
                         malware_type: "Ransomware".to_string(),
                         confidence: 90,
-                        affected_files: vec![asset.id.clone()],
+                        affected_files: vec![asset.package_hash.clone()],
                         signature: "RANSOMWARE_PATTERN_001".to_string(),
                         risk_level: RiskLevel::Critical,
                     });
@@ -244,7 +244,7 @@ impl SecurityScanner for StaticSecurityScanner {
                         rule_id: "no-hardcoded-credentials".to_string(),
                         description: "Hardcoded credentials detected".to_string(),
                         location: CodeLocation {
-                            file: asset.id.clone(),
+                            file: asset.package_hash.clone(),
                             line: None,
                             column: None,
                             snippet: None,

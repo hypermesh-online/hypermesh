@@ -171,8 +171,9 @@ impl LibraryIndex {
         // Index by type
         {
             let mut type_index = self.type_index.write().await;
+            // Use the string asset_type directly from the package
             type_index
-                .entry(package.spec.asset_type)
+                .entry(package.asset_type.clone())
                 .or_insert_with(HashSet::new)
                 .insert(Arc::clone(&package_id));
         }
@@ -359,7 +360,7 @@ impl LibraryIndex {
         }
 
         // Combine results (intersection if multiple filters)
-        let final_results = if result_sets.is_empty() {
+        let final_results: HashSet<Arc<str>> = if result_sets.is_empty() {
             // No filters, return all packages
             let all = self.all_packages.read().await;
             all.iter().cloned().collect()

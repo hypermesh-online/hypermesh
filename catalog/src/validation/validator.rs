@@ -8,8 +8,8 @@ use chrono::Utc;
 use std::collections::HashMap;
 use std::time::Instant;
 
-// Use BlockMatrix Assets directly from extensions
-use blockmatrix::extensions::AssetPackage;
+// Use local Catalog AssetPackage
+use crate::assets::AssetPackage;
 use super::config::{ValidationConfig, SecuritySeverity};
 use super::dependency::{DependencyResolver, VersionConflict};
 use super::results::{
@@ -140,10 +140,10 @@ impl AssetValidator {
         Ok(ValidationResult {
             passed,
             timestamp: Utc::now(),
-            // BlockMatrix AssetPackage has .id field directly
-            asset_id: asset.id.clone(),
-            // BlockMatrix AssetPackage has .version field (semver::Version)
-            version: asset.version.to_string(),
+            // Generate ID from package hash
+            asset_id: asset.package_hash.clone(),
+            // Extract version from metadata
+            version: asset.spec.metadata.version.clone(),
             security: security_result,
             syntax: syntax_result,
             performance: performance_result,
@@ -154,10 +154,8 @@ impl AssetValidator {
 
     /// Validate asset syntax from BlockMatrix Asset
     async fn validate_syntax(&self, asset: &AssetPackage) -> Result<SyntaxValidationResult> {
-        // Extract asset type from metadata or asset_types field
-        let asset_type = asset.asset_types.first()
-            .map(|t| format!("{:?}", t).to_lowercase())
-            .unwrap_or_default();
+        // Extract asset type from kind field
+        let asset_type = asset.spec.kind.to_lowercase();
 
         if let Some(validator) = self.type_validators.get(&asset_type) {
             validator.validate_syntax(asset).await

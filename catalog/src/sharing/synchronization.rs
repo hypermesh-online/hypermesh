@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
 use sha2::{Sha256, Digest};
+use chrono::{DateTime, Utc};
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
 use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator, ClientAssembler};
@@ -123,7 +124,7 @@ pub struct SyncManager {
     merkle_tree: Arc<RwLock<HashMap<String, MerkleNode>>>,
     package_index: Arc<RwLock<HashMap<AssetId, AssetPackage>>>,
     sync_history: Arc<RwLock<Vec<SyncEvent>>>,
-    instruction_generator: Arc<InstructionGenerator>,
+    // instruction_generator: Arc<InstructionGenerator>,  // Commented until BlockMatrix integration
 }
 
 /// Synchronization event for history tracking
@@ -156,8 +157,9 @@ impl SyncManager {
         sync_interval: Duration,
         registry: Arc<CatalogRegistry>,
     ) -> Result<Self> {
-        let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
-        let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
+        // STUB: InstructionGenerator requires BlockMatrix components not available in Catalog
+        // let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
+        // let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
 
         Ok(Self {
             node_id,
@@ -167,7 +169,7 @@ impl SyncManager {
             merkle_tree: Arc::new(RwLock::new(HashMap::new())),
             package_index: Arc::new(RwLock::new(HashMap::new())),
             sync_history: Arc::new(RwLock::new(Vec::new())),
-            instruction_generator,
+            // instruction_generator,  // Commented until BlockMatrix integration
         })
     }
 
@@ -401,7 +403,7 @@ impl SyncManager {
             match resolution {
                 ConflictResolution::NewestWins => {
                     // Compare timestamps using updated_at field
-                    if conflict.remote_metadata.updated_at > conflict.local_metadata.updated_at {
+                    if conflict.remote_metadata.updated > conflict.local_metadata.updated {
                         // Use remote version
                         if let Ok(package) = self.request_package(
                             &conflict.asset_id,
@@ -642,9 +644,11 @@ impl SyncManager {
 
     async fn get_packages_since(&self, since: SystemTime) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
-        // Filter by updated_at field from AssetMetadata
+        // Filter by updated field from AssetMetadata (if it exists)
+        // Convert SystemTime to DateTime<Utc> for comparison
+        let since_dt = DateTime::<Utc>::from(since);
         Ok(packages.values()
-            .filter(|p| p.metadata().updated_at > since)
+            .filter(|p| p.metadata().updated.map(|u| u > since_dt).unwrap_or(false))
             .cloned()
             .collect())
     }

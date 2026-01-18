@@ -73,7 +73,7 @@ impl AssetRegistry {
 #[async_trait::async_trait]
 pub trait AssetDiscovery {
     /// Search for assets by query
-    async fn search(&self, query: &SearchQuery) -> Result<SearchResults>;
+    async fn search(&self, query: &SearchQuery) -> Result<LegacySearchResults>;
 
     /// Get asset by ID
     async fn get_asset(&self, id: &AssetPackageId) -> Result<Option<crate::assets::AssetPackage>>;
@@ -135,6 +135,19 @@ pub struct AssetSearchResult {
     pub entry: AssetIndexEntry,
     pub score: f64,
     pub matched_fields: Vec<String>,
+}
+
+/// Legacy search results for AssetDiscovery trait (DEPRECATED)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacySearchResults {
+    /// Matching assets
+    pub assets: Vec<AssetSearchResult>,
+    /// Total matching assets (for pagination)
+    pub total_count: usize,
+    /// Search execution time in milliseconds
+    pub execution_time_ms: u64,
+    /// Search query that was executed
+    pub query: String,
 }
 
 // SortCriteria and DateRange now re-exported from catalog_registry above

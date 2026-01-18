@@ -12,27 +12,26 @@
 
 use crate::assets::*;
 use crate::library::{
-    AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface,
-    LibraryStats, PackageSummary, SearchQuery as LibrarySearchQuery,
-    DependencyResolution, ValidationResult
+    AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
 };
 use crate::registry::{
-    AssetDiscovery, SearchQuery, SearchResults, AssetFilters,
-    RecommendationContext, AssetIndexEntry, AssetSearchResult,
-    SortCriteria, DateRange
+    CatalogRegistry, SearchQuery, LegacySearchResults as SearchResults, SearchResult,
+    SortCriteria, TrustPolicy, RegistryConfig, DateRange,
+    AssetDiscovery, AssetFilters, AssetIndexEntry, AssetSearchResult,
+    RecommendationContext
 };
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use blockmatrix::assets::core::{
-    AssetManager, AssetId, AssetType, AssetStatus, AssetState,
-    AssetAllocationRequest, AssetAllocation, PrivacyLevel,
-    ConsensusProof, ResourceRequirements,
+    AssetManager, AssetType, PrivacyLevel,
+    AssetAllocationRequest, ConsensusProof, ResourceRequirements,
+    CpuRequirements, MemoryRequirements, StorageRequirements, GpuRequirements,
+    StorageType,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 /// HyperMesh-integrated asset registry that replaces the standalone HTTP registry
 pub struct HyperMeshAssetRegistry {
@@ -224,33 +223,55 @@ impl HyperMeshAssetRegistry {
     ) -> Result<ResourceRequirements> {
         let mut requirements = ResourceRequirements::default();
 
-        // Parse requirements from spec
-        if let Some(req_value) = spec.requirements.get("cpu") {
-            if let Some(cpu_str) = req_value.as_str() {
-                requirements.cpu = Some(blockmatrix::assets::core::CpuRequirements {
-                    cores: cpu_str.parse().unwrap_or(1.0),
-                    architecture: None,
-                    features: vec![],
+        // Parse CPU requirements from spec.resources
+        let cpu_str = &spec.resources.cpu_limit;
+        if !cpu_str.is_empty() {
+            // Parse millicores or cores (e.g., "1000m" = 1 core, "2" = 2 cores)
+            let cores = if cpu_str.ends_with('m') {
+                (cpu_str.trim_end_matches('m').parse::<f64>()? / 1000.0) as u32
+            } else {
+                cpu_str.parse::<u32>()?
+            };
+            requirements.cpu = Some(blockmatrix::assets::core::CpuRequirements {
+                cores,
+                min_frequency_mhz: None,
+                architecture: None,
+                required_features: vec![],
+            });
+        }
+
+        // Parse memory requirements from spec.resources
+        let mem_str = &spec.resources.memory_limit;
+        if !mem_str.is_empty() {
+            requirements.memory_usage = Some(blockmatrix::assets::core::MemoryRequirements {
+                size_bytes: self.parse_memory_string(mem_str)?,
+                memory_type: None,
+                ecc_required: false,
+                numa_node: None,
+            });
+        }
+
+        // Parse storage requirements from spec.resources
+        if let Some(storage_str) = &spec.resources.storage_required {
+            if !storage_str.is_empty() {
+                requirements.storage_usage = Some(blockmatrix::assets::core::StorageRequirements {
+                    size_bytes: self.parse_memory_string(storage_str)?,
+                    storage_type: blockmatrix::assets::core::StorageType::Ssd,
+                    min_iops: None,
+                    min_bandwidth_mbps: None,
+                    durability_replicas: 1,
                 });
             }
         }
 
-        if let Some(req_value) = spec.requirements.get("memory") {
-            if let Some(mem_str) = req_value.as_str() {
-                requirements.memory = Some(blockmatrix::extensions::MemoryRequirement {
-                    min_bytes: self.parse_memory_string(mem_str)?,
-                    max_bytes: None,
-                });
-            }
-        }
-
-        if let Some(req_value) = spec.requirements.get("storage") {
-            if let Some(storage_str) = req_value.as_str() {
-                requirements.storage = Some(blockmatrix::extensions::StorageRequirement {
-                    min_bytes: self.parse_memory_string(storage_str)?,
-                    storage_type: Some("ssd".to_string()),
-                });
-            }
+        // GPU requirements if needed
+        if spec.resources.gpu_required {
+            requirements.gpu_usage = Some(blockmatrix::assets::core::GpuRequirements {
+                units: 1,
+                min_memory_mb: Some(4096), // 4GB in MB
+                compute_capability: None,
+                required_features: vec![],
+            });
         }
 
         Ok(requirements)
@@ -320,26 +341,90 @@ impl HyperMeshAssetRegistry {
         Err(anyhow::anyhow!("Asset package {} not found in HyperMesh", id))
     }
 
-    /// Convert library package to asset package format
+    /// Convert library package to catalog asset package format
     fn library_package_to_asset_package(&self, lib_package: LibraryAssetPackage) -> Result<AssetPackage> {
-        use blockmatrix::extensions::AssetPackage;
-        use semver::Version;
+        use chrono::Utc;
+
+        // Create AssetSpec from library package
+        let spec = AssetSpec {
+            api_version: "v1".to_string(),
+            kind: lib_package.asset_type.clone(),
+            metadata: AssetMetadata {
+                name: lib_package.name.clone(),
+                version: lib_package.version.clone(),
+                tags: lib_package.tags().to_vec(),
+                description: lib_package.description.clone(),
+                author: lib_package.author().map(|s| s.to_string()),
+                license: lib_package.license().map(|s| s.to_string()),
+                homepage: None,
+                repository: None,
+                keywords: vec![],
+                created: Some(Utc::now()),
+                updated: Some(Utc::now()),
+            },
+            spec: AssetSpecification {
+                asset_type: lib_package.asset_type.clone(),
+                content: AssetContent {
+                    main: lib_package.content.clone(),
+                    files: vec![],
+                    inline: None,
+                    binary: vec![],
+                    templates: vec![],
+                },
+                security: AssetSecurity {
+                    sandboxed: true,
+                    capabilities_required: vec![],
+                    network_access: false,
+                    file_system_access: vec![],
+                    environment_variables: vec![],
+                    signing_required: false,
+                    encryption: None,
+                },
+                resources: AssetResources {
+                    cpu_limit: "1000m".to_string(),
+                    memory_limit: "512Mi".to_string(),
+                    execution_timeout: "30s".to_string(),
+                    storage_required: None,
+                    network_bandwidth: None,
+                    gpu_required: false,
+                    hardware_requirements: vec![],
+                },
+                execution: AssetExecution {
+                    runtime: "wasm".to_string(),
+                    entry_point: None,
+                    arguments: vec![],
+                    output_format: None,
+                    error_handling: None,
+                },
+                dependencies: vec![],
+                environment: HashMap::new(),
+            },
+        };
+
+        // Create resolved content
+        let content = AssetContentResolved {
+            main_content: lib_package.content.clone(),
+            file_contents: HashMap::new(),
+            binary_contents: HashMap::new(),
+            template_content: HashMap::new(),
+            resolved_dependencies: vec![],
+        };
+
+        // Create validation status
+        let validation = AssetValidationStatus {
+            validated: true,
+            errors: vec![],
+            warnings: vec![],
+            security_checks: HashMap::new(),
+        };
 
         Ok(AssetPackage {
-            id: lib_package.id.clone(),
-            name: lib_package.name.clone(),
-            version: Version::parse(&lib_package.version.to_string()).unwrap_or(Version::new(1, 0, 0)),
-            description: lib_package.description.clone().unwrap_or_default(),
-            author: lib_package.author().map(|s| s.to_string()).unwrap_or_default(),
-            license: lib_package.license().map(|s| s.to_string()).unwrap_or_default(),
-            asset_types: vec![],  // Extract from metadata if available
-            size_bytes: lib_package.content.len() as u64,
-            install_count: 0,
-            rating: 0.0,
-            dependencies: vec![],  // Convert from lib_package.dependencies if available
-            signature: None,
-            distribution_hash: lib_package.hash.clone(),
-            metadata: HashMap::new(),
+            spec,
+            content,
+            validation,
+            package_hash: lib_package.hash.clone(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         })
     }
 
@@ -438,9 +523,9 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
             for (package_id, metadata) in &cache.package_metadata {
                 if self.matches_filters(metadata, query).await {
                     results.push(AssetSearchResult {
-                        asset: self.metadata_to_index_entry(*package_id, metadata).await?,
+                        entry: self.metadata_to_index_entry(*package_id, metadata).await?,
                         score: 1.0,
-                        highlights: vec![],
+                        matched_fields: vec![],
                     });
                 }
             }
@@ -477,9 +562,9 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
             for (package_id, score) in scored_vec {
                 if let Some(metadata) = cache.package_metadata.get(&package_id) {
                     results.push(AssetSearchResult {
-                        asset: self.metadata_to_index_entry(package_id, metadata).await?,
+                        entry: self.metadata_to_index_entry(package_id, metadata).await?,
                         score: score / query_terms.len() as f64,
-                        highlights: self.generate_highlights(metadata, &query_terms),
+                        matched_fields: self.generate_highlights(metadata, &query_terms),
                     });
                 }
             }
@@ -624,15 +709,15 @@ impl HyperMeshAssetRegistry {
 
         Ok(AssetIndexEntry {
             id: package_id,
-            name: package_info.name,
-            version: package_info.version,
-            asset_type: package_info.asset_type,
+            name: package_info.name.clone(),
+            version: package_info.version.clone(),
+            asset_type: package_info.asset_type.clone(),
             description: metadata.description.clone(),
             tags: metadata.tags.clone(),
             keywords: metadata.keywords.clone(),
             location: format!("hypermesh://{}", package_id),
             size: package_info.size,
-            hash: package_info.hash,
+            hash: package_info.hash.clone(),
             published_at: metadata.updated_at,
             updated_at: metadata.updated_at,
             registry: "hypermesh".to_string(),

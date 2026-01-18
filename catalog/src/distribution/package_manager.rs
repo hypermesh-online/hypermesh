@@ -38,8 +38,8 @@ pub struct PackageManager {
     upload_semaphore: Arc<Semaphore>,
     /// Content chunker
     chunker: ContentChunker,
-    /// Instruction generator for IBR
-    instruction_generator: Arc<InstructionGenerator>,
+    // /// Instruction generator for IBR
+    // instruction_generator: Arc<InstructionGenerator>,  // Commented until BlockMatrix integration
 }
 
 /// Chunk cache for efficient retrieval
@@ -65,9 +65,10 @@ impl PackageManager {
         tokio::fs::create_dir_all(&storage_dir).await
             .context("Failed to create storage directory")?;
 
-        // Create instruction generator for IBR
-        let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
-        let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
+        // STUB: InstructionGenerator requires BlockMatrix components not available in Catalog
+        // For now, we'll handle instruction generation at a higher level
+        // let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
+        // let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
 
         Ok(Self {
             registry,
@@ -78,7 +79,7 @@ impl PackageManager {
             download_semaphore: Arc::new(Semaphore::new(10)), // Max 10 concurrent downloads
             upload_semaphore: Arc::new(Semaphore::new(10)),   // Max 10 concurrent uploads
             chunker: ContentChunker::new(1024 * 1024, CompressionType::Zstd), // 1MB chunks with Zstd
-            instruction_generator,
+            // instruction_generator,  // Commented until BlockMatrix integration
         })
     }
 

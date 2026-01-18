@@ -26,6 +26,8 @@ use peer_discovery::PeerDiscovery;
 
 /// P2P Distribution system for Catalog assets
 pub struct P2PDistribution {
+    /// Catalog registry for asset discovery
+    registry: Arc<crate::registry::CatalogRegistry>,
     /// STOQ transport layer for P2P communication
     transport: Arc<StoqTransportLayer>,
     /// DHT network for package discovery
@@ -249,7 +251,10 @@ pub struct DistributionMetrics {
 
 impl P2PDistribution {
     /// Create a new P2P distribution system
-    pub async fn new(config: DistributionConfig) -> Result<Self> {
+    pub async fn new(
+        registry: Arc<crate::registry::CatalogRegistry>,
+        config: DistributionConfig
+    ) -> Result<Self> {
         // Initialize security manager
         let security_manager = Arc::new(
             SecurityManager::new(config.security.clone())
@@ -285,6 +290,7 @@ impl P2PDistribution {
         // Initialize package manager
         let package_manager = Arc::new(
             PackageManager::new(
+                registry.clone(),
                 content_store.clone(),
                 config.storage_dir.clone(),
             )
@@ -301,6 +307,7 @@ impl P2PDistribution {
         );
 
         Ok(Self {
+            registry,
             transport,
             dht,
             content_store,

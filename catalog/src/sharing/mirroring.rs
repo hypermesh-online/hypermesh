@@ -170,7 +170,7 @@ pub struct MirrorManager {
     popularity_metrics: Arc<RwLock<HashMap<AssetId, PopularityMetrics>>>,
     mirror_queue: Arc<RwLock<BinaryHeap<MirrorCandidate>>>,
     replication_config: Arc<ReplicationConfig>,
-    instruction_generator: Arc<InstructionGenerator>,
+    // instruction_generator: Arc<InstructionGenerator>,  // Commented until BlockMatrix integration
 }
 
 impl MirrorManager {
@@ -180,8 +180,9 @@ impl MirrorManager {
         replication_factor: u32,
         registry: Arc<CatalogRegistry>,
     ) -> Result<Self> {
-        let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
-        let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
+        // STUB: InstructionGenerator requires BlockMatrix components not available in Catalog
+        // let generator_config = blockmatrix::retrieval::GeneratorConfig::default();
+        // let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
 
         Ok(Self {
             max_storage,
@@ -192,7 +193,7 @@ impl MirrorManager {
             popularity_metrics: Arc::new(RwLock::new(HashMap::new())),
             mirror_queue: Arc::new(RwLock::new(BinaryHeap::new())),
             replication_config: Arc::new(ReplicationConfig::default()),
-            instruction_generator,
+            // instruction_generator,  // Commented until BlockMatrix integration
         })
     }
 
@@ -541,8 +542,9 @@ impl MirrorManager {
         let mut nodes = self.mirror_nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
             node.mirrored_packages.insert(asset_id.clone());
-            // Use size_bytes field from AssetMetadata
-            node.storage_used += metadata.size_bytes;
+            // STUB: AssetMetadata doesn't have size, would need full package
+            // For now, use estimated size of 1MB per package
+            node.storage_used += 1024 * 1024;
             Ok(())
         } else {
             Err(anyhow::anyhow!("Node not found"))

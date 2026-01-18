@@ -7,8 +7,8 @@ use anyhow::{Result, Context};
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
-// Use BlockMatrix Assets directly from extensions
-use blockmatrix::extensions::AssetPackage;
+// Use local Catalog AssetPackage
+use crate::assets::AssetPackage;
 
 /// Dependency information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +52,7 @@ impl DependencyResolver {
         let mut graph = DependencyGraph::new();
         let mut visited = HashSet::new();
         // BlockMatrix AssetPackage has .id field directly
-        let mut stack = vec![asset.id.clone()];
+        let mut stack = vec![asset.package_hash.clone()];
 
         while let Some(current) = stack.pop() {
             if visited.contains(&current) {
@@ -67,7 +67,7 @@ impl DependencyResolver {
             graph.add_node(DependencyNode {
                 asset_id: current.clone(),
                 // BlockMatrix AssetPackage has .version field (semver::Version)
-                version: asset.version.to_string(),
+                version: asset.spec.metadata.version.clone(),
                 dependencies: deps.clone(),
                 resolved_version: None,
             });

@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use semver::Version;
-use anyhow::Result;
 
 use blockmatrix::extensions::{
     HyperMeshExtension, AssetLibraryExtension, ExtensionMetadata, ExtensionCategory,
@@ -21,18 +20,18 @@ use blockmatrix::extensions::{
     ResourceUsageReport,
 };
 
-use blockmatrix::assets::core::{AssetManager, AssetId, AssetType};
+use blockmatrix::assets::core::{AssetManager, AssetType};
 
 use crate::{
-    Catalog, CatalogConfig, CatalogBuilder,
+    Catalog, CatalogConfig,
     library::{AssetLibrary, LibraryConfig},
     hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig},
-    registry::{AssetRegistry, SearchQuery, SearchResults},
     validation::{AssetValidator, ValidationResult},
     template::{CatalogTemplateGenerator, TemplateContext, TemplateGenerationResult},
     documentation::{DocumentationGenerator, GeneratedDocumentation},
     versioning::{VersionManager, SemanticVersion},
     sharing::{SharingManager, SharingConfig, SharingStats, SharePermission},
+    registry::SearchQuery,
 };
 
 use super::asset_handlers::{
@@ -51,8 +50,8 @@ pub struct CatalogExtension {
     /// Library manager for asset packages
     library_manager: Arc<RwLock<AssetLibrary>>,
 
-    /// HyperMesh asset registry bridge
-    asset_registry: Arc<HyperMeshAssetRegistry>,
+    /// HyperMesh asset registry bridge (initialized in initialize())
+    asset_registry: Option<Arc<HyperMeshAssetRegistry>>,
 
     /// Decentralized sharing manager
     sharing_manager: Option<Arc<SharingManager>>,
@@ -134,21 +133,20 @@ impl CatalogExtension {
         let library_config = LibraryConfig {
             enable_cache: true,
             l1_cache_size: 100,
-            l2_cache_size: config.cache_size,
-            l3_cache_path: Some(config.library_path.clone()),
+            l2_cache_size: config.cache_size as usize,
+            l3_cache_path: Some(config.library_path.to_string_lossy().to_string()),
             enable_zero_copy: true,
             max_concurrent_ops: 100,
             enable_metrics: true,
         };
 
         let library_manager = Arc::new(RwLock::new(
-            AssetLibrary::new(library_config)
+            AssetLibrary::with_config(library_config)
         ));
 
-        let bridge_config = BridgeConfig::default();
-        let asset_registry = Arc::new(
-            HyperMeshAssetRegistry::new(bridge_config)
-        );
+        // Asset registry will be initialized in the initialize method
+        // when we have access to the async context
+        let asset_registry = None;
 
         // Create asset handlers
         let mut asset_handlers = HashMap::new();

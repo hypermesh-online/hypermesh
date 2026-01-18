@@ -287,7 +287,7 @@ impl TrustChainIntegration {
 
         let request = IssueCertificateRequest {
             common_name: common_name.clone(),
-            organization,
+            organization: organization.clone(),
             san_entries: vec![
                 format!("catalog.{}.hypermesh.online", common_name),
             ],

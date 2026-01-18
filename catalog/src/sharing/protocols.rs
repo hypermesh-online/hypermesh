@@ -312,7 +312,7 @@ impl SharingProtocol {
         let package = self.receive_package_with_limiting(peer_id, asset_id).await?;
 
         // Update stats
-        self.update_contribution_stats(peer_id, package.metadata().size as u64, false).await?;
+        self.update_contribution_stats(peer_id, package.size(), false).await?;
 
         // Clean up transfer
         transfers.remove(&transfer_id);
@@ -339,11 +339,11 @@ impl SharingProtocol {
         let transfer = ActiveTransfer {
             id: transfer_id.clone(),
             peer_id: peer_id.to_string(),
-            asset_id: package.metadata().id.clone(),
+            asset_id: package.package_hash.clone(),
             direction: TransferDirection::Upload,
             priority: TransferPriority::Normal,
             bytes_transferred: 0,
-            total_size: package.metadata().size as u64,
+            total_size: package.size(),
             started_at: SystemTime::now(),
             current_bandwidth: 0,
         };
@@ -356,7 +356,7 @@ impl SharingProtocol {
         self.send_package_with_limiting(package, peer_id).await?;
 
         // Update stats
-        self.update_contribution_stats(peer_id, package.metadata().size as u64, true).await?;
+        self.update_contribution_stats(peer_id, package.size(), true).await?;
 
         // Clean up transfer
         transfers.remove(&transfer_id);

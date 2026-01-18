@@ -337,11 +337,12 @@ impl DependencyResolver {
 
         let duration_us = start.elapsed().as_micros() as u64;
 
+        let success = context.conflicts.is_empty() && context.missing.is_empty();
         Ok(DependencyResolution {
             resolved,
             conflicts: context.conflicts,
             missing: context.missing,
-            success: context.conflicts.is_empty() && context.missing.is_empty(),
+            success,
             resolution_time_us: duration_us,
         })
     }

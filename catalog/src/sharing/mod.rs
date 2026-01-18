@@ -193,18 +193,23 @@ pub struct SharingManager {
 
 impl SharingManager {
     /// Create new sharing manager
-    pub async fn new(config: SharingConfig) -> Result<Self> {
+    pub async fn new(
+        config: SharingConfig,
+        registry: Arc<crate::registry::CatalogRegistry>,
+    ) -> Result<Self> {
         let config = Arc::new(config.clone());
 
         // Initialize components
         let sync_manager = Arc::new(SyncManager::new(
             config.node_id.clone(),
             config.sync_interval,
+            registry.clone(),
         ).await?);
 
         let mirror_manager = Arc::new(MirrorManager::new(
             config.max_mirror_storage,
             config.replication_factor,
+            registry.clone(),
         ).await?);
 
         let discovery_service = Arc::new(DiscoveryService::new(

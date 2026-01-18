@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use blockmatrix::extensions::AssetPackage;
+use crate::assets::AssetPackage;
 use super::results::{SecurityValidationResult, SyntaxValidationResult};
 
 /// Type-specific validator trait

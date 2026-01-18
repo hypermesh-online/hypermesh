@@ -215,8 +215,10 @@ impl DiscoveryService {
             permissions,
             indexed_at: SystemTime::now(),
             keywords: self.extract_keywords(metadata),
-            categories: vec![metadata.category.clone()],
-            dependencies: metadata.dependencies.clone(),
+            // STUB: AssetMetadata doesn't have category field, use tags as categories
+            categories: metadata.tags.clone(),
+            // STUB: AssetMetadata doesn't have dependencies field
+            dependencies: vec![],
             usage_stats: UsageStats::default(),
         };
 
