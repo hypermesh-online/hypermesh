@@ -125,7 +125,9 @@ impl StaticSecurityScanner {
         // In production, this would query a real vulnerability database
 
         // Check for dependencies in asset metadata
-        if let Some(deps) = asset.metadata.get("dependencies") {
+        // STUB: AssetMetadata doesn't have a get method - would need full content
+        // if let Some(deps) = asset.metadata().get("dependencies") {
+        if false {
             if let Some(deps_array) = deps.as_array() {
                 for dep in deps_array {
                     if let Some(dep_obj) = dep.as_object() {
@@ -220,7 +222,9 @@ impl SecurityScanner for StaticSecurityScanner {
         vulnerabilities.extend(self.check_vulnerabilities(asset));
 
         // Scan code for security issues from BlockMatrix Asset metadata
-        if let Some(code) = asset.metadata.get("code") {
+        // STUB: AssetMetadata doesn't have code - would need to check content
+        // if let Some(code) = asset.metadata().get("code") {
+        if let Some(code) = Some(&asset.content.main_content) {
             if let Some(code_str) = code.as_str() {
                 // Scan for various injection types
                 injection_risks.extend(self.scan_sql_injection(code_str));

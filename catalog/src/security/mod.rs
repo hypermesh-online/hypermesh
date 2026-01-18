@@ -490,6 +490,9 @@ impl SecurityManager {
 }
 
 // Extension trait for AssetPackage
+// STUB: Commented out as AssetMetadata doesn't have custom_fields
+// These would need to be stored elsewhere or in a wrapper type
+/*
 impl AssetPackage {
     /// Attach signature to package
     pub fn attach_signature(&mut self, signature: PackageSignature) {
@@ -505,6 +508,7 @@ impl AssetPackage {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {

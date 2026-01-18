@@ -58,14 +58,15 @@ impl AssetValidator {
 
     /// Register default type validators
     fn register_default_validators(&mut self) {
-        let julia = Box::new(JuliaValidator::new());
+        // Create a new instance for each type
+        let julia = JuliaValidator::new();
         for type_name in julia.supported_types() {
-            self.type_validators.insert(type_name, julia.clone());
+            self.type_validators.insert(type_name, Box::new(JuliaValidator::new()));
         }
 
-        let lua = Box::new(LuaValidator::new());
+        let lua = LuaValidator::new();
         for type_name in lua.supported_types() {
-            self.type_validators.insert(type_name, lua.clone());
+            self.type_validators.insert(type_name, Box::new(LuaValidator::new()));
         }
     }
 

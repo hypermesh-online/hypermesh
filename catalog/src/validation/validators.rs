@@ -47,7 +47,8 @@ impl TypeValidator for JuliaValidator {
         let mut linting_issues = Vec::new();
 
         // Check for Julia syntax errors from BlockMatrix Asset metadata
-        if let Some(code) = asset.metadata.get("code") {
+        // Use content from AssetPackage
+        if let Some(code) = Some(&asset.content.main_content) {
             let code_str = code.as_str().unwrap_or("");
 
             // Check for balanced parentheses
@@ -197,7 +198,8 @@ impl TypeValidator for LuaValidator {
         let mut linting_issues = Vec::new();
 
         // Check for Lua syntax errors from BlockMatrix Asset metadata
-        if let Some(code) = asset.metadata.get("code") {
+        // Use content from AssetPackage
+        if let Some(code) = Some(&asset.content.main_content) {
             let code_str = code.as_str().unwrap_or("");
 
             // Check for balanced do-end blocks

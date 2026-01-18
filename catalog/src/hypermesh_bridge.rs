@@ -10,7 +10,7 @@
 //! - 100x performance improvement through native integration
 //! - Full compatibility with existing Catalog functionality
 
-use crate::assets::*;
+use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig};
 use crate::library::{
     AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
 };
@@ -372,13 +372,21 @@ impl HyperMeshAssetRegistry {
                     templates: vec![],
                 },
                 security: AssetSecurity {
-                    sandboxed: true,
-                    capabilities_required: vec![],
-                    network_access: false,
-                    file_system_access: vec![],
-                    environment_variables: vec![],
-                    signing_required: false,
-                    encryption: None,
+                    consensus_required: false,
+                    certificate_pinning: false,
+                    hash_validation: "sha256".to_string(),
+                    sandbox_level: "strict".to_string(),
+                    allowed_syscalls: vec![],
+                    network_access: NetworkAccess {
+                        enabled: false,
+                        allowed_domains: vec![],
+                        allowed_ports: vec![],
+                    },
+                    file_access: FileAccess {
+                        level: "none".to_string(),
+                        allowed_paths: vec![],
+                    },
+                    permissions: vec![],
                 },
                 resources: AssetResources {
                     cpu_limit: "1000m".to_string(),
@@ -390,11 +398,18 @@ impl HyperMeshAssetRegistry {
                     hardware_requirements: vec![],
                 },
                 execution: AssetExecution {
-                    runtime: "wasm".to_string(),
-                    entry_point: None,
-                    arguments: vec![],
-                    output_format: None,
-                    error_handling: None,
+                    delegation_strategy: "round_robin".to_string(),
+                    minimum_consensus: 1,
+                    retry_policy: "exponential_backoff".to_string(),
+                    max_concurrent: Some(10),
+                    priority: "normal".to_string(),
+                    timeout_config: TimeoutConfig {
+                        execution: "30s".to_string(),
+                        network: "10s".to_string(),
+                        io: "5s".to_string(),
+                        compilation: None,
+                    },
+                    scheduling: None,
                 },
                 dependencies: vec![],
                 environment: HashMap::new(),
@@ -771,20 +786,20 @@ impl HyperMeshAssetRegistry {
             SortCriteria::Relevance => {
                 results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
             }
-            SortCriteria::DateCreated => {
-                results.sort_by(|a, b| b.asset.published_at.cmp(&a.asset.published_at));
+            SortCriteria::Published => {
+                results.sort_by(|a, b| b.entry.published_at.cmp(&a.entry.published_at));
             }
-            SortCriteria::DateUpdated => {
-                results.sort_by(|a, b| b.asset.updated_at.cmp(&a.asset.updated_at));
+            SortCriteria::Updated => {
+                results.sort_by(|a, b| b.entry.updated_at.cmp(&a.entry.updated_at));
             }
-            SortCriteria::Popularity => {
-                results.sort_by(|a, b| b.asset.download_count.cmp(&a.asset.download_count));
+            SortCriteria::Downloads => {
+                results.sort_by(|a, b| b.entry.download_count.cmp(&a.entry.download_count));
             }
             SortCriteria::Rating => {
-                results.sort_by(|a, b| b.asset.rating.partial_cmp(&a.asset.rating).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| b.entry.rating.partial_cmp(&a.entry.rating).unwrap_or(std::cmp::Ordering::Equal));
             }
             SortCriteria::Name => {
-                results.sort_by(|a, b| a.asset.name.cmp(&b.asset.name));
+                results.sort_by(|a, b| a.entry.name.cmp(&b.entry.name));
             }
         }
     }
