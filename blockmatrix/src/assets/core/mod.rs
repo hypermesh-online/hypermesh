@@ -24,7 +24,13 @@ pub mod privacy;
 pub mod proxy;
 
 // Re-exports
-pub use asset_id::{AssetId, AssetType};
+pub use asset_id::{
+    AssetId, AssetType, AssetIdError, SecurityError,
+    NetworkScope, RegistryId, FederationId, NodeId,
+    AssetCategory, BaseSystemType, ApplicationDomain,
+    ProofScope, ProofRequirements, ScopeBinding,
+    AssetData,
+};
 pub use adapter::{
     AssetAdapter, AssetAllocationRequest, ResourceRequirements, ResourceLimits, ResourceUsage,
     CpuRequirements, CpuUsage, CpuLimit,
@@ -225,24 +231,46 @@ impl AssetManager {
     
     /// Deallocate an asset
     pub async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
-        // Get adapter for asset type
+        // Get adapter for asset type (check both new and legacy fields)
+        let asset_type = if let Some(ref at) = asset_id.asset_type {
+            at.clone()
+        } else {
+            // Derive from category if legacy field not present
+            match &asset_id.category {
+                AssetCategory::BaseSystem(sys) => match sys {
+                    BaseSystemType::Cpu => AssetType::Cpu,
+                    BaseSystemType::Gpu => AssetType::Gpu,
+                    BaseSystemType::Memory => AssetType::Memory,
+                    BaseSystemType::Storage => AssetType::Storage,
+                    BaseSystemType::Network => AssetType::Network,
+                    BaseSystemType::Container => AssetType::Container,
+                    BaseSystemType::Economic => AssetType::Economic,
+                },
+                AssetCategory::Application(_) => {
+                    return Err(AssetError::AdapterError {
+                        message: "Cannot determine asset type for application asset".to_string()
+                    });
+                }
+            }
+        };
+
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No adapter found for asset type: {:?}", asset_id.asset_type)
+                message: format!("No adapter found for asset type: {:?}", asset_type)
             })?;
-        
+
         // Delegate to adapter
         adapter.deallocate_asset(asset_id).await?;
-        
+
         // Remove from registry
         let mut assets = self.assets.write().await;
         assets.remove(asset_id);
-        
+
         tracing::info!("Deallocated asset: {}", asset_id);
         Ok(())
     }
-    
+
     /// Get current status of an asset
     pub async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
         // First check local registry
@@ -252,48 +280,63 @@ impl AssetManager {
                 return Ok(status.clone());
             }
         }
-        
+
         // If not in registry, query adapter
-        let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let asset_type = asset_id.asset_type.as_ref()
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
+
+        let adapters = self.adapters.read().await;
+        let adapter = adapters.get(asset_type)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string()
+            })?;
+
         adapter.get_asset_status(asset_id).await
     }
-    
+
     /// Configure privacy level for an asset
     pub async fn configure_privacy(
         &self,
         asset_id: &AssetId,
         privacy_level: PrivacyLevel,
     ) -> AssetResult<()> {
-        let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let asset_type = asset_id.asset_type.as_ref()
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
+
+        let adapters = self.adapters.read().await;
+        let adapter = adapters.get(asset_type)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string()
+            })?;
+
         adapter.configure_privacy_level(asset_id, privacy_level).await
     }
-    
+
     /// Assign proxy address for remote access
     pub async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
-        let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let asset_type = asset_id.asset_type.as_ref()
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
+
+        let adapters = self.adapters.read().await;
+        let adapter = adapters.get(asset_type)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string()
+            })?;
+
         let proxy_address = adapter.assign_proxy_address(asset_id).await?;
-        
+
         // Register with proxy resolver
         self.proxy_resolver.register_mapping(proxy_address.clone(), asset_id.clone()).await;
-        
+
         Ok(proxy_address)
     }
-    
+
     /// Resolve proxy address to asset ID
     pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
         self.proxy_resolver.resolve(proxy_addr).await
@@ -301,42 +344,52 @@ impl AssetManager {
                 address: proxy_addr.clone()
             })
     }
-    
+
     /// List all assets of a specific type
     pub async fn list_assets_by_type(&self, asset_type: AssetType) -> AssetResult<Vec<AssetStatus>> {
         let assets = self.assets.read().await;
         let filtered_assets: Vec<AssetStatus> = assets
             .iter()
-            .filter(|(id, _)| id.asset_type == asset_type)
+            .filter(|(id, _)| id.asset_type.as_ref() == Some(&asset_type))
             .map(|(_, status)| status.clone())
             .collect();
-        
+
         Ok(filtered_assets)
     }
-    
+
     /// Get resource usage for an asset
     pub async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
-        let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let asset_type = asset_id.asset_type.as_ref()
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
+
+        let adapters = self.adapters.read().await;
+        let adapter = adapters.get(asset_type)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string()
+            })?;
+
         adapter.get_resource_usage(asset_id).await
     }
-    
+
     /// Set resource limits for an asset
     pub async fn set_resource_limits(
         &self,
         asset_id: &AssetId,
         limits: ResourceLimits,
     ) -> AssetResult<()> {
-        let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_id.asset_type)
+        let asset_type = asset_id.asset_type.as_ref()
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
-        
+
+        let adapters = self.adapters.read().await;
+        let adapter = adapters.get(asset_type)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string()
+            })?;
+
         adapter.set_resource_limits(asset_id, limits).await
     }
     
@@ -396,21 +449,40 @@ impl AssetManager {
     pub async fn get_asset_statistics(&self) -> AssetStatistics {
         let assets = self.assets.read().await;
         let mut stats = AssetStatistics::default();
-        
+
         for (asset_id, status) in assets.iter() {
-            match asset_id.asset_type {
-                AssetType::Cpu => stats.cpu_assets += 1,
-                AssetType::Gpu => stats.gpu_assets += 1,
-                AssetType::Memory => stats.memory_assets += 1,
-                AssetType::Storage => stats.storage_assets += 1,
-                AssetType::Network => stats.network_assets += 1,
-                AssetType::Container => stats.container_assets += 1,
-                AssetType::Economic => stats.economic_assets += 1,
-                // STUB: Phase 4b - VM and Library assets not yet tracked in statistics
-                AssetType::VirtualMachine => {},
-                AssetType::Library => {},
+            // Check legacy asset_type field first, then category
+            if let Some(asset_type) = &asset_id.asset_type {
+                match asset_type {
+                    AssetType::Cpu => stats.cpu_assets += 1,
+                    AssetType::Gpu => stats.gpu_assets += 1,
+                    AssetType::Memory => stats.memory_assets += 1,
+                    AssetType::Storage => stats.storage_assets += 1,
+                    AssetType::Network => stats.network_assets += 1,
+                    AssetType::Container => stats.container_assets += 1,
+                    AssetType::Economic => stats.economic_assets += 1,
+                    // STUB: Phase 4b - VM and Library assets not yet tracked in statistics
+                    AssetType::VirtualMachine => {},
+                    AssetType::Library => {},
+                }
+            } else {
+                // Use category if legacy field not present
+                match &asset_id.category {
+                    AssetCategory::BaseSystem(sys) => match sys {
+                        BaseSystemType::Cpu => stats.cpu_assets += 1,
+                        BaseSystemType::Gpu => stats.gpu_assets += 1,
+                        BaseSystemType::Memory => stats.memory_assets += 1,
+                        BaseSystemType::Storage => stats.storage_assets += 1,
+                        BaseSystemType::Network => stats.network_assets += 1,
+                        BaseSystemType::Container => stats.container_assets += 1,
+                        BaseSystemType::Economic => stats.economic_assets += 1,
+                    },
+                    AssetCategory::Application(_) => {
+                        // Application assets not tracked separately yet
+                    }
+                }
             }
-            
+
             match status.state {
                 AssetState::Available => stats.available_assets += 1,
                 AssetState::Allocated => stats.allocated_assets += 1,
@@ -419,7 +491,7 @@ impl AssetManager {
                 AssetState::Failed => stats.failed_assets += 1,
             }
         }
-        
+
         stats.total_assets = assets.len();
         stats
     }

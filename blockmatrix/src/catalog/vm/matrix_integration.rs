@@ -518,7 +518,7 @@ impl MatrixAwareVM {
                 interaction_type: InteractionType::Validation,
                 source_entity: context.target_entity.clone().unwrap_or_default(),
                 target_entity: validation.entity_domain.clone(),
-                asset_id: Some(validation.asset_id.uuid),
+                asset_id: Some(validation.asset_id.get_uuid()),
                 timestamp: std::time::SystemTime::now(),
                 privacy_level: validation.privacy_level.clone(),
             });

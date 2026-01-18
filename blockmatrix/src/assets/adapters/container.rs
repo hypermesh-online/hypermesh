@@ -396,9 +396,9 @@ impl ContainerAssetAdapter {
     
     /// Generate container name
     async fn generate_container_name(&self, asset_id: &AssetId) -> String {
-        format!("hypermesh-{}", &asset_id.uuid.to_string()[..8])
+        format!("hypermesh-{}", &asset_id.get_uuid().to_string()[..8])
     }
-    
+
     /// Create container via runtime API
     async fn create_container(
         &self,
@@ -407,7 +407,7 @@ impl ContainerAssetAdapter {
     ) -> AssetResult<String> {
         // TODO: Implement actual container creation via runtime API
         // For now, simulate container creation
-        let container_id = format!("container_{}", asset_id.uuid);
+        let container_id = format!("container_{}", asset_id.get_uuid());
         
         tracing::info!(
             "Creating container {} with image {} for asset {}",
@@ -472,7 +472,8 @@ impl ContainerAssetAdapter {
     
     /// Generate proxy address for container access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid_bytes = asset_id.uuid.as_bytes();
+        let uuid = asset_id.get_uuid();
+        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&uuid_bytes[..8]);
         ProxyAddress::new(
@@ -618,7 +619,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         let network_config = ContainerNetworkConfig {
             network_mode: NetworkMode::Bridge, // Default to bridge mode
             port_mappings,
-            ipv6_addresses: vec![format!("2001:db8:hypermesh:container::{:x}", asset_id.uuid.as_u128() & 0xFFFF)],
+            ipv6_addresses: vec![format!("2001:db8:hypermesh:container::{:x}", asset_id.get_uuid().as_u128() & 0xFFFF)],
             network_aliases: vec![container_name.clone()],
             dns_config: DnsConfig {
                 nameservers: vec!["2001:4860:4860::8888".to_string()], // Google DNS IPv6
@@ -1041,7 +1042,7 @@ mod tests {
         let request = create_test_container_request().await;
         
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, AssetType::Container);
+        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Container));
         
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();

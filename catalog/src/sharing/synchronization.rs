@@ -122,7 +122,7 @@ pub struct SyncManager {
     registry: Arc<CatalogRegistry>,
     peer_states: Arc<RwLock<HashMap<String, SyncMetadata>>>,
     merkle_tree: Arc<RwLock<HashMap<String, MerkleNode>>>,
-    package_index: Arc<RwLock<HashMap<AssetId, AssetPackage>>>,
+    package_index: Arc<RwLock<HashMap<String, AssetPackage>>>,
     sync_history: Arc<RwLock<Vec<SyncEvent>>>,
     // instruction_generator: Arc<InstructionGenerator>,  // Commented until BlockMatrix integration
 }
@@ -358,17 +358,17 @@ impl SyncManager {
 
         // Find additions and updates
         for (id, remote_meta) in peer_packages.iter() {
-            if let Some(local_package) = our_packages.get(id) {
-                if local_package.metadata().version != remote_meta.version {
+            if let Some(local_package) = our_packages.get(id.as_str()) {
+                if local_package.spec.metadata.version != remote_meta.version {
                     // Version conflict
                     delta.conflicts.push(ConflictInfo {
                         asset_id: id.clone(),
-                        local_version: local_package.metadata().version.clone(),
+                        local_version: local_package.spec.metadata.version.clone(),
                         remote_version: remote_meta.version.clone(),
-                        local_metadata: local_package.metadata().clone(),
+                        local_metadata: local_package.spec.metadata.clone(),
                         remote_metadata: remote_meta.clone(),
                         suggested_resolution: self.suggest_resolution(
-                            &local_package.metadata(),
+                            &local_package.spec.metadata,
                             remote_meta,
                         ),
                     });
@@ -473,13 +473,13 @@ impl SyncManager {
 
         // Apply additions
         for package in delta.additions {
-            package_index.insert(package.id().clone(), package);
+            package_index.insert(package.package_hash.clone(), package);
             packages_synced += 1;
         }
 
         // Apply updates
         for package in delta.updates {
-            package_index.insert(package.id().clone(), package);
+            package_index.insert(package.package_hash.clone(), package);
             packages_synced += 1;
         }
 
@@ -576,7 +576,8 @@ impl SyncManager {
 
         // Keep only last 1000 events
         if history.len() > 1000 {
-            history.drain(0..history.len() - 1000);
+            let to_remove = history.len() - 1000;
+            history.drain(0..to_remove);
         }
     }
 
@@ -632,12 +633,12 @@ impl SyncManager {
         Ok(String::new())
     }
 
-    async fn request_package_list(&self, _peer_merkle: &str) -> Result<HashMap<AssetId, AssetMetadata>> {
+    async fn request_package_list(&self, _peer_merkle: &str) -> Result<HashMap<String, AssetMetadata>> {
         // Would make actual network request
         Ok(HashMap::new())
     }
 
-    async fn request_package(&self, _id: &AssetId, _version: &str) -> Result<AssetPackage> {
+    async fn request_package(&self, _id: &str, _version: &str) -> Result<AssetPackage> {
         // Would make actual network request
         Err(anyhow::anyhow!("Not implemented"))
     }
@@ -678,7 +679,7 @@ impl SyncManager {
             .ok_or_else(|| anyhow::anyhow!("Package not found"))
     }
 
-    async fn needs_update(&self, _id: &AssetId, _peer_id: &str) -> Result<bool> {
+    async fn needs_update(&self, _id: &str, _peer_id: &str) -> Result<bool> {
         // Would check version comparison
         Ok(false)
     }
@@ -712,7 +713,7 @@ impl SyncManager {
         Err(anyhow::anyhow!("Merge not supported"))
     }
 
-    async fn can_safely_delete(&self, _id: &AssetId) -> Result<bool> {
+    async fn can_safely_delete(&self, _id: &str) -> Result<bool> {
         // Would check if package can be safely deleted
         Ok(false) // Conservative default
     }

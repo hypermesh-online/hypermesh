@@ -7,7 +7,8 @@ use crate::assets::core::AssetId;
 
 /// Generate proxy address for storage access
 pub async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-    let uuid_bytes = asset_id.uuid.as_bytes();
+    let uuid = asset_id.get_uuid();
+    let uuid_bytes = uuid.as_bytes();
     let mut node_id = [0u8; 8];
     node_id.copy_from_slice(&uuid_bytes[..8]);
     ProxyAddress::new(

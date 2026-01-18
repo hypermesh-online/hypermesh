@@ -10,7 +10,7 @@
 //! - 100x performance improvement through native integration
 //! - Full compatibility with existing Catalog functionality
 
-use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig};
+use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig, SecurityScanResults, DependencyValidationResults};
 use crate::library::{
     AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
 };
@@ -381,10 +381,13 @@ impl HyperMeshAssetRegistry {
                         enabled: false,
                         allowed_domains: vec![],
                         allowed_ports: vec![],
+                        require_tls: true,
                     },
                     file_access: FileAccess {
                         level: "none".to_string(),
                         allowed_paths: vec![],
+                        denied_paths: vec![],
+                        allow_temp: false,
                     },
                     permissions: vec![],
                 },
@@ -413,6 +416,7 @@ impl HyperMeshAssetRegistry {
                 },
                 dependencies: vec![],
                 environment: HashMap::new(),
+                config_schema: None,
             },
         };
 
@@ -427,10 +431,24 @@ impl HyperMeshAssetRegistry {
 
         // Create validation status
         let validation = AssetValidationStatus {
-            validated: true,
+            is_valid: true,
+            validated_at: Utc::now(),
             errors: vec![],
             warnings: vec![],
-            security_checks: HashMap::new(),
+            security_results: SecurityScanResults {
+                security_score: 100,
+                vulnerabilities: vec![],
+                recommendations: vec![],
+                scanned_at: Utc::now(),
+            },
+            dependency_results: DependencyValidationResults {
+                dependencies_valid: true,
+                total_dependencies: 0,
+                valid_dependencies: 0,
+                invalid_dependencies: vec![],
+                conflicts: vec![],
+                validated_at: Utc::now(),
+            },
         };
 
         Ok(AssetPackage {
@@ -440,6 +458,7 @@ impl HyperMeshAssetRegistry {
             package_hash: lib_package.hash.clone(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            signature: None,
         })
     }
 

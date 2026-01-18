@@ -66,19 +66,11 @@ impl CatalogPlugin {
 #[async_trait]
 impl HyperMeshExtension for CatalogPlugin {
     fn metadata(&self) -> ExtensionMetadata {
-        // Parse hardcoded versions with compile-time validation via const assertion
-        const _: () = {
-            // This will fail at compile time if versions are invalid
-            match semver::Version::parse(PLUGIN_VERSION) {
-                Ok(_) => {},
-                Err(_) => panic!("PLUGIN_VERSION must be valid semver"),
-            }
-        };
-
+        // Parse hardcoded versions (validation happens at runtime)
         let version = semver::Version::parse(PLUGIN_VERSION)
-            .expect("PLUGIN_VERSION validated at compile time");
+            .expect("PLUGIN_VERSION must be valid semver");
         let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
-            .expect("REQUIRED_HYPERMESH_VERSION validated at compile time");
+            .expect("REQUIRED_HYPERMESH_VERSION must be valid semver");
 
         ExtensionMetadata {
             id: "catalog".to_string(),

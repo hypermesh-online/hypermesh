@@ -29,6 +29,9 @@ pub struct AssetPackage {
     pub created_at: DateTime<Utc>,
     /// Last modification timestamp
     pub updated_at: DateTime<Utc>,
+    /// Package signature (if signed)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<serde_json::Value>,
 }
 
 impl AssetPackage {
@@ -613,6 +616,7 @@ impl AssetPackage {
             package_hash: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            signature: None,
         };
         
         // Load content files

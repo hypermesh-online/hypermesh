@@ -235,7 +235,8 @@ impl MemoryAssetAdapter {
     
     /// Generate proxy address for NAT-like system
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid_bytes = asset_id.uuid.as_bytes();
+        let uuid = asset_id.get_uuid();
+        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&uuid_bytes[..8]);
         ProxyAddress::new(
@@ -245,7 +246,7 @@ impl MemoryAssetAdapter {
             8080
         )
     }
-    
+
     /// Create FALCON-1024 signature for quantum security
     async fn create_access_signature(
         &self,
@@ -255,7 +256,7 @@ impl MemoryAssetAdapter {
         // For now, return placeholder signature
         let mut signature = Vec::new();
         signature.extend_from_slice(b"FALCON1024_SIG_");
-        signature.extend_from_slice(&proxy_mapping.local_asset_id.blockchain_hash[..16]);
+        signature.extend_from_slice(&proxy_mapping.local_asset_id.blockchain_hash()[..16]);
         signature
     }
     
@@ -785,7 +786,7 @@ mod tests {
         let request = create_test_memory_request();
 
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, AssetType::Memory);
+        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Memory));
         assert!(allocation.status.proxy_address.is_some());
 
         // Test deallocation

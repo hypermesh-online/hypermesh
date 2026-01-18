@@ -292,7 +292,7 @@ impl GlobalAddress {
         address_type: GlobalAddressType,
     ) -> Self {
         let mut asset_bytes = [0u8; 16];
-        asset_bytes.copy_from_slice(asset_id.uuid.as_bytes());
+        asset_bytes.copy_from_slice(asset_id.get_uuid().as_bytes());
         
         Self {
             network_prefix,

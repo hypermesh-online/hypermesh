@@ -390,7 +390,8 @@ impl NetworkAssetAdapter {
     
     /// Generate proxy address for network access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid_bytes = asset_id.uuid.as_bytes();
+        let uuid = asset_id.get_uuid();
+        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&uuid_bytes[..8]);
         ProxyAddress::new(
@@ -562,7 +563,7 @@ impl AssetAdapter for NetworkAssetAdapter {
             isolation_enabled: matches!(request.privacy_level, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork),
             ipv6_addresses,
             vlan_id: if matches!(request.privacy_level, PrivacyLevel::Private) {
-                Some(100 + (asset_id.uuid.as_u128() % 4000) as u16) // Generate unique VLAN ID
+                Some(100 + (asset_id.get_uuid().as_u128() % 4000) as u16) // Generate unique VLAN ID
             } else {
                 None
             },
@@ -934,7 +935,7 @@ mod tests {
         let request = create_test_network_request().await;
         
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, AssetType::Network);
+        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Network));
         
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();

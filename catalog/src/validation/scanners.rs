@@ -126,8 +126,10 @@ impl StaticSecurityScanner {
 
         // Check for dependencies in asset metadata
         // STUB: AssetMetadata doesn't have a get method - would need full content
-        // if let Some(deps) = asset.metadata().get("dependencies") {
+        // This block is disabled until metadata dependency access is implemented
+        #[allow(unreachable_code)]
         if false {
+            let deps: &serde_json::Value = &serde_json::Value::Null; // Placeholder for stub code
             if let Some(deps_array) = deps.as_array() {
                 for dep in deps_array {
                     if let Some(dep_obj) = dep.as_object() {
@@ -224,8 +226,9 @@ impl SecurityScanner for StaticSecurityScanner {
         // Scan code for security issues from BlockMatrix Asset metadata
         // STUB: AssetMetadata doesn't have code - would need to check content
         // if let Some(code) = asset.metadata().get("code") {
-        if let Some(code) = Some(&asset.content.main_content) {
-            if let Some(code_str) = code.as_str() {
+        if !asset.content.main_content.is_empty() {
+            let code_str = &asset.content.main_content;
+            {
                 // Scan for various injection types
                 injection_risks.extend(self.scan_sql_injection(code_str));
                 injection_risks.extend(self.scan_command_injection(code_str));

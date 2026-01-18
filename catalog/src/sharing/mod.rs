@@ -106,8 +106,8 @@ pub struct PeerInfo {
     pub node_id: String,
     /// Peer network address
     pub address: String,
-    /// Peer's available packages
-    pub available_packages: HashSet<AssetId>,
+    /// Peer's available packages (using package hash as string ID)
+    pub available_packages: HashSet<String>,
     /// Peer's storage capacity
     pub storage_capacity: u64,
     /// Peer's bandwidth capacity
@@ -125,8 +125,8 @@ pub struct PeerInfo {
 /// Package availability information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageAvailability {
-    /// Package asset ID
-    pub asset_id: AssetId,
+    /// Package asset ID (using package hash as string ID)
+    pub asset_id: String,
     /// Nodes that have this package
     pub available_nodes: Vec<String>,
     /// Replication count
@@ -292,20 +292,22 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        let asset_id = Uuid::new_v4();
+        // Create AssetId from package kind
+        let asset_type = blockmatrix::assets::AssetType::Library;
+        let asset_id = AssetId::new(asset_type);
 
         // Register with discovery service
         self.discovery_service.register_package(
             &asset_id,
-            &package.metadata(),
+            &package.spec.metadata,
             permission.clone(),
         ).await?;
 
-        // Update availability
+        // Update availability (use package_hash as string key)
         let mut availability = self.package_availability.write().await;
-        availability.entry(asset_id.clone()).or_insert_with(|| {
+        availability.entry(package.package_hash.clone()).or_insert_with(|| {
             PackageAvailability {
-                asset_id: asset_id.clone(),
+                asset_id: package.package_hash.clone(),
                 available_nodes: vec![self.config.node_id.clone()],
                 replication_count: 1,
                 geographic_distribution: HashMap::new(),
@@ -316,7 +318,7 @@ impl SharingManager {
         });
 
         // Notify peers about new package
-        self.broadcast_package_availability(&asset_id).await?;
+        self.broadcast_package_availability(&package.package_hash).await?;
 
         // Update stats
         let mut stats = self.stats.write().await;
@@ -563,7 +565,7 @@ impl SharingManager {
         Ok(best_node)
     }
 
-    async fn broadcast_package_availability(&self, asset_id: &AssetId) -> Result<()> {
+    async fn broadcast_package_availability(&self, asset_id: &str) -> Result<()> {
         let peers = self.peers.read().await;
 
         for (node_id, _) in peers.iter() {

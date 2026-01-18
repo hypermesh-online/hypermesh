@@ -171,11 +171,13 @@ impl LibraryIndex {
         // Index by type
         {
             let mut type_index = self.type_index.write().await;
-            // Use the string asset_type directly from the package
-            type_index
-                .entry(package.asset_type.clone())
-                .or_insert_with(HashSet::new)
-                .insert(Arc::clone(&package_id));
+            // Convert string asset_type to AssetType enum
+            if let Some(asset_type_enum) = AssetType::from_str(&package.asset_type) {
+                type_index
+                    .entry(asset_type_enum)
+                    .or_insert_with(HashSet::new)
+                    .insert(Arc::clone(&package_id));
+            }
         }
 
         // Index by author
@@ -376,10 +378,11 @@ impl LibraryIndex {
         };
 
         // Apply pagination
+        let results_vec: Vec<Arc<str>> = final_results.into_iter().collect();
         let start = query.offset;
-        let end = (query.offset + query.limit).min(final_results.len());
+        let end = (query.offset + query.limit).min(results_vec.len());
 
-        Ok(final_results[start..end].to_vec())
+        Ok(results_vec[start..end].to_vec())
     }
 
     /// Find packages by name (exact or prefix match)

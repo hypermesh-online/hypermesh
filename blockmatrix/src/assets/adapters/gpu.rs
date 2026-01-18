@@ -492,7 +492,8 @@ impl GpuAssetAdapter {
     
     /// Generate proxy address for GPU access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid_bytes = asset_id.uuid.as_bytes();
+        let uuid = asset_id.get_uuid();
+        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&uuid_bytes[..8]);
         ProxyAddress::new(
@@ -502,10 +503,10 @@ impl GpuAssetAdapter {
             8080
         )
     }
-    
+
     /// Create GPU compute context for isolation
     async fn create_gpu_context(&self, asset_id: &AssetId, device_id: u32) -> String {
-        let context_id = format!("gpu_ctx_{}_{}", device_id, asset_id.uuid);
+        let context_id = format!("gpu_ctx_{}_{}", device_id, asset_id.get_uuid());
         
         let context = GpuContext {
             context_id: context_id.clone(),

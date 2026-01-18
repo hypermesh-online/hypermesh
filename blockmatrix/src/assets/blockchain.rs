@@ -91,8 +91,9 @@ impl HyperMeshAssetRecord {
         consensus_proofs: Vec<ConsensusProof>,
         privacy_level: AssetPrivacyLevel,
     ) -> Self {
-        let adapter_type = asset_id.asset_type.clone();
-        
+        // Get adapter type from AssetId (check legacy field first)
+        let adapter_type = asset_id.asset_type.clone().unwrap_or(AssetType::Container);
+
         Self {
             asset_id,
             record_type,

@@ -753,11 +753,13 @@ impl LibraryAssetPackage {
                     valid_dependencies: 0,
                     invalid_dependencies: vec![],
                     conflicts: vec![],
+                    validated_at: Utc::now(),
                 },
             },
             package_hash: self.hash.clone(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            signature: None,
         }
     }
 
