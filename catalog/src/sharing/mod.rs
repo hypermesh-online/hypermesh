@@ -186,7 +186,7 @@ pub struct SharingManager {
     sharing_protocol: Arc<SharingProtocol>,
     network_topology: Arc<RwLock<NetworkTopology>>,
     peers: Arc<RwLock<HashMap<String, PeerInfo>>>,
-    package_availability: Arc<RwLock<HashMap<AssetId, PackageAvailability>>>,
+    package_availability: Arc<RwLock<HashMap<String, PackageAvailability>>>,
     stats: Arc<RwLock<SharingStats>>,
     event_listeners: Arc<RwLock<Vec<Box<dyn Fn(SharingEvent) + Send + Sync>>>>,
 }
@@ -443,13 +443,14 @@ impl SharingManager {
 
         // Find nodes that have this package
         let availability = self.package_availability.read().await;
-        if let Some(info) = availability.get(asset_id) {
+        let asset_id_str = asset_id.to_hex_string();
+        if let Some(info) = availability.get(&asset_id_str) {
             // Select best node based on location and bandwidth
             let best_node = self.select_best_node(&info.available_nodes).await?;
 
             // Download from selected node
             let package = self.sharing_protocol.download_package(
-                asset_id,
+                &asset_id_str,
                 &best_node,
             ).await?;
 
@@ -516,7 +517,8 @@ impl SharingManager {
 
         // Check replication needs
         let availability = self.package_availability.read().await;
-        if let Some(info) = availability.get(asset_id) {
+        let asset_id_str = asset_id.to_hex_string();
+        if let Some(info) = availability.get(&asset_id_str) {
             if info.replication_count >= self.config.replication_factor {
                 return Ok(false);
             }

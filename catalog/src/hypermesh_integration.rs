@@ -254,36 +254,53 @@ impl HyperMeshAssetAdapter {
         let mut resources = Vec::new();
 
         // Analyze asset requirements and map to HyperMesh resources
-        if let Some(execution) = &asset.spec.execution {
-            // Map execution requirements to resources
-            if execution.cpu_required {
-                resources.push(HyperMeshResource::Cpu {
-                    cores: execution.cpu_cores.unwrap_or(1),
-                    architecture: execution.cpu_architecture.clone().unwrap_or_else(|| "x86_64".to_string()),
-                });
-            }
+        let asset_resources = &asset.spec.spec.resources;
 
-            if execution.gpu_required {
-                resources.push(HyperMeshResource::Gpu {
-                    memory_mb: execution.gpu_memory_mb.unwrap_or(1024),
-                    gpu_type: execution.gpu_type.clone().unwrap_or_else(|| "CUDA".to_string()),
-                });
-            }
+        // Parse CPU limit (millicores to cores)
+        if let Ok(cpu_millicores) = asset_resources.cpu_limit.replace("m", "").parse::<u32>() {
+            resources.push(HyperMeshResource::Cpu {
+                cores: (cpu_millicores / 1000).max(1),
+                architecture: "x86_64".to_string(),
+            });
+        }
 
-            if let Some(memory_mb) = execution.memory_mb {
-                resources.push(HyperMeshResource::Memory {
-                    size_mb: memory_mb,
-                    memory_type: "RAM".to_string(),
-                });
-            }
+        // Check GPU requirement
+        if asset_resources.gpu_required {
+            resources.push(HyperMeshResource::Gpu {
+                memory_mb: 1024,  // Default GPU memory
+                gpu_type: "CUDA".to_string(),
+            });
+        }
 
-            if let Some(storage_mb) = execution.storage_mb {
-                resources.push(HyperMeshResource::Storage {
-                    size_mb: storage_mb,
-                    storage_type: "SSD".to_string(),
-                    persistent: execution.persistent_storage.unwrap_or(false),
-                });
-            }
+        // Parse memory limit (e.g., "1Gi" to MB)
+        let memory_mb = if asset_resources.memory_limit.ends_with("Gi") {
+            asset_resources.memory_limit.trim_end_matches("Gi").parse::<u64>().unwrap_or(1) * 1024
+        } else if asset_resources.memory_limit.ends_with("Mi") {
+            asset_resources.memory_limit.trim_end_matches("Mi").parse::<u64>().unwrap_or(1024)
+        } else {
+            1024 // Default 1GB
+        };
+
+        resources.push(HyperMeshResource::Memory {
+            size_mb: memory_mb,
+            memory_type: "RAM".to_string(),
+        });
+
+        // Parse storage requirement
+        if let Some(storage_req) = &asset_resources.storage_required {
+            let storage_mb = if storage_req.ends_with("Gi") {
+                storage_req.trim_end_matches("Gi").parse::<u64>().unwrap_or(1) * 1024
+            } else if storage_req.ends_with("Mi") {
+                storage_req.trim_end_matches("Mi").parse::<u64>().unwrap_or(1024)
+            } else {
+                1024 // Default 1GB
+            };
+
+            resources.push(HyperMeshResource::Storage {
+                size_mb: storage_mb,
+                storage_type: "SSD".to_string(),
+                persistent: true,  // Assume persistent for catalog assets
+            });
         }
 
         resources

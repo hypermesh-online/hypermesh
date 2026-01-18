@@ -79,8 +79,8 @@ pub struct PackageDelta {
     pub additions: Vec<AssetPackage>,
     /// Packages to update
     pub updates: Vec<AssetPackage>,
-    /// Packages to remove
-    pub deletions: Vec<AssetId>,
+    /// Packages to remove (package names, not BlockMatrix AssetIds)
+    pub deletions: Vec<String>,
     /// Conflicting packages
     pub conflicts: Vec<ConflictInfo>,
 }
@@ -88,8 +88,8 @@ pub struct PackageDelta {
 /// Conflict information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConflictInfo {
-    /// Asset ID with conflict
-    pub asset_id: AssetId,
+    /// Package ID with conflict (catalog package name, not BlockMatrix AssetId)
+    pub asset_id: String,
     /// Local version
     pub local_version: String,
     /// Remote version
@@ -259,7 +259,7 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if peer.available_packages.contains(&package.id()) {
+            if peer.available_packages.contains(package.id()) {
                 // Check if peer has older version
                 if self.needs_update(&package.id(), &peer.node_id).await? {
                     self.send_package_update(&package, &peer.node_id).await?;
@@ -285,7 +285,7 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if !peer.available_packages.contains(&package.id()) {
+            if !peer.available_packages.contains(package.id()) {
                 self.send_package(&package, &peer.node_id).await?;
                 synced_count += 1;
             }
@@ -304,7 +304,7 @@ impl SyncManager {
         let mut synced_count = 0;
 
         for package in packages {
-            if !peer.available_packages.contains(&package.id()) {
+            if !peer.available_packages.contains(package.id()) {
                 self.send_package(&package, &peer.node_id).await?;
                 synced_count += 1;
             }
@@ -334,7 +334,7 @@ impl SyncManager {
         for node_hash in diff_nodes {
             if let Some(node) = our_merkle.get(&node_hash) {
                 for package_id in &node.packages {
-                    let package = self.get_package(package_id).await?;
+                    let package = self.get_package(&package_id.to_hex_string()).await?;
                     self.send_package(&package, &peer.node_id).await?;
                     synced_count += 1;
                 }
@@ -513,11 +513,21 @@ impl SyncManager {
         let mut leaves = Vec::new();
         for (id, package) in packages.iter() {
             let hash = self.hash_package(package);
+            // Parse string ID to AssetId
+            let asset_id = AssetId::from_hex_string(id)
+                .unwrap_or_else(|_| {
+                    // Fallback: create from package hash
+                    let mut hash_bytes = [0u8; 32];
+                    if let Ok(bytes) = hex::decode(&package.package_hash) {
+                        hash_bytes[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
+                    }
+                    AssetId::new_from_hash(&hash_bytes)
+                });
             let node = MerkleNode {
                 hash: hash.clone(),
                 left: None,
                 right: None,
-                packages: vec![id.clone()],
+                packages: vec![asset_id],
             };
             tree.insert(hash.clone(), node);
             leaves.push(hash);
@@ -587,10 +597,16 @@ impl SyncManager {
         remote: &AssetMetadata,
     ) -> ConflictResolution {
         // Simple heuristic for suggesting resolution
-        if remote.timestamp > local.timestamp {
-            ConflictResolution::NewestWins
-        } else {
-            ConflictResolution::ConsensusWins
+        // Compare updated timestamps if they exist
+        match (local.updated, remote.updated) {
+            (Some(local_time), Some(remote_time)) => {
+                if remote_time > local_time {
+                    ConflictResolution::NewestWins
+                } else {
+                    ConflictResolution::ConsensusWins
+                }
+            }
+            _ => ConflictResolution::ConsensusWins,
         }
     }
 
@@ -672,7 +688,7 @@ impl SyncManager {
             .collect())
     }
 
-    async fn get_package(&self, id: &AssetId) -> Result<AssetPackage> {
+    async fn get_package(&self, id: &str) -> Result<AssetPackage> {
         let packages = self.package_index.read().await;
         packages.get(id)
             .cloned()

@@ -235,7 +235,7 @@ impl PackageSigner {
 
         info!("Signed with FALCON-1024, signature size: {} bytes", signed_msg.len());
 
-        Ok(signed_msg.to_vec())
+        Ok(signed_msg.as_bytes().to_vec())
     }
 
     /// Sign with ED25519

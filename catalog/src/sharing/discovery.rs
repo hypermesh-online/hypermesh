@@ -528,7 +528,7 @@ impl DiscoveryService {
 
     fn calculate_relevance(&self, metadata: &AssetMetadata, query: &str) -> f64 {
         let query_lower = query.to_lowercase();
-        let mut score = 0.0;
+        let mut score: f64 = 0.0;
 
         // Name match (highest weight)
         if metadata.name.to_lowercase() == query_lower {
@@ -551,13 +551,13 @@ impl DiscoveryService {
             score += 0.2;
         }
 
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
     fn calculate_popularity(&self, stats: &UsageStats) -> f64 {
-        let download_score = (stats.downloads as f64 / 10000.0).min(1.0);
-        let weekly_score = (stats.weekly_downloads as f64 / 1000.0).min(1.0);
-        let star_score = (stats.stars as f64 / 100.0).min(1.0);
+        let download_score = (stats.downloads as f64 / 10000.0).min(1.0_f64);
+        let weekly_score = (stats.weekly_downloads as f64 / 1000.0).min(1.0_f64);
+        let star_score = (stats.stars as f64 / 100.0).min(1.0_f64);
 
         download_score * 0.4 + weekly_score * 0.4 + star_score * 0.2
     }
@@ -585,7 +585,7 @@ impl DiscoveryService {
         &self,
         mut results: Vec<(AssetId, AssetMetadata)>,
     ) -> Vec<(AssetId, AssetMetadata)> {
-        results.sort_by(|a, b| a.0.cmp(&b.0));
+        results.sort_by(|a, b| a.0.to_hex_string().cmp(&b.0.to_hex_string()));
         results.dedup_by(|a, b| a.0 == b.0);
         results
     }
@@ -638,10 +638,11 @@ impl DiscoveryService {
 
         if entry.metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
             // Extract matching portion
-            let desc = &entry.metadata.description;
-            if let Some(start) = desc.to_lowercase().find(&query_lower) {
-                let end = (start + 100).min(desc.len());
-                highlights.push(desc[start..end].to_string());
+            if let Some(ref desc) = entry.metadata.description {
+                if let Some(start) = desc.to_lowercase().find(&query_lower) {
+                    let end = (start + 100).min(desc.len());
+                    highlights.push(desc[start..end].to_string());
+                }
             }
             return (true, highlights);
         }

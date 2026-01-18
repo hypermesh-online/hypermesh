@@ -444,7 +444,7 @@ impl LibraryInterface for AssetLibrary {
                     if dep_package.version() == dep.version_constraint.as_ref() {
                         resolved.push(super::ResolvedDependency {
                             name: dep.name.to_string(),
-                            version: dep_package.version().clone(),
+                            version: dep_package.version().to_string(),
                             source: "library".to_string(),
                             dependencies: vec![], // Would recurse in full implementation
                         });
@@ -453,7 +453,7 @@ impl LibraryInterface for AssetLibrary {
                             name: dep.name.to_string(),
                             versions: vec![
                                 dep.version_constraint.to_string(),
-                                dep_package.version().clone(),
+                                dep_package.version().to_string(),
                             ],
                             reason: "Version mismatch".to_string(),
                         });
@@ -466,11 +466,13 @@ impl LibraryInterface for AssetLibrary {
 
         let elapsed_us = start.elapsed().as_micros() as u64;
 
+        let success = conflicts.is_empty() && missing.is_empty();
+
         Ok(DependencyResolution {
             resolved,
             conflicts,
             missing,
-            success: conflicts.is_empty() && missing.is_empty(),
+            success,
             resolution_time_us: elapsed_us,
         })
     }

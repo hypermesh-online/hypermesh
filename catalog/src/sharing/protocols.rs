@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 use bytes::Bytes;
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
+use blockmatrix::assets::core::AssetType;
 use super::PeerInfo;
 
 /// Share permission levels
@@ -131,22 +132,22 @@ pub struct ContributionStats {
 pub enum ProtocolMessage {
     /// Request package
     RequestPackage {
-        asset_id: AssetId,
+        asset_id: String,  // Package hash, not BlockMatrix AssetId
         requester: String,
     },
     /// Package response
     PackageResponse {
-        asset_id: AssetId,
+        asset_id: String,  // Package hash, not BlockMatrix AssetId
         package: AssetPackage,
     },
     /// Package metadata
     PackageMetadata {
-        asset_id: AssetId,
+        asset_id: String,  // Package hash, not BlockMatrix AssetId
         metadata: AssetMetadata,
     },
     /// Availability notification
     AvailabilityNotification {
-        asset_id: AssetId,
+        asset_id: String,  // Package hash, not BlockMatrix AssetId
         available: bool,
     },
     /// Bandwidth negotiation
@@ -272,7 +273,7 @@ impl SharingProtocol {
     /// Download package from peer
     pub async fn download_package(
         &self,
-        asset_id: &AssetId,
+        asset_id: &str,
         peer_id: &str,
     ) -> Result<AssetPackage> {
         // Check peer connection
@@ -285,10 +286,16 @@ impl SharingProtocol {
 
         // Create transfer
         let transfer_id = uuid::Uuid::new_v4().to_string();
+        // Parse asset_id from string to AssetId
+        let parsed_asset_id = AssetId::from_hex_string(asset_id)
+            .unwrap_or_else(|_| {
+                // Fallback: create a default AssetId
+                AssetId::new(AssetType::Container)
+            });
         let transfer = ActiveTransfer {
             id: transfer_id.clone(),
             peer_id: peer_id.to_string(),
-            asset_id: asset_id.clone(),
+            asset_id: parsed_asset_id.clone(),
             direction: TransferDirection::Download,
             priority: TransferPriority::Normal,
             bytes_transferred: 0,
@@ -303,13 +310,13 @@ impl SharingProtocol {
 
         // Send request
         let request = ProtocolMessage::RequestPackage {
-            asset_id: asset_id.clone(),
+            asset_id: asset_id.to_string(),
             requester: self.get_local_id(),
         };
         self.send_message(peer_id, request).await?;
 
         // Receive package with bandwidth limiting
-        let package = self.receive_package_with_limiting(peer_id, asset_id).await?;
+        let package = self.receive_package_with_limiting(peer_id, &parsed_asset_id).await?;
 
         // Update stats
         self.update_contribution_stats(peer_id, package.size(), false).await?;
@@ -336,10 +343,20 @@ impl SharingProtocol {
 
         // Create transfer
         let transfer_id = uuid::Uuid::new_v4().to_string();
+        // Parse package hash to AssetId
+        let parsed_asset_id = AssetId::from_hex_string(&package.package_hash)
+            .unwrap_or_else(|_| {
+                // Fallback: create from hash bytes
+                let mut hash_bytes = [0u8; 32];
+                if let Ok(bytes) = hex::decode(&package.package_hash) {
+                    hash_bytes[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
+                }
+                AssetId::new_from_hash(&hash_bytes)
+            });
         let transfer = ActiveTransfer {
             id: transfer_id.clone(),
             peer_id: peer_id.to_string(),
-            asset_id: package.package_hash.clone(),
+            asset_id: parsed_asset_id,
             direction: TransferDirection::Upload,
             priority: TransferPriority::Normal,
             bytes_transferred: 0,
@@ -368,10 +385,10 @@ impl SharingProtocol {
     pub async fn notify_availability(
         &self,
         peer_id: &str,
-        asset_id: &AssetId,
+        asset_id: &str,
     ) -> Result<()> {
         let message = ProtocolMessage::AvailabilityNotification {
-            asset_id: asset_id.clone(),
+            asset_id: asset_id.to_string(),
             available: true,
         };
 

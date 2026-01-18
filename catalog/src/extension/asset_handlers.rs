@@ -328,7 +328,7 @@ impl AssetExtensionHandler for LibraryHandler {
 
         if let Some(metadata) = update.metadata {
             if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
-                package.version() = version.to_string();
+                package.version = version.to_string();
             }
         }
 
@@ -377,9 +377,9 @@ impl AssetExtensionHandler for LibraryHandler {
             })?;
 
         let mut metadata_map = HashMap::new();
-        metadata_map.insert("version".to_string(), serde_json::json!(package.version()));
+        metadata_map.insert("version".to_string(), serde_json::json!(package.version.clone()));
         metadata_map.insert("language".to_string(), serde_json::json!(package.language));
-        metadata_map.insert("dependencies".to_string(), serde_json::json!(package.dependencies()));
+        metadata_map.insert("dependencies".to_string(), serde_json::json!(package.dependencies.clone()));
 
         Ok(AssetMetadata {
             id: id.clone(),
@@ -551,7 +551,8 @@ impl AssetExtensionHandler for DatasetHandler {
 
         Ok(AssetMetadata {
             id: id.clone(),
-            asset_type: AssetType::Dataset,
+            // STUB: Dataset no longer exists, using Library
+            asset_type: AssetType::Library,
             name: dataset.name.clone(),
             description: Some(format!("{} dataset with {} records", dataset.format, dataset.record_count)),
             created_at: std::time::SystemTime::now(),
@@ -704,7 +705,8 @@ impl AssetExtensionHandler for TemplateHandler {
 
         Ok(AssetMetadata {
             id: id.clone(),
-            asset_type: AssetType::Template,
+            // STUB: Template no longer exists, using Library
+            asset_type: AssetType::Library,
             name: template.name.clone(),
             description: Some(format!("{} template for {}", template.template_type, template.language)),
             created_at: std::time::SystemTime::now(),
@@ -797,12 +799,14 @@ mod tests {
     #[tokio::test]
     async fn test_dataset_handler() {
         let handler = DatasetHandler::new();
-        assert_eq!(handler.asset_type(), AssetType::Dataset);
+        // STUB: Dataset replaced with Library
+        assert_eq!(handler.asset_type(), AssetType::Library);
     }
 
     #[tokio::test]
     async fn test_template_handler() {
         let handler = TemplateHandler::new();
-        assert_eq!(handler.asset_type(), AssetType::Template);
+        // STUB: Template replaced with Library
+        assert_eq!(handler.asset_type(), AssetType::Library);
     }
 }

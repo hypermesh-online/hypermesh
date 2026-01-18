@@ -104,10 +104,10 @@ impl VersionConstraintParser {
                 version_parts[0] == constraint_parts[0] &&
                 version_parts[1] == constraint_parts[1]
             }
-            VersionConstraint::Greater(v) => version > v,
-            VersionConstraint::GreaterEqual(v) => version >= v,
-            VersionConstraint::Less(v) => version < v,
-            VersionConstraint::LessEqual(v) => version <= v,
+            VersionConstraint::Greater(v) => version > v.as_str(),
+            VersionConstraint::GreaterEqual(v) => version >= v.as_str(),
+            VersionConstraint::Less(v) => version < v.as_str(),
+            VersionConstraint::LessEqual(v) => version <= v.as_str(),
             VersionConstraint::Or(constraints) => {
                 constraints.iter().any(|c| {
                     if let Ok(parsed) = self.parse(c) {

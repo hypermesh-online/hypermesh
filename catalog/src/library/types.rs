@@ -189,6 +189,8 @@ pub enum AssetType {
     Dataset,
     /// Template
     Template,
+    /// Library (Added for BlockMatrix compatibility)
+    Library,
     /// Generic binary
     Binary,
     /// Custom asset type
@@ -207,6 +209,7 @@ impl AssetType {
             AssetType::DataPipeline => "data_pipeline",
             AssetType::Dataset => "dataset",
             AssetType::Template => "template",
+            AssetType::Library => "library",
             AssetType::Binary => "binary",
             AssetType::Custom => "custom",
         }
@@ -223,6 +226,7 @@ impl AssetType {
             "data_pipeline" | "data-pipeline" => Some(AssetType::DataPipeline),
             "dataset" => Some(AssetType::Dataset),
             "template" => Some(AssetType::Template),
+            "library" => Some(AssetType::Library),
             "binary" => Some(AssetType::Binary),
             "custom" => Some(AssetType::Custom),
             _ => None,

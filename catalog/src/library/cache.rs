@@ -452,7 +452,9 @@ fn estimate_package_size(package: &LibraryAssetPackage) -> usize {
                        package.metadata().version.len() +
                        package.metadata().description.as_ref().map_or(0, |d| d.len());
 
-    let content_size = package.content_refs.total_size as usize;
+    let content_size = package.content_refs
+        .as_ref()
+        .map_or(0, |refs| refs.total_size as usize);
 
     // Add some overhead for structure
     metadata_size + content_size + 1024

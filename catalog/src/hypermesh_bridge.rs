@@ -10,7 +10,7 @@
 //! - 100x performance improvement through native integration
 //! - Full compatibility with existing Catalog functionality
 
-use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig, SecurityScanResults, DependencyValidationResults};
+use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig, SecurityScanResults, DependencyValidationResults, SchedulingConfig};
 use crate::library::{
     AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
 };
@@ -412,7 +412,12 @@ impl HyperMeshAssetRegistry {
                         io: "5s".to_string(),
                         compilation: None,
                     },
-                    scheduling: None,
+                    scheduling: SchedulingConfig {
+                        timing: "immediate".to_string(),
+                        allocation_strategy: "best_fit".to_string(),
+                        node_affinity: vec![],
+                        anti_affinity: vec![],
+                    },
                 },
                 dependencies: vec![],
                 environment: HashMap::new(),
@@ -680,8 +685,11 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
 
         recommendations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
+        // Default to 10 recommendations if not specified
+        const DEFAULT_RECOMMENDATION_COUNT: usize = 10;
+
         Ok(recommendations.into_iter()
-            .take(context.count)
+            .take(DEFAULT_RECOMMENDATION_COUNT)
             .map(|(entry, _)| entry)
             .collect())
     }

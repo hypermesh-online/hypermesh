@@ -49,7 +49,7 @@ impl TypeValidator for JuliaValidator {
         // Check for Julia syntax errors from BlockMatrix Asset metadata
         // Use content from AssetPackage
         if let Some(code) = Some(&asset.content.main_content) {
-            let code_str = code.as_str().unwrap_or("");
+            let code_str = code.as_str();
 
             // Check for balanced parentheses
             let mut paren_count = 0;
@@ -200,7 +200,7 @@ impl TypeValidator for LuaValidator {
         // Check for Lua syntax errors from BlockMatrix Asset metadata
         // Use content from AssetPackage
         if let Some(code) = Some(&asset.content.main_content) {
-            let code_str = code.as_str().unwrap_or("");
+            let code_str = code.as_str();
 
             // Check for balanced do-end blocks
             let do_count = code_str.matches("do").count();
