@@ -322,12 +322,12 @@ impl CtStoqClient {
                     return Ok(response);
                 }
                 Err(e) => {
-                    last_error = Some(e);
                     if attempt < self.config.max_retries {
-                        warn!("CT submission attempt {} failed for {}, retrying: {}", 
-                              attempt + 1, fingerprint, last_error.as_ref().unwrap());
+                        warn!("CT submission attempt {} failed for {}, retrying: {}",
+                              attempt + 1, fingerprint, &e);
                         tokio::time::sleep(self.config.retry_delay).await;
                     }
+                    last_error = Some(e);
                 }
             }
         }

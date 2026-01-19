@@ -743,10 +743,11 @@ pub enum CrossChainValidationError {
 mod tests {
     use super::*;
     use crate::assets::core::asset_id::AssetId;
+    use crate::test_utils::test_asset_id;
 
     #[test]
     fn test_cross_network_validator_creation() {
-        let asset_id = AssetId::new(AssetType::Container);
+        let asset_id = test_asset_id(AssetType::Container);
         
         let validator = CrossNetworkValidator {
             source_network: "buyer.hypermesh.online".to_string(),

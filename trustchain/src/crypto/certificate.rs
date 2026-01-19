@@ -172,8 +172,8 @@ impl PQCertificateManager {
                 params.subject_alt_names.push(SanType::Rfc822Name(
                     Ia5String::try_from(san.as_str())?
                 ));
-            } else if san.parse::<std::net::IpAddr>().is_ok() {
-                params.subject_alt_names.push(SanType::IpAddress(san.parse().unwrap()));
+            } else if let Ok(ip_addr) = san.parse::<std::net::IpAddr>() {
+                params.subject_alt_names.push(SanType::IpAddress(ip_addr));
             } else {
                 params.subject_alt_names.push(SanType::DnsName(
                     Ia5String::try_from(san.as_str())?

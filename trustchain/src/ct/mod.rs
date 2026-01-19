@@ -81,7 +81,12 @@ impl LogEntry {
         hasher.update(&self.sequence_number.to_be_bytes());
         hasher.update(&self.certificate_der);
         hasher.update(&self.fingerprint);
-        hasher.update(&self.timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs().to_be_bytes());
+        // Use 0 if timestamp is before UNIX_EPOCH (should never happen in practice)
+        let timestamp_secs = self.timestamp
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        hasher.update(&timestamp_secs.to_be_bytes());
         hasher.update(self.common_name.as_bytes());
         hasher.update(self.issuer_ca_id.as_bytes());
         hasher.finalize().into()
@@ -433,7 +438,12 @@ impl CertificateTransparency {
         let mut hasher = Sha256::new();
         hasher.update(&seq_num.to_be_bytes());
         hasher.update(cert_der);
-        hasher.update(&timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs().to_be_bytes());
+        // Use 0 if timestamp is before UNIX_EPOCH (should never happen in practice)
+        let timestamp_secs = timestamp
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        hasher.update(&timestamp_secs.to_be_bytes());
         hasher.finalize().into()
     }
 

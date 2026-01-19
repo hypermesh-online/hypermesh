@@ -224,7 +224,9 @@ impl Default for TrustChainStoqConfig {
                 dns_resolvers: vec![
                     ServiceEndpoint {
                         service_type: ServiceType::Dns,
-                        address: "2001:4860:4860::8888".parse().unwrap(), // Google DNS
+                        // Safe: hardcoded valid IPv6 address
+                        address: "2001:4860:4860::8888".parse()
+                            .expect("hardcoded valid IPv6 address"), // Google DNS
                         port: 853, // DNS-over-QUIC port
                         service_name: Some("dns.google".to_string()),
                     },

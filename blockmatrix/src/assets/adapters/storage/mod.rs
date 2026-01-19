@@ -114,11 +114,12 @@ mod tests {
     #[tokio::test]
     async fn test_storage_allocation() {
         use crate::assets::core::AssetAdapter;
+        use crate::assets::core::{AssetCategory, BaseSystemType};
         let adapter = StorageAssetAdapter::new().await;
         let request = create_test_storage_request().await;
 
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Storage));
+        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Storage)));
 
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();

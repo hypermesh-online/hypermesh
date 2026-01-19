@@ -10,12 +10,16 @@ use anyhow::{Result, anyhow};
 
 pub mod proof;
 pub mod validator;
+pub mod validation;
+pub mod asset_integration;
 pub mod block_matrix;
 pub mod hypermesh_client;
 pub mod real_validator;
 
 pub use proof::*;
 pub use validator::*;
+pub use validation::*;
+pub use asset_integration::*;
 pub use block_matrix::*;
 pub use hypermesh_client::*;
 
@@ -72,17 +76,11 @@ impl ConsensusProof {
         })
     }
 
-    /// DEPRECATED - SECURITY BYPASS - DO NOT USE IN PRODUCTION
-    /// This method creates invalid proofs and bypasses security validation
-    /// TODO: Replace all calls to this method with generate_from_network()
+    /// TEST-ONLY: Create a valid test proof
+    /// This is ONLY available in test builds and should NEVER be used in production
     #[cfg(test)]
     pub fn default_for_testing() -> Self {
-        Self {
-            stake_proof: StakeProof::default(),
-            time_proof: TimeProof::default(),
-            space_proof: SpaceProof::default(),
-            work_proof: WorkProof::default(),
-        }
+        Self::new_for_testing()
     }
 
     /// Create a testing proof (non-test builds, for API placeholder usage only)
@@ -130,24 +128,14 @@ impl ConsensusProof {
     /// Comprehensive validation of all four proofs with detailed error reporting
     /// This is the async version required by BlockMatrix for detailed validation
     pub async fn validate_comprehensive(&self) -> Result<bool> {
-        // Validate stake proof
-        if !self.stake_proof.validate() {
-            return Err(anyhow!("Stake proof validation failed: invalid stake amount or signature"));
-        }
+        // Use the new validation module for detailed checking
+        let validation = self.verify_all()?;
 
-        // Validate time proof
-        if !self.time_proof.validate() {
-            return Err(anyhow!("Time proof validation failed: invalid timestamp or nonce"));
-        }
-
-        // Validate space proof
-        if !self.space_proof.validate() {
-            return Err(anyhow!("Space proof validation failed: invalid storage commitment"));
-        }
-
-        // Validate work proof
-        if !self.work_proof.validate() {
-            return Err(anyhow!("Work proof validation failed: invalid computational work"));
+        if !validation.all_valid {
+            return Err(anyhow!(
+                "Consensus proof validation failed: {}",
+                validation.error_summary()
+            ));
         }
 
         // All proofs passed comprehensive validation

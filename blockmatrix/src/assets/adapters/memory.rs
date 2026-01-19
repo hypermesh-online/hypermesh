@@ -794,7 +794,7 @@ mod tests {
         let request = create_test_memory_request();
 
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Memory));
+        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Memory)));
         assert!(allocation.status.proxy_address.is_some());
 
         // Test deallocation

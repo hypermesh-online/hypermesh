@@ -587,6 +587,7 @@ impl Default for ResourceSharingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::test_asset_id;
     
     #[tokio::test]
     async fn test_consensus_proof_vm_creation() {
@@ -623,11 +624,12 @@ mod tests {
     async fn test_matrix_integration_types() {
         use crate::assets::matrix_blockchain::{MatrixBlockchainManager, EntityType};
         use crate::assets::core::{AssetType, asset_id::AssetId as RealAssetId};
+        use crate::test_utils::test_asset_id;
 
         // Test CrossEntityValidation creation
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: RealAssetId::new(AssetType::Container),
+            asset_id: test_asset_id(AssetType::Container),
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,
@@ -726,7 +728,7 @@ mod tests {
             cross_entity_validations: vec![
                 CrossEntityValidation {
                     entity_domain: "dmv.hypermesh.online".to_string(),
-                    asset_id: RealAssetId::new(AssetType::Container),
+                    asset_id: test_asset_id(AssetType::Container),
                     validation_fields: vec!["registration_status".to_string()],
                     validation_type: ValidationRequirementType::AssetExists,
                     privacy_level: PrivacyLevel::P2P,

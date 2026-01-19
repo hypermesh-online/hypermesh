@@ -493,24 +493,25 @@ mod tests {
     use super::AssetId;
     use crate::AssetType;
     use crate::assets::core::status::AssetStatus;
-    
+    use crate::test_utils::test_asset_id;
+
     #[test]
     fn test_privacy_level_access_control() {
         assert!(!PrivacyLevel::Private.allows_access_from(&PrivacyLevel::FullPublic));
         assert!(PrivacyLevel::FullPublic.allows_access_from(&PrivacyLevel::Private));
         assert!(PrivacyLevel::P2P.allows_access_from(&PrivacyLevel::PrivateNetwork));
     }
-    
+
     #[test]
     fn test_privacy_level_rewards() {
         assert_eq!(PrivacyLevel::Private.caesar_reward_multiplier(), 0.0);
         assert_eq!(PrivacyLevel::FullPublic.caesar_reward_multiplier(), 1.0);
         assert!(PrivacyLevel::P2P.caesar_reward_multiplier() > 0.0);
     }
-    
+
     #[test]
     fn test_asset_allocation_creation() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = test_asset_id(AssetType::Cpu);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),
@@ -526,7 +527,7 @@ mod tests {
     
     #[test]
     fn test_allocation_expiry() {
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),
@@ -545,7 +546,7 @@ mod tests {
     
     #[test]
     fn test_caesar_reward_calculation() {
-        let asset_id = AssetId::new(AssetType::Storage);
+        let asset_id = test_asset_id(AssetType::Storage);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),

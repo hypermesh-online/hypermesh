@@ -413,6 +413,7 @@ mod tests {
     use super::*;
     use super::AssetId;
     use crate::AssetType;
+    use crate::test_utils::test_asset_id;
     
     #[test]
     fn test_proxy_address_creation() {
@@ -459,7 +460,7 @@ mod tests {
     #[tokio::test]
     async fn test_proxy_resolver() {
         let resolver = ProxyAddressResolver::new();
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = test_asset_id(AssetType::Cpu);
         let proxy_addr = ProxyAddress::new([0x01; 16], [0x02; 8], 8080);
         
         // Register mapping

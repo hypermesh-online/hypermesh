@@ -100,7 +100,7 @@ impl Router {
         Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(b"Not Found".to_vec())
-            .unwrap()
+            .expect("valid response builder")
     }
 
     fn path_matches(request_path: &str, route_pattern: &str) -> bool {

@@ -606,23 +606,24 @@ impl ShardManager {
 mod tests {
     use super::*;
     use crate::assets::core::{AssetId, AssetType};
-    
+    use crate::test_utils::test_asset_id;
+
     #[tokio::test]
     async fn test_sharded_data_access_creation() {
         let access = ShardedDataAccess::new().await.unwrap();
         assert_eq!(access.active_sessions.read().await.len(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_shard_manager_creation() {
         let manager = ShardManager::new().await.unwrap();
         assert_eq!(manager.available_shards.read().await.len(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_create_shards() {
         let manager = ShardManager::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Storage);
+        let asset_id = test_asset_id(AssetType::Storage);
         let test_data = b"This is test data that will be sharded and encrypted";
         
         let shards = manager.create_shards(&asset_id, test_data).await.unwrap();
@@ -636,7 +637,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_and_get_shard() {
         let manager = ShardManager::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Storage);
+        let asset_id = test_asset_id(AssetType::Storage);
         
         let shard = EncryptedShard {
             shard_id: "test-shard".to_string(),

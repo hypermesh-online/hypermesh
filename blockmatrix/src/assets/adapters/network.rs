@@ -943,9 +943,9 @@ mod tests {
     async fn test_network_allocation() {
         let adapter = NetworkAssetAdapter::new().await;
         let request = create_test_network_request().await;
-        
+
         let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert_eq!(allocation.asset_id.asset_type, Some(AssetType::Network));
+        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Network)));
         
         // Test deallocation
         adapter.deallocate_asset(&allocation.asset_id).await.unwrap();

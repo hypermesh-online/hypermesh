@@ -288,6 +288,10 @@ pub mod monitoring {
     pub struct Monitor;
 }
 
+// Test utilities
+#[cfg(test)]
+pub mod test_utils;
+
 #[cfg(test)]
 mod tests {
     use super::*;

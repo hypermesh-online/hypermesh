@@ -765,10 +765,11 @@ impl NATTranslator {
 mod tests {
     use super::*;
     use crate::assets::core::{AssetType, AssetId};
-    
+    use crate::test_utils::test_asset_id;
+
     #[test]
     fn test_global_address_creation() {
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
             [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
@@ -783,7 +784,7 @@ mod tests {
     
     #[test]
     fn test_global_address_string_conversion() {
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
             [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
@@ -808,7 +809,7 @@ mod tests {
     #[tokio::test]
     async fn test_translation_creation() {
         let translator = NATTranslator::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
@@ -848,7 +849,7 @@ mod tests {
     #[tokio::test]
     async fn test_real_memory_mapping() {
         let translator = NATTranslator::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
 
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
@@ -904,7 +905,7 @@ mod tests {
     #[tokio::test]
     async fn test_translation_with_privacy() {
         let translator = NATTranslator::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
 
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
@@ -953,7 +954,7 @@ mod tests {
     #[tokio::test]
     async fn test_invalid_privacy_config() {
         let translator = NATTranslator::new().await.unwrap();
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
 
         let global_addr = GlobalAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],

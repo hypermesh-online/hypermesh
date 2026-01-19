@@ -552,6 +552,7 @@ pub struct IsolationReport {
 mod tests {
     use super::*;
     use crate::assets::core::AssetType;
+    use crate::test_utils::test_asset_id;
 
     struct MockTrustChainClient;
 
@@ -647,7 +648,7 @@ mod tests {
             MultiNetworkConfig::default(),
         );
 
-        let asset_id = AssetId::new(AssetType::Storage);
+        let asset_id = test_asset_id(AssetType::Storage);
         let bank_network = [1u8; 16];
         let dealer_network = [2u8; 16];
 

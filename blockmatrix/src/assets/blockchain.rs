@@ -396,10 +396,11 @@ pub struct ActualResourceUsage {
 mod tests {
     use super::*;
     use crate::assets::core::asset_id::AssetType;
+    use crate::test_utils::test_asset_id;
 
     #[tokio::test]
     async fn test_asset_record_creation() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = test_asset_id(AssetType::Cpu);
         
         // Create mock consensus proof (would be real in production)
         let consensus_proofs = vec![]; // TODO: Add real consensus proofs
@@ -420,7 +421,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_asset_record_with_consensus_proof() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = test_asset_id(AssetType::Cpu);
         
         // Create real consensus proof for testing
         let space_proof = SpaceProof::new(
@@ -473,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_privacy_validation() {
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         let record = HyperMeshAssetRecord::new(
             asset_id,
             AssetRecordType::StatusUpdate,
@@ -490,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_block_data_serialization() {
-        let asset_id = AssetId::new(AssetType::Storage);
+        let asset_id = test_asset_id(AssetType::Storage);
         let record = HyperMeshAssetRecord::new(
             asset_id,
             AssetRecordType::Transfer,

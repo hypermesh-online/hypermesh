@@ -141,10 +141,9 @@ async fn handle_request(
     add_cors_headers(&mut response);
 
     // Add request ID header
-    response.headers_mut().insert(
-        "x-request-id",
-        request_id.parse().unwrap(),
-    );
+    if let Ok(header_value) = request_id.parse() {
+        response.headers_mut().insert("x-request-id", header_value);
+    }
 
     RequestLogger::log_response(&response, &request_id, start_time);
 
