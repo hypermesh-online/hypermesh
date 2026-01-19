@@ -68,7 +68,10 @@ use crate::assets::privacy::{
     CaesarRewardCalculator, PrivacyEnforcer, AccessControlResult,
     ResourceAllocationConfig, PayoutFrequency
 };
-use crate::assets::core::{PrivacyLevel, AssetId};
+use crate::assets::core::{
+    PrivacyLevel, AssetId, NetworkScope, AssetCategory,
+    BaseSystemType, AssetData,
+};
 
 // Import Sprint 2.3: Multi-Network Participation
 use crate::assets::multi_node::{
@@ -432,7 +435,17 @@ impl IntelligenceLayer {
                 z: matrix_positions.first().map(|p| p.z).unwrap_or(0),
             };
 
-            let asset_id = AssetId::new(crate::assets::core::AssetType::Storage);
+            // Create asset ID with real content-based hash
+            let data = AssetData {
+                config: vec![1, 2, 3], // Test data
+                definition: vec![4, 5, 6],
+                metadata: vec![7, 8, 9],
+            };
+            let asset_id = AssetId::from_asset_data(
+                &data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Storage),
+            );
 
             // Attempt registration, but don't fail if network membership not established
             if let Err(e) = self.network_coordinator

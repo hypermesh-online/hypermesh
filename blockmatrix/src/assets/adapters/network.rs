@@ -22,6 +22,7 @@ use crate::assets::core::{
     ResourceUsage, ResourceLimits, NetworkUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     NetworkRequirements,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 
 /// Network allocation record
@@ -390,10 +391,8 @@ impl NetworkAssetAdapter {
     
     /// Generate proxy address for network access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid = asset_id.get_uuid();
-        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
-        node_id.copy_from_slice(&uuid_bytes[..8]);
+        node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
@@ -532,9 +531,18 @@ impl AssetAdapter for NetworkAssetAdapter {
             });
         }
         
-        // Create asset ID
-        let asset_id = AssetId::new(AssetType::Network);
-        
+        // Create asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Network),
+        );
+
         // Allocate network bandwidth
         let (allocated_interfaces, allocated_bandwidth) = self.allocate_network_bandwidth(network_req, &asset_id).await?;
         
@@ -563,7 +571,9 @@ impl AssetAdapter for NetworkAssetAdapter {
             isolation_enabled: matches!(request.privacy_level, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork),
             ipv6_addresses,
             vlan_id: if matches!(request.privacy_level, PrivacyLevel::Private) {
-                Some(100 + (asset_id.get_uuid().as_u128() % 4000) as u16) // Generate unique VLAN ID
+                // Use first 16 bytes of content_hash to generate VLAN ID
+                let hash_as_u128 = u128::from_le_bytes(asset_id.content_hash[..16].try_into().unwrap());
+                Some(100 + (hash_as_u128 % 4000) as u16) // Generate unique VLAN ID
             } else {
                 None
             },

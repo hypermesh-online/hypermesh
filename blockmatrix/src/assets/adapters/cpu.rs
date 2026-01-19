@@ -23,6 +23,7 @@ use crate::assets::core::{
     ResourceUsage, ResourceLimits, CpuUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     CpuRequirements,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 use crate::os_integration::{create_os_abstraction, OsAbstraction};
 
@@ -386,10 +387,8 @@ impl CpuAssetAdapter {
     
     /// Generate proxy address for CPU access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid = asset_id.get_uuid();
-        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
-        node_id.copy_from_slice(&uuid_bytes[..8]);
+        node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
@@ -552,9 +551,18 @@ impl AssetAdapter for CpuAssetAdapter {
                 reason: "No CPU requirements specified".to_string()
             })?;
         
-        // Create asset ID
-        let asset_id = AssetId::new(AssetType::Cpu);
-        
+        // Create asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Cpu),
+        );
+
         // Allocate CPU cores
         let allocated_cores = self.allocate_cpu_cores(cpu_req, &asset_id).await?;
         

@@ -430,7 +430,7 @@ impl ShardedDataAccess {
     /// Generate session ID
     fn generate_session_id(&self, asset_id: &AssetId) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(asset_id.get_uuid().as_bytes());
+        hasher.update(&asset_id.content_hash[..16]);
 
         let time_nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)

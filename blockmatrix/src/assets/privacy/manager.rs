@@ -1004,8 +1004,10 @@ impl PrivacyManager {
         privacy_level: &PrivacyLevel,
         asset_id: &AssetId,
     ) -> AssetResult<ResourceAllocationConfig> {
-        let asset_type = format!("{:?}", asset_id.asset_type).to_lowercase();
-        
+        let asset_type = asset_id.asset_type()
+            .map(|at| format!("{:?}", at).to_lowercase())
+            .unwrap_or_else(|| "unknown".to_string());
+
         let resource_privacy = user_config.resource_privacy_settings
             .get(&asset_type)
             .cloned()

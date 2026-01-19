@@ -231,7 +231,9 @@ impl RemoteProxyManager {
         let node_id_str = hex::encode(selected_node.node_id);
 
         // Allocate port for this asset type
-        let asset_type_str = format!("{:?}", asset_id.asset_type).to_lowercase();
+        let asset_type_str = asset_id.asset_type()
+            .map(|at| format!("{:?}", at).to_lowercase())
+            .unwrap_or_else(|| "unknown".to_string());
         let port = self.allocate_port_for_node(&node_id_str, &asset_type_str).await?;
 
         // Generate global proxy address using NAT-like addressing

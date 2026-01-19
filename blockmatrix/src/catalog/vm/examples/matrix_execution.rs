@@ -16,7 +16,10 @@ use crate::catalog::vm::{
     ValidationConstraint
 };
 use crate::catalog::vm::execution::ExecutionContext;
-use crate::assets::core::{AssetId, AssetType};
+use crate::assets::core::{
+    AssetId, AssetType, NetworkScope, AssetCategory,
+    BaseSystemType, AssetData,
+};
 use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityConfig,
     EntityType, MatrixCoordinate, GeographicDimension,
@@ -51,9 +54,18 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
     // Configure matrix VM with entity configurations
     let configured_matrix_vm = setup_entity_vm_configs(matrix_vm).await?;
     
-    // Vehicle to purchase (example VIN as AssetId)
-    let vehicle_vin = AssetId::new(AssetType::Container);
-    
+    // Vehicle to purchase (example VIN as AssetId with real content-based hash)
+    let data = AssetData {
+        config: vec![1, 2, 3], // Test VIN data
+        definition: vec![4, 5, 6],
+        metadata: vec![7, 8, 9],
+    };
+    let vehicle_vin = AssetId::from_asset_data(
+        &data,
+        NetworkScope::Global,
+        AssetCategory::BaseSystem(BaseSystemType::Container),
+    );
+
     // Create multi-entity workflow for vehicle purchase
     let workflow = MultiEntityWorkflow {
         entity_sequence: vec![
@@ -218,7 +230,17 @@ pub async fn medical_data_processing_example() -> Result<()> {
     let vm = Arc::new(ConsensusProofVM::new(VMConfig::default()).await?);
     let matrix_vm = vm.create_matrix_aware_vm(matrix_manager).await?;
     
-    let patient_record_id = AssetId::new(AssetType::Container);
+    // Create patient record ID with real content-based hash
+    let data = AssetData {
+        config: vec![1, 2, 3], // Test patient data
+        definition: vec![4, 5, 6],
+        metadata: vec![7, 8, 9],
+    };
+    let patient_record_id = AssetId::from_asset_data(
+        &data,
+        NetworkScope::Global,
+        AssetCategory::BaseSystem(BaseSystemType::Container),
+    );
     
     // Create privacy-focused execution context
     let matrix_context = MatrixExecutionContext {

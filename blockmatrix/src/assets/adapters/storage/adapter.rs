@@ -20,6 +20,7 @@ use crate::assets::core::{
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, StorageUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 
 use super::allocation::{
@@ -146,8 +147,17 @@ impl AssetAdapter for StorageAssetAdapter {
             });
         }
 
-        // Create asset ID
-        let asset_id = AssetId::new(AssetType::Storage);
+        // Create asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Storage),
+        );
 
         // Allocate storage from devices
         let (allocated_devices, allocated_size) = allocate_storage_from_devices(

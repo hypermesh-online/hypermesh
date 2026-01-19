@@ -401,7 +401,28 @@ mod tests {
     use super::AssetId;
     use crate::AssetType;
     use crate::assets::core::privacy::PrivacyLevel;
-    
+    use crate::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
+
+    // Test helper to create AssetId from AssetType
+    fn test_asset_id(asset_type: AssetType) -> AssetId {
+        let data = AssetData {
+            config: vec![1, 2, 3],
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let category = match asset_type {
+            AssetType::Cpu => AssetCategory::BaseSystem(BaseSystemType::Cpu),
+            AssetType::Gpu => AssetCategory::BaseSystem(BaseSystemType::Gpu),
+            AssetType::Memory => AssetCategory::BaseSystem(BaseSystemType::Memory),
+            AssetType::Storage => AssetCategory::BaseSystem(BaseSystemType::Storage),
+            AssetType::Network => AssetCategory::BaseSystem(BaseSystemType::Network),
+            AssetType::Container => AssetCategory::BaseSystem(BaseSystemType::Container),
+            AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
+            _ => AssetCategory::BaseSystem(BaseSystemType::Container),
+        };
+        AssetId::from_asset_data(&data, NetworkScope::Global, category)
+    }
+
     #[test]
     fn test_asset_state_operations() {
         assert!(AssetState::Available.is_operational());
@@ -413,7 +434,7 @@ mod tests {
     
     #[test]
     fn test_asset_status_creation() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = test_asset_id(AssetType::Cpu);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert-fingerprint".to_string(),
@@ -442,7 +463,7 @@ mod tests {
     
     #[test]
     fn test_health_status_with_alerts() {
-        let asset_id = AssetId::new(AssetType::Memory);
+        let asset_id = test_asset_id(AssetType::Memory);
         let mut status = AssetStatus::new(
             asset_id,
             "test-cert".to_string(),

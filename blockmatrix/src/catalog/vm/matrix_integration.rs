@@ -518,7 +518,12 @@ impl MatrixAwareVM {
                 interaction_type: InteractionType::Validation,
                 source_entity: context.target_entity.clone().unwrap_or_default(),
                 target_entity: validation.entity_domain.clone(),
-                asset_id: Some(validation.asset_id.get_uuid()),
+                asset_id: Some({
+                    // Use first 16 bytes of content_hash as UUID-like identifier
+                    let mut bytes = [0u8; 16];
+                    bytes.copy_from_slice(&validation.asset_id.content_hash[..16]);
+                    uuid::Uuid::from_bytes(bytes)
+                }),
                 timestamp: std::time::SystemTime::now(),
                 privacy_level: validation.privacy_level.clone(),
             });
@@ -888,15 +893,27 @@ mod tests {
     
     #[test]
     fn test_cross_entity_validation_creation() {
-        use crate::assets::core::{AssetId, AssetType};
+        use crate::assets::core::{AssetId, AssetData, NetworkScope, AssetCategory, BaseSystemType};
+
+        let data = AssetData {
+            config: vec![1, 2, 3],
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Container),
+        );
+
         let validation = CrossEntityValidation {
             entity_domain: "honda.hypermesh.online".to_string(),
-            asset_id: AssetId::new(AssetType::Container),
+            asset_id,
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
             privacy_level: PrivacyLevel::P2P,
         };
-        
+
         assert_eq!(validation.entity_domain, "honda.hypermesh.online");
         assert_eq!(validation.validation_fields.len(), 2);
     }

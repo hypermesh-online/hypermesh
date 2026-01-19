@@ -190,7 +190,25 @@ impl AssetManager {
             consensus_requirements: ConsensusRequirements::default(),
         }
     }
-    
+
+    /// Convert AssetCategory to AssetType for adapter lookup
+    fn category_to_asset_type(category: &AssetCategory) -> AssetResult<AssetType> {
+        match category {
+            AssetCategory::BaseSystem(sys) => Ok(match sys {
+                BaseSystemType::Cpu => AssetType::Cpu,
+                BaseSystemType::Gpu => AssetType::Gpu,
+                BaseSystemType::Memory => AssetType::Memory,
+                BaseSystemType::Storage => AssetType::Storage,
+                BaseSystemType::Network => AssetType::Network,
+                BaseSystemType::Container => AssetType::Container,
+                BaseSystemType::Economic => AssetType::Economic,
+            }),
+            AssetCategory::Application(_) => Err(AssetError::AdapterError {
+                message: "Cannot determine asset type for application asset".to_string()
+            }),
+        }
+    }
+
     /// Register an asset adapter for a specific asset type
     pub async fn register_adapter(
         &self,
@@ -231,28 +249,8 @@ impl AssetManager {
     
     /// Deallocate an asset
     pub async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
-        // Get adapter for asset type (check both new and legacy fields)
-        let asset_type = if let Some(ref at) = asset_id.asset_type {
-            at.clone()
-        } else {
-            // Derive from category if legacy field not present
-            match &asset_id.category {
-                AssetCategory::BaseSystem(sys) => match sys {
-                    BaseSystemType::Cpu => AssetType::Cpu,
-                    BaseSystemType::Gpu => AssetType::Gpu,
-                    BaseSystemType::Memory => AssetType::Memory,
-                    BaseSystemType::Storage => AssetType::Storage,
-                    BaseSystemType::Network => AssetType::Network,
-                    BaseSystemType::Container => AssetType::Container,
-                    BaseSystemType::Economic => AssetType::Economic,
-                },
-                AssetCategory::Application(_) => {
-                    return Err(AssetError::AdapterError {
-                        message: "Cannot determine asset type for application asset".to_string()
-                    });
-                }
-            }
-        };
+        // Derive asset type from category
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
         let adapter = adapters.get(&asset_type)
@@ -282,13 +280,10 @@ impl AssetManager {
         }
 
         // If not in registry, query adapter
-        let asset_type = asset_id.asset_type.as_ref()
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
@@ -302,13 +297,10 @@ impl AssetManager {
         asset_id: &AssetId,
         privacy_level: PrivacyLevel,
     ) -> AssetResult<()> {
-        let asset_type = asset_id.asset_type.as_ref()
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
@@ -318,13 +310,10 @@ impl AssetManager {
 
     /// Assign proxy address for remote access
     pub async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
-        let asset_type = asset_id.asset_type.as_ref()
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
@@ -350,7 +339,7 @@ impl AssetManager {
         let assets = self.assets.read().await;
         let filtered_assets: Vec<AssetStatus> = assets
             .iter()
-            .filter(|(id, _)| id.asset_type.as_ref() == Some(&asset_type))
+            .filter(|(id, _)| Self::category_to_asset_type(&id.category).ok() == Some(asset_type.clone()))
             .map(|(_, status)| status.clone())
             .collect();
 
@@ -359,13 +348,10 @@ impl AssetManager {
 
     /// Get resource usage for an asset
     pub async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
-        let asset_type = asset_id.asset_type.as_ref()
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
@@ -379,13 +365,10 @@ impl AssetManager {
         asset_id: &AssetId,
         limits: ResourceLimits,
     ) -> AssetResult<()> {
-        let asset_type = asset_id.asset_type.as_ref()
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(asset_type)
+        let adapter = adapters.get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
                 asset_id: asset_id.to_string()
             })?;
@@ -451,35 +434,19 @@ impl AssetManager {
         let mut stats = AssetStatistics::default();
 
         for (asset_id, status) in assets.iter() {
-            // Check legacy asset_type field first, then category
-            if let Some(asset_type) = &asset_id.asset_type {
-                match asset_type {
-                    AssetType::Cpu => stats.cpu_assets += 1,
-                    AssetType::Gpu => stats.gpu_assets += 1,
-                    AssetType::Memory => stats.memory_assets += 1,
-                    AssetType::Storage => stats.storage_assets += 1,
-                    AssetType::Network => stats.network_assets += 1,
-                    AssetType::Container => stats.container_assets += 1,
-                    AssetType::Economic => stats.economic_assets += 1,
-                    // STUB: Phase 4b - VM and Library assets not yet tracked in statistics
-                    AssetType::VirtualMachine => {},
-                    AssetType::Library => {},
-                }
-            } else {
-                // Use category if legacy field not present
-                match &asset_id.category {
-                    AssetCategory::BaseSystem(sys) => match sys {
-                        BaseSystemType::Cpu => stats.cpu_assets += 1,
-                        BaseSystemType::Gpu => stats.gpu_assets += 1,
-                        BaseSystemType::Memory => stats.memory_assets += 1,
-                        BaseSystemType::Storage => stats.storage_assets += 1,
-                        BaseSystemType::Network => stats.network_assets += 1,
-                        BaseSystemType::Container => stats.container_assets += 1,
-                        BaseSystemType::Economic => stats.economic_assets += 1,
-                    },
-                    AssetCategory::Application(_) => {
-                        // Application assets not tracked separately yet
-                    }
+            // Derive asset type from category
+            match &asset_id.category {
+                AssetCategory::BaseSystem(sys) => match sys {
+                    BaseSystemType::Cpu => stats.cpu_assets += 1,
+                    BaseSystemType::Gpu => stats.gpu_assets += 1,
+                    BaseSystemType::Memory => stats.memory_assets += 1,
+                    BaseSystemType::Storage => stats.storage_assets += 1,
+                    BaseSystemType::Network => stats.network_assets += 1,
+                    BaseSystemType::Container => stats.container_assets += 1,
+                    BaseSystemType::Economic => stats.economic_assets += 1,
+                },
+                AssetCategory::Application(_) => {
+                    // Application assets not tracked separately yet
                 }
             }
 

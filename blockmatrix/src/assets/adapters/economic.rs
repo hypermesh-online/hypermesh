@@ -10,6 +10,7 @@ use crate::assets::core::{
     AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
     ResourceUsage, ResourceLimits, PrivacyLevel, ProxyAddress,
     AdapterHealth, AdapterCapabilities, AssetType,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 use crate::assets::core::privacy::{
     AllocationConfig, AccessConfig, ResourceAllocationConfig, ConcurrencyLimits,
@@ -213,8 +214,17 @@ impl AssetAdapter for EconomicAssetAdapter {
                 reason: "Economic requirements not specified".to_string()
             })?;
 
-        // Generate asset ID
-        let asset_id = AssetId::new(AssetType::Economic);
+        // Generate asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Economic),
+        );
 
         // Create economic asset state
         let usage = EconomicUsage {

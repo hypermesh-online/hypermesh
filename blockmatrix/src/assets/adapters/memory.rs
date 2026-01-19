@@ -24,6 +24,7 @@ use crate::assets::core::{
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, MemoryUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 use crate::os_integration::{create_os_abstraction, OsAbstraction};
 
@@ -235,10 +236,8 @@ impl MemoryAssetAdapter {
     
     /// Generate proxy address for NAT-like system
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid = asset_id.get_uuid();
-        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
-        node_id.copy_from_slice(&uuid_bytes[..8]);
+        node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
@@ -256,7 +255,7 @@ impl MemoryAssetAdapter {
         // For now, return placeholder signature
         let mut signature = Vec::new();
         signature.extend_from_slice(b"FALCON1024_SIG_");
-        signature.extend_from_slice(&proxy_mapping.local_asset_id.blockchain_hash()[..16]);
+        signature.extend_from_slice(&proxy_mapping.local_asset_id.content_hash[..16]);
         signature
     }
     
@@ -425,9 +424,18 @@ impl AssetAdapter for MemoryAssetAdapter {
             memory_req.numa_node,
         ).await?;
         
-        // Create asset ID
-        let asset_id = AssetId::new(AssetType::Memory);
-        
+        // Create asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Memory),
+        );
+
         // Generate proxy address for NAT-like system
         let proxy_address = Self::generate_proxy_address(&asset_id).await;
         

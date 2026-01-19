@@ -447,7 +447,9 @@ impl EntityBlockchain {
                     for field in &self.config.privacy_policies.public_fields {
                         match field.as_str() {
                             "asset_type" => {
-                                public_info.insert("asset_type".to_string(), format!("{:?}", record.asset_id.asset_type));
+                                if let Some(asset_type) = record.asset_id.asset_type() {
+                                    public_info.insert("asset_type".to_string(), format!("{:?}", asset_type));
+                                }
                             },
                             "record_type" => {
                                 public_info.insert("record_type".to_string(), record.record_type.to_string());

@@ -184,12 +184,6 @@ pub struct AssetId {
 
     /// Creation timestamp
     pub creation_timestamp: SystemTime,
-
-    /// Legacy fields for backward compatibility
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_type: Option<AssetType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub uuid: Option<Uuid>,
 }
 
 impl AssetId {
@@ -206,89 +200,17 @@ impl AssetId {
             network_scope,
             category,
             creation_timestamp: SystemTime::now(),
-            asset_type: None,
-            uuid: None,
         }
     }
 
-    /// Create new asset ID with automatic blockchain hash generation (legacy support)
-    pub fn new(asset_type: AssetType) -> Self {
-        // For backward compatibility, create a default asset in global scope
-        let data = AssetData {
-            config: vec![],
-            definition: vec![asset_type.type_id()],
-            metadata: vec![],
-        };
-
-        let category = match asset_type {
-            AssetType::Cpu => AssetCategory::BaseSystem(BaseSystemType::Cpu),
-            AssetType::Gpu => AssetCategory::BaseSystem(BaseSystemType::Gpu),
-            AssetType::Memory => AssetCategory::BaseSystem(BaseSystemType::Memory),
-            AssetType::Storage => AssetCategory::BaseSystem(BaseSystemType::Storage),
-            AssetType::Network => AssetCategory::BaseSystem(BaseSystemType::Network),
-            AssetType::Container => AssetCategory::BaseSystem(BaseSystemType::Container),
-            AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
-            AssetType::VirtualMachine | AssetType::Library => {
-                AssetCategory::Application(ApplicationDomain {
-                    domain_name: "legacy".to_string(),
-                    domain_hash: [0u8; 32],
-                })
-            }
-        };
-
-        let mut asset_id = Self::from_asset_data(&data, NetworkScope::Global, category);
-        asset_id.asset_type = Some(asset_type);
-        asset_id.uuid = Some(Uuid::new_v4());
-        asset_id
-    }
-
-    /// Create asset ID from existing components (legacy support)
-    pub fn from_components(
-        asset_type: AssetType,
-        uuid: Uuid,
-        blockchain_hash: [u8; 32],
-        creation_timestamp: SystemTime,
-    ) -> Self {
-        // Convert legacy format to new format
-        let category = match asset_type {
-            AssetType::Cpu => AssetCategory::BaseSystem(BaseSystemType::Cpu),
-            AssetType::Gpu => AssetCategory::BaseSystem(BaseSystemType::Gpu),
-            AssetType::Memory => AssetCategory::BaseSystem(BaseSystemType::Memory),
-            AssetType::Storage => AssetCategory::BaseSystem(BaseSystemType::Storage),
-            AssetType::Network => AssetCategory::BaseSystem(BaseSystemType::Network),
-            AssetType::Container => AssetCategory::BaseSystem(BaseSystemType::Container),
-            AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
-            AssetType::VirtualMachine | AssetType::Library => {
-                AssetCategory::Application(ApplicationDomain {
-                    domain_name: "legacy".to_string(),
-                    domain_hash: [0u8; 32],
-                })
-            }
-        };
-
-        Self {
-            content_hash: blockchain_hash, // Use existing hash as content hash
-            network_scope: NetworkScope::Global,
-            category,
-            creation_timestamp,
-            asset_type: Some(asset_type),
-            uuid: Some(uuid),
-        }
-    }
 
     /// Create asset ID from hash (for default/test purposes)
     pub fn new_from_hash(hash: &[u8; 32]) -> Self {
-        // Extract first 16 bytes for UUID
-        let mut uuid_bytes = [0u8; 16];
-        uuid_bytes.copy_from_slice(&hash[..16]);
-
         Self {
             content_hash: *hash,
             network_scope: NetworkScope::Global,
             category: AssetCategory::BaseSystem(BaseSystemType::Container),
             creation_timestamp: SystemTime::now(),
-            asset_type: Some(AssetType::Container),
-            uuid: Some(Uuid::from_bytes(uuid_bytes)),
         }
     }
 
@@ -386,35 +308,6 @@ impl AssetId {
         }
     }
 
-    /// Get blockchain hash (compatibility method)
-    pub fn blockchain_hash(&self) -> [u8; 32] {
-        self.content_hash
-    }
-
-    /// Get UUID (compatibility method)
-    /// Returns a deterministic UUID derived from content hash if legacy UUID not present
-    pub fn get_uuid(&self) -> Uuid {
-        if let Some(uuid) = self.uuid {
-            uuid
-        } else {
-            // Derive UUID from first 16 bytes of content hash
-            let mut uuid_bytes = [0u8; 16];
-            uuid_bytes.copy_from_slice(&self.content_hash[..16]);
-            Uuid::from_bytes(uuid_bytes)
-        }
-    }
-
-    /// Get UUID bytes (compatibility helper for code that needs raw bytes)
-    pub fn uuid_bytes(&self) -> [u8; 16] {
-        if let Some(uuid) = self.uuid {
-            *uuid.as_bytes()
-        } else {
-            // Derive from content hash
-            let mut uuid_bytes = [0u8; 16];
-            uuid_bytes.copy_from_slice(&self.content_hash[..16]);
-            uuid_bytes
-        }
-    }
 
     /// Get asset ID as hex string
     pub fn to_hex_string(&self) -> String {
@@ -436,117 +329,77 @@ impl AssetId {
 
     /// Parse asset ID from hex string format
     pub fn from_hex_string(hex_str: &str) -> Result<Self, AssetIdError> {
-        // Try new format first, then fall back to legacy format
-        if hex_str.contains("global") || hex_str.contains("reg:") ||
-           hex_str.contains("fed:") || hex_str.contains("priv:") {
-            // New format parsing
-            let parts: Vec<&str> = hex_str.split(':').collect();
-            if parts.len() < 3 {
-                return Err(AssetIdError::InvalidFormat {
-                    input: hex_str.to_string(),
-                });
-            }
-
-            // Parse network scope
-            let network_scope = match parts[0] {
-                "global" => NetworkScope::Global,
-                scope if scope.starts_with("reg") => {
-                    let hash = hex::decode(parts[1])
-                        .map_err(|_| AssetIdError::InvalidFormat {
-                            input: hex_str.to_string(),
-                        })?;
-                    let mut id = [0u8; 32];
-                    id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
-                    NetworkScope::Registry(RegistryId(id))
-                }
-                _ => NetworkScope::Global, // Default to global
-            };
-
-            // Parse content hash (last part)
-            let hash_bytes = hex::decode(parts[parts.len() - 1])
-                .map_err(|_| AssetIdError::InvalidHash {
-                    hash_str: parts[parts.len() - 1].to_string(),
-                })?;
-
-            if hash_bytes.len() != 32 {
-                return Err(AssetIdError::InvalidHashLength {
-                    expected: 32,
-                    actual: hash_bytes.len(),
-                });
-            }
-
-            let mut content_hash = [0u8; 32];
-            content_hash.copy_from_slice(&hash_bytes);
-
-            // Simple category detection for now
-            let category = AssetCategory::Application(ApplicationDomain {
-                domain_name: "imported".to_string(),
-                domain_hash: [0u8; 32],
+        // Parse new format: scope:category:hash
+        let parts: Vec<&str> = hex_str.split(':').collect();
+        if parts.len() < 3 {
+            return Err(AssetIdError::InvalidFormat {
+                input: hex_str.to_string(),
             });
-
-            Ok(Self {
-                content_hash,
-                network_scope,
-                category,
-                creation_timestamp: SystemTime::now(),
-                asset_type: None,
-                uuid: None,
-            })
-        } else {
-            // Legacy format: type:uuid:hash
-            let parts: Vec<&str> = hex_str.split(':').collect();
-            if parts.len() != 3 {
-                return Err(AssetIdError::InvalidFormat {
-                    input: hex_str.to_string(),
-                });
-            }
-
-            // Parse asset type
-            let asset_type = match parts[0] {
-                "cpu" => AssetType::Cpu,
-                "gpu" => AssetType::Gpu,
-                "memory" => AssetType::Memory,
-                "storage" => AssetType::Storage,
-                "network" => AssetType::Network,
-                "container" => AssetType::Container,
-                "economic" => AssetType::Economic,
-                _ => return Err(AssetIdError::InvalidAssetType {
-                    type_name: parts[0].to_string(),
-                }),
-            };
-
-            // Parse UUID
-            let uuid = Uuid::parse_str(parts[1])
-                .map_err(|_| AssetIdError::InvalidUuid {
-                    uuid_str: parts[1].to_string(),
-                })?;
-
-            // Parse blockchain hash
-            let hash_bytes = hex::decode(parts[2])
-                .map_err(|_| AssetIdError::InvalidHash {
-                    hash_str: parts[2].to_string(),
-                })?;
-
-            if hash_bytes.len() != 32 {
-                return Err(AssetIdError::InvalidHashLength {
-                    expected: 32,
-                    actual: hash_bytes.len(),
-                });
-            }
-
-            let mut blockchain_hash = [0u8; 32];
-            blockchain_hash.copy_from_slice(&hash_bytes);
-
-            Ok(Self::from_components(asset_type, uuid, blockchain_hash, SystemTime::now()))
         }
+
+        // Parse network scope
+        let network_scope = match parts[0] {
+            "global" => NetworkScope::Global,
+            scope if scope.starts_with("reg") => {
+                let hash = hex::decode(parts[1])
+                    .map_err(|_| AssetIdError::InvalidFormat {
+                        input: hex_str.to_string(),
+                    })?;
+                let mut id = [0u8; 32];
+                id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
+                NetworkScope::Registry(RegistryId(id))
+            }
+            scope if scope.starts_with("fed") => {
+                let hash = hex::decode(parts[1])
+                    .map_err(|_| AssetIdError::InvalidFormat {
+                        input: hex_str.to_string(),
+                    })?;
+                let mut id = [0u8; 32];
+                id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
+                NetworkScope::Federated(FederationId(id))
+            }
+            scope if scope.starts_with("priv") => {
+                let hash = hex::decode(parts[1])
+                    .map_err(|_| AssetIdError::InvalidFormat {
+                        input: hex_str.to_string(),
+                    })?;
+                let mut id = [0u8; 32];
+                id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
+                NetworkScope::Private(NodeId(id))
+            }
+            _ => NetworkScope::Global, // Default to global
+        };
+
+        // Parse content hash (last part)
+        let hash_bytes = hex::decode(parts[parts.len() - 1])
+            .map_err(|_| AssetIdError::InvalidHash {
+                hash_str: parts[parts.len() - 1].to_string(),
+            })?;
+
+        if hash_bytes.len() != 32 {
+            return Err(AssetIdError::InvalidHashLength {
+                expected: 32,
+                actual: hash_bytes.len(),
+            });
+        }
+
+        let mut content_hash = [0u8; 32];
+        content_hash.copy_from_slice(&hash_bytes);
+
+        // Simple category detection for now
+        let category = AssetCategory::Application(ApplicationDomain {
+            domain_name: "imported".to_string(),
+            domain_hash: [0u8; 32],
+        });
+
+        Ok(Self {
+            content_hash,
+            network_scope,
+            category,
+            creation_timestamp: SystemTime::now(),
+        })
     }
 
-    /// Verify blockchain hash integrity (legacy support)
-    pub fn verify_blockchain_hash(&self) -> bool {
-        // For new assets, there's no separate blockchain hash to verify
-        // The content hash IS the verification
-        true
-    }
 
     /// Get short identifier
     pub fn short_id(&self) -> String {
@@ -563,6 +416,22 @@ impl AssetId {
     /// Get age since creation
     pub fn age(&self) -> Option<std::time::Duration> {
         SystemTime::now().duration_since(self.creation_timestamp).ok()
+    }
+
+    /// Get AssetType from category (for legacy compatibility)
+    pub fn asset_type(&self) -> Option<AssetType> {
+        match &self.category {
+            AssetCategory::BaseSystem(base_type) => Some(match base_type {
+                BaseSystemType::Cpu => AssetType::Cpu,
+                BaseSystemType::Gpu => AssetType::Gpu,
+                BaseSystemType::Memory => AssetType::Memory,
+                BaseSystemType::Storage => AssetType::Storage,
+                BaseSystemType::Network => AssetType::Network,
+                BaseSystemType::Container => AssetType::Container,
+                BaseSystemType::Economic => AssetType::Economic,
+            }),
+            AssetCategory::Application(_) => Some(AssetType::Library),
+        }
     }
 }
 
@@ -753,26 +622,17 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_compatibility() {
-        // Test that legacy creation still works
-        let legacy_id = AssetId::new(AssetType::Cpu);
-        assert_eq!(legacy_id.asset_type, Some(AssetType::Cpu));
-        assert!(legacy_id.uuid.is_some());
-
-        // Test legacy component creation
-        let components_id = AssetId::from_components(
-            AssetType::Storage,
-            Uuid::new_v4(),
-            [42u8; 32],
-            SystemTime::now(),
-        );
-        assert_eq!(components_id.asset_type, Some(AssetType::Storage));
-        assert_eq!(components_id.content_hash, [42u8; 32]);
-    }
-
-    #[test]
     fn test_short_id() {
-        let asset_id = AssetId::new(AssetType::Container);
+        let data = AssetData {
+            config: vec![1, 2, 3],
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Container),
+        );
         let short_id = asset_id.short_id();
         assert!(short_id.starts_with("G:")); // Global scope
     }

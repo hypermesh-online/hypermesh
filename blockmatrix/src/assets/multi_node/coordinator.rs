@@ -654,7 +654,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
     }
 
     async fn allocate_asset(&self, asset_id: AssetId) -> AssetResult<AllocationDecision> {
-        let asset_type = asset_id.asset_type.clone().ok_or_else(|| AssetError::AdapterError {
+        let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
             message: "AssetId missing asset_type field".to_string(),
         })?;
         let target_node = self.select_allocation_node(asset_type).await?;
@@ -712,7 +712,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
 
         // Migrate affected assets
         for asset_id in affected_assets {
-            let asset_type = asset_id.asset_type.clone().ok_or_else(|| AssetError::AdapterError {
+            let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
                 message: "AssetId missing asset_type field during migration".to_string(),
             })?;
             let new_node = self.select_allocation_node(asset_type).await?;

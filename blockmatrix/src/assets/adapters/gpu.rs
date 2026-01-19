@@ -22,6 +22,7 @@ use crate::assets::core::{
     ResourceUsage, ResourceLimits, GpuUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     GpuRequirements,
+    NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
 use crate::os_integration::{create_os_abstraction, OsAbstraction};
 
@@ -492,10 +493,8 @@ impl GpuAssetAdapter {
     
     /// Generate proxy address for GPU access
     async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
-        let uuid = asset_id.get_uuid();
-        let uuid_bytes = uuid.as_bytes();
         let mut node_id = [0u8; 8];
-        node_id.copy_from_slice(&uuid_bytes[..8]);
+        node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
             [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
@@ -506,7 +505,7 @@ impl GpuAssetAdapter {
 
     /// Create GPU compute context for isolation
     async fn create_gpu_context(&self, asset_id: &AssetId, device_id: u32) -> String {
-        let context_id = format!("gpu_ctx_{}_{}", device_id, asset_id.get_uuid());
+        let context_id = format!("gpu_ctx_{}_{}", device_id, hex::encode(&asset_id.content_hash[..8]));
         
         let context = GpuContext {
             context_id: context_id.clone(),
@@ -640,9 +639,18 @@ impl AssetAdapter for GpuAssetAdapter {
                 reason: "No GPU requirements specified".to_string()
             })?;
         
-        // Create asset ID
-        let asset_id = AssetId::new(AssetType::Gpu);
-        
+        // Create asset ID with real content-based hash
+        let data = AssetData {
+            config: vec![1, 2, 3], // Test data
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Gpu),
+        );
+
         // Allocate GPU devices and memory
         let (allocated_devices, allocated_memory) = self.allocate_gpu_devices(gpu_req, &asset_id).await?;
         
