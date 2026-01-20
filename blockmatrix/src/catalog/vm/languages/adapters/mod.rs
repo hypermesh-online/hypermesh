@@ -5,14 +5,12 @@
 //! maintaining full ConsensusProof validation (PoSp+PoSt+PoWk+PoTm).
 //!
 //! Each adapter follows Proof of State patterns for consensus integration:
-//! - Native Julia VM integration (direct runtime access)
-//! - PyCall for Python execution through Julia
-//! - RCall for R execution through Julia  
+//! - Python execution through native interpreter
+//! - R execution through native interpreter
 //! - JavaScriptCall for JavaScript execution
 //! - Clang/Cxx for C/C++ compilation and execution
 //! - RustCall for Rust compilation and execution
 
-pub mod julia;
 pub mod python;
 pub mod r;
 pub mod javascript;
@@ -21,7 +19,6 @@ pub mod cpp;
 pub mod rust;
 
 // Re-export adapters
-pub use julia::JuliaAdapter;
 pub use python::PythonAdapter;
 pub use r::RAdapter;
 pub use javascript::JavaScriptAdapter;
@@ -414,7 +411,6 @@ pub mod utils {
         
         // Language-specific parsing logic would go here
         match language {
-            "julia" => parse_julia_consensus_annotations(code, &mut constructs)?,
             "python" => parse_python_consensus_annotations(code, &mut constructs)?,
             "r" => parse_r_consensus_annotations(code, &mut constructs)?,
             "javascript" => parse_javascript_consensus_annotations(code, &mut constructs)?,
@@ -432,7 +428,6 @@ pub mod utils {
         constructs: &[ConsensusConstruct],
     ) -> Result<String> {
         match language {
-            "julia" => generate_julia_consensus_code(constructs),
             "python" => generate_python_consensus_code(constructs),
             "r" => generate_r_consensus_code(constructs),
             "javascript" => generate_javascript_consensus_code(constructs),
@@ -442,27 +437,8 @@ pub mod utils {
             _ => Err(anyhow::anyhow!("Unsupported language for consensus code generation: {}", language)),
         }
     }
-    
+
     // Language-specific parsing implementations (placeholders)
-    fn parse_julia_consensus_annotations(code: &str, constructs: &mut Vec<ConsensusConstruct>) -> Result<()> {
-        // Parse @consensus macros and similar Julia constructs
-        // This would implement actual Julia AST parsing
-        if code.contains("@consensus") {
-            constructs.push(ConsensusConstruct {
-                construct_type: super::ConsensusConstructType::ConsensusFunction,
-                source_location: super::SourceLocation {
-                    line: 1,
-                    column: 1,
-                    length: code.len() as u32,
-                    text: code.to_string(),
-                },
-                required_proofs: vec![],
-                asset_dependencies: vec![],
-            });
-        }
-        Ok(())
-    }
-    
     fn parse_python_consensus_annotations(code: &str, constructs: &mut Vec<ConsensusConstruct>) -> Result<()> {
         // Parse Python consensus decorators and functions
         if code.contains("@consensus_required") || code.contains("consensus.validate") {
@@ -552,19 +528,8 @@ pub mod utils {
         }
         Ok(())
     }
-    
+
     // Language-specific consensus code generation (placeholders)
-    fn generate_julia_consensus_code(constructs: &[ConsensusConstruct]) -> Result<String> {
-        let mut code = String::new();
-        for construct in constructs {
-            code.push_str(&format!(
-                "# Consensus validation for: {}\n",
-                construct.source_location.text
-            ));
-        }
-        Ok(code)
-    }
-    
     fn generate_python_consensus_code(constructs: &[ConsensusConstruct]) -> Result<String> {
         let mut code = String::new();
         for construct in constructs {
@@ -677,12 +642,12 @@ mod tests {
     
     #[test]
     fn test_consensus_annotation_parsing() {
-        let julia_code = "@consensus function test() end";
-        let constructs = utils::parse_consensus_annotations(julia_code, "julia").unwrap();
-        assert_eq!(constructs.len(), 1);
-        
         let python_code = "@consensus_required\ndef test(): pass";
         let constructs = utils::parse_consensus_annotations(python_code, "python").unwrap();
+        assert_eq!(constructs.len(), 1);
+
+        let rust_code = "#[consensus_required]\nfn test() {}";
+        let constructs = utils::parse_consensus_annotations(rust_code, "rust").unwrap();
         assert_eq!(constructs.len(), 1);
     }
 }

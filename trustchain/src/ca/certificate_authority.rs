@@ -21,7 +21,7 @@ use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, Certific
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.
-// Using software-based cryptography (Ed25519/RSA) for all operations.
+// Using post-quantum cryptography (FALCON-1024/Kyber-1024) for all operations.
 
 /// Production TrustChain Certificate Authority (Software-Only)
 pub struct TrustChainCA {
@@ -128,7 +128,7 @@ impl TrustChainCA {
         info!("Initializing production TrustChain CA: {}", config.ca_id);
 
         // AWS CloudHSM dependencies REMOVED - software-only operation
-        info!("Using software-based keys (Ed25519/RSA) for production CA");
+        info!("Using post-quantum keys (FALCON-1024/Kyber-1024) for production CA");
 
         // Initialize four-proof consensus validator
         let consensus = Arc::new(Mutex::new(FourProofValidator::new()));

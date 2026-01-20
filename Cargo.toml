@@ -52,7 +52,7 @@ hmac = "0.12"
 blake3 = "1.5"
 merkletree = "0.23"
 ed25519-dalek = "2.0"
-rsa = "0.9"
+# rsa = "0.9"  # REMOVED: RUSTSEC-2023-0071 - Unfixable Marvin Attack vulnerability
 aes-gcm = "0.10"
 
 # Post-quantum cryptography
@@ -225,7 +225,7 @@ time = { workspace = true }
 hex = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
-rsa = { workspace = true }
+# rsa = { workspace = true }  # REMOVED: RUSTSEC-2023-0071
 
 # Performance monitoring
 sysinfo = { workspace = true }

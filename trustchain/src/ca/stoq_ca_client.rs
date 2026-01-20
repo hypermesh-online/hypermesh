@@ -199,7 +199,9 @@ pub enum ExtendedKeyUsage {
 /// Key algorithms supported
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KeyAlgorithm {
-    Rsa,
+    // Rsa, // REMOVED: RUSTSEC-2023-0071 - Use FALCON-1024 for protocol layer
+    Falcon1024,  // Post-quantum signature for protocol layer
+    Kyber1024,   // Post-quantum encryption for asset layer
     EcdsaP256,
     EcdsaP384,
     Ed25519,
@@ -653,8 +655,8 @@ mod tests {
             key_usage: vec![KeyUsage::DigitalSignature, KeyUsage::KeyEncipherment],
             extended_key_usage: vec![ExtendedKeyUsage::ServerAuth],
             validity_days: 365,
-            key_size: 2048,
-            key_algorithm: KeyAlgorithm::Rsa,
+            key_size: 1024,  // FALCON-1024 key size
+            key_algorithm: KeyAlgorithm::Falcon1024,  // Post-quantum signature
             requester: CertificateRequester {
                 identity: "test-requester".to_string(),
                 organization: Some("Test Org".to_string()),
