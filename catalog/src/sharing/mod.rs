@@ -292,9 +292,22 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        // Create AssetId from package kind
-        let asset_type = blockmatrix::assets::AssetType::Library;
-        let asset_id = AssetId::new(asset_type);
+        // Create AssetId from package data (using package hash and spec)
+        let asset_data = blockmatrix::assets::core::AssetData {
+            config: package.package_hash.as_bytes().to_vec(),
+            definition: serde_json::to_vec(&package.spec).unwrap_or_default(),
+            metadata: vec![],
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            blockmatrix::assets::core::NetworkScope::Global,
+            blockmatrix::assets::core::AssetCategory::Application(
+                blockmatrix::assets::core::ApplicationDomain {
+                    domain_name: "catalog".to_string(),
+                    domain_hash: [0u8; 32],
+                }
+            ),
+        );
 
         // Register with discovery service
         self.discovery_service.register_package(

@@ -447,10 +447,10 @@ async fn test_catalog_extension_integration() {
 
     // Create a library asset
     let spec = AssetCreationSpec {
-        name: "julia-scientific-package".to_string(),
-        description: Some("Julia scientific computing package".to_string()),
+        name: "python-scientific-package".to_string(),
+        description: Some("Python scientific computing package".to_string()),
         metadata: HashMap::from([
-            ("language".to_string(), serde_json::json!("julia")),
+            ("language".to_string(), serde_json::json!("python")),
             ("version".to_string(), serde_json::json!("1.0.0")),
         ]),
         privacy_level: PrivacyLevel::PublicNetwork,

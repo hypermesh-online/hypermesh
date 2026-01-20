@@ -22,18 +22,6 @@ pub mod utils {
         asset: &CatalogAssetType,
     ) -> DeploymentStrategy {
         match asset {
-            CatalogAssetType::JuliaScript { .. } => {
-                DeploymentStrategy::VMExecution {
-                    vm_config: VMDeploymentConfig {
-                        language_runtime: "julia".to_string(),
-                        execution_timeout: std::time::Duration::from_secs(3600),
-                        memory_limit: 2 * 1024 * 1024 * 1024, // 2GB
-                        cpu_limit: 4,
-                        enable_gpu: false,
-                        environment_variables: std::collections::HashMap::new(),
-                    },
-                }
-            },
             CatalogAssetType::PythonApp { .. } => {
                 DeploymentStrategy::VMExecution {
                     vm_config: VMDeploymentConfig {
@@ -98,18 +86,6 @@ pub mod utils {
         asset: &CatalogAssetType,
     ) -> hypermesh_bridge::CatalogResourceRequirements {
         match asset {
-            CatalogAssetType::JuliaScript { code, .. } => {
-                // Estimate based on code complexity
-                let complexity_factor = estimate_code_complexity(code);
-                hypermesh_bridge::CatalogResourceRequirements {
-                    cpu_cores: Some((2.0 * complexity_factor) as u32),
-                    memory_mb: Some((1024.0 * complexity_factor) as u64),
-                    storage_gb: Some(1),
-                    gpu_count: if code.contains("GPU") || code.contains("Nova") { Some(1) } else { None },
-                    network_bandwidth_mbps: Some(10),
-                    custom_resources: std::collections::HashMap::new(),
-                }
-            },
             CatalogAssetType::PythonApp { code, .. } => {
                 let complexity_factor = estimate_code_complexity(code);
                 hypermesh_bridge::CatalogResourceRequirements {
@@ -195,14 +171,6 @@ mod tests {
     
     #[test]
     fn test_deployment_strategy_recommendation() {
-        let julia_script = CatalogAssetType::JuliaScript {
-            code: "println(\"Hello, World!\")".to_string(),
-            dependencies: vec![],
-            entry_point: "main".to_string(),
-        };
-        
-        let strategy = utils::recommend_deployment_strategy(&julia_script);
-        assert!(matches!(strategy, DeploymentStrategy::VMExecution { .. }));
     }
     
     #[test]

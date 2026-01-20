@@ -16,10 +16,11 @@ use blockmatrix::extensions::{
     TransferResult, SharingResult, ResourceUsageReport,
 };
 
-use blockmatrix::assets::core::{AssetId, AssetType};
+use blockmatrix::assets::core::{AssetId, AssetType, AssetData, NetworkScope, AssetCategory, BaseSystemType, ApplicationDomain};
 use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
+use sha2::Digest;
 
-/// Handler for Virtual Machine assets (Julia, Python, WASM, etc.)
+/// Handler for Virtual Machine assets (Lua, WASM, etc.)
 pub struct VirtualMachineHandler {
     /// VM instances registry
     instances: Arc<RwLock<HashMap<AssetId, VMInstance>>>,
@@ -66,13 +67,29 @@ impl AssetExtensionHandler for VirtualMachineHandler {
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        // Generate new asset ID
-        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
+        // Create AssetId from asset specification
+        let asset_data = AssetData {
+            config: spec.name.as_bytes().to_vec(),
+            definition: b"catalog_vm".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::Application(ApplicationDomain {
+                domain_name: "catalog_vm".to_string(),
+                domain_hash: {
+                    let mut hasher = sha2::Sha256::new();
+                    hasher.update(b"catalog_vm");
+                    hasher.finalize().into()
+                },
+            }),
+        );
 
         // Extract VM configuration from metadata
         let language = spec.metadata.get("language")
             .and_then(|v| v.as_str())
-            .unwrap_or("julia")
+            .unwrap_or("lua")
             .to_string();
 
         let version = spec.metadata.get("version")
@@ -291,7 +308,24 @@ impl AssetExtensionHandler for LibraryHandler {
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
+        // Create AssetId from library asset specification
+        let asset_data = AssetData {
+            config: spec.name.as_bytes().to_vec(),
+            definition: b"catalog_library".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::Application(ApplicationDomain {
+                domain_name: "catalog_library".to_string(),
+                domain_hash: {
+                    let mut hasher = sha2::Sha256::new();
+                    hasher.update(b"catalog_library");
+                    hasher.finalize().into()
+                },
+            }),
+        );
 
         let package = LibraryPackage {
             id: asset_id.clone(),
@@ -302,7 +336,7 @@ impl AssetExtensionHandler for LibraryHandler {
                 .to_string(),
             language: spec.metadata.get("language")
                 .and_then(|v| v.as_str())
-                .unwrap_or("julia")
+                .unwrap_or("lua")
                 .to_string(),
             dependencies: vec![],
             size_bytes: 1024 * 1024, // 1MB default
@@ -466,7 +500,24 @@ impl AssetExtensionHandler for DatasetHandler {
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
+        // Create AssetId from dataset asset specification
+        let asset_data = AssetData {
+            config: spec.name.as_bytes().to_vec(),
+            definition: b"catalog_dataset".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::Application(ApplicationDomain {
+                domain_name: "catalog_dataset".to_string(),
+                domain_hash: {
+                    let mut hasher = sha2::Sha256::new();
+                    hasher.update(b"catalog_dataset");
+                    hasher.finalize().into()
+                },
+            }),
+        );
 
         let dataset = Dataset {
             id: asset_id.clone(),
@@ -620,7 +671,24 @@ impl AssetExtensionHandler for TemplateHandler {
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let asset_id = AssetId::new(AssetType::VirtualMachine); // Will be updated based on handler type
+        // Create AssetId from template asset specification
+        let asset_data = AssetData {
+            config: spec.name.as_bytes().to_vec(),
+            definition: b"catalog_template".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::Application(ApplicationDomain {
+                domain_name: "catalog_template".to_string(),
+                domain_hash: {
+                    let mut hasher = sha2::Sha256::new();
+                    hasher.update(b"catalog_template");
+                    hasher.finalize().into()
+                },
+            }),
+        );
 
         let template = Template {
             id: asset_id.clone(),
@@ -631,7 +699,7 @@ impl AssetExtensionHandler for TemplateHandler {
                 .to_string(),
             language: spec.metadata.get("language")
                 .and_then(|v| v.as_str())
-                .unwrap_or("julia")
+                .unwrap_or("lua")
                 .to_string(),
             parameters: vec![],
         };
@@ -757,7 +825,7 @@ mod tests {
             name: "Test VM".to_string(),
             description: Some("Test virtual machine".to_string()),
             metadata: HashMap::from([
-                ("language".to_string(), serde_json::json!("julia")),
+                ("language".to_string(), serde_json::json!("lua")),
                 ("version".to_string(), serde_json::json!("1.9.0")),
             ]),
             privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
@@ -782,7 +850,7 @@ mod tests {
             description: Some("Test library package".to_string()),
             metadata: HashMap::from([
                 ("version".to_string(), serde_json::json!("1.0.0")),
-                ("language".to_string(), serde_json::json!("julia")),
+                ("language".to_string(), serde_json::json!("lua")),
             ]),
             privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
             allocation: None,

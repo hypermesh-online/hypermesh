@@ -47,6 +47,6 @@ pub use traits::{SecurityScanner, TypeValidator};
 
 pub use validator::AssetValidator;
 
-pub use validators::{JuliaValidator, LuaValidator};
+pub use validators::LuaValidator;
 
 pub use scanners::StaticSecurityScanner;

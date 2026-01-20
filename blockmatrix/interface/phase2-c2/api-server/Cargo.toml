@@ -51,9 +51,6 @@ jsonwebtoken = "9.2"
 bcrypt = "0.15"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
-# Database (for API server state)
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
-
 # Configuration
 config = "0.13"
 clap = { version = "4.0", features = ["derive"] }

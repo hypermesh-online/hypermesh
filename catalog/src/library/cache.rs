@@ -185,7 +185,8 @@ impl DiskCache {
         let index_path = format!("{}/index.json", cache_dir);
         let index = if tokio::fs::metadata(&index_path).await.is_ok() {
             let index_data = tokio::fs::read_to_string(&index_path).await?;
-            serde_json::from_str(&index_data).unwrap_or_default()
+            let temp_index: HashMap<String, DiskCacheEntry> = serde_json::from_str(&index_data).unwrap_or_default();
+            temp_index.into_iter().map(|(k, v)| (Arc::from(k.as_str()), v)).collect()
         } else {
             HashMap::new()
         };
@@ -280,7 +281,10 @@ impl DiskCache {
 
     async fn save_index(&self) -> Result<()> {
         let index_path = format!("{}/index.json", self.cache_dir);
-        let index_data = serde_json::to_string(&self.index)?;
+        let temp_index: HashMap<String, DiskCacheEntry> = self.index.iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        let index_data = serde_json::to_string(&temp_index)?;
         tokio::fs::write(&index_path, index_data).await?;
         Ok(())
     }
@@ -530,7 +534,7 @@ mod tests {
             name: id.to_string(),
             version: "1.0.0".to_string(),
             description: Some("Test package".to_string()),
-            asset_type: "julia".to_string(),
+            asset_type: "lua".to_string(),
             size: 100,
             hash: "test-hash".to_string(),
             content: "println(\"test\")".to_string(),
@@ -546,7 +550,7 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                asset_type: AssetType::JuliaProgram,
+                asset_type: AssetType::LuaScript,
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

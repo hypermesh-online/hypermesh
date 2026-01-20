@@ -322,14 +322,14 @@ mod tests {
         let mut adapter = HyperMeshAssetAdapter::new();
 
         adapter.register_asset_mapping(
-            "julia_computation".to_string(),
+            "lua_computation".to_string(),
             HyperMeshResource::Cpu {
                 cores: 4,
                 architecture: "x86_64".to_string(),
             },
         );
 
-        let resource = adapter.get_resource_requirements("julia_computation");
+        let resource = adapter.get_resource_requirements("lua_computation");
         assert!(resource.is_some());
     }
 

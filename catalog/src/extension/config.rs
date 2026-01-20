@@ -260,7 +260,7 @@ impl Default for SecurityConfig {
             min_consensus_proofs: 2, // At least 2 of 4 proofs
             enable_sandbox: true,
             allowed_languages: vec![
-                "julia".to_string(),
+                "lua".to_string(),
                 "python".to_string(),
                 "wasm".to_string(),
                 "javascript".to_string(),

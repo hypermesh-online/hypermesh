@@ -22,12 +22,6 @@ use crate::container::{ContainerSpec, ResourceRequirements};
 /// Catalog asset types that can be deployed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CatalogAssetType {
-    /// Julia computation script
-    JuliaScript {
-        code: String,
-        dependencies: Vec<String>,
-        entry_point: String,
-    },
     /// Python application
     PythonApp {
         code: String,
@@ -772,27 +766,6 @@ impl CatalogHyperMeshBridge {
         consensus_proof: &ConsensusProof,
     ) -> Result<InternalDeploymentResult> {
         match asset {
-            CatalogAssetType::JuliaScript { code, .. } => {
-                let execution_context = ExecutionContext::new(
-                    consensus_proof.clone(),
-                    "julia".to_string(),
-                    HashMap::new(), // Asset allocations would be populated
-                    crate::catalog::vm::PrivacyConfig::default(),
-                );
-                
-                let result = self.vm_runtime.execute_with_consensus(
-                    code,
-                    "julia",
-                    consensus_proof.clone(),
-                ).await?;
-                
-                Ok(InternalDeploymentResult {
-                    success: result.success,
-                    output: result.output,
-                    error_message: result.error_message,
-                    resource_allocations: HashMap::new(), // Would be populated from result
-                })
-            },
             CatalogAssetType::PythonApp { code, .. } => {
                 let result = self.vm_runtime.execute_with_consensus(
                     code,
@@ -935,7 +908,6 @@ impl CatalogHyperMeshBridge {
     /// Get asset type name for tracking
     fn get_asset_type_name(&self, asset: &CatalogAssetType) -> String {
         match asset {
-            CatalogAssetType::JuliaScript { .. } => "julia_script".to_string(),
             CatalogAssetType::PythonApp { .. } => "python_app".to_string(),
             CatalogAssetType::RustBinary { .. } => "rust_binary".to_string(),
             CatalogAssetType::ContainerImage { .. } => "container_image".to_string(),
@@ -1020,13 +992,6 @@ mod tests {
     
     #[test]
     fn test_catalog_asset_types() {
-        let julia_script = CatalogAssetType::JuliaScript {
-            code: "println(\"Hello, World!\")".to_string(),
-            dependencies: vec!["DataFrames".to_string()],
-            entry_point: "main".to_string(),
-        };
-        
-        assert!(matches!(julia_script, CatalogAssetType::JuliaScript { .. }));
     }
     
     #[test]

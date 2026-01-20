@@ -373,9 +373,6 @@ catalog install {{asset.name}}
         });
         
         match package.spec.spec.asset_type.as_str() {
-            "julia-program" => {
-                api_docs = self.extract_julia_api(&package.content.main_content).await?;
-            }
             "lua-script" => {
                 api_docs = self.extract_lua_api(&package.content.main_content).await?;
             }
@@ -388,64 +385,6 @@ catalog install {{asset.name}}
         }
         
         Ok(api_docs)
-    }
-    
-    /// Extract Julia API documentation
-    async fn extract_julia_api(&self, content: &str) -> Result<serde_json::Value> {
-        let mut functions = Vec::new();
-        let mut constants = Vec::new();
-        
-        // Simple regex-based extraction (could be improved with proper parsing)
-        let function_regex = regex::Regex::new(r#"(?m)^function\s+(\w+)\s*\(([^)]*)\)"#)?;
-        let const_regex = regex::Regex::new(r#"(?m)^const\s+(\w+)\s*=\s*(.+)$"#)?;
-        let comment_regex = regex::Regex::new(r#"(?m)^#\s*(.+)$"#)?;
-        
-        // Extract functions
-        for cap in function_regex.captures_iter(content) {
-            let name = cap.get(1).unwrap().as_str();
-            let params = cap.get(2).unwrap().as_str();
-            
-            // Look for documentation comment above function
-            let function_start = cap.get(0).unwrap().start();
-            let lines_before = content[..function_start].lines().rev().take(10);
-            let mut doc_comments = Vec::new();
-            
-            for line in lines_before {
-                let trimmed = line.trim();
-                if trimmed.starts_with('#') && !trimmed.starts_with("##") {
-                    doc_comments.push(trimmed.trim_start_matches('#').trim());
-                } else if !trimmed.is_empty() {
-                    break;
-                }
-            }
-            doc_comments.reverse();
-            
-            functions.push(serde_json::json!({
-                "name": name,
-                "parameters": params,
-                "description": doc_comments.join(" "),
-                "type": "function"
-            }));
-        }
-        
-        // Extract constants
-        for cap in const_regex.captures_iter(content) {
-            let name = cap.get(1).unwrap().as_str();
-            let value = cap.get(2).unwrap().as_str();
-            
-            constants.push(serde_json::json!({
-                "name": name,
-                "value": value,
-                "type": "constant"
-            }));
-        }
-        
-        Ok(serde_json::json!({
-            "functions": functions,
-            "constants": constants,
-            "modules": [],
-            "classes": []
-        }))
     }
     
     /// Extract Lua API documentation
@@ -509,7 +448,6 @@ catalog install {{asset.name}}
         
         // Look for example comments in main content
         let example_patterns = [
-            r#"(?m)^#\s*Example:?\s*\n((?:^#.*\n?)*)"#,  // Julia examples
             r#"(?m)^--\s*Example:?\s*\n((?:^--.*\n?)*)"#, // Lua examples
         ];
         
@@ -685,9 +623,9 @@ mod tests {
                     updated: None,
                 },
                 spec: AssetSpecification {
-                    asset_type: "julia-program".to_string(),
+                    asset_type: "lua-script".to_string(),
                     content: AssetContent {
-                        main: "main.jl".to_string(),
+                        main: "main.lua".to_string(),
                         files: vec![],
                         inline: None,
                         binary: vec![],
@@ -747,7 +685,7 @@ mod tests {
                 },
             },
             content: AssetContentResolved {
-                main_content: "# Test function\nfunction main()\n    println(\"Hello, world!\")\nend".to_string(),
+                main_content: "-- Test function\nfunction main()\n    print(\"Hello, world!\")\nend".to_string(),
                 file_contents: std::collections::HashMap::new(),
                 binary_contents: std::collections::HashMap::new(),
                 template_content: std::collections::HashMap::new(),

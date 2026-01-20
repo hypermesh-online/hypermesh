@@ -76,9 +76,8 @@
 //! Based on Proof of State four-proof consensus patterns adapted for HyperMesh ecosystem.
 
 pub mod consensus;
-pub mod execution;  
+pub mod execution;
 pub mod integration;
-pub mod julia;
 pub mod languages;
 pub mod matrix_integration;
 pub mod examples;
@@ -103,7 +102,6 @@ pub use consensus::{ConsensusVM, VMConsensusContext, ConsensusOperation};
 pub use execution::{VMExecutor, ExecutionContext, ExecutionResult};
 pub use crate::assets::AssetAdapter;
 pub use crate::integration::{BlockchainIntegration, P2PRouter};
-pub use julia::{JuliaVM, JuliaConsensusRuntime};
 pub use languages::{MultiLanguageSupport, LanguageRuntime};
 pub use matrix_integration::{
     MatrixAwareVM, MatrixExecutionContext, MatrixExecutionResult,
@@ -348,8 +346,6 @@ pub struct ConsensusProofVM {
     consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Execution engine
     executor: Arc<VMExecutor>,
-    /// Julia runtime
-    julia_runtime: Arc<JuliaVM>,
     /// Multi-language support
     language_support: Arc<MultiLanguageSupport>,
     /// Asset adapters
@@ -376,10 +372,6 @@ impl ConsensusProofVM {
             config.asset_config.clone(),
         ).await?);
         
-        // Initialize Julia runtime with consensus integration
-        let julia_runtime = Arc::new(JuliaVM::new(
-            Arc::clone(&consensus_vm)
-        ).await?);
         
         // Initialize multi-language support
         let language_support = Arc::new(MultiLanguageSupport::new(
@@ -405,7 +397,6 @@ impl ConsensusProofVM {
             config,
             consensus_vm,
             executor,
-            julia_runtime,
             language_support,
             asset_adapters,
             blockchain,
@@ -512,10 +503,6 @@ impl ConsensusProofVM {
         Arc::clone(&self.consensus_vm)
     }
     
-    /// Get Julia runtime
-    pub fn julia_runtime(&self) -> Arc<JuliaVM> {
-        Arc::clone(&self.julia_runtime)
-    }
     
     /// Get language support
     pub fn language_support(&self) -> Arc<MultiLanguageSupport> {

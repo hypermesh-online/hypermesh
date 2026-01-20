@@ -72,8 +72,6 @@ pub struct TemplateDefinition {
 /// Template types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TemplateType {
-    /// Julia program template
-    JuliaProgram,
     /// Lua script template
     LuaScript,
     /// WASM module template
@@ -275,69 +273,6 @@ impl CatalogTemplateGenerator {
     
     /// Load built-in templates
     fn load_builtin_templates(&mut self) -> Result<()> {
-        // Julia program template
-        self.register_template(TemplateDefinition {
-            name: "julia-program".to_string(),
-            description: "Basic Julia program asset template".to_string(),
-            version: "1.0.0".to_string(),
-            template_type: TemplateType::JuliaProgram,
-            parameters: vec![
-                TemplateParameter {
-                    name: "program_name".to_string(),
-                    param_type: "string".to_string(),
-                    default: None,
-                    description: Some("Name of the Julia program".to_string()),
-                    required: true,
-                    constraints: Some(ParameterConstraints {
-                        min: None,
-                        max: None,
-                        min_length: Some(1),
-                        max_length: Some(64),
-                        pattern: Some(r"^[a-zA-Z][a-zA-Z0-9_-]*$".to_string()),
-                        allowed_values: None,
-                    }),
-                },
-                TemplateParameter {
-                    name: "main_function".to_string(),
-                    param_type: "string".to_string(),
-                    default: Some(serde_json::Value::String("main".to_string())),
-                    description: Some("Name of the main function".to_string()),
-                    required: false,
-                    constraints: Some(ParameterConstraints {
-                        min: None,
-                        max: None,
-                        min_length: Some(1),
-                        max_length: Some(32),
-                        pattern: Some(r"^[a-zA-Z][a-zA-Z0-9_]*$".to_string()),
-                        allowed_values: None,
-                    }),
-                },
-                TemplateParameter {
-                    name: "include_tests".to_string(),
-                    param_type: "boolean".to_string(),
-                    default: Some(serde_json::Value::Bool(true)),
-                    description: Some("Include test files".to_string()),
-                    required: false,
-                    constraints: None,
-                },
-            ],
-            files: self.get_julia_template_files(),
-            post_actions: vec![
-                PostGenerationAction::CreateFile {
-                    path: "README.md".to_string(),
-                    content: include_str!("../templates/julia/README.md.hbs").to_string(),
-                },
-            ],
-            metadata: TemplateMetadata {
-                author: "Catalog Team".to_string(),
-                created: Utc::now(),
-                updated: Utc::now(),
-                tags: vec!["julia".to_string(), "program".to_string(), "computation".to_string()],
-                compatible_versions: vec!["^1.0.0".to_string()],
-                required_tools: vec!["julia".to_string()],
-            },
-        })?;
-        
         // Lua script template
         self.register_template(TemplateDefinition {
             name: "lua-script".to_string(),
@@ -394,162 +329,6 @@ impl CatalogTemplateGenerator {
         })?;
         
         Ok(())
-    }
-    
-    /// Get Julia template files
-    fn get_julia_template_files(&self) -> HashMap<String, String> {
-        let mut files = HashMap::new();
-        
-        files.insert("asset.yaml".to_string(), r#"
-apiVersion: "catalog.v1"
-kind: "Asset"
-metadata:
-  name: "{{program_name}}"
-  version: "{{asset_version}}"
-  tags: ["julia", "program", "computation"]
-  description: "{{description}}"
-  {{#if author}}author: "{{author}}"{{/if}}
-  license: "{{default license "MIT"}}"
-
-spec:
-  type: "julia-program"
-  content:
-    main: "{{program_name}}.jl"
-    files:
-      {{#if include_tests}}- "test_{{program_name}}.jl"{{/if}}
-    binary: []
-    templates: []
-    
-  security:
-    consensus_required: {{consensus_required}}
-    certificate_pinning: false
-    hash_validation: "sha256"
-    sandbox_level: "standard"
-    allowed_syscalls: []
-    network_access:
-      enabled: false
-      allowed_domains: []
-      allowed_ports: []
-      require_tls: true
-    file_access:
-      level: "read_only"
-      allowed_paths: []
-      denied_paths: []
-      allow_temp: true
-    permissions: []
-    
-  resources:
-    cpu_limit: "{{default cpu_limit "2000m"}}"
-    memory_limit: "{{default memory_limit "2Gi"}}"
-    execution_timeout: "{{default execution_timeout "300s"}}"
-    gpu_required: {{default gpu_required false}}
-    hardware_requirements: []
-    
-  execution:
-    delegation_strategy: "high_performance_cluster"
-    minimum_consensus: {{default minimum_consensus 3}}
-    retry_policy: "exponential_backoff"
-    priority: "normal"
-    timeout_config:
-      execution: "{{default execution_timeout "300s"}}"
-      network: "30s"
-      io: "10s"
-      compilation: "60s"
-    scheduling:
-      timing: "immediate"
-      allocation_strategy: "best_fit"
-      node_affinity: []
-      anti_affinity: []
-      
-  dependencies: []
-  environment: {}
-"#.to_string());
-
-        files.insert("{{program_name}}.jl".to_string(), r#"
-# {{program_name}} - {{description}}
-# Generated by Catalog Template Generator on {{date "Y-m-d H:M:S"}}
-
-using LinearAlgebra
-using Statistics
-
-"""
-    {{main_function}}()
-
-Main function for {{program_name}}.
-{{description}}
-"""
-function {{main_function}}()
-    println("Starting {{program_name}}...")
-    
-    # Your Julia code goes here
-    result = perform_computation()
-    
-    println("{{program_name}} completed successfully!")
-    return result
-end
-
-"""
-    perform_computation()
-
-Core computation logic for {{program_name}}.
-"""
-function perform_computation()
-    # Example computation - replace with your actual logic
-    data = randn(1000, 100)
-    
-    # Perform some mathematical operations
-    mean_values = mean(data, dims=1)
-    std_values = std(data, dims=1)
-    
-    # Return results
-    return Dict(
-        "mean" => mean_values,
-        "std" => std_values,
-        "size" => size(data)
-    )
-end
-
-# Execute main function if script is run directly
-if abspath(PROGRAM_FILE) == @__FILE__
-    result = {{main_function}}()
-    println("Result: ", result)
-end
-"#.to_string());
-
-        if true { // This would be conditional based on include_tests parameter
-            files.insert("test_{{program_name}}.jl".to_string(), r#"
-# Test suite for {{program_name}}
-# Generated by Catalog Template Generator
-
-using Test
-include("{{program_name}}.jl")
-
-@testset "{{program_name}} Tests" begin
-    @testset "Main Function Tests" begin
-        @test {{main_function}}() isa Dict
-        
-        result = {{main_function}}()
-        @test haskey(result, "mean")
-        @test haskey(result, "std")
-        @test haskey(result, "size")
-    end
-    
-    @testset "Computation Tests" begin
-        result = perform_computation()
-        @test result isa Dict
-        @test result["size"] == (1000, 100)
-    end
-end
-
-# Run tests
-if abspath(PROGRAM_FILE) == @__FILE__
-    println("Running tests for {{program_name}}...")
-    # Tests run automatically when file is included
-end
-"#.to_string());
-        }
-        
-        files
     }
     
     /// Get Lua template files
@@ -1094,7 +873,7 @@ mod tests {
             metadata: HashMap::new(),
         };
         
-        let result = generator.generate_from_template("julia-program", context).await.unwrap();
+        let result = generator.generate_from_template("lua-script", context).await.unwrap();
         
         assert!(!result.generated_files.is_empty());
         assert_eq!(result.asset_package.spec.metadata.name, "test_program");

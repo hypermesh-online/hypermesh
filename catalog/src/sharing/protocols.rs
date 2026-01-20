@@ -289,8 +289,22 @@ impl SharingProtocol {
         // Parse asset_id from string to AssetId
         let parsed_asset_id = AssetId::from_hex_string(asset_id)
             .unwrap_or_else(|_| {
-                // Fallback: create a default AssetId
-                AssetId::new(AssetType::Container)
+                // Fallback: create a default AssetId from empty data
+                let asset_data = blockmatrix::assets::core::AssetData {
+                    config: vec![],
+                    definition: vec![],
+                    metadata: vec![],
+                };
+                AssetId::from_asset_data(
+                    &asset_data,
+                    blockmatrix::assets::core::NetworkScope::Global,
+                    blockmatrix::assets::core::AssetCategory::Application(
+                        blockmatrix::assets::core::ApplicationDomain {
+                            domain_name: "catalog".to_string(),
+                            domain_hash: [0u8; 32],
+                        }
+                    ),
+                )
             });
         let transfer = ActiveTransfer {
             id: transfer_id.clone(),

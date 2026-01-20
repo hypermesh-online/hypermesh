@@ -244,7 +244,7 @@ fn create_test_package(id: &str) -> LibraryAssetPackage {
             modified: chrono::Utc::now().timestamp(),
         },
         spec: PackageSpec {
-            asset_type: AssetType::JuliaProgram,
+            asset_type: AssetType::LuaScript,
             resources: ResourceRequirements::default(),
             security: SecurityConfig {
                 consensus_required: false,

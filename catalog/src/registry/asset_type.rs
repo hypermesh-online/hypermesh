@@ -7,9 +7,11 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 // Import BlockMatrix asset types directly
-use blockmatrix::assets::{AssetId, AssetType, ConsensusProof};
+use blockmatrix::assets::{AssetId, AssetType, ConsensusProof, PrivacyLevel, AssetAllocation};
+use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///
@@ -106,8 +108,22 @@ impl AssetTypeDefinition {
         schema: JsonValue,
         consensus_proof: ConsensusProof,
     ) -> Self {
+        // Create AssetId from type definition data
+        let asset_data = blockmatrix::assets::core::AssetData {
+            config: type_name.as_bytes().to_vec(),
+            definition: b"catalog_asset_type".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            blockmatrix::assets::core::NetworkScope::Global,
+            blockmatrix::assets::core::AssetCategory::BaseSystem(
+                blockmatrix::assets::core::BaseSystemType::Storage,
+            ),
+        );
+
         Self {
-            asset_id: AssetId::new(AssetType::Library),
+            asset_id,
             type_name,
             schema,
             validation_rules: Vec::new(),

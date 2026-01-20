@@ -603,7 +603,7 @@ mod tests {
             name: "test-package".to_string(),
             version: "1.0.0".to_string(),
             description: Some("A test package".to_string()),
-            asset_type: "julia".to_string(),
+            asset_type: "lua".to_string(),
             size: 100,
             hash: "test-hash".to_string(),
             content: "println(\"test\")".to_string(),
@@ -619,7 +619,7 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                asset_type: AssetType::JuliaProgram,
+                asset_type: AssetType::LuaScript,
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

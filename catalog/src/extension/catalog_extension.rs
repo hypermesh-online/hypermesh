@@ -22,7 +22,8 @@ use blockmatrix::extensions::{
     ResourceUsageReport, SecurityIssue,
 };
 
-use blockmatrix::assets::core::{AssetManager, AssetType, AssetId};
+use blockmatrix::assets::core::{AssetManager, AssetType, AssetId, AssetData, NetworkScope, AssetCategory, BaseSystemType};
+use blockmatrix::assets::core::ApplicationDomain;
 
 use crate::{
     Catalog, CatalogConfig,
@@ -790,7 +791,26 @@ impl AssetLibraryExtension for CatalogExtension {
         // Create installed asset IDs
         let installed_asset_ids: Vec<AssetId> = vec![
             AssetId::from_hex_string(package_id)
-                .unwrap_or_else(|_| AssetId::new(blockmatrix::assets::core::AssetType::Container))
+                .unwrap_or_else(|_| {
+                    // Fallback: create a default AssetId from package data
+                    let asset_data = AssetData {
+                        config: package_id.as_bytes().to_vec(),
+                        definition: b"catalog_package".to_vec(),
+                        metadata: b"{}".to_vec(),
+                    };
+                    AssetId::from_asset_data(
+                        &asset_data,
+                        NetworkScope::Global,
+                        AssetCategory::Application(ApplicationDomain {
+                            domain_name: "catalog".to_string(),
+                            domain_hash: {
+                                let mut hasher = sha2::Sha256::new();
+                                hasher.update(b"catalog");
+                                hasher.finalize().into()
+                            },
+                        }),
+                    )
+                })
         ];
 
         let result = InstallResult {

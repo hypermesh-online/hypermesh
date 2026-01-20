@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use blockmatrix::assets::{AssetId, AssetType, ConsensusProof, PrivacyLevel};
+use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
 use super::asset_type::{AssetTypeDefinition, ValidationResult};
 
@@ -95,8 +96,20 @@ impl Default for RegistryConfig {
 impl CatalogRegistry {
     /// Create a new registry
     pub fn new(privacy: PrivacyLevel, trust_policy: TrustPolicy, config: RegistryConfig) -> Self {
+        // Create registry AssetId from registry configuration
+        let asset_data = AssetData {
+            config: format!("registry_{:?}", privacy).as_bytes().to_vec(),
+            definition: b"catalog_registry".to_vec(),
+            metadata: b"{}".to_vec(),
+        };
+        let registry_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Storage),
+        );
+
         Self {
-            registry_id: AssetId::new(AssetType::Library),
+            registry_id,
             index: Arc::new(RwLock::new(HashMap::new())),
             privacy,
             trust_policy,

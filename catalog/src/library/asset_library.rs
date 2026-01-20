@@ -561,7 +561,7 @@ mod tests {
             name: "Test Package".to_string(),
             version: "1.0.0".to_string(),
             description: Some("A test package".to_string()),
-            asset_type: "julia".to_string(),
+            asset_type: "lua".to_string(),
             size: 1024,
             hash: "package-hash".to_string(),
             content: "test content".to_string(),

@@ -37,11 +37,11 @@ async fn test_complete_blockchain_native_compute_flow() {
     
     let compute_system = compute_system.unwrap();
     
-    // Create a sample Julia compute asset
-    let julia_asset = ComputeAsset::new(
+    // Create a sample Python compute asset
+    let python_asset = ComputeAsset::new(
         "Matrix Multiplication".to_string(),
-        "High-performance matrix multiplication using Julia".to_string(),
-        ComputeAssetType::JuliaScript,
+        "High-performance matrix multiplication using Python".to_string(),
+        ComputeAssetType::PythonScript,
         r#"
         function matrix_multiply(A, B)
             return A * B
@@ -243,7 +243,7 @@ async fn test_blockchain_blocks() {
     let asset = ComputeAsset::new(
         "Test Asset".to_string(),
         "Test compute asset".to_string(),
-        ComputeAssetType::JuliaScript,
+        ComputeAssetType::PythonScript,
         "println(\"test\")".to_string(),
     );
     
@@ -329,7 +329,7 @@ fn create_test_host(host_id: &str, name: &str) -> P2PHost {
             gpu_usage: None,
             network_mbps: 100,
         },
-        supported_asset_types: vec!["JuliaScript".to_string(), "PythonScript".to_string()],
+        supported_asset_types: vec!["PythonScript".to_string()],
         reputation_score: 0.8,
         privacy_capabilities: PrivacyCapabilities {
             supports_private: true,

@@ -109,10 +109,9 @@ lazy_static = "1.4"
 # CLI
 clap = { version = "4.5", features = ["derive", "env"] }
 
-# Storage
+# Storage (BlockMatrix Asset-based, no traditional databases)
 sled = "0.34"
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "chrono", "uuid"] }
-redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }  # For caching only
 
 # Testing
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }

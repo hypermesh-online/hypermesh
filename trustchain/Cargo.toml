@@ -75,7 +75,6 @@ merkletree = { workspace = true }
 dashmap = { workspace = true }
 arc-swap = { workspace = true }
 parking_lot = { workspace = true }
-sqlx = { workspace = true }
 once_cell = "1.19"
 
 # Error handling and logging

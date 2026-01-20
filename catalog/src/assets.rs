@@ -90,7 +90,7 @@ pub struct AssetMetadata {
 /// Asset specification details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetSpecification {
-    /// Asset type (julia-program, lua-script, wasm-module, etc.)
+    /// Asset type (lua-script, wasm-module, etc.)
     #[serde(rename = "type")]
     pub asset_type: String,
     /// Asset content definitions
@@ -849,7 +849,7 @@ metadata:
   tags: ["test", "example"]
   description: "Test asset for validation"
 spec:
-  type: "julia-program"
+  type: "lua-script"
   content:
     main: ""
     files: []
@@ -902,7 +902,7 @@ spec:
         
         assert_eq!(package.spec.metadata.name, "test-asset");
         assert_eq!(package.spec.metadata.version, "1.0.0");
-        assert_eq!(package.spec.spec.asset_type, "julia-program");
+        assert_eq!(package.spec.spec.asset_type, "lua-script");
         assert!(!package.package_hash.is_empty());
     }
     

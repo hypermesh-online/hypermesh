@@ -225,11 +225,11 @@ async fn test_vm_handler_operations() {
 
     // Create a VM asset
     let spec = AssetCreationSpec {
-        name: "Test Julia VM".to_string(),
+        name: "Test Lua VM".to_string(),
         description: Some("Test virtual machine".to_string()),
         metadata: HashMap::from([
-            ("language".to_string(), serde_json::json!("julia")),
-            ("version".to_string(), serde_json::json!("1.9.0")),
+            ("language".to_string(), serde_json::json!("lua")),
+            ("version".to_string(), serde_json::json!("5.4.0")),
         ]),
         privacy_level: PrivacyLevel::Private,
         allocation: None,
@@ -243,7 +243,7 @@ async fn test_vm_handler_operations() {
     // Query the asset
     let query = AssetQuery {
         asset_type: Some(AssetType::VirtualMachine),
-        name_pattern: Some("julia".to_string()),
+        name_pattern: Some("lua".to_string()),
         tags: None,
         privacy_level: None,
         parent_id: None,
@@ -258,7 +258,7 @@ async fn test_vm_handler_operations() {
     // Get metadata
     let metadata = handler.get_metadata(&asset_id).await.unwrap();
     assert_eq!(metadata.asset_type, AssetType::VirtualMachine);
-    assert!(metadata.name.contains("julia"));
+    assert!(metadata.name.contains("lua"));
 
     // Delete the asset
     let result = handler.delete_asset(&asset_id).await;
@@ -271,17 +271,17 @@ async fn test_library_handler_operations() {
 
     // Create a library asset
     let spec = AssetCreationSpec {
-        name: "TestPackage.jl".to_string(),
-        description: Some("Test Julia package".to_string()),
+        name: "TestPackage.lua".to_string(),
+        description: Some("Test Lua package".to_string()),
         metadata: HashMap::from([
             ("version".to_string(), serde_json::json!("1.0.0")),
-            ("language".to_string(), serde_json::json!("julia")),
+            ("language".to_string(), serde_json::json!("lua")),
         ]),
         privacy_level: PrivacyLevel::Public,
         allocation: None,
         consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
         parent_id: None,
-        tags: vec!["julia".to_string(), "package".to_string()],
+        tags: vec!["lua".to_string(), "package".to_string()],
     };
 
     let asset_id = handler.create_asset(spec).await.unwrap();
@@ -289,11 +289,11 @@ async fn test_library_handler_operations() {
     // Get metadata
     let metadata = handler.get_metadata(&asset_id).await.unwrap();
     assert_eq!(metadata.asset_type, AssetType::Library);
-    assert_eq!(metadata.name, "TestPackage.jl");
+    assert_eq!(metadata.name, "TestPackage.lua");
 
     // Update the asset
     let update = hypermesh::extensions::AssetUpdate {
-        name: Some("UpdatedPackage.jl".to_string()),
+        name: Some("UpdatedPackage.lua".to_string()),
         description: None,
         metadata: None,
         privacy_level: None,
@@ -343,7 +343,7 @@ async fn test_template_handler_operations() {
         description: Some("Template for ML projects".to_string()),
         metadata: HashMap::from([
             ("template_type".to_string(), serde_json::json!("ml_project")),
-            ("language".to_string(), serde_json::json!("julia")),
+            ("language".to_string(), serde_json::json!("lua")),
         ]),
         privacy_level: PrivacyLevel::Public,
         allocation: None,

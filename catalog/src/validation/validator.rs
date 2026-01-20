@@ -20,7 +20,7 @@ use super::results::{
 };
 use super::scanners::StaticSecurityScanner;
 use super::traits::{SecurityScanner, TypeValidator};
-use super::validators::{JuliaValidator, LuaValidator};
+use super::validators::LuaValidator;
 
 /// Asset validator for comprehensive package validation
 pub struct AssetValidator {
@@ -58,12 +58,7 @@ impl AssetValidator {
 
     /// Register default type validators
     fn register_default_validators(&mut self) {
-        // Create a new instance for each type
-        let julia = JuliaValidator::new();
-        for type_name in julia.supported_types() {
-            self.type_validators.insert(type_name, Box::new(JuliaValidator::new()));
-        }
-
+        // Create Lua validator for supported types
         let lua = LuaValidator::new();
         for type_name in lua.supported_types() {
             self.type_validators.insert(type_name, Box::new(LuaValidator::new()));

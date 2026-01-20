@@ -6,8 +6,7 @@
 //! full four-proof validation (PoSp+PoSt+PoWk+PoTm).
 //!
 //! Supported Languages:
-//! - Julia (native runtime)
-//! - Python (via PyCall adapter)  
+//! - Python (via PyCall adapter)
 //! - R (via RCall adapter)
 //! - JavaScript (via JavaScriptCall adapter)
 //! - C/C++ (via Clang/Cxx adapters)
@@ -39,8 +38,7 @@ use super::PrivacyLevel;
 
 /// Supported programming languages based on Proof of State analysis
 const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
-    ("julia", "JuliaVM"),        // Native runtime
-    ("python", "PyCall"),        // Python via PyCall
+    ("python", "PyCall"),        // Python via native interpreter
     ("r", "RCall"),             // R via RCall  
     ("javascript", "JavaScriptCall"), // JS via JavaScriptCall
     ("c", "Clang"),             // C via Clang
@@ -474,9 +472,6 @@ impl MultiLanguageSupport {
         config: Option<&LanguageSpecificConfig>,
     ) -> Result<Arc<dyn LanguageRuntime>> {
         match adapter_type {
-            "JuliaVM" => Ok(Arc::new(
-                adapters::JuliaAdapter::new(consensus_vm, config).await?
-            )),
             "PyCall" => Ok(Arc::new(
                 adapters::PythonAdapter::new(consensus_vm, consensus_bridge, config).await?
             )),
@@ -717,7 +712,6 @@ mod tests {
     fn test_language_config_defaults() {
         let config = LanguageConfig::default();
         
-        assert!(config.enabled_languages.contains(&"julia".to_string()));
         assert!(config.enabled_languages.contains(&"python".to_string()));
         assert!(config.enabled_languages.contains(&"rust".to_string()));
         

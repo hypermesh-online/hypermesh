@@ -5,12 +5,233 @@
 //!
 //! MIGRATION: This module now wraps the Asset Registry architecture for backward compatibility.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 // Import Asset Registry types
 use crate::registry::AssetTypeDefinition;
+
+// Serde support for Arc<str>
+mod arc_str_serde {
+    use super::*;
+    use serde::de::{Deserializer, Visitor};
+    use std::fmt;
+
+    pub fn serialize<S>(value: &Arc<str>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ArcStrVisitor;
+        impl<'de> Visitor<'de> for ArcStrVisitor {
+            type Value = Arc<str>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string")
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Arc::from(v))
+            }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Arc::from(v))
+            }
+        }
+        deserializer.deserialize_string(ArcStrVisitor)
+    }
+}
+
+// Serde support for Option<Arc<str>>
+mod option_arc_str_serde {
+    use super::*;
+    use serde::de::{Deserializer, Visitor};
+    use std::fmt;
+
+    pub fn serialize<S>(value: &Option<Arc<str>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            Some(s) => serializer.serialize_some(s.as_ref()),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Arc<str>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct OptArcStrVisitor;
+        impl<'de> Visitor<'de> for OptArcStrVisitor {
+            type Value = Option<Arc<str>>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an optional string")
+            }
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(None)
+            }
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                super::arc_str_serde::deserialize(deserializer).map(Some)
+            }
+        }
+        deserializer.deserialize_option(OptArcStrVisitor)
+    }
+}
+
+// Serde support for Arc<[Arc<str>]>
+mod arc_slice_arc_str_serde {
+    use super::*;
+    use serde::de::{Deserializer, SeqAccess, Visitor};
+    use std::fmt;
+
+    pub fn serialize<S>(value: &Arc<[Arc<str>]>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for item in value.iter() {
+            seq.serialize_element(item.as_ref())?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<[Arc<str>]>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ArcSliceVisitor;
+        impl<'de> Visitor<'de> for ArcSliceVisitor {
+            type Value = Arc<[Arc<str>]>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a sequence of strings")
+            }
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(elem) = seq.next_element::<String>()? {
+                    vec.push(Arc::from(elem.as_str()));
+                }
+                Ok(Arc::from(vec.into_boxed_slice()))
+            }
+        }
+        deserializer.deserialize_seq(ArcSliceVisitor)
+    }
+}
+
+// Generic serde for Arc<[T]> where T: Serialize + Deserialize
+macro_rules! arc_slice_serde {
+    ($name:ident, $ty:ty) => {
+        mod $name {
+            use super::*;
+            use serde::de::{Deserializer, SeqAccess, Visitor};
+            use std::fmt;
+
+            pub fn serialize<S>(value: &Arc<[$ty]>, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                use serde::ser::SerializeSeq;
+                let mut seq = serializer.serialize_seq(Some(value.len()))?;
+                for item in value.iter() {
+                    seq.serialize_element(item)?;
+                }
+                seq.end()
+            }
+
+            pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<[$ty]>, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct ArcSliceVisitor;
+                impl<'de> Visitor<'de> for ArcSliceVisitor {
+                    type Value = Arc<[$ty]>;
+                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                        formatter.write_str("a sequence")
+                    }
+                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: SeqAccess<'de>,
+                    {
+                        let mut vec = Vec::new();
+                        while let Some(elem) = seq.next_element::<$ty>()? {
+                            vec.push(elem);
+                        }
+                        Ok(Arc::from(vec.into_boxed_slice()))
+                    }
+                }
+                deserializer.deserialize_seq(ArcSliceVisitor)
+            }
+        }
+    };
+}
+
+arc_slice_serde!(arc_slice_dependency_serde, PackageDependency);
+arc_slice_serde!(arc_slice_contentref_serde, ContentRef);
+arc_slice_serde!(arc_slice_binaryref_serde, BinaryRef);
+arc_slice_serde!(arc_slice_templateparam_serde, TemplateParameter);
+
+// Serde support for Arc<HashMap<Arc<str>, Arc<str>>>
+mod arc_hashmap_arc_str_serde {
+    use super::*;
+    use serde::de::{Deserializer, MapAccess, Visitor};
+    use std::fmt;
+
+    pub fn serialize<S>(value: &Arc<HashMap<Arc<str>, Arc<str>>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value.iter() {
+            map.serialize_entry(k.as_ref(), v.as_ref())?;
+        }
+        map.end()
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<HashMap<Arc<str>, Arc<str>>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ArcHashMapVisitor;
+        impl<'de> Visitor<'de> for ArcHashMapVisitor {
+            type Value = Arc<HashMap<Arc<str>, Arc<str>>>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map of strings to strings")
+            }
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut hashmap = HashMap::new();
+                while let Some((key, value)) = map.next_entry::<String, String>()? {
+                    hashmap.insert(Arc::from(key.as_str()), Arc::from(value.as_str()));
+                }
+                Ok(Arc::new(hashmap))
+            }
+        }
+        deserializer.deserialize_map(ArcHashMapVisitor)
+    }
+}
 
 /// Lightweight asset package for library operations
 ///
@@ -22,6 +243,7 @@ use crate::registry::AssetTypeDefinition;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryAssetPackage {
     /// Unique package identifier
+    #[serde(with = "arc_str_serde")]
     pub id: Arc<str>,
     /// Package name
     pub name: String,
@@ -134,18 +356,25 @@ pub struct PackageMetadataView<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageMetadata {
     /// Package name
+    #[serde(with = "arc_str_serde")]
     pub name: Arc<str>,
     /// Semantic version
+    #[serde(with = "arc_str_serde")]
     pub version: Arc<str>,
     /// Package description
+    #[serde(with = "option_arc_str_serde")]
     pub description: Option<Arc<str>>,
     /// Author information
+    #[serde(with = "option_arc_str_serde")]
     pub author: Option<Arc<str>>,
     /// License identifier
+    #[serde(with = "option_arc_str_serde")]
     pub license: Option<Arc<str>>,
     /// Tags for categorization
+    #[serde(with = "arc_slice_arc_str_serde")]
     pub tags: Arc<[Arc<str>]>,
     /// Keywords for search
+    #[serde(with = "arc_slice_arc_str_serde")]
     pub keywords: Arc<[Arc<str>]>,
     /// Creation timestamp
     pub created: i64,
@@ -156,7 +385,7 @@ pub struct PackageMetadata {
 /// Package specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageSpec {
-    /// Asset type (julia, lua, wasm, etc.)
+    /// Asset type (lua, wasm, etc.)
     pub asset_type: AssetType,
     /// Resource requirements
     pub resources: ResourceRequirements,
@@ -165,16 +394,16 @@ pub struct PackageSpec {
     /// Execution configuration
     pub execution: ExecutionConfig,
     /// Dependencies
+    #[serde(with = "arc_slice_dependency_serde")]
     pub dependencies: Arc<[PackageDependency]>,
     /// Environment variables
+    #[serde(with = "arc_hashmap_arc_str_serde")]
     pub environment: Arc<HashMap<Arc<str>, Arc<str>>>,
 }
 
 /// Asset types supported by the library
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum AssetType {
-    /// Julia program
-    JuliaProgram,
     /// Lua script
     LuaScript,
     /// WebAssembly module
@@ -201,7 +430,6 @@ impl AssetType {
     /// Get string representation
     pub fn as_str(&self) -> &str {
         match self {
-            AssetType::JuliaProgram => "julia",
             AssetType::LuaScript => "lua",
             AssetType::WasmModule => "wasm",
             AssetType::Container => "container",
@@ -218,7 +446,6 @@ impl AssetType {
     /// Parse from string
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "julia" | "julia-program" => Some(AssetType::JuliaProgram),
             "lua" | "lua-script" => Some(AssetType::LuaScript),
             "wasm" | "wasm-module" => Some(AssetType::WasmModule),
             "container" => Some(AssetType::Container),
@@ -276,6 +503,7 @@ pub struct SecurityConfig {
     /// File system access level
     pub filesystem_access: FilesystemAccess,
     /// Required permissions
+    #[serde(with = "arc_slice_arc_str_serde")]
     pub permissions: Arc<[Arc<str>]>,
 }
 
@@ -363,12 +591,15 @@ impl Default for RetryPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageDependency {
     /// Dependency name
+    #[serde(with = "arc_str_serde")]
     pub name: Arc<str>,
     /// Version constraint
+    #[serde(with = "arc_str_serde")]
     pub version_constraint: Arc<str>,
     /// Optional dependency
     pub optional: bool,
     /// Platform-specific
+    #[serde(with = "option_arc_str_serde")]
     pub platform: Option<Arc<str>>,
 }
 
@@ -378,8 +609,10 @@ pub struct ContentReferences {
     /// Main entry point reference
     pub main_ref: ContentRef,
     /// Additional file references
+    #[serde(with = "arc_slice_contentref_serde")]
     pub file_refs: Arc<[ContentRef]>,
     /// Binary content references
+    #[serde(with = "arc_slice_binaryref_serde")]
     pub binary_refs: Arc<[BinaryRef]>,
     /// Total content size in bytes
     pub total_size: u64,
@@ -389,8 +622,10 @@ pub struct ContentReferences {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentRef {
     /// File path or identifier
+    #[serde(with = "arc_str_serde")]
     pub path: Arc<str>,
     /// Content hash for verification
+    #[serde(with = "arc_str_serde")]
     pub hash: Arc<str>,
     /// Content size in bytes
     pub size: u64,
@@ -402,10 +637,13 @@ pub struct ContentRef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BinaryRef {
     /// Binary identifier
+    #[serde(with = "arc_str_serde")]
     pub id: Arc<str>,
     /// MIME type
+    #[serde(with = "arc_str_serde")]
     pub mime_type: Arc<str>,
     /// Content hash
+    #[serde(with = "arc_str_serde")]
     pub hash: Arc<str>,
     /// Size in bytes
     pub size: u64,
@@ -443,16 +681,21 @@ pub struct ValidationStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageTemplate {
     /// Template identifier
+    #[serde(with = "arc_str_serde")]
     pub id: Arc<str>,
     /// Template name
+    #[serde(with = "arc_str_serde")]
     pub name: Arc<str>,
     /// Template description
+    #[serde(with = "option_arc_str_serde")]
     pub description: Option<Arc<str>>,
     /// Template type
     pub template_type: AssetType,
     /// Template parameters
+    #[serde(with = "arc_slice_templateparam_serde")]
     pub parameters: Arc<[TemplateParameter]>,
     /// Template files
+    #[serde(with = "arc_hashmap_arc_str_serde")]
     pub files: Arc<HashMap<Arc<str>, Arc<str>>>,
 }
 
@@ -460,12 +703,15 @@ pub struct PackageTemplate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateParameter {
     /// Parameter name
+    #[serde(with = "arc_str_serde")]
     pub name: Arc<str>,
     /// Parameter type
     pub param_type: ParameterType,
     /// Default value
+    #[serde(with = "option_arc_str_serde")]
     pub default: Option<Arc<str>>,
     /// Parameter description
+    #[serde(with = "option_arc_str_serde")]
     pub description: Option<Arc<str>>,
     /// Required parameter
     pub required: bool,
@@ -811,9 +1057,9 @@ mod tests {
 
     #[test]
     fn test_asset_type_conversion() {
-        assert_eq!(AssetType::JuliaProgram.as_str(), "julia");
-        assert_eq!(AssetType::from_str("julia"), Some(AssetType::JuliaProgram));
-        assert_eq!(AssetType::from_str("julia-program"), Some(AssetType::JuliaProgram));
+        assert_eq!(AssetType::LuaScript.as_str(), "lua");
+        assert_eq!(AssetType::from_str("lua"), Some(AssetType::LuaScript));
+        assert_eq!(AssetType::from_str("lua-script"), Some(AssetType::LuaScript));
         assert_eq!(AssetType::from_str("unknown"), None);
     }
 
