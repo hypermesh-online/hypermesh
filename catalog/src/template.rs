@@ -57,8 +57,8 @@ pub struct TemplateDefinition {
     pub description: String,
     /// Template version
     pub version: String,
-    /// Template type
-    pub template_type: TemplateType,
+    /// Template runtime requirements
+    pub runtime: TemplateRuntime,
     /// Template parameters
     pub parameters: Vec<TemplateParameter>,
     /// Template files
@@ -69,23 +69,14 @@ pub struct TemplateDefinition {
     pub metadata: TemplateMetadata,
 }
 
-/// Template types
+/// Template types - REMOVED: Use RuntimeRequirements instead
+/// Templates now specify runtime type and version in metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TemplateType {
-    /// Lua script template
-    LuaScript,
-    /// WASM module template
-    WasmModule,
-    /// Container application template
-    ContainerApp,
-    /// Machine learning model template
-    MLModel,
-    /// Data processing pipeline template
-    DataPipeline,
-    /// Security audit template
-    SecurityAudit,
-    /// Custom template type
-    Custom(String),
+pub struct TemplateRuntime {
+    /// Runtime type (lua, python, wasm, native)
+    pub runtime_type: String,
+    /// Runtime version
+    pub version: String,
 }
 
 /// Post-generation action
@@ -278,7 +269,10 @@ impl CatalogTemplateGenerator {
             name: "lua-script".to_string(),
             description: "Basic Lua script asset template".to_string(),
             version: "1.0.0".to_string(),
-            template_type: TemplateType::LuaScript,
+            runtime: TemplateRuntime {
+                runtime_type: "lua".to_string(),
+                version: "5.4".to_string(),
+            },
             parameters: vec![
                 TemplateParameter {
                     name: "script_name".to_string(),

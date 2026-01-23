@@ -20,7 +20,6 @@ use super::results::{
 };
 use super::scanners::StaticSecurityScanner;
 use super::traits::{SecurityScanner, TypeValidator};
-use super::validators::LuaValidator;
 
 /// Asset validator for comprehensive package validation
 pub struct AssetValidator {
@@ -58,11 +57,8 @@ impl AssetValidator {
 
     /// Register default type validators
     fn register_default_validators(&mut self) {
-        // Create Lua validator for supported types
-        let lua = LuaValidator::new();
-        for type_name in lua.supported_types() {
-            self.type_validators.insert(type_name, Box::new(LuaValidator::new()));
-        }
+        // No default validators - syntax validation happens on remote nodes
+        // Catalog only validates package structure and security
     }
 
     /// Register default security scanners

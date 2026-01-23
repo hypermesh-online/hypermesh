@@ -15,8 +15,8 @@ pub struct LibraryIndex {
     name_index: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
     /// Tag index (tag -> package IDs)
     tag_index: Arc<RwLock<HashMap<Arc<str>, HashSet<Arc<str>>>>>,
-    /// Type index (asset type -> package IDs)
-    type_index: Arc<RwLock<HashMap<AssetType, HashSet<Arc<str>>>>>,
+    /// Runtime type index (runtime type -> package IDs) - e.g. "lua", "python", "wasm"
+    runtime_index: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
     /// Author index (author -> package IDs)
     author_index: Arc<RwLock<HashMap<Arc<str>, HashSet<Arc<str>>>>>,
     /// Keyword index (keyword -> package IDs)
@@ -117,7 +117,7 @@ impl LibraryIndex {
         Self {
             name_index: Arc::new(RwLock::new(HashMap::new())),
             tag_index: Arc::new(RwLock::new(HashMap::new())),
-            type_index: Arc::new(RwLock::new(HashMap::new())),
+            runtime_index: Arc::new(RwLock::new(HashMap::new())),
             author_index: Arc::new(RwLock::new(HashMap::new())),
             keyword_index: Arc::new(RwLock::new(HashMap::new())),
             version_index: Arc::new(RwLock::new(HashMap::new())),
@@ -168,13 +168,19 @@ impl LibraryIndex {
             }
         }
 
-        // Index by type
+        // Index by runtime type
         {
-            let mut type_index = self.type_index.write().await;
-            // Convert string asset_type to AssetType enum
-            if let Some(asset_type_enum) = AssetType::from_str(&package.asset_type) {
-                type_index
-                    .entry(asset_type_enum)
+            let mut runtime_index = self.runtime_index.write().await;
+            // Get runtime type from spec if available
+            if let Some(runtime_type) = package.runtime_type() {
+                runtime_index
+                    .entry(runtime_type.to_string())
+                    .or_insert_with(HashSet::new)
+                    .insert(Arc::clone(&package_id));
+            } else {
+                // Fallback to asset_type string for backward compatibility
+                runtime_index
+                    .entry(package.asset_type.clone())
                     .or_insert_with(HashSet::new)
                     .insert(Arc::clone(&package_id));
             }
@@ -264,10 +270,10 @@ impl LibraryIndex {
             });
         }
 
-        // Remove from type index
+        // Remove from runtime index
         {
-            let mut type_index = self.type_index.write().await;
-            type_index.retain(|_, packages| {
+            let mut runtime_index = self.runtime_index.write().await;
+            runtime_index.retain(|_, packages| {
                 packages.remove(package_id);
                 !packages.is_empty()
             });
@@ -343,13 +349,11 @@ impl LibraryIndex {
             }
         }
 
-        // Type filter
+        // Runtime type filter
         if let Some(asset_type) = &query.asset_type {
-            if let Some(typed) = AssetType::from_str(asset_type) {
-                let type_index = self.type_index.read().await;
-                if let Some(packages) = type_index.get(&typed) {
-                    result_sets.push(packages.clone());
-                }
+            let runtime_index = self.runtime_index.read().await;
+            if let Some(packages) = runtime_index.get(asset_type) {
+                result_sets.push(packages.clone());
             }
         }
 
@@ -431,9 +435,9 @@ impl LibraryIndex {
         tag_index.clear();
         drop(tag_index);
 
-        let mut type_index = self.type_index.write().await;
-        type_index.clear();
-        drop(type_index);
+        let mut runtime_index = self.runtime_index.write().await;
+        runtime_index.clear();
+        drop(runtime_index);
 
         let mut author_index = self.author_index.write().await;
         author_index.clear();
@@ -472,7 +476,7 @@ impl LibraryIndex {
         let all = self.all_packages.read().await;
         let name_index = self.name_index.read().await;
         let tag_index = self.tag_index.read().await;
-        let type_index = self.type_index.read().await;
+        let runtime_index = self.runtime_index.read().await;
         let author_index = self.author_index.read().await;
         let keyword_index = self.keyword_index.read().await;
 
@@ -480,7 +484,7 @@ impl LibraryIndex {
             total_packages: all.len(),
             unique_names: name_index.len(),
             unique_tags: tag_index.len(),
-            unique_types: type_index.len(),
+            unique_runtime_types: runtime_index.len(),
             unique_authors: author_index.len(),
             unique_keywords: keyword_index.len(),
         })
@@ -493,7 +497,7 @@ pub struct IndexStats {
     pub total_packages: usize,
     pub unique_names: usize,
     pub unique_tags: usize,
-    pub unique_types: usize,
+    pub unique_runtime_types: usize,
     pub unique_authors: usize,
     pub unique_keywords: usize,
 }
@@ -619,7 +623,11 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                asset_type: AssetType::LuaScript,
+                runtime: RuntimeRequirements {
+                    runtime_type: "lua".to_string(),
+                    version: "5.4".to_string(),
+                    dependencies: vec![],
+                },
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

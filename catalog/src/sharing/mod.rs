@@ -608,15 +608,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_sharing_manager_creation() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use blockmatrix::assets::PrivacyLevel;
+
+        let registry = Arc::new(CatalogRegistry::new(
+            PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
         let config = SharingConfig::default();
-        let manager = SharingManager::new(config).await;
+        let manager = SharingManager::new(config, registry).await;
         assert!(manager.is_ok());
     }
 
     #[tokio::test]
     async fn test_peer_connection() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use blockmatrix::assets::PrivacyLevel;
+
+        let registry = Arc::new(CatalogRegistry::new(
+            PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
         let config = SharingConfig::default();
-        let manager = SharingManager::new(config).await.unwrap();
+        let manager = SharingManager::new(config, registry).await.unwrap();
 
         // Test connecting to a peer (would need mock in real test)
         // let node_id = manager.connect_peer("peer.hypermesh.online").await;

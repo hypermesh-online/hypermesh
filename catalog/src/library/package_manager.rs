@@ -608,7 +608,7 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                asset_type: AssetType::LuaScript,
+                runtime: RuntimeRequirements { runtime_type: "lua".to_string(), version: "5.4".to_string(), dependencies: vec![] },
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

@@ -1017,6 +1017,7 @@ spec:
             package_hash: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            signature: None,
         };
         
         package.compute_hash().unwrap();

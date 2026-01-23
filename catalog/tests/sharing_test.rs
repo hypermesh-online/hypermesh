@@ -1,10 +1,12 @@
 //! Integration tests for decentralized asset library sharing
 
+mod common;
+
 use catalog::sharing::{
     SharingManager, SharingConfig, SharePermission,
     MirrorStrategy, SyncStrategy,
 };
-use catalog::{AssetPackage, AssetMetadata, AssetId};
+use catalog::assets::AssetPackage;
 use std::time::{Duration, SystemTime};
 use tokio;
 
@@ -269,59 +271,8 @@ async fn test_sharing_events() {
 
 // Helper function to create test packages
 fn create_test_package(name: &str, version: &str) -> AssetPackage {
-    use catalog::{AssetContent, AssetSecurity, AssetResources, AssetExecution, AssetDependency};
-
-    AssetPackage {
-        metadata: AssetMetadata {
-            id: AssetId::from(format!("test-{}", name)),
-            name: name.to_string(),
-            version: version.to_string(),
-            description: format!("Test package {}", name),
-            author: "Test Author".to_string(),
-            category: "test".to_string(),
-            tags: vec!["test".to_string(), "integration".to_string()],
-            dependencies: vec![],
-            size: 1024,
-            hash: "abc123".to_string(),
-            signature: None,
-            timestamp: SystemTime::now(),
-            priority: 0.5,
-        },
-        spec: catalog::AssetSpec {
-            asset_type: catalog::AssetType::Library,
-            platform: "universal".to_string(),
-            requirements: HashMap::new(),
-            capabilities: vec![],
-        },
-        content: AssetContent {
-            data: vec![],
-            format: "binary".to_string(),
-            compression: None,
-            encryption: None,
-        },
-        security: AssetSecurity {
-            permissions: vec![],
-            consensus_required: false,
-            validators: vec![],
-            signatures: vec![],
-        },
-        resources: AssetResources {
-            cpu: 1,
-            memory: 1024,
-            storage: 1024,
-            network: 100,
-        },
-        execution: AssetExecution {
-            runtime: "native".to_string(),
-            entry_point: "main".to_string(),
-            arguments: vec![],
-            environment: HashMap::new(),
-        },
-        dependencies: vec![],
-    }
+    common::create_test_package(name, version)
 }
-
-use std::collections::HashMap;
 
 /// Test performance and scalability
 #[tokio::test]

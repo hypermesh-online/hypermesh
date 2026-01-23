@@ -512,11 +512,20 @@ impl ChunkCache {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+    use blockmatrix::assets::PrivacyLevel;
 
     #[tokio::test]
     async fn test_package_manager() {
         let temp_dir = TempDir::new().unwrap();
         let storage_dir = temp_dir.path().to_path_buf();
+
+        // Create mock registry
+        let registry = Arc::new(CatalogRegistry::new(
+            PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
 
         // Create mock content store
         let storage = super::super::FileBasedStorage::new(storage_dir.clone()).unwrap();
@@ -526,7 +535,7 @@ mod tests {
             merkle_trees: Arc::new(RwLock::new(HashMap::new())),
         });
 
-        let manager = PackageManager::new(content_store, storage_dir).await.unwrap();
+        let manager = PackageManager::new(registry, content_store, storage_dir).await.unwrap();
 
         // Test basic operations
         assert!(manager.get_storage_stats().await.is_ok());

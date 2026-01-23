@@ -541,7 +541,7 @@ mod tests {
             level: TrustLevel::Custom("custom-test".to_string()),
             rules: vec![],
             required_checks: RequiredChecks::default(),
-            allowed_publisher_types: vec![super::PublisherType::Official],
+            allowed_publisher_types: vec![crate::security::PublisherType::Official],
             min_reputation_score: Some(0.9),
             max_vulnerability_severity: None,
             allow_unsigned: false,

@@ -985,7 +985,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_catalog_extension_creation() {
-        let config = CatalogExtensionConfig::default();
+        let mut config = CatalogExtensionConfig::default();
+        // Use much smaller cache sizes for testing (in number of entries, not bytes)
+        config.cache_size = 100; // 100 entries, not bytes
         let extension = CatalogExtension::new(config);
 
         assert_eq!(extension.metadata.id, "catalog");
@@ -995,7 +997,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_extension_metadata() {
-        let config = CatalogExtensionConfig::default();
+        let mut config = CatalogExtensionConfig::default();
+        config.cache_size = 100; // Use small cache for testing
         let extension = CatalogExtension::new(config);
         let metadata = extension.metadata();
 
@@ -1006,7 +1009,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_extension_status() {
-        let config = CatalogExtensionConfig::default();
+        let mut config = CatalogExtensionConfig::default();
+        config.cache_size = 100; // Use small cache for testing
         let extension = CatalogExtension::new(config);
         let status = extension.status().await;
 

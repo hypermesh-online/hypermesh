@@ -444,7 +444,7 @@ mod tests {
 
         // Search for "Vehicle"
         let query = SearchQuery {
-            query_text: "Vehicle".to_string(),
+            query: "Vehicle".to_string(),
             ..Default::default()
         };
 

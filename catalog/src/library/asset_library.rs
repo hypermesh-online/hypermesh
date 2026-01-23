@@ -270,9 +270,8 @@ impl AssetLibrary {
 
     /// Convert AssetPackage to LibraryAssetPackage
     fn convert_to_library_package(&self, id: String, package: crate::assets::AssetPackage) -> Result<LibraryAssetPackage> {
-        // Use library's AssetType, not blockmatrix's
-        let asset_type = super::types::AssetType::from_str(&package.spec.spec.asset_type)
-            .unwrap_or(super::types::AssetType::Custom);
+        // AssetType removed - use runtime type string directly
+        let asset_type = package.spec.spec.asset_type.clone();
 
         Ok(LibraryAssetPackage {
             id: Arc::from(id.as_str()),
@@ -520,7 +519,7 @@ mod tests {
         library.add_package(package).await.unwrap();
 
         // Get package
-        let retrieved = library.get_package(&package_id).await.unwrap();
+        let retrieved = library.get_package(&package_id).await;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().id.as_ref(), package_id);
 
@@ -541,17 +540,8 @@ mod tests {
             library.add_package(package).await.unwrap();
         }
 
-        // Search packages
-        let query = SearchQuery {
-            query: "Package".to_string(),
-            tags: vec![],
-            asset_type: None,
-            author: None,
-            limit: 10,
-            offset: 0,
-        };
-
-        let results = library.search_packages(&query).await.unwrap();
+        // Search packages using the simple string search
+        let results = library.search_packages("Package").await;
         assert_eq!(results.len(), 5);
     }
 

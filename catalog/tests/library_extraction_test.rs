@@ -3,6 +3,8 @@
 //! Verifies that the core asset library functionality has been successfully
 //! extracted from the standalone service into reusable components.
 
+mod common;
+
 use catalog::library::{
     AssetLibrary, AssetPackageManager, LibraryConfig, LibraryInterface,
     SearchQuery, PackageSummary, LibraryAssetPackage,
@@ -37,7 +39,7 @@ async fn test_library_zero_copy_operations() {
     library.add_package(package.clone()).await.unwrap();
 
     // Retrieve package
-    let retrieved = library.get_package("test-pkg").await.unwrap();
+    let retrieved = library.get_package("test-pkg").await;
     assert!(retrieved.is_some());
 
     // Verify the package data
@@ -244,7 +246,11 @@ fn create_test_package(id: &str) -> LibraryAssetPackage {
             modified: chrono::Utc::now().timestamp(),
         },
         spec: PackageSpec {
-            asset_type: AssetType::LuaScript,
+            runtime: RuntimeRequirements {
+                runtime_type: "lua".to_string(),
+                version: "5.4".to_string(),
+                dependencies: vec![],
+            },
             resources: ResourceRequirements::default(),
             security: SecurityConfig {
                 consensus_required: false,

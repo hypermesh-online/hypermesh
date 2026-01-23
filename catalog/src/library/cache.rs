@@ -482,8 +482,8 @@ mod tests {
         let key3: Arc<str> = Arc::from("pkg3");
 
         // Insert packages
-        cache.insert(key1.clone(), package1.clone());
-        cache.insert(key2.clone(), package2.clone());
+        cache.insert(key1.clone(), Arc::new(package1.clone()));
+        cache.insert(key2.clone(), Arc::new(package2.clone()));
 
         // Cache should have 2 items
         assert_eq!(cache.len(), 2);
@@ -492,7 +492,7 @@ mod tests {
         assert!(cache.get(&key1).is_some());
 
         // Insert pkg3 (should evict pkg2 since pkg1 was just accessed)
-        cache.insert(key3.clone(), package3.clone());
+        cache.insert(key3.clone(), Arc::new(package3.clone()));
 
         // pkg2 should be evicted
         assert!(cache.get(&key2).is_none());
@@ -550,7 +550,7 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                asset_type: AssetType::LuaScript,
+                runtime: RuntimeRequirements { runtime_type: "lua".to_string(), version: "5.4".to_string(), dependencies: vec![] },
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

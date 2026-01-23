@@ -2,69 +2,25 @@
 //!
 //! Tests for TrustChain integration, package signing, and verification
 
+mod common;
+
 use catalog::security::{
     SecurityManager, SecurityConfig, TrustLevel,
     PackageSigner, SignatureVerifier, PublisherReputation,
     PolicyEngine, TrustPolicy
 };
-use catalog::assets::{
-    AssetPackage, AssetMetadata, AssetContent, AssetSpec,
-    AssetSecurity, AssetResources, AssetExecution, IsolationLevel
-};
+use catalog::assets::AssetPackage;
 use catalog::distribution::{P2PDistribution, DistributionConfig};
-use catalog::AssetType;
 
 use anyhow::Result;
 use tokio;
 
 /// Create a test package
 fn create_test_package(name: &str) -> AssetPackage {
-    AssetPackage {
-        metadata: AssetMetadata {
-            name: name.to_string(),
-            version: "1.0.0".to_string(),
-            description: "Test package for security testing".to_string(),
-            author: "Test Author".to_string(),
-            license: "MIT".to_string(),
-            repository: Some("https://github.com/test/package".to_string()),
-            keywords: vec!["test".to_string()],
-            categories: vec!["testing".to_string()],
-            dependencies: vec![],
-            custom_fields: std::collections::HashMap::new(),
-        },
-        content: AssetContent {
-            main_content: "console.log('Hello from test package');".to_string(),
-            file_contents: std::collections::HashMap::from([
-                ("README.md".to_string(), "# Test Package".to_string()),
-            ]),
-            binary_contents: std::collections::HashMap::new(),
-        },
-        spec: AssetSpec {
-            asset_type: AssetType::Compute,
-            capabilities: vec!["compute".to_string()],
-            constraints: vec![],
-            interfaces: vec![],
-        },
-        security: AssetSecurity {
-            permissions: vec!["network".to_string()],
-            isolation_level: IsolationLevel::Standard,
-            encryption: None,
-        },
-        resources: AssetResources {
-            cpu_cores: Some(1),
-            memory_mb: Some(512),
-            storage_mb: Some(100),
-            gpu_required: false,
-            network_bandwidth_mbps: Some(10),
-        },
-        execution: AssetExecution {
-            entry_point: Some("index.js".to_string()),
-            runtime: Some("node".to_string()),
-            environment_variables: std::collections::HashMap::new(),
-            arguments: vec![],
-            working_directory: None,
-        },
-    }
+    let mut package = common::create_test_package(name, "1.0.0");
+    // Customize for security test if needed
+    package.spec.metadata.description = Some("Test package for security testing".to_string());
+    package
 }
 
 #[tokio::test]

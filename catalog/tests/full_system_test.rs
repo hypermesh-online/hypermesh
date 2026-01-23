@@ -7,6 +7,8 @@
 //! - Performance under load
 //! - Multi-node coordination
 
+mod common;
+
 use catalog::{
     CatalogExtension, CatalogConfig, AssetLibrary, Package, PackageVersion,
     DistributionConfig, P2PNode, SecurityConfig, ValidationReport,

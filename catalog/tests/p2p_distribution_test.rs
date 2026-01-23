@@ -1,10 +1,12 @@
 //! P2P Distribution Integration Tests
 
+mod common;
+
 use catalog::distribution::{
     P2PDistribution, DistributionConfig,
     TransferDirection, TransferStatus,
 };
-use catalog::assets::{AssetPackage, AssetSpec, AssetContent, AssetMetadata};
+use catalog::assets::AssetPackage;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio;
@@ -227,51 +229,7 @@ async fn test_package_integrity() {
 // Helper functions
 
 fn create_test_package(name: &str, version: &str) -> AssetPackage {
-    AssetPackage {
-        spec: AssetSpec {
-            metadata: AssetMetadata {
-                name: name.to_string(),
-                version: version.to_string(),
-                description: Some(format!("Test package {}", name)),
-                author: Some("Test Author".to_string()),
-                license: Some("MIT".to_string()),
-                homepage: None,
-                repository: None,
-                keywords: vec!["test".to_string()],
-                categories: vec!["testing".to_string()],
-                tags: vec!["test".to_string()],
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            },
-            spec: catalog::assets::AssetSpecification {
-                asset_type: "test".to_string(),
-                schema_version: "1.0.0".to_string(),
-                extensions: vec![],
-                dependencies: vec![],
-                runtime_requirements: catalog::assets::RuntimeRequirements {
-                    min_hypermesh_version: "1.0.0".to_string(),
-                    required_extensions: vec![],
-                    capabilities: vec![],
-                    resources: catalog::assets::ResourceRequirements {
-                        min_cpu_cores: Some(1),
-                        min_memory_gb: Some(1),
-                        min_storage_gb: Some(1),
-                        requires_gpu: false,
-                        network_bandwidth_mbps: None,
-                    },
-                },
-                interfaces: vec![],
-                configuration: serde_json::json!({}),
-                constraints: vec![],
-            },
-        },
-        content: AssetContent {
-            main_content: format!("// Main content for {}", name),
-            file_contents: std::collections::HashMap::new(),
-            binary_contents: std::collections::HashMap::new(),
-            metadata_contents: std::collections::HashMap::new(),
-        },
-    }
+    common::create_test_package(name, version)
 }
 
 /// Test concurrent package operations

@@ -47,6 +47,6 @@ pub use traits::{SecurityScanner, TypeValidator};
 
 pub use validator::AssetValidator;
 
-pub use validators::LuaValidator;
+// LuaValidator removed - syntax validation happens on remote nodes
 
 pub use scanners::StaticSecurityScanner;

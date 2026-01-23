@@ -714,6 +714,7 @@ mod tests {
             package_hash: "test-hash".to_string(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            signature: None,
         }
     }
 }

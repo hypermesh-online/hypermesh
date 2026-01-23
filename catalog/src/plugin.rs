@@ -48,8 +48,10 @@ pub struct CatalogPlugin {
 impl CatalogPlugin {
     /// Create new catalog plugin instance
     pub fn new() -> Self {
+        let mut config = CatalogExtensionConfig::default();
+        config.cache_size = 1000; // Use reasonable cache size (1000 entries)
         Self {
-            inner: Arc::new(RwLock::new(CatalogExtension::new(CatalogExtensionConfig::default()))),
+            inner: Arc::new(RwLock::new(CatalogExtension::new(config))),
             config: ExtensionConfig {
                 settings: serde_json::Value::Null,
                 resource_limits: ResourceLimits::default(),

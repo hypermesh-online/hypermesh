@@ -711,7 +711,7 @@ mod tests {
 
     #[test]
     fn test_value_key_generation() {
-        let package_id = AssetPackageId::new();
+        let package_id = AssetPackageId::new_v4();
         let key1 = ValueKey::from_package_id(&package_id);
         let key2 = ValueKey::from_package_id(&package_id);
 

@@ -325,9 +325,9 @@ impl LibraryAssetPackage {
             .unwrap_or_default()
     }
 
-    /// Get asset type enum
-    pub fn asset_type_enum(&self) -> Option<AssetType> {
-        AssetType::from_str(&self.asset_type)
+    /// Get runtime type
+    pub fn runtime_type(&self) -> Option<&str> {
+        self.spec.as_ref().map(|s| s.runtime.runtime_type.as_str())
     }
 
     /// Get content reference
@@ -385,8 +385,8 @@ pub struct PackageMetadata {
 /// Package specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageSpec {
-    /// Asset type (lua, wasm, etc.)
-    pub asset_type: AssetType,
+    /// Runtime requirements (language, version, dependencies)
+    pub runtime: RuntimeRequirements,
     /// Resource requirements
     pub resources: ResourceRequirements,
     /// Security configuration
@@ -401,65 +401,20 @@ pub struct PackageSpec {
     pub environment: Arc<HashMap<Arc<str>, Arc<str>>>,
 }
 
-/// Asset types supported by the library
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum AssetType {
-    /// Lua script
-    LuaScript,
-    /// WebAssembly module
-    WasmModule,
-    /// Container application
-    Container,
-    /// Machine learning model
-    MLModel,
-    /// Data processing pipeline
-    DataPipeline,
-    /// Dataset
-    Dataset,
-    /// Template
-    Template,
-    /// Library (Added for BlockMatrix compatibility)
-    Library,
-    /// Generic binary
-    Binary,
-    /// Custom asset type
-    Custom,
+/// Runtime requirements for asset execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeRequirements {
+    /// Runtime type (python, lua, wasm, native, etc.)
+    pub runtime_type: String,
+    /// Runtime version (e.g. "3.11", "5.4", "1.0")
+    pub version: String,
+    /// Runtime-specific dependencies
+    pub dependencies: Vec<String>,
 }
 
-impl AssetType {
-    /// Get string representation
-    pub fn as_str(&self) -> &str {
-        match self {
-            AssetType::LuaScript => "lua",
-            AssetType::WasmModule => "wasm",
-            AssetType::Container => "container",
-            AssetType::MLModel => "ml_model",
-            AssetType::DataPipeline => "data_pipeline",
-            AssetType::Dataset => "dataset",
-            AssetType::Template => "template",
-            AssetType::Library => "library",
-            AssetType::Binary => "binary",
-            AssetType::Custom => "custom",
-        }
-    }
-
-    /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "lua" | "lua-script" => Some(AssetType::LuaScript),
-            "wasm" | "wasm-module" => Some(AssetType::WasmModule),
-            "container" => Some(AssetType::Container),
-            "ml_model" | "ml-model" => Some(AssetType::MLModel),
-            "data_pipeline" | "data-pipeline" => Some(AssetType::DataPipeline),
-            "dataset" => Some(AssetType::Dataset),
-            "template" => Some(AssetType::Template),
-            "library" => Some(AssetType::Library),
-            "binary" => Some(AssetType::Binary),
-            "custom" => Some(AssetType::Custom),
-            _ => None,
-        }
-    }
-}
+// AssetType removed - use blockmatrix::assets::core::AssetCategory instead
+// For applications: AssetCategory::Application(ApplicationDomain)
+// Runtime requirements go in RuntimeRequirements metadata
 
 /// Resource requirements for asset execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -689,8 +644,8 @@ pub struct PackageTemplate {
     /// Template description
     #[serde(with = "option_arc_str_serde")]
     pub description: Option<Arc<str>>,
-    /// Template type
-    pub template_type: AssetType,
+    /// Template runtime requirements
+    pub runtime: RuntimeRequirements,
     /// Template parameters
     #[serde(with = "arc_slice_templateparam_serde")]
     pub parameters: Arc<[TemplateParameter]>,
@@ -1056,11 +1011,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_asset_type_conversion() {
-        assert_eq!(AssetType::LuaScript.as_str(), "lua");
-        assert_eq!(AssetType::from_str("lua"), Some(AssetType::LuaScript));
-        assert_eq!(AssetType::from_str("lua-script"), Some(AssetType::LuaScript));
-        assert_eq!(AssetType::from_str("unknown"), None);
+    fn test_runtime_requirements() {
+        let runtime = RuntimeRequirements {
+            runtime_type: "lua".to_string(),
+            version: "5.4".to_string(),
+            dependencies: vec!["luasocket".to_string()],
+        };
+        assert_eq!(runtime.runtime_type, "lua");
+        assert_eq!(runtime.version, "5.4");
+        assert_eq!(runtime.dependencies.len(), 1);
     }
 
     #[test]

@@ -673,8 +673,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_p2p_distribution_creation() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use blockmatrix::assets::PrivacyLevel;
+
+        let registry = Arc::new(CatalogRegistry::new(
+            PrivacyLevel::FullPublic,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        ));
+
         let config = DistributionConfig::default();
-        let distribution = P2PDistribution::new(config).await;
+        let distribution = P2PDistribution::new(registry, config).await;
         assert!(distribution.is_ok());
     }
 }

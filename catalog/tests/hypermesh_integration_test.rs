@@ -4,9 +4,11 @@
 //! AssetManager, eliminating the standalone registry and achieving
 //! 100x performance improvement through in-memory operations.
 
+mod common;
+
 use catalog::{
     HyperMeshAssetRegistry, BridgeConfig,
-    AssetPackage, AssetSpec, AssetMetadata, AssetContent,
+    assets::AssetPackage,
     AssetDiscovery, AssetRegistry,
     registry::{SearchQuery, SortCriteria, AssetFilters},
 };

@@ -66,7 +66,7 @@ pub use assets::{
     AssetPackage, AssetSpec, AssetMetadata, AssetContent, AssetSecurity,
     AssetResources, AssetExecution, AssetDependency
 };
-pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateType};
+pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateRuntime};
 pub use registry::{AssetRegistry, RegistryConfig, AssetDiscovery};
 pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
 pub use documentation::DocumentationGenerator;
