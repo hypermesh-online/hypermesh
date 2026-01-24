@@ -179,6 +179,11 @@ pub mod intelligence;
 // Integration modules for cross-phase coordination
 pub mod integration;
 
+// Node Bootstrap - Unified TrustChain + BlockMatrix initialization
+/// CRITICAL: Every node starts with its own genesis block and self-signed certificate
+/// TrustChain and BlockMatrix are ONE SYSTEM, not separate components
+pub mod bootstrap;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
