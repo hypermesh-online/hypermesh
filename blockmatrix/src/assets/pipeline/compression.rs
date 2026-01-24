@@ -73,6 +73,9 @@ impl CompressionStats {
 
         let throughput_mbps = if duration_ms > 0 {
             (original_size as f64 / (1024.0 * 1024.0)) / (duration_ms as f64 / 1000.0)
+        } else if original_size > 0 {
+            // If duration is too small to measure, use a minimum of 0.001ms (1 microsecond)
+            (original_size as f64 / (1024.0 * 1024.0)) / 0.001
         } else {
             0.0
         };
@@ -175,30 +178,36 @@ impl Compressor {
             CompressionAlgorithm::Brotli => {
                 use brotli::enc::BrotliEncoderParams;
                 use brotli::enc::writer::CompressorWriter;
+                use std::io::Write;
 
                 let mut params = BrotliEncoderParams::default();
                 params.quality = self.config.level as i32;
                 params.lgwin = self.config.window_size as i32;
 
-                let mut encoder = CompressorWriter::with_params(writer, 4096, &params);
-                let mut buffer = vec![0u8; self.config.chunk_size];
+                // Use a buffer to capture output for size tracking
+                let mut output_buffer = Vec::new();
+                {
+                    let mut encoder = CompressorWriter::with_params(&mut output_buffer, 4096, &params);
+                    let mut buffer = vec![0u8; self.config.chunk_size];
 
-                loop {
-                    let n = reader.read(&mut buffer)
-                        .map_err(|e| PipelineError::CompressionFailed(format!("Stream read failed: {}", e)))?;
-                    if n == 0 { break; }
+                    loop {
+                        let n = reader.read(&mut buffer)
+                            .map_err(|e| PipelineError::CompressionFailed(format!("Stream read failed: {}", e)))?;
+                        if n == 0 { break; }
 
-                    total_read += n;
-                    let written = encoder.write(&buffer[..n])
-                        .map_err(|e| PipelineError::CompressionFailed(format!("Stream write failed: {}", e)))?;
-                    total_written += written;
-                }
+                        total_read += n;
+                        encoder.write_all(&buffer[..n])
+                            .map_err(|e| PipelineError::CompressionFailed(format!("Stream write failed: {}", e)))?;
+                    }
 
-                encoder.flush()
-                    .map_err(|e| PipelineError::CompressionFailed(format!("Stream flush failed: {}", e)))?;
+                    encoder.flush()
+                        .map_err(|e| PipelineError::CompressionFailed(format!("Stream flush failed: {}", e)))?;
+                } // encoder dropped here, finalizing compression
 
-                // Finalize the encoder
-                drop(encoder);
+                // Now write the compressed data and track its size
+                total_written = output_buffer.len();
+                writer.write_all(&output_buffer)
+                    .map_err(|e| PipelineError::CompressionFailed(format!("Final write failed: {}", e)))?;
             }
             CompressionAlgorithm::None => {
                 total_written = std::io::copy(&mut reader, &mut writer)

@@ -595,6 +595,22 @@ mod tests {
                     member_count: 100,
                     is_public: true,
                 },
+                NetworkDiscovery {
+                    network_id: [2u8; 16],
+                    name: "Dealer".to_string(),
+                    description: "Dealer network".to_string(),
+                    entry_points: vec![],
+                    requirements: JoinRequirements {
+                        invitation_required: false,
+                        min_reputation: None,
+                        required_proofs: HashSet::new(),
+                        geo_restrictions: None,
+                        approval_process: ApprovalProcess::Automatic,
+                    },
+                    privacy_tier: PrivacyTier::Federated,
+                    member_count: 50,
+                    is_public: false,
+                },
             ])
         }
     }

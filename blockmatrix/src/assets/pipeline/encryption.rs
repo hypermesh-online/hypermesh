@@ -48,8 +48,12 @@ pub struct EncryptionStats {
 
 impl EncryptionStats {
     fn calculate(original_size: usize, encrypted_size: usize, duration_ms: u64) -> Self {
+        // Use microseconds for better precision and convert back for throughput calculation
         let throughput_mbps = if duration_ms > 0 {
             (original_size as f64 / (1024.0 * 1024.0)) / (duration_ms as f64 / 1000.0)
+        } else if original_size > 0 {
+            // If duration is too small to measure, use a minimum of 0.001ms (1 microsecond)
+            (original_size as f64 / (1024.0 * 1024.0)) / 0.001
         } else {
             0.0
         };
