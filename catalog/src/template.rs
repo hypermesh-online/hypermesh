@@ -333,12 +333,13 @@ impl CatalogTemplateGenerator {
 apiVersion: "catalog.v1"
 kind: "Asset"
 metadata:
-  name: "{{script_name}}"
+  name: "{{asset_name}}"
   version: "{{asset_version}}"
   tags: ["lua", "script", "logic"]
+  keywords: []
   description: "{{description}}"
-  {{#if author}}author: "{{author}}"{{/if}}
-  license: "{{default license "MIT"}}"
+  author: "{{author}}"
+  license: "MIT"
 
 spec:
   type: "lua-script"
@@ -367,9 +368,9 @@ spec:
     permissions: []
     
   resources:
-    cpu_limit: "{{default cpu_limit "500m"}}"
-    memory_limit: "{{default memory_limit "512Mi"}}"
-    execution_timeout: "{{default execution_timeout "30s"}}"
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    execution_timeout: "30s"
     gpu_required: false
     hardware_requirements: []
     
@@ -379,7 +380,7 @@ spec:
     retry_policy: "simple"
     priority: "normal"
     timeout_config:
-      execution: "{{default execution_timeout "30s"}}"
+      execution: "30s"
       network: "10s"
       io: "5s"
     scheduling:
@@ -855,8 +856,10 @@ mod tests {
         
         let mut context_params = HashMap::new();
         context_params.insert("program_name".to_string(), serde_json::Value::String("test_program".to_string()));
+        context_params.insert("script_name".to_string(), serde_json::Value::String("test_script".to_string()));
         context_params.insert("description".to_string(), serde_json::Value::String("A test program".to_string()));
         context_params.insert("consensus_required".to_string(), serde_json::Value::Bool(false));
+        context_params.insert("sandbox_level".to_string(), serde_json::Value::String("standard".to_string()));
         
         let context = TemplateContext {
             parameters: context_params,

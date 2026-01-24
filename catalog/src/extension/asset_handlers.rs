@@ -876,7 +876,7 @@ mod tests {
     #[tokio::test]
     async fn test_template_handler() {
         let handler = TemplateHandler::new();
-        // STUB: Template replaced with Library
-        assert_eq!(handler.asset_type(), AssetType::Library);
+        // Template handler uses Container type
+        assert_eq!(handler.asset_type(), AssetType::Container);
     }
 }

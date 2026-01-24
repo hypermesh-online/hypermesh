@@ -92,13 +92,14 @@ impl LRUCache {
 
     fn insert(&mut self, key: Arc<str>, package: Arc<LibraryAssetPackage>) -> Option<CacheEntry> {
         let size_bytes = estimate_package_size(&package);
+        let mut evicted = None;
 
         // Check if we need to evict
         while self.entries.len() >= self.capacity {
             if let Some(evicted_key) = self.access_order.pop_front() {
-                if let Some(evicted) = self.entries.remove(&evicted_key) {
-                    self.current_size = self.current_size.saturating_sub(evicted.size_bytes);
-                    return Some(evicted);
+                if let Some(evicted_entry) = self.entries.remove(&evicted_key) {
+                    self.current_size = self.current_size.saturating_sub(evicted_entry.size_bytes);
+                    evicted = Some(evicted_entry);
                 }
             }
         }
@@ -107,8 +108,11 @@ impl LRUCache {
         if let Some(max_size) = self.max_size_bytes {
             while self.current_size + size_bytes > max_size && !self.access_order.is_empty() {
                 if let Some(evicted_key) = self.access_order.pop_front() {
-                    if let Some(evicted) = self.entries.remove(&evicted_key) {
-                        self.current_size = self.current_size.saturating_sub(evicted.size_bytes);
+                    if let Some(evicted_entry) = self.entries.remove(&evicted_key) {
+                        self.current_size = self.current_size.saturating_sub(evicted_entry.size_bytes);
+                        if evicted.is_none() {
+                            evicted = Some(evicted_entry);
+                        }
                     }
                 }
             }
@@ -125,7 +129,7 @@ impl LRUCache {
         self.access_order.push_back(key);
         self.current_size += size_bytes;
 
-        None
+        evicted
     }
 
     fn remove(&mut self, key: &Arc<str>) -> Option<CacheEntry> {

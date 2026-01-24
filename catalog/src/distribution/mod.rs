@@ -682,8 +682,12 @@ mod tests {
             RegistryConfig::default(),
         ));
 
-        let config = DistributionConfig::default();
+        let mut config = DistributionConfig::default();
+        config.bootstrap_nodes = vec![]; // No bootstrap nodes for test
         let distribution = P2PDistribution::new(registry, config).await;
+        if let Err(e) = &distribution {
+            eprintln!("Distribution creation error: {:?}", e);
+        }
         assert!(distribution.is_ok());
     }
 }

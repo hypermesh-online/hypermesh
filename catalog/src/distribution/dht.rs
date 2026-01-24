@@ -285,6 +285,11 @@ impl DhtNetwork {
 
     /// Bootstrap the DHT by connecting to known nodes
     async fn bootstrap(&self, bootstrap_nodes: Vec<String>) -> Result<()> {
+        // If no bootstrap nodes, start in standalone mode
+        if bootstrap_nodes.is_empty() {
+            return Ok(());
+        }
+
         for node_addr in bootstrap_nodes {
             let addr = node_addr.parse::<std::net::SocketAddr>()
                 .context("Invalid bootstrap node address")?;
@@ -689,7 +694,7 @@ mod getrandom {
             .map(|d| d.as_nanos())
             .unwrap_or(0);
 
-        for (i, byte) in buf.iter_mut().enumerate() {
+        for (i, byte) in buf.iter_mut().enumerate().take(8) {
             *byte = ((nanos >> (i * 8)) & 0xFF) as u8;
         }
         Ok(())

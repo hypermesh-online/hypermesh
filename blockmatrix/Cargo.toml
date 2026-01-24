@@ -60,6 +60,7 @@ lazy_static = { workspace = true }
 hypermesh-lib = { path = "../lib" }
 
 # TrustChain - Consensus and certificate system
+# NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
 trustchain = { path = "../trustchain" }
 
 # Blockchain dependencies already included below

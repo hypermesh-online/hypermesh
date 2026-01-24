@@ -40,8 +40,8 @@ aes-gcm = { workspace = true }
 falcon-rust = "0.1"  # Alternative FALCON implementation
 serde_arrays = "0.1"  # For serializing fixed-size arrays
 
-# HTTP client
-# reqwest = ... # REMOVED: STOQ-only transport
+# HTTP client (for bootstrap testing only)
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
 
 # Compression
 flate2 = { workspace = true }
@@ -131,6 +131,10 @@ production-ready = ["consensus"]
 name = "trustchain"
 path = "src/lib.rs"
 
+
+[[bin]]
+name = "trustchain-bootstrap"
+path = "src/bin/trustchain_bootstrap.rs"
 
 [[bin]]
 name = "trustchain-stoq-server"

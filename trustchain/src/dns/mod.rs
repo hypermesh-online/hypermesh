@@ -19,6 +19,7 @@ use crate::config::DnsConfig;
 use crate::consensus::ConsensusContext;
 use crate::errors::{DnsError, Result as TrustChainResult};
 
+pub mod bootstrap;
 pub mod cache;
 pub mod resolver;
 pub mod cert_validator;
@@ -29,6 +30,7 @@ pub mod dns_over_quic;
 pub mod authoritative_server;
 pub mod production_zones;
 
+pub use bootstrap::*;
 pub use cache::*;
 pub use resolver::*;
 pub use cert_validator::*;

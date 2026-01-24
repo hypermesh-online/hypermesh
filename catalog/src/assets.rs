@@ -847,6 +847,7 @@ metadata:
   name: "test-asset"
   version: "1.0.0"
   tags: ["test", "example"]
+  keywords: []
   description: "Test asset for validation"
 spec:
   type: "lua-script"
