@@ -23,6 +23,7 @@ use sha2::{Sha256, Digest};
 
 // Import STOQ ALPN protocol identifier
 use crate::protocol::STOQ_ALPN;
+use super::certificate_strategy::{CertificateStrategy, NetworkType};
 
 /// Certificate manager configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -39,14 +40,18 @@ pub struct CertificateConfig {
     pub rotation_interval: Duration,
     /// TrustChain CA endpoint (for production)
     pub trustchain_endpoint: Option<String>,
+    /// Network type for strategy-based certificate management
+    pub network_type: Option<NetworkType>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum CertificateMode {
     /// Self-signed certificates for localhost testing ONLY
     LocalhostTesting,
     /// TrustChain CA-issued certificates for production
     TrustChainProduction,
+    /// Network-aware strategy-based certificate management
+    NetworkStrategy,
 }
 
 impl Default for CertificateConfig {
@@ -58,6 +63,7 @@ impl Default for CertificateConfig {
             common_name: "localhost".to_string(),
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             trustchain_endpoint: None,
+            network_type: None,
         }
     }
 }
@@ -71,7 +77,9 @@ impl CertificateConfig {
             ipv6_addresses,
             common_name,
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
-            trustchain_endpoint: Some("quic://trust.hypermesh.online:8443".to_string()),
+            // Use local CA for development, trust.hypermesh.online for production
+            trustchain_endpoint: Some("quic://[::1]:8443".to_string()),
+            network_type: None,
         }
     }
 
@@ -84,6 +92,25 @@ impl CertificateConfig {
             common_name,
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             trustchain_endpoint: None,
+            network_type: None,
+        }
+    }
+
+    /// Network-aware configuration with strategy pattern
+    pub fn with_network_type(
+        node_id: String,
+        common_name: String,
+        ipv6_addresses: Vec<Ipv6Addr>,
+        network_type: NetworkType,
+    ) -> Self {
+        Self {
+            mode: CertificateMode::NetworkStrategy,
+            node_id,
+            ipv6_addresses,
+            common_name,
+            rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
+            trustchain_endpoint: None,
+            network_type: Some(network_type),
         }
     }
 }
@@ -105,6 +132,20 @@ pub struct StoqNodeCertificate {
     pub fingerprint_sha256: [u8; 32],
     /// Optional application-specific metadata (for custom validators)
     pub metadata: Option<Vec<u8>>,
+}
+
+impl Clone for StoqNodeCertificate {
+    fn clone(&self) -> Self {
+        Self {
+            node_id: self.node_id.clone(),
+            certificate: self.certificate.clone(),
+            private_key: self.private_key.clone_key(),
+            issued_at: self.issued_at,
+            expires_at: self.expires_at,
+            fingerprint_sha256: self.fingerprint_sha256,
+            metadata: self.metadata.clone(),
+        }
+    }
 }
 
 impl StoqNodeCertificate {
@@ -138,6 +179,8 @@ pub struct CertificateManager {
     certificate_cache: Arc<DashMap<String, StoqNodeCertificate>>,
     /// TrustChain client (for production mode)
     trustchain_client: Option<Arc<TrustChainClient>>,
+    /// Network-aware certificate strategy
+    certificate_strategy: Option<Arc<dyn CertificateStrategy>>,
 }
 
 /// TrustChain client for certificate operations
@@ -163,14 +206,26 @@ impl TrustChainClient {
 
         // Parse TrustChain endpoint to get address/port
         let endpoint_url = self.endpoint.strip_prefix("quic://").unwrap_or(&self.endpoint);
-        let parts: Vec<&str> = endpoint_url.split(':').collect();
-        if parts.len() != 2 {
-            return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
-        }
 
-        let host = parts[0];
-        let port = parts[1].parse::<u16>()
-            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", parts[1]))?;
+        // Handle IPv6 addresses with brackets: [::1]:8443
+        let (host, port) = if endpoint_url.starts_with('[') {
+            let close_bracket = endpoint_url.find(']')
+                .ok_or_else(|| anyhow!("Invalid IPv6 endpoint format: {}", self.endpoint))?;
+            let ipv6_addr = &endpoint_url[1..close_bracket];
+            let port_part = &endpoint_url[close_bracket+1..];
+            let port_str = port_part.trim_start_matches(':');
+            (ipv6_addr, port_str)
+        } else {
+            // IPv4 or hostname:port format
+            let parts: Vec<&str> = endpoint_url.split(':').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
+            }
+            (parts[0], parts[1])
+        };
+
+        let port = port.parse::<u16>()
+            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", port))?;
 
         // Resolve to IPv6 address
         let socket_addrs = tokio::net::lookup_host((host, port)).await?;
@@ -183,9 +238,15 @@ impl TrustChainClient {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-        let client_config = rustls::ClientConfig::builder()
+        let mut client_config = rustls::ClientConfig::builder()
             .with_root_certificates(roots)
             .with_no_client_auth();
+
+        // Configure ALPN protocols - must match server
+        client_config.alpn_protocols = vec![
+            STOQ_ALPN.to_vec(),   // Primary: STOQ protocol
+            b"h3".to_vec(),       // Secondary: Standard HTTP/3 for compatibility
+        ];
 
         let quinn_config = quinn::ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?
@@ -299,14 +360,25 @@ impl TrustChainClient {
 
         // Parse TrustChain endpoint
         let endpoint_url = self.endpoint.strip_prefix("quic://").unwrap_or(&self.endpoint);
-        let parts: Vec<&str> = endpoint_url.split(':').collect();
-        if parts.len() != 2 {
-            return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
-        }
 
-        let host = parts[0];
-        let port = parts[1].parse::<u16>()
-            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", parts[1]))?;
+        // Handle IPv6 addresses with brackets: [::1]:8443
+        let (host, port) = if endpoint_url.starts_with('[') {
+            let close_bracket = endpoint_url.find(']')
+                .ok_or_else(|| anyhow!("Invalid IPv6 endpoint format: {}", self.endpoint))?;
+            let ipv6_addr = &endpoint_url[1..close_bracket];
+            let port_part = &endpoint_url[close_bracket+1..];
+            let port_str = port_part.trim_start_matches(':');
+            (ipv6_addr, port_str)
+        } else {
+            let parts: Vec<&str> = endpoint_url.split(':').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
+            }
+            (parts[0], parts[1])
+        };
+
+        let port = port.parse::<u16>()
+            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", port))?;
 
         // Resolve to IPv6 address
         let socket_addrs = tokio::net::lookup_host((host, port)).await?;
@@ -319,9 +391,15 @@ impl TrustChainClient {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-        let client_config = rustls::ClientConfig::builder()
+        let mut client_config = rustls::ClientConfig::builder()
             .with_root_certificates(roots)
             .with_no_client_auth();
+
+        // Configure ALPN protocols - must match server
+        client_config.alpn_protocols = vec![
+            STOQ_ALPN.to_vec(),   // Primary: STOQ protocol
+            b"h3".to_vec(),       // Secondary: Standard HTTP/3 for compatibility
+        ];
 
         let quinn_config = quinn::ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?
@@ -382,14 +460,25 @@ impl TrustChainClient {
 
         // Parse TrustChain endpoint
         let endpoint_url = self.endpoint.strip_prefix("quic://").unwrap_or(&self.endpoint);
-        let parts: Vec<&str> = endpoint_url.split(':').collect();
-        if parts.len() != 2 {
-            return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
-        }
 
-        let host = parts[0];
-        let port = parts[1].parse::<u16>()
-            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", parts[1]))?;
+        // Handle IPv6 addresses with brackets: [::1]:8443
+        let (host, port) = if endpoint_url.starts_with('[') {
+            let close_bracket = endpoint_url.find(']')
+                .ok_or_else(|| anyhow!("Invalid IPv6 endpoint format: {}", self.endpoint))?;
+            let ipv6_addr = &endpoint_url[1..close_bracket];
+            let port_part = &endpoint_url[close_bracket+1..];
+            let port_str = port_part.trim_start_matches(':');
+            (ipv6_addr, port_str)
+        } else {
+            let parts: Vec<&str> = endpoint_url.split(':').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
+            }
+            (parts[0], parts[1])
+        };
+
+        let port = port.parse::<u16>()
+            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", port))?;
 
         // Resolve to IPv6 address
         let socket_addrs = tokio::net::lookup_host((host, port)).await?;
@@ -601,6 +690,22 @@ impl CertificateManager {
                 }
             }
             CertificateMode::LocalhostTesting => None,
+            CertificateMode::NetworkStrategy => None,
+        };
+
+        // Create certificate strategy if using network-aware mode
+        let certificate_strategy = if config.mode == CertificateMode::NetworkStrategy {
+            if let Some(ref network_type) = config.network_type {
+                Some(network_type.create_strategy(
+                    config.node_id.clone(),
+                    config.common_name.clone(),
+                    config.ipv6_addresses.clone(),
+                )?)
+            } else {
+                return Err(anyhow!("NetworkType required for NetworkStrategy mode"));
+            }
+        } else {
+            None
         };
 
         let manager = Self {
@@ -608,6 +713,7 @@ impl CertificateManager {
             current_certificate: Arc::new(RwLock::new(None)),
             certificate_cache: Arc::new(DashMap::new()),
             trustchain_client,
+            certificate_strategy,
         };
 
         // Initialize certificate
@@ -617,8 +723,68 @@ impl CertificateManager {
         Ok(manager)
     }
 
+    /// Create certificate manager with network strategy
+    pub async fn with_strategy(strategy: Arc<dyn CertificateStrategy>) -> Result<Self> {
+        info!("Initializing STOQ certificate manager with strategy: {}", strategy.strategy_name());
+
+        let config = CertificateConfig {
+            mode: CertificateMode::NetworkStrategy,
+            node_id: "stoq-node".to_string(),
+            ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
+            common_name: "stoq.local".to_string(),
+            rotation_interval: Duration::from_secs(24 * 60 * 60),
+            trustchain_endpoint: None,
+            network_type: None,
+        };
+
+        let manager = Self {
+            config: Arc::new(config),
+            current_certificate: Arc::new(RwLock::new(None)),
+            certificate_cache: Arc::new(DashMap::new()),
+            trustchain_client: None,
+            certificate_strategy: Some(strategy),
+        };
+
+        // Initialize certificate if strategy requires it
+        if manager.certificate_strategy.as_ref().map_or(true, |s| s.requires_certificate()) {
+            manager.initialize_certificate().await?;
+        }
+
+        info!("STOQ certificate manager initialized with strategy");
+        Ok(manager)
+    }
+
     /// Get server crypto configuration for QUIC
     pub async fn server_crypto_config(&self) -> Result<rustls::ServerConfig> {
+        // For NetworkStrategy mode with Anonymous network, create a temporary self-signed cert
+        if self.config.mode == CertificateMode::NetworkStrategy {
+            if let Some(ref strategy) = self.certificate_strategy {
+                if !strategy.requires_certificate() {
+                    // Anonymous network - create temporary self-signed certificate for QUIC
+                    let cert_key = rcgen::generate_simple_self_signed(vec!["anonymous.local".to_string()])?;
+                    let cert_der = cert_key.cert.der().clone();
+                    let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
+                        .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
+
+                    let mut server_config = rustls::ServerConfig::builder()
+                        .with_no_client_auth()
+                        .with_single_cert(
+                            vec![cert_der],
+                            private_key_der,
+                        )?;
+
+                    // Configure ALPN protocols
+                    server_config.alpn_protocols = vec![
+                        STOQ_ALPN.to_vec(),
+                        b"h3".to_vec(),
+                    ];
+
+                    debug!("Server crypto config created for anonymous network");
+                    return Ok(server_config);
+                }
+            }
+        }
+
         let cert_guard = self.current_certificate.read().await;
         let cert = cert_guard.as_ref().ok_or_else(|| anyhow!("No certificate available"))?;
 
@@ -658,6 +824,42 @@ impl CertificateManager {
                 rustls::ClientConfig::builder()
                     .with_root_certificates(root_store)
                     .with_no_client_auth()
+            }
+            CertificateMode::NetworkStrategy => {
+                // For network strategy mode, configuration depends on the strategy
+                if let Some(ref strategy) = self.certificate_strategy {
+                    match strategy.strategy_name() {
+                        "Anonymous" => {
+                            // Anonymous accepts all certificates
+                            rustls::ClientConfig::builder()
+                                .dangerous()
+                                .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                                .with_no_client_auth()
+                        }
+                        "P2P" => {
+                            // P2P uses self-signed certificates
+                            rustls::ClientConfig::builder()
+                                .dangerous()
+                                .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                                .with_no_client_auth()
+                        }
+                        _ => {
+                            // Federated and Public use proper CA validation
+                            let mut root_store = rustls::RootCertStore::empty();
+                            root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+
+                            rustls::ClientConfig::builder()
+                                .with_root_certificates(root_store)
+                                .with_no_client_auth()
+                        }
+                    }
+                } else {
+                    // Default to accepting self-signed for safety
+                    rustls::ClientConfig::builder()
+                        .dangerous()
+                        .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                        .with_no_client_auth()
+                }
             }
         };
 
@@ -703,11 +905,40 @@ impl CertificateManager {
                     Err(anyhow!("TrustChain client not available"))
                 }
             }
+            CertificateMode::NetworkStrategy => {
+                // For network strategy mode, use the strategy's validation
+                if let Some(ref strategy) = self.certificate_strategy {
+                    // Create a temporary certificate for validation
+                    let temp_cert = StoqNodeCertificate {
+                        node_id: "unknown".to_string(),
+                        certificate: CertificateDer::from(cert_der.to_vec()),
+                        private_key: PrivateKeyDer::try_from(vec![0u8]).unwrap(), // Dummy key for validation
+                        issued_at: SystemTime::now(),
+                        expires_at: SystemTime::now() + Duration::from_secs(3600),
+                        fingerprint_sha256: fingerprint,
+                        metadata: None,
+                    };
+                    strategy.validate_certificate(&temp_cert).await
+                } else {
+                    // Default to accepting for safety
+                    Ok(true)
+                }
+            }
         }
     }
 
     /// Get current certificate fingerprint
     pub async fn get_certificate_fingerprint(&self) -> Result<String> {
+        // For anonymous networks, return a placeholder fingerprint
+        if self.config.mode == CertificateMode::NetworkStrategy {
+            if let Some(ref strategy) = self.certificate_strategy {
+                if !strategy.requires_certificate() {
+                    // Anonymous network - return placeholder
+                    return Ok("0000000000000000000000000000000000000000000000000000000000000000".to_string());
+                }
+            }
+        }
+
         let cert_guard = self.current_certificate.read().await;
         let cert = cert_guard.as_ref().ok_or_else(|| anyhow!("No certificate available"))?;
         Ok(cert.fingerprint())
@@ -741,6 +972,20 @@ impl CertificateManager {
             }
             CertificateMode::TrustChainProduction => {
                 self.request_trustchain_certificate().await?;
+            }
+            CertificateMode::NetworkStrategy => {
+                if let Some(ref strategy) = self.certificate_strategy {
+                    if strategy.requires_certificate() {
+                        if let Some(cert) = strategy.get_certificate().await? {
+                            *self.current_certificate.write().await = Some(cert);
+                            info!("Certificate obtained from {} strategy", strategy.strategy_name());
+                        }
+                    } else {
+                        info!("No certificate required for {} strategy", strategy.strategy_name());
+                    }
+                } else {
+                    return Err(anyhow!("No certificate strategy configured"));
+                }
             }
         }
         Ok(())

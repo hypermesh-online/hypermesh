@@ -17,6 +17,7 @@ use tracing_subscriber;
 
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
+use blockmatrix::network::NetworkManager;
 
 #[derive(Parser, Debug)]
 #[clap(name = "blockmatrix-node")]
@@ -42,6 +43,14 @@ struct Cli {
     /// Initial privacy mode
     #[clap(short, long, default_value = "private")]
     privacy: PrivacyModeArg,
+
+    /// Bootstrap nodes (IPv6 addresses)
+    #[clap(short = 'b', long)]
+    bootstrap: Vec<String>,
+
+    /// STOQ port
+    #[clap(short = 's', long, default_value = "9292")]
+    stoq_port: u16,
 
     #[clap(subcommand)]
     command: Option<Commands>,
@@ -121,6 +130,75 @@ async fn main() -> Result<()> {
             let target_mode = cli.privacy.into();
             if bootstrap.privacy_mode().await != target_mode {
                 bootstrap.set_privacy_mode(target_mode).await?;
+            }
+
+            // Initialize STOQ transport if not in Private mode
+            let privacy_mode = bootstrap.privacy_mode().await;
+            if privacy_mode != PrivacyMode::Private {
+                info!("Initializing STOQ transport on port {}", cli.stoq_port);
+
+                // Create STOQ config
+                let mut stoq_config = stoq::TransportConfig::default();
+                stoq_config.port = cli.stoq_port;
+                stoq_config.bind_address = std::net::Ipv6Addr::UNSPECIFIED;
+
+                // Initialize STOQ
+                let transport = std::sync::Arc::new(
+                    stoq::StoqTransport::new(stoq_config).await?
+                );
+
+                // Parse bootstrap nodes
+                let bootstrap_nodes: Vec<std::net::SocketAddr> = cli.bootstrap.iter()
+                    .filter_map(|addr| addr.parse().ok())
+                    .collect();
+
+                if !bootstrap_nodes.is_empty() {
+                    info!("Bootstrap nodes: {:?}", bootstrap_nodes);
+                }
+
+                // Create network manager
+                let network_manager = NetworkManager::new(
+                    coord.clone(),
+                    transport.clone(),
+                    privacy_mode,
+                    bootstrap_nodes,
+                ).await?;
+
+                // Start discovery based on privacy mode
+                network_manager.start_discovery().await?;
+
+                // Start accepting connections in background
+                let network_clone = std::sync::Arc::new(network_manager);
+                let network_accept = network_clone.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = network_accept.accept_connections().await {
+                        warn!("Connection acceptor error: {}", e);
+                    }
+                });
+
+                info!("Network initialized, accepting connections on port {}", cli.stoq_port);
+
+                // Periodically show connected nodes
+                let network_status = network_clone.clone();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+                    loop {
+                        interval.tick().await;
+                        let node_count = network_status.get_node_count().await;
+                        if node_count > 0 {
+                            info!("Connected nodes: {}", node_count);
+                            let neighbors = network_status.find_matrix_neighbors(10.0).await;
+                            for neighbor in neighbors.iter().take(3) {
+                                info!("  - Node {} at ({},{},{})",
+                                    &neighbor.node_id[..8],
+                                    neighbor.coordinate.x,
+                                    neighbor.coordinate.y,
+                                    neighbor.coordinate.z
+                                );
+                            }
+                        }
+                    }
+                });
             }
 
             info!("Node running in {:?} mode", bootstrap.privacy_mode().await);

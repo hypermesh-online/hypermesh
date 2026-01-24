@@ -14,6 +14,7 @@ use std::time::Duration;
 use tracing::{info, debug, warn};
 
 use super::certificates::CertificateManager;
+use super::certificate_strategy::NetworkType;
 use super::config::{TransportConfig, NetworkTier, CongestionControl};
 use super::connection::{Connection, Endpoint, MemoryPool, FrameBatch};
 use super::metrics::TransportMetrics;
@@ -84,6 +85,39 @@ impl StoqTransport {
         };
 
         let cert_manager = Arc::new(CertificateManager::new(cert_config).await?);
+
+        Self::new_with_cert_manager(config, cert_manager).await
+    }
+
+    /// Create a new STOQ transport for specific network type
+    pub async fn new_for_network(config: TransportConfig, network_type: NetworkType) -> Result<Self> {
+        // Initialize crypto provider once (globally)
+        CRYPTO_INIT.call_once(|| {
+            if let Err(e) = rustls::crypto::ring::default_provider().install_default() {
+                // Provider might already be installed, log but don't fail
+                debug!("Crypto provider initialization: {:?}", e);
+            }
+        });
+
+        info!("Initializing STOQ transport for network type: {:?}", network_type);
+        info!("Transport config: zero_copy={}, pool_size={}, max_streams={}",
+              config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams);
+
+        // Create network-aware certificate configuration
+        let cert_config = super::certificates::CertificateConfig::with_network_type(
+            format!("{}-{}", "stoq-node", config.port),
+            "stoq.hypermesh.online".to_string(),
+            vec![config.bind_address],
+            network_type,
+        );
+
+        let cert_manager = Arc::new(CertificateManager::new(cert_config).await?);
+
+        Self::new_with_cert_manager(config, cert_manager).await
+    }
+
+    /// Internal: Create transport with provided certificate manager
+    async fn new_with_cert_manager(config: TransportConfig, cert_manager: Arc<CertificateManager>) -> Result<Self> {
 
         // Configure QUIC transport for adaptive network tiers performance
         let mut server_transport_config = QuinnTransportConfig::default();

@@ -184,6 +184,9 @@ pub mod integration;
 /// TrustChain and BlockMatrix are ONE SYSTEM, not separate components
 pub mod bootstrap;
 
+/// Network module - Multi-node communication
+pub mod network;
+
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 

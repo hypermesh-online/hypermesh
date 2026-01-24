@@ -148,6 +148,10 @@ path = "src/bin/validate-deployment.rs"
 name = "trustchain-http3-server"
 path = "src/bin/trustchain-http3-server.rs"
 
+[[bin]]
+name = "trustchain_ca"
+path = "src/bin/trustchain_ca.rs"
+
 [[bench]]
 name = "certificate_bench"
 harness = false

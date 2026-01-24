@@ -2,6 +2,7 @@
 
 // Module declarations
 pub mod certificates;
+pub mod certificate_strategy;
 pub mod streams;
 pub mod metrics;
 pub mod falcon;
@@ -23,6 +24,10 @@ pub use manager::StoqTransport;
 pub use metrics::{TransportMetrics, ProtocolMetrics, IntervalMetrics};
 pub use falcon::{FalconTransport, FalconVariant};
 pub use adaptive::{AdaptiveConnection, AdaptationManager};
+pub use certificate_strategy::{CertificateStrategy, NetworkType,
+    AnonymousCertificateStrategy, P2PCertificateStrategy,
+    FederatedCertificateStrategy, PublicCertificateStrategy};
+pub use certificates::{CertificateManager, CertificateConfig, CertificateMode, StoqNodeCertificate};
 
 #[cfg(test)]
 mod tests {
@@ -39,6 +44,10 @@ mod tests {
     #[test]
     fn test_transport_config_default() {
         let config = TransportConfig::default();
+        // In test mode, port is 0 (OS-assigned) to avoid binding conflicts
+        #[cfg(test)]
+        assert_eq!(config.port, 0);
+        #[cfg(not(test))]
         assert_eq!(config.port, 9292);
         assert!(config.enable_migration);
         assert!(!config.enable_0rtt); // 0-RTT disabled for security
