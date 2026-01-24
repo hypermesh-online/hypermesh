@@ -19,7 +19,7 @@ use super::{
 /// Public network handler - global blockchain-registered certificates
 pub struct PublicNetworkHandler {
     /// Blockchain-registered certificate
-    blockchain_cert: Option<Certificate>,
+    blockchain_cert: Arc<RwLock<Option<Certificate>>>,
     /// Active connection
     connection: Arc<RwLock<Option<NetworkConnection>>>,
     /// Blockchain state
@@ -74,7 +74,7 @@ impl PublicNetworkHandler {
     pub fn new() -> Self {
         info!("Creating public network handler");
         PublicNetworkHandler {
-            blockchain_cert: None,
+            blockchain_cert: Arc::new(RwLock::new(None)),
             connection: Arc::new(RwLock::new(None)),
             blockchain_state: Arc::new(RwLock::new(BlockchainState::default())),
             dns_asset: Arc::new(RwLock::new(None)),
@@ -168,10 +168,7 @@ impl NetworkHandler for PublicNetworkHandler {
         let blockchain_cert = self.submit_proof_of_state(&proof, &stoq).await?;
 
         // Store certificate
-        unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.blockchain_cert = Some(blockchain_cert.clone());
-        }
+        *self.blockchain_cert.write().await = Some(blockchain_cert.clone());
 
         // Initialize blockchain state
         let mut state = self.blockchain_state.write().await;
@@ -202,7 +199,8 @@ impl NetworkHandler for PublicNetworkHandler {
         info!("Connecting to public HyperMesh network");
 
         // Verify we have a valid blockchain certificate
-        let cert = self.blockchain_cert.as_ref()
+        let cert_opt = self.blockchain_cert.read().await;
+        let cert = cert_opt.as_ref()
             .ok_or_else(|| anyhow!("No blockchain certificate - bootstrap first"))?;
 
         if !cert.is_blockchain_registered() {

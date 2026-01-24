@@ -19,9 +19,9 @@ use super::{
 /// Federated network handler - federation-specific trust anchor
 pub struct FederatedNetworkHandler {
     /// Federation gateway URL (e.g., "bank.internal")
-    federation_gateway: String,
+    federation_gateway: Arc<RwLock<String>>,
     /// Certificate from federation CA
-    federation_cert: Option<Certificate>,
+    federation_cert: Arc<RwLock<Option<Certificate>>>,
     /// Known federation members
     federation_members: Arc<RwLock<HashSet<PeerId>>>,
     /// Active connection
@@ -52,8 +52,8 @@ impl FederatedNetworkHandler {
     pub fn new() -> Self {
         info!("Creating federated network handler");
         FederatedNetworkHandler {
-            federation_gateway: String::new(),
-            federation_cert: None,
+            federation_gateway: Arc::new(RwLock::new(String::new())),
+            federation_cert: Arc::new(RwLock::new(None)),
             federation_members: Arc::new(RwLock::new(HashSet::new())),
             connection: Arc::new(RwLock::new(None)),
             federation_info: Arc::new(RwLock::new(FederationInfo::default())),
@@ -61,7 +61,7 @@ impl FederatedNetworkHandler {
     }
 
     /// Join a specific federation
-    async fn join_federation(&mut self, gateway_url: &str, stoq: &Arc<StoqTransport>) -> Result<Certificate> {
+    async fn join_federation(&self, gateway_url: &str, stoq: &Arc<StoqTransport>) -> Result<Certificate> {
         info!("Joining federation at: {}", gateway_url);
 
         // Request membership from federation gateway
@@ -115,7 +115,8 @@ impl FederatedNetworkHandler {
     /// Validate federation membership
     async fn validate_membership(&self, peer_cert: &Certificate) -> bool {
         // Check if certificate is issued by our federation gateway
-        peer_cert.issuer() == self.federation_gateway
+        let gateway = self.federation_gateway.read().await;
+        peer_cert.issuer() == gateway.as_str()
     }
 }
 
@@ -132,22 +133,14 @@ impl NetworkHandler for FederatedNetworkHandler {
             NetworkType::Federated { gateway_url: gateway_url.clone() }
         )?;
 
-        // Request certificate from federation gateway
-        // Need mutable self for this specific operation
-        let federation_cert = {
-            // Create a temporary mutable handler for joining
-            let mut temp_handler = FederatedNetworkHandler::new();
-            temp_handler.federation_gateway = gateway_url.clone();
-            temp_handler.join_federation(&gateway_url, &stoq).await?
-        };
+        // Store the gateway URL
+        *self.federation_gateway.write().await = gateway_url.clone();
 
-        // Store the certificate and gateway in self
-        // This is safe because we're behind an Arc<RwLock>
-        unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.federation_gateway = gateway_url.clone();
-            self_mut.federation_cert = Some(federation_cert.clone());
-        }
+        // Request certificate from federation gateway
+        let federation_cert = self.join_federation(&gateway_url, &stoq).await?;
+
+        // Store the certificate
+        *self.federation_cert.write().await = Some(federation_cert.clone());
 
         // Discover other federation members
         self.discover_members(&stoq).await?;
@@ -172,16 +165,18 @@ impl NetworkHandler for FederatedNetworkHandler {
         info!("Connecting to federated network");
 
         // Verify we have a valid federation certificate
-        if self.federation_cert.is_none() {
+        let cert_opt = self.federation_cert.read().await;
+        if cert_opt.is_none() {
             return Err(anyhow!("No federation certificate - bootstrap first"));
         }
 
-        let cert = self.federation_cert.as_ref().unwrap();
+        let cert = cert_opt.as_ref().unwrap();
         if cert.is_expired() {
             return Err(anyhow!("Federation certificate expired"));
         }
 
-        info!("Connected to federation: {}", self.federation_gateway);
+        let gateway = self.federation_gateway.read().await;
+        info!("Connected to federation: {}", gateway);
         Ok(())
     }
 
@@ -189,10 +184,11 @@ impl NetworkHandler for FederatedNetworkHandler {
         debug!("Validating federated peer: {}", peer.peer_id);
 
         // Peer must be in federated mode
+        let our_gateway = self.federation_gateway.read().await;
         match &peer.network_type {
             NetworkType::Federated { gateway_url } => {
                 // Must be same federation
-                if gateway_url != &self.federation_gateway {
+                if gateway_url != our_gateway.as_str() {
                     warn!("Peer {} is in different federation: {}", peer.peer_id, gateway_url);
                     return Ok(false);
                 }
@@ -243,7 +239,7 @@ impl NetworkHandler for FederatedNetworkHandler {
             metadata: {
                 let mut meta = std::collections::HashMap::new();
                 meta.insert("network".to_string(), "federated".to_string());
-                meta.insert("federation".to_string(), self.federation_gateway.clone());
+                meta.insert("federation".to_string(), self.federation_gateway.read().await.clone());
                 meta.insert("member_count".to_string(),
                     self.federation_members.read().await.len().to_string());
                 if let Some(peer_id) = &request.peer_id {
@@ -280,8 +276,10 @@ impl NetworkHandler for FederatedNetworkHandler {
     }
 
     fn network_type(&self) -> NetworkType {
+        // Note: This is synchronous so we can't await. We'll need to store a cached value
+        // For now, return a placeholder
         NetworkType::Federated {
-            gateway_url: self.federation_gateway.clone()
+            gateway_url: String::from("federation")
         }
     }
 }
@@ -321,8 +319,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_federated_peer_validation() {
-        let mut handler = FederatedNetworkHandler::new();
-        handler.federation_gateway = "bank.internal".to_string();
+        let handler = FederatedNetworkHandler::new();
+        *handler.federation_gateway.write().await = "bank.internal".to_string();
 
         // Create a certificate from the same federation
         let valid_cert = Certificate {

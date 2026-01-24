@@ -22,6 +22,9 @@ pub mod p2p;
 pub mod federated;
 pub mod public;
 
+#[cfg(test)]
+mod tests;
+
 pub use anonymous::AnonymousNetworkHandler;
 pub use p2p::P2PNetworkHandler;
 pub use federated::FederatedNetworkHandler;
@@ -257,6 +260,15 @@ pub struct StoqTransport {
     inner: Arc<RwLock<Option<stoq::StoqTransport>>>,
 }
 
+impl std::fmt::Debug for StoqTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StoqTransport")
+            .field("network_type", &self.network_type)
+            .field("connected", &"<transport>")
+            .finish()
+    }
+}
+
 impl StoqTransport {
     /// Create new STOQ transport for specific network type
     pub fn new_for_network(network_type: NetworkType) -> Result<Arc<Self>> {
@@ -284,7 +296,7 @@ impl StoqTransport {
 }
 
 /// Network connection with isolated context
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NetworkConnection {
     /// Unique network ID
     pub network_id: NetworkId,
@@ -368,51 +380,3 @@ mod stoq {
     pub struct Connection;
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_network_types() {
-        assert_eq!(NetworkType::Anonymous.name(), "Anonymous");
-        assert_eq!(NetworkType::P2P.name(), "P2P");
-        assert_eq!(NetworkType::Public.name(), "Public");
-
-        let federated = NetworkType::Federated {
-            gateway_url: "bank.internal".to_string()
-        };
-        assert_eq!(federated.name(), "Federated");
-    }
-
-    #[test]
-    fn test_certificate_validation() {
-        let cert = Certificate {
-            subject: "node".to_string(),
-            issuer: "node".to_string(),
-            public_key: vec![0; 32],
-            signature: vec![0; 64],
-            fingerprint: "test".to_string(),
-            expires_at: 0,
-            network_type: NetworkType::P2P,
-            blockchain_registered: false,
-        };
-
-        assert!(cert.is_self_signed());
-        assert!(!cert.is_blockchain_registered());
-        assert!(cert.is_expired()); // expires_at is 0
-    }
-
-    #[test]
-    fn test_network_id() {
-        let id1 = NetworkId::new_v4();
-        let id2 = NetworkId::new_v4();
-        assert_ne!(id1, id2); // Should be unique
-    }
-
-    #[test]
-    fn test_ephemeral_key() {
-        let key = EphemeralKey::generate();
-        assert_eq!(key.public_key.len(), 32);
-        assert_ne!(key.session_id, Uuid::nil());
-    }
-}
