@@ -1,0 +1,540 @@
+//! Multi-Network Coordinator
+//!
+//! Central coordinator for multi-network participation, enabling a single node
+//! to simultaneously connect to multiple network types with complete isolation.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use anyhow::{Result, anyhow};
+use tracing::{info, warn, debug};
+use uuid::Uuid;
+
+use super::trust::{
+    NetworkHandler, NetworkConnection, NetworkType, NetworkId,
+    AssetRequest, AssetResponse, ProofOfState, NetworkConfig as TrustNetworkConfig,
+    AnonymousNetworkHandler, P2PNetworkHandler,
+    FederatedNetworkHandler, PublicNetworkHandler,
+};
+use super::isolation::{IsolationManager, DefaultIsolationManager};
+use crate::assets::core::AssetId;
+
+/// Configuration for joining a network
+#[derive(Debug, Clone)]
+pub struct NetworkConfig {
+    /// Peer addresses for P2P mode
+    pub peer_addresses: Vec<String>,
+
+    /// Federation gateway URL
+    pub federation_gateway: Option<String>,
+
+    /// DNS name for public network
+    pub dns_name: Option<String>,
+
+    /// Proof of State for public network
+    pub proof_of_state: Option<ProofOfState>,
+
+    /// Custom STOQ port
+    pub stoq_port: Option<u16>,
+}
+
+impl NetworkConfig {
+    pub fn anonymous() -> Self {
+        Self {
+            peer_addresses: vec![],
+            federation_gateway: None,
+            dns_name: None,
+            proof_of_state: None,
+            stoq_port: None,
+        }
+    }
+
+    pub fn p2p(peers: Vec<String>) -> Self {
+        Self {
+            peer_addresses: peers,
+            federation_gateway: None,
+            dns_name: None,
+            proof_of_state: None,
+            stoq_port: None,
+        }
+    }
+
+    pub fn federated(gateway: String) -> Self {
+        Self {
+            peer_addresses: vec![],
+            federation_gateway: Some(gateway),
+            dns_name: None,
+            proof_of_state: None,
+            stoq_port: None,
+        }
+    }
+
+    pub fn public(dns_name: String, proof: ProofOfState) -> Self {
+        Self {
+            peer_addresses: vec![],
+            federation_gateway: None,
+            dns_name: Some(dns_name),
+            proof_of_state: Some(proof),
+            stoq_port: None,
+        }
+    }
+
+    /// Convert to trust module's NetworkConfig
+    fn to_trust_config(&self, network_type: NetworkType) -> TrustNetworkConfig {
+        TrustNetworkConfig {
+            network_type,
+            peer_addresses: self.peer_addresses.clone(),
+            federation_gateway: self.federation_gateway.clone(),
+            dns_name: self.dns_name.clone(),
+            proof_of_state: self.proof_of_state.clone(),
+        }
+    }
+}
+
+/// Asset visibility control
+pub struct AssetVisibilityControl {
+    /// Asset ID -> Allowed network IDs
+    visibility_map: HashMap<AssetId, Vec<NetworkId>>,
+
+    /// Default visibility policy for new assets
+    default_policy: VisibilityPolicy,
+}
+
+impl AssetVisibilityControl {
+    pub fn new() -> Self {
+        Self {
+            visibility_map: HashMap::new(),
+            default_policy: VisibilityPolicy::Private, // Private by default
+        }
+    }
+
+    pub fn set_visibility(&mut self, asset_id: AssetId, networks: Vec<NetworkId>) {
+        self.visibility_map.insert(asset_id, networks);
+    }
+
+    pub fn is_visible_to(&self, asset_id: &AssetId, network_id: &NetworkId) -> bool {
+        self.visibility_map
+            .get(asset_id)
+            .map(|networks| networks.contains(network_id))
+            .unwrap_or(false)
+    }
+
+    pub fn get_visible_networks(&self, asset_id: &AssetId) -> Vec<NetworkId> {
+        self.visibility_map
+            .get(asset_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn remove_visibility(&mut self, asset_id: &AssetId) {
+        self.visibility_map.remove(asset_id);
+    }
+
+    pub fn set_default_policy(&mut self, policy: VisibilityPolicy) {
+        self.default_policy = policy;
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum VisibilityPolicy {
+    Private,      // Not visible by default
+    AllNetworks,  // Visible to all connected networks
+    Explicit,     // Must be explicitly configured
+}
+
+/// Central coordinator for multi-network participation
+pub struct MultiNetworkCoordinator {
+    /// Network handlers by type
+    handlers: HashMap<NetworkType, Arc<dyn NetworkHandler>>,
+
+    /// Active network connections (isolated)
+    connections: Arc<RwLock<HashMap<NetworkId, NetworkConnection>>>,
+
+    /// Isolation manager prevents cross-network leakage
+    isolation: Arc<dyn IsolationManager>,
+
+    /// Asset visibility controller
+    asset_visibility: Arc<RwLock<AssetVisibilityControl>>,
+}
+
+impl MultiNetworkCoordinator {
+    pub fn new(isolation: Arc<dyn IsolationManager>) -> Self {
+        let mut handlers = HashMap::new();
+
+        // Register all 4 network type handlers
+        handlers.insert(
+            NetworkType::Anonymous,
+            Arc::new(AnonymousNetworkHandler::new()) as Arc<dyn NetworkHandler>
+        );
+
+        // P2P handler will be created on-demand with peer addresses
+        // Federated handler will be created with gateway URL
+        // Public handler uses standard configuration
+        handlers.insert(
+            NetworkType::Public,
+            Arc::new(PublicNetworkHandler::new()) as Arc<dyn NetworkHandler>
+        );
+
+        Self {
+            handlers,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            isolation,
+            asset_visibility: Arc::new(RwLock::new(AssetVisibilityControl::new())),
+        }
+    }
+
+    /// Create with default isolation manager
+    pub fn new_default() -> Self {
+        Self::new(Arc::new(DefaultIsolationManager::new()))
+    }
+
+    /// Join a network with specified configuration
+    pub async fn join_network(
+        &mut self,
+        mut network_type: NetworkType,
+        config: NetworkConfig,
+    ) -> Result<NetworkId> {
+        // Create handler for P2P and Federated on-demand
+        match &network_type {
+            NetworkType::P2P => {
+                if !self.handlers.contains_key(&network_type) {
+                    let handler = P2PNetworkHandler::new();
+                    self.handlers.insert(
+                        NetworkType::P2P,
+                        Arc::new(handler) as Arc<dyn NetworkHandler>
+                    );
+                }
+            }
+            NetworkType::Federated { gateway_url } => {
+                // Update network_type with gateway from config if needed
+                if config.federation_gateway.is_some() {
+                    network_type = NetworkType::Federated {
+                        gateway_url: config.federation_gateway.clone().unwrap()
+                    };
+                }
+
+                // Create new handler for this specific federation
+                let handler = FederatedNetworkHandler::new();
+                self.handlers.insert(
+                    network_type.clone(),
+                    Arc::new(handler) as Arc<dyn NetworkHandler>
+                );
+            }
+            _ => {}
+        }
+
+        // Get appropriate handler
+        let handler = self.handlers.get(&network_type)
+            .ok_or_else(|| anyhow!("Unknown network type: {:?}", network_type))?;
+
+        // Convert to trust config
+        let trust_config = config.to_trust_config(network_type.clone());
+
+        // Bootstrap with network-specific logic
+        let connection = handler.bootstrap(trust_config).await?;
+
+        // Store isolated connection
+        let network_id = connection.network_id.clone();
+        self.connections.write().await.insert(network_id.clone(), connection);
+
+        // Configure isolation for this network
+        self.isolation.configure_network(network_id.clone(), network_type.clone()).await?;
+
+        info!("Joined network: {:?} with ID: {}", network_type, network_id);
+        Ok(network_id)
+    }
+
+    /// Leave a network gracefully
+    pub async fn leave_network(&self, network_id: NetworkId) -> Result<()> {
+        // Remove connection
+        let mut connections = self.connections.write().await;
+        let connection = connections.remove(&network_id)
+            .ok_or_else(|| anyhow!("Network not found: {}", network_id))?;
+
+        // Get handler for disconnection
+        let handler = self.handlers.get(&connection.network_type)
+            .ok_or_else(|| anyhow!("Handler not found for network type: {:?}", connection.network_type))?;
+
+        // Disconnect gracefully
+        handler.disconnect().await?;
+
+        // Remove isolation configuration
+        self.isolation.remove_network(network_id.clone()).await?;
+
+        info!("Left network: {}", network_id);
+        Ok(())
+    }
+
+    /// Get list of active networks
+    pub async fn active_networks(&self) -> Vec<NetworkId> {
+        self.connections.read().await.keys().cloned().collect()
+    }
+
+    /// Check if connected to specific network
+    pub async fn is_connected(&self, network_id: NetworkId) -> bool {
+        self.connections.read().await.contains_key(&network_id)
+    }
+
+    /// Get network type for a connected network
+    pub async fn get_network_type(&self, network_id: &NetworkId) -> Option<NetworkType> {
+        self.connections
+            .read()
+            .await
+            .get(network_id)
+            .map(|conn| conn.network_type.clone())
+    }
+
+    /// Set asset visibility for specific networks
+    pub async fn set_asset_visibility(
+        &self,
+        asset_id: AssetId,
+        networks: Vec<NetworkId>,
+    ) -> Result<()> {
+        // Verify all networks are connected
+        let connections = self.connections.read().await;
+        for network_id in &networks {
+            if !connections.contains_key(network_id) {
+                return Err(anyhow!("Network {} not connected", network_id));
+            }
+        }
+
+        self.asset_visibility.write().await.set_visibility(asset_id, networks);
+        Ok(())
+    }
+
+    /// Handle asset request with network-specific authorization
+    pub async fn handle_asset_request(
+        &self,
+        network_id: NetworkId,
+        asset_id: AssetId,
+    ) -> Result<AssetResponse> {
+        // Check if asset is visible to this network
+        let visibility = self.asset_visibility.read().await;
+        if !visibility.is_visible_to(&asset_id, &network_id) {
+            return Ok(AssetResponse {
+                asset_id: format!("{:?}", asset_id),
+                data: None,
+                authorized: false,
+                metadata: HashMap::from([
+                    ("error".to_string(), "Asset not visible to network".to_string()),
+                ]),
+            });
+        }
+
+        // Get network connection
+        let connections = self.connections.read().await;
+        let connection = connections.get(&network_id)
+            .ok_or_else(|| anyhow!("Network not connected"))?;
+
+        // Delegate to network-specific handler
+        let handler = self.handlers.get(&connection.network_type)
+            .ok_or_else(|| anyhow!("Handler not found"))?;
+
+        handler.handle_asset_request(AssetRequest {
+            asset_id: format!("{:?}", asset_id),
+            network_type: connection.network_type.clone(),
+            peer_id: None,
+            metadata: HashMap::new(),
+        }).await
+    }
+
+    /// Get statistics about connected networks
+    pub async fn get_network_stats(&self) -> NetworkStats {
+        let connections = self.connections.read().await;
+        let mut stats = NetworkStats::default();
+
+        for connection in connections.values() {
+            match connection.network_type {
+                NetworkType::Anonymous => stats.anonymous_count += 1,
+                NetworkType::P2P => stats.p2p_count += 1,
+                NetworkType::Federated { .. } => stats.federated_count += 1,
+                NetworkType::Public => stats.public_count += 1,
+            }
+        }
+
+        stats.total_networks = connections.len();
+        stats
+    }
+
+    /// List all connected networks with their types
+    pub async fn list_networks(&self) -> Vec<(NetworkId, NetworkType)> {
+        self.connections
+            .read()
+            .await
+            .iter()
+            .map(|(id, conn)| (id.clone(), conn.network_type.clone()))
+            .collect()
+    }
+}
+
+/// Network statistics
+#[derive(Debug, Default, Clone)]
+pub struct NetworkStats {
+    pub total_networks: usize,
+    pub anonymous_count: usize,
+    pub p2p_count: usize,
+    pub federated_count: usize,
+    pub public_count: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assets::core::{
+        AssetCategory, BaseSystemType, NetworkScope, AssetData,
+    };
+    use std::time::SystemTime;
+
+    fn create_test_asset_id() -> AssetId {
+        let asset_data = AssetData {
+            config: vec![1, 2, 3],
+            definition: vec![4, 5, 6],
+            metadata: vec![7, 8, 9],
+        };
+
+        AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Storage),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_multiple_networks() {
+        let mut coordinator = MultiNetworkCoordinator::new_default();
+
+        // Join Anonymous network
+        let anon_id = coordinator.join_network(
+            NetworkType::Anonymous,
+            NetworkConfig::anonymous(),
+        ).await.unwrap();
+
+        // Join Public network
+        let pub_id = coordinator.join_network(
+            NetworkType::Public,
+            NetworkConfig::public(
+                "test.node".to_string(),
+                ProofOfState {
+                    proof_of_space: vec![1, 2, 3],
+                    proof_of_stake: vec![4, 5, 6],
+                    proof_of_work: vec![7, 8, 9],
+                    proof_of_time: vec![10, 11, 12],
+                },
+            ),
+        ).await.unwrap();
+
+        // Verify both networks are active
+        let active = coordinator.active_networks().await;
+        assert_eq!(active.len(), 2);
+        assert!(active.contains(&anon_id));
+        assert!(active.contains(&pub_id));
+
+        // Check network types
+        assert_eq!(
+            coordinator.get_network_type(&anon_id).await.unwrap(),
+            NetworkType::Anonymous
+        );
+        assert_eq!(
+            coordinator.get_network_type(&pub_id).await.unwrap(),
+            NetworkType::Public
+        );
+    }
+
+    #[tokio::test]
+    async fn test_asset_visibility() {
+        let mut coordinator = MultiNetworkCoordinator::new_default();
+
+        // Join two networks
+        let network1 = coordinator.join_network(
+            NetworkType::Anonymous,
+            NetworkConfig::anonymous(),
+        ).await.unwrap();
+
+        let network2 = coordinator.join_network(
+            NetworkType::Public,
+            NetworkConfig::public(
+                "test.node".to_string(),
+                ProofOfState {
+                    proof_of_space: vec![1],
+                    proof_of_stake: vec![2],
+                    proof_of_work: vec![3],
+                    proof_of_time: vec![4],
+                },
+            ),
+        ).await.unwrap();
+
+        // Create test asset
+        let asset_id = create_test_asset_id();
+
+        // Set visibility to only network1
+        coordinator.set_asset_visibility(
+            asset_id.clone(),
+            vec![network1.clone()],
+        ).await.unwrap();
+
+        // Test access from network1 (should be authorized)
+        let response1 = coordinator.handle_asset_request(network1, asset_id.clone()).await.unwrap();
+        assert!(response1.authorized);
+
+        // Test access from network2 (should be denied)
+        let response2 = coordinator.handle_asset_request(network2, asset_id).await.unwrap();
+        assert!(!response2.authorized);
+    }
+
+    #[tokio::test]
+    async fn test_leave_network() {
+        let mut coordinator = MultiNetworkCoordinator::new_default();
+
+        // Join network
+        let network_id = coordinator.join_network(
+            NetworkType::Anonymous,
+            NetworkConfig::anonymous(),
+        ).await.unwrap();
+
+        // Verify it's connected
+        assert!(coordinator.is_connected(network_id.clone()).await);
+
+        // Leave network
+        coordinator.leave_network(network_id.clone()).await.unwrap();
+
+        // Verify it's disconnected
+        assert!(!coordinator.is_connected(network_id).await);
+    }
+
+    #[tokio::test]
+    async fn test_network_stats() {
+        let mut coordinator = MultiNetworkCoordinator::new_default();
+
+        // Join various networks
+        coordinator.join_network(
+            NetworkType::Anonymous,
+            NetworkConfig::anonymous(),
+        ).await.unwrap();
+
+        coordinator.join_network(
+            NetworkType::Anonymous,
+            NetworkConfig::anonymous(),
+        ).await.unwrap();
+
+        coordinator.join_network(
+            NetworkType::Public,
+            NetworkConfig::public(
+                "test.node".to_string(),
+                ProofOfState {
+                    proof_of_space: vec![1],
+                    proof_of_stake: vec![2],
+                    proof_of_work: vec![3],
+                    proof_of_time: vec![4],
+                },
+            ),
+        ).await.unwrap();
+
+        // Get stats
+        let stats = coordinator.get_network_stats().await;
+        assert_eq!(stats.total_networks, 3);
+        assert_eq!(stats.anonymous_count, 2);
+        assert_eq!(stats.public_count, 1);
+        assert_eq!(stats.p2p_count, 0);
+        assert_eq!(stats.federated_count, 0);
+    }
+}

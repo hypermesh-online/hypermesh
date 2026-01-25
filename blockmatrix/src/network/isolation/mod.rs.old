@@ -1,0 +1,360 @@
+//! Network Isolation Management
+//!
+//! Provides complete isolation between different networks to prevent
+//! any cross-network data leakage or packet routing.
+
+use async_trait::async_trait;
+use anyhow::{Result, anyhow};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use uuid::Uuid;
+
+use crate::network::trust::{NetworkId, NetworkType};
+
+/// Packet identifier
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PacketId(Uuid);
+
+impl PacketId {
+    pub fn new() -> Self {
+        PacketId(Uuid::new_v4())
+    }
+}
+
+/// Network packet abstraction
+#[derive(Debug, Clone)]
+pub struct Packet {
+    pub id: PacketId,
+    pub source_network: NetworkId,
+    pub destination_network: NetworkId,
+    pub data: Vec<u8>,
+}
+
+/// Isolation violation details
+#[derive(Debug, Clone)]
+pub struct IsolationViolation {
+    pub timestamp: u64,
+    pub packet_id: PacketId,
+    pub source_network: NetworkId,
+    pub attempted_destination: NetworkId,
+    pub violation_type: ViolationType,
+}
+
+/// Types of isolation violations
+#[derive(Debug, Clone)]
+pub enum ViolationType {
+    CrossNetworkPacket,
+    UnauthorizedAccess,
+    ResourceLeakage,
+    ConfigurationError,
+}
+
+/// Connection pool for isolated network connections
+#[derive(Clone)]
+pub struct ConnectionPool {
+    network_id: NetworkId,
+    connections: Arc<RwLock<Vec<Arc<dyn NetworkConnection>>>>,
+}
+
+impl ConnectionPool {
+    pub fn new(network_id: NetworkId) -> Self {
+        ConnectionPool {
+            network_id,
+            connections: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    pub async fn add_connection(&self, conn: Arc<dyn NetworkConnection>) {
+        self.connections.write().await.push(conn);
+    }
+
+    pub async fn connection_count(&self) -> usize {
+        self.connections.read().await.len()
+    }
+}
+
+/// Network connection trait
+#[async_trait]
+pub trait NetworkConnection: Send + Sync {
+    async fn send(&self, data: Vec<u8>) -> Result<()>;
+    async fn receive(&self) -> Result<Vec<u8>>;
+    async fn close(&self) -> Result<()>;
+}
+
+/// Resource quota for per-network resource allocation
+#[derive(Debug, Clone)]
+pub struct ResourceQuota {
+    pub cpu_cores: f64,
+    pub memory_mb: u64,
+    pub storage_gb: u64,
+    pub bandwidth_mbps: u64,
+}
+
+impl Default for ResourceQuota {
+    fn default() -> Self {
+        ResourceQuota {
+            cpu_cores: 1.0,
+            memory_mb: 1024,
+            storage_gb: 10,
+            bandwidth_mbps: 100,
+        }
+    }
+}
+
+/// Isolation manager trait for network separation
+#[async_trait]
+pub trait IsolationManager: Send + Sync {
+    /// Configure isolation for a network
+    async fn configure_network(&self, network_id: NetworkId, network_type: NetworkType) -> Result<()>;
+
+    /// Remove network isolation configuration
+    async fn remove_network(&self, network_id: NetworkId) -> Result<()>;
+
+    /// Validate packet doesn't cross network boundary
+    async fn validate_packet(&self, packet: &Packet) -> Result<()>;
+
+    /// Get isolated connection pool for network
+    async fn get_connection_pool(&self, network_id: NetworkId) -> Result<ConnectionPool>;
+
+    /// Set resource quota for network
+    async fn set_resource_quota(&self, network_id: NetworkId, quota: ResourceQuota) -> Result<()>;
+
+    /// Check for isolation violations
+    async fn check_violations(&self) -> Vec<IsolationViolation>;
+
+    /// Clear violation history
+    async fn clear_violations(&self) -> Result<()>;
+}
+
+/// Default implementation of isolation manager
+pub struct DefaultIsolationManager {
+    /// Network configurations
+    networks: Arc<RwLock<HashMap<NetworkId, NetworkConfig>>>,
+
+    /// Connection pools per network
+    connection_pools: Arc<RwLock<HashMap<NetworkId, ConnectionPool>>>,
+
+    /// Resource quotas per network
+    resource_quotas: Arc<RwLock<HashMap<NetworkId, ResourceQuota>>>,
+
+    /// Packet origin tracking
+    packet_origins: Arc<RwLock<HashMap<PacketId, NetworkId>>>,
+
+    /// Isolation violations log
+    violations: Arc<RwLock<Vec<IsolationViolation>>>,
+}
+
+/// Internal network configuration
+#[derive(Debug, Clone)]
+struct NetworkConfig {
+    network_id: NetworkId,
+    network_type: NetworkType,
+    created_at: u64,
+}
+
+impl DefaultIsolationManager {
+    pub fn new() -> Self {
+        DefaultIsolationManager {
+            networks: Arc::new(RwLock::new(HashMap::new())),
+            connection_pools: Arc::new(RwLock::new(HashMap::new())),
+            resource_quotas: Arc::new(RwLock::new(HashMap::new())),
+            packet_origins: Arc::new(RwLock::new(HashMap::new())),
+            violations: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    async fn log_violation(&self, violation: IsolationViolation) {
+        self.violations.write().await.push(violation);
+    }
+
+    fn current_timestamp() -> u64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
+}
+
+#[async_trait]
+impl IsolationManager for DefaultIsolationManager {
+    async fn configure_network(&self, network_id: NetworkId, network_type: NetworkType) -> Result<()> {
+        let config = NetworkConfig {
+            network_id: network_id.clone(),
+            network_type,
+            created_at: Self::current_timestamp(),
+        };
+
+        self.networks.write().await.insert(network_id.clone(), config);
+
+        // Create isolated connection pool
+        let pool = ConnectionPool::new(network_id.clone());
+        self.connection_pools.write().await.insert(network_id.clone(), pool);
+
+        // Set default resource quota
+        self.resource_quotas.write().await.insert(network_id, ResourceQuota::default());
+
+        Ok(())
+    }
+
+    async fn remove_network(&self, network_id: NetworkId) -> Result<()> {
+        self.networks.write().await.remove(&network_id);
+        self.connection_pools.write().await.remove(&network_id);
+        self.resource_quotas.write().await.remove(&network_id);
+
+        // Clean up packet origins for this network
+        let mut origins = self.packet_origins.write().await;
+        origins.retain(|_, net_id| *net_id != network_id);
+
+        Ok(())
+    }
+
+    async fn validate_packet(&self, packet: &Packet) -> Result<()> {
+        // Track packet origin
+        self.packet_origins.write().await.insert(packet.id, packet.source_network.clone());
+
+        // Enforce isolation: packets cannot cross network boundaries
+        if packet.source_network != packet.destination_network {
+            let violation = IsolationViolation {
+                timestamp: Self::current_timestamp(),
+                packet_id: packet.id,
+                source_network: packet.source_network.clone(),
+                attempted_destination: packet.destination_network.clone(),
+                violation_type: ViolationType::CrossNetworkPacket,
+            };
+
+            self.log_violation(violation).await;
+
+            return Err(anyhow!(
+                "Isolation violation: Packet from network {} cannot be sent to network {}",
+                packet.source_network,
+                packet.destination_network
+            ));
+        }
+
+        // Verify both networks are configured
+        let networks = self.networks.read().await;
+        if !networks.contains_key(&packet.source_network) {
+            return Err(anyhow!("Source network {} not configured", packet.source_network));
+        }
+        if !networks.contains_key(&packet.destination_network) {
+            return Err(anyhow!("Destination network {} not configured", packet.destination_network));
+        }
+
+        Ok(())
+    }
+
+    async fn get_connection_pool(&self, network_id: NetworkId) -> Result<ConnectionPool> {
+        let pools = self.connection_pools.read().await;
+        pools
+            .get(&network_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Connection pool not found for network {}", network_id))
+    }
+
+    async fn set_resource_quota(&self, network_id: NetworkId, quota: ResourceQuota) -> Result<()> {
+        // Verify network exists
+        if !self.networks.read().await.contains_key(&network_id) {
+            return Err(anyhow!("Network {} not configured", network_id));
+        }
+
+        self.resource_quotas.write().await.insert(network_id, quota);
+        Ok(())
+    }
+
+    async fn check_violations(&self) -> Vec<IsolationViolation> {
+        self.violations.read().await.clone()
+    }
+
+    async fn clear_violations(&self) -> Result<()> {
+        self.violations.write().await.clear();
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_isolation_enforcement() {
+        let manager = DefaultIsolationManager::new();
+
+        let network1 = NetworkId::new_v4();
+        let network2 = NetworkId::new_v4();
+
+        // Configure two networks
+        manager.configure_network(network1.clone(), NetworkType::Anonymous).await.unwrap();
+        manager.configure_network(network2.clone(), NetworkType::P2P).await.unwrap();
+
+        // Create cross-network packet (should be blocked)
+        let packet = Packet {
+            id: PacketId::new(),
+            source_network: network1.clone(),
+            destination_network: network2.clone(),
+            data: vec![1, 2, 3],
+        };
+
+        // Validate packet - should fail
+        let result = manager.validate_packet(&packet).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Isolation violation"));
+
+        // Check that violation was logged
+        let violations = manager.check_violations().await;
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].source_network, network1);
+        assert_eq!(violations[0].attempted_destination, network2);
+    }
+
+    #[tokio::test]
+    async fn test_same_network_allowed() {
+        let manager = DefaultIsolationManager::new();
+
+        let network = NetworkId::new_v4();
+        manager.configure_network(network.clone(), NetworkType::Anonymous).await.unwrap();
+
+        // Create same-network packet (should be allowed)
+        let packet = Packet {
+            id: PacketId::new(),
+            source_network: network.clone(),
+            destination_network: network.clone(),
+            data: vec![1, 2, 3],
+        };
+
+        // Validate packet - should succeed
+        let result = manager.validate_packet(&packet).await;
+        assert!(result.is_ok());
+
+        // No violations should be logged
+        let violations = manager.check_violations().await;
+        assert_eq!(violations.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_resource_quotas() {
+        let manager = DefaultIsolationManager::new();
+
+        let network = NetworkId::new_v4();
+        manager.configure_network(network.clone(), NetworkType::Federated {
+            gateway_url: "test.gateway".to_string()
+        }).await.unwrap();
+
+        // Set custom resource quota
+        let quota = ResourceQuota {
+            cpu_cores: 4.0,
+            memory_mb: 8192,
+            storage_gb: 100,
+            bandwidth_mbps: 1000,
+        };
+
+        manager.set_resource_quota(network.clone(), quota.clone()).await.unwrap();
+
+        // Verify quota was set
+        let quotas = manager.resource_quotas.read().await;
+        let stored_quota = quotas.get(&network).unwrap();
+        assert_eq!(stored_quota.cpu_cores, 4.0);
+        assert_eq!(stored_quota.memory_mb, 8192);
+    }
+}

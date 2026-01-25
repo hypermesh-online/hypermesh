@@ -4,6 +4,9 @@
 //! to discover and communicate with each other using STOQ transport.
 
 pub mod trust;
+pub mod isolation;
+pub mod multi_network;
+pub mod config;
 
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;

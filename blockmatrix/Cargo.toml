@@ -30,6 +30,10 @@ path = "src/bin/node.rs"
 name = "car_purchase"
 path = "examples/car_purchase.rs"
 
+[[example]]
+name = "multi_network_coordinator"
+path = "examples/multi_network_coordinator.rs"
+
 [[bench]]
 name = "basic_benchmark"
 harness = false
