@@ -2,6 +2,10 @@
 //!
 //! Central coordinator for multi-network participation, enabling a single node
 //! to simultaneously connect to multiple network types with complete isolation.
+//!
+//! CRITICAL: Networks CANNOT transition between types. Only independent
+//! connect/disconnect operations are allowed. Each network maintains its type
+//! throughout its lifetime.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -189,6 +193,9 @@ impl MultiNetworkCoordinator {
     }
 
     /// Join a network with specified configuration
+    ///
+    /// CRITICAL: Once joined, a network's type CANNOT be changed. Networks are immutable.
+    /// To change network type, you must leave_network() and join_network() with new type.
     pub async fn join_network(
         &mut self,
         mut network_type: NetworkType,
@@ -364,6 +371,22 @@ impl MultiNetworkCoordinator {
             .iter()
             .map(|(id, conn)| (id.clone(), conn.network_type.clone()))
             .collect()
+    }
+
+    /// Verify network type cannot be changed (enforcement guard)
+    ///
+    /// This method exists to enforce the architectural constraint that networks
+    /// are immutable once created. Attempting to change network type will fail.
+    pub async fn verify_network_immutability(&self, network_id: &NetworkId) -> Result<()> {
+        let connections = self.connections.read().await;
+        if connections.contains_key(network_id) {
+            return Err(anyhow!(
+                "Network {} already exists. Networks are immutable. \
+                Use leave_network() then join_network() to change type.",
+                network_id
+            ));
+        }
+        Ok(())
     }
 }
 

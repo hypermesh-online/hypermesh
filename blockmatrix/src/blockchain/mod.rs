@@ -20,6 +20,7 @@ pub mod validation;
 pub mod propagation;
 pub mod state;
 pub mod errors;
+pub mod genesis_auth;
 
 pub use block::Block;
 pub use node_chain::{NodeBlockchain, ChainStats};
@@ -27,6 +28,7 @@ pub use validation::{ChainValidator, ValidationRules};
 pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult};
 pub use state::{ChainStateManager, ChainSnapshot, BlockQuery, SortOrder, StorageStats};
 pub use errors::{BlockchainError, StateError, PropagationError, Result};
+pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use std::path::Path;

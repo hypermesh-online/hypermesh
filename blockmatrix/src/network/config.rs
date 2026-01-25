@@ -2,6 +2,9 @@
 //!
 //! Provides configuration types for different network participation modes,
 //! supporting all four network types with their specific requirements.
+//!
+//! CRITICAL: Networks are IMMUTABLE once created. Network types CANNOT transition.
+//! Only independent connect/disconnect operations are allowed.
 
 use super::trust::ProofOfState;
 use serde::{Serialize, Deserialize};
