@@ -14,12 +14,19 @@ pub mod frames;
 pub mod parameters;
 pub mod handshake;
 pub mod pos_validator;
+pub mod pos_integration;
 
 // Re-exports for backward compatibility
 pub use pos_validator::{
     PosToken, PosTokenValidator, ProofData,
     ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
     ValidationResult, TrustChainClient
+};
+
+// Re-export integration types
+pub use pos_integration::{
+    StoqPosIntegration, PrivacyTier, MatrixPosition, ShardAddress,
+    AssetVerification, ConnectionStats, IntegrationStats,
 };
 
 use crate::extensions::{PacketToken, PacketShard, StoqProtocolExtension};

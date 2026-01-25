@@ -22,7 +22,7 @@ use super::stats::{ConnectionPoolStats, PerformanceStats};
 use super::falcon::{FalconTransport, FalconVariant};
 use super::adaptive::{AdaptiveConnection, AdaptationManager};
 
-use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension};
+use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};
 use crate::extensions::DefaultStoqExtensions;
 
 #[cfg(feature = "ebpf")]
@@ -56,6 +56,8 @@ pub struct StoqTransport {
     /// eBPF transport acceleration (if available)
     #[cfg(feature = "ebpf")]
     pub(crate) ebpf_transport: Option<Arc<RwLock<ebpf::EbpfTransport>>>,
+    /// STOQ + PoS protocol integration
+    pub(crate) pos_integration: Arc<StoqPosIntegration>,
 }
 
 impl StoqTransport {
@@ -265,6 +267,9 @@ impl StoqTransport {
         // Create adaptation manager with 1 second interval
         let adaptation_manager = Arc::new(AdaptationManager::new(Duration::from_secs(1)));
 
+        // Create STOQ + PoS integration with 5-minute cache TTL
+        let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
+
         // Initialize eBPF transport acceleration if available
         #[cfg(feature = "ebpf")]
         let ebpf_transport = match ebpf::EbpfTransport::new() {
@@ -309,6 +314,7 @@ impl StoqTransport {
             adaptive_connections: Arc::new(DashMap::new()),
             #[cfg(feature = "ebpf")]
             ebpf_transport,
+            pos_integration,
         })
     }
 
@@ -607,6 +613,70 @@ impl StoqTransport {
     pub fn quinn_endpoint(&self) -> Arc<quinn::Endpoint> {
         self.endpoint.clone()
     }
+
+    /// Get STOQ + PoS integration instance
+    pub fn pos_integration(&self) -> &Arc<StoqPosIntegration> {
+        &self.pos_integration
+    }
+
+    /// Validate connection with PoS token (for public networks)
+    pub async fn validate_connection_with_pos(
+        &self,
+        connection_id: String,
+        network_type: &NetworkType,
+        pos_token: Option<&crate::protocol::PosToken>,
+    ) -> Result<bool> {
+        self.pos_integration.validate_connection(connection_id, network_type, pos_token).await
+    }
+
+    /// Register shard address for matrix-aware distribution
+    pub fn register_shard_address(
+        &self,
+        shard_id: u32,
+        position: crate::protocol::MatrixPosition,
+        network_id: String,
+        node_id: Option<String>,
+    ) {
+        self.pos_integration.register_shard_address(shard_id, position, network_id, node_id);
+    }
+
+    /// Get shard addresses for retrieval
+    pub fn get_shard_addresses(&self, shard_ids: &[u32]) -> Vec<crate::protocol::ShardAddress> {
+        self.pos_integration.get_shard_addresses(shard_ids)
+    }
+
+    /// Calculate optimal shard positions using matrix topology
+    pub fn calculate_shard_positions(
+        &self,
+        num_shards: usize,
+        origin: crate::protocol::MatrixPosition,
+        min_distance: f64,
+        max_distance: f64,
+    ) -> Vec<crate::protocol::MatrixPosition> {
+        self.pos_integration.calculate_shard_positions(num_shards, origin, min_distance, max_distance)
+    }
+
+    /// Validate asset hash at protocol level
+    pub fn validate_asset_hash(
+        &self,
+        connection_id: &str,
+        asset_id: &[u8],
+        content_hash: &[u8; 32],
+        data: &[u8],
+    ) -> Result<bool> {
+        self.pos_integration.validate_asset_hash(connection_id, asset_id, content_hash, data)
+    }
+
+    /// Get STOQ + PoS integration statistics
+    pub fn get_pos_integration_stats(&self) -> crate::protocol::IntegrationStats {
+        self.pos_integration.get_stats()
+    }
+
+    /// Cleanup expired connections and assets (call periodically)
+    pub fn cleanup_expired(&self) {
+        self.pos_integration.cleanup_expired_connections();
+        self.pos_integration.cleanup_expired_assets(Duration::from_secs(3600)); // 1 hour TTL
+    }
 }
 
 #[async_trait]
@@ -648,6 +718,7 @@ impl Clone for StoqTransport {
             adaptive_connections: self.adaptive_connections.clone(),
             #[cfg(feature = "ebpf")]
             ebpf_transport: self.ebpf_transport.clone(),
+            pos_integration: self.pos_integration.clone(),
         }
     }
 }
