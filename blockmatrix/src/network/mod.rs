@@ -7,6 +7,9 @@ pub mod trust;
 pub mod isolation;
 pub mod multi_network;
 pub mod config;
+pub mod stoq_integration;
+pub mod blockchain_integration;
+pub mod validation;
 
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
@@ -19,6 +22,7 @@ use crate::matrix::coordinate::MatrixCoordinate;
 use serde::{Serialize, Deserialize};
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::bootstrap::PrivacyMode;
+use crate::network::stoq_integration::{MatrixStoqIntegration, MatrixNodeInfo};
 
 /// Node network information
 #[derive(Clone)]
@@ -60,6 +64,8 @@ pub struct NetworkManager {
     bootstrap_nodes: Vec<SocketAddr>,
     /// Current privacy mode
     privacy_mode: Arc<RwLock<PrivacyMode>>,
+    /// Matrix-STOQ integration layer
+    stoq_integration: Option<Arc<MatrixStoqIntegration>>,
 }
 
 impl NetworkManager {
@@ -75,12 +81,28 @@ impl NetworkManager {
             local_coordinate.x, local_coordinate.y, local_coordinate.z, privacy_mode
         );
 
+        // Create Matrix-STOQ integration layer
+        let node_id = Self::generate_node_id(&local_coordinate);
+        let stoq_integration = MatrixStoqIntegration::new(
+            local_coordinate,
+            node_id.clone(),
+            transport.clone(),
+            privacy_mode,
+        ).await.ok().map(Arc::new);
+
+        if stoq_integration.is_some() {
+            info!("Matrix-STOQ integration layer initialized successfully");
+        } else {
+            warn!("Failed to initialize Matrix-STOQ integration layer");
+        }
+
         Ok(Self {
             local_coordinate,
             transport,
             nodes: Arc::new(RwLock::new(HashMap::new())),
             bootstrap_nodes,
             privacy_mode: Arc::new(RwLock::new(privacy_mode)),
+            stoq_integration,
         })
     }
 
@@ -160,6 +182,12 @@ impl NetworkManager {
     pub async fn connect_to_peer(&self, addr: SocketAddr) -> Result<String> {
         info!("Connecting to peer at {}", addr);
 
+        // Use STOQ integration layer if available
+        if let Some(ref stoq_integration) = self.stoq_integration {
+            return stoq_integration.connect_to_node(addr).await;
+        }
+
+        // Fallback to direct STOQ connection
         // Create endpoint for connection
         let endpoint = stoq::Endpoint::new(
             match addr {
@@ -311,13 +339,35 @@ impl NetworkManager {
 
     /// Get local node ID
     fn get_node_id(&self) -> String {
+        Self::generate_node_id(&self.local_coordinate)
+    }
+
+    /// Generate node ID from coordinate
+    fn generate_node_id(coordinate: &MatrixCoordinate) -> String {
         // Use coordinate hash as node ID for now
         use blake3::Hasher;
         let mut hasher = Hasher::new();
-        hasher.update(&self.local_coordinate.x.to_le_bytes());
-        hasher.update(&self.local_coordinate.y.to_le_bytes());
-        hasher.update(&self.local_coordinate.z.to_le_bytes());
+        hasher.update(&coordinate.x.to_le_bytes());
+        hasher.update(&coordinate.y.to_le_bytes());
+        hasher.update(&coordinate.z.to_le_bytes());
         hasher.finalize().to_hex().to_string()
+    }
+
+    /// Broadcast matrix position to connected nodes via STOQ
+    pub async fn broadcast_matrix_position(&self) -> Result<()> {
+        if let Some(ref stoq_integration) = self.stoq_integration {
+            stoq_integration.broadcast_position().await?;
+        }
+        Ok(())
+    }
+
+    /// Discover neighbors using STOQ integration
+    pub async fn discover_matrix_neighbors_stoq(&self, max_distance: f64, max_count: usize) -> Result<Vec<MatrixNodeInfo>> {
+        if let Some(ref stoq_integration) = self.stoq_integration {
+            stoq_integration.discover_neighbors(max_distance, max_count).await
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     /// Accept incoming connections
