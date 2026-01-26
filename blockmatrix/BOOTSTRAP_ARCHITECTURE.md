@@ -33,18 +33,21 @@ The old architecture treated TrustChain and BlockMatrix as **separate components
 
 Every node starts with **complete self-sufficiency**:
 
-### 1. Unique Genesis Block
+### 1. Unique Genesis Block (Starts IMMEDIATELY on Boot)
 ```rust
-// Each node creates its own genesis block
+// Each node creates its own genesis block IMMEDIATELY on startup
 let genesis_block = Block::genesis(node_coordinate);
 // Genesis hash is UNIQUE per node (includes node coordinates)
+// Blockchain starts REGARDLESS of network connectivity
 ```
 
 **Key Points**:
+- **Blockchain starts IMMEDIATELY when node boots** - no network required
 - Each node has its own independent blockchain
 - No merkle consolidation across nodes
 - Genesis block includes node's matrix position (x,y,z)
 - Hash is unique due to coordinate embedding
+- **Node is fully functional from moment of creation**
 
 ### 2. Self-Signed Localhost Certificate
 ```rust
@@ -94,7 +97,18 @@ pub enum PrivacyMode {
 - Default: `Private` mode (localhost only, no network)
 - Anonymous: Ephemeral connections, no DNS registration
 - P2P: Peer discovery, no blockchain asset registration
-- Public: DNS-as-Asset, full consensus, maximum CAESAR rewards
+- Public: DNS-as-Asset via `trust.hypermesh.online` gateway, full consensus, maximum CAESAR rewards
+
+**User-Owned Networks**:
+- Users can run multiple devices with SAME blockchain
+- Private federated system across personal devices
+- Complete isolation from global network
+- Example: HyperMesh dashboard + all user devices sharing blockchain
+
+**Privacy Flexibility**:
+- Network transport layer INDEPENDENT from blockchain consensus
+- Private blockchain CAN use Anonymous network (maximum security)
+- Any combination possible (Private chain + Anonymous transport, etc.)
 
 ## Implementation Details
 

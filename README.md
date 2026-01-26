@@ -17,7 +17,7 @@
 ### Matrix Topology - Not Just Another Blockchain
 Unlike traditional linear blockchains (Bitcoin, Ethereum), Block-MATRIX uses a **literal matrix topology** with x,y,z coordinates:
 
-- **Every node = Its own blockchain** (not just a validator)
+- **Every node = Its own blockchain** (starts immediately on boot, no network required)
 - **Matrix coordinates**: Blocks have (x,y,z) positions in 3D space
 - **Tensor operations**: Matrix multiplication for consensus
 - **Instruction-based retrieval**: Retrieve by computation, not just hash
@@ -26,14 +26,14 @@ Unlike traditional linear blockchains (Bitcoin, Ethereum), Block-MATRIX uses a *
 ### The 12 Revolutionary Concepts
 
 1. **Matrix Topology**: 3D blockchain with x,y,z coordinates
-2. **Node = Blockchain**: Every participant runs their own chain
+2. **Node = Blockchain**: Every participant runs their own chain (starts immediately, no network needed)
 3. **Tensor Consensus**: Matrix operations validate transactions
 4. **Four-Proof System**: PoSpace + PoStake + PoWork + PoTime
 5. **Everything is an Asset**: CPU, GPU, RAM, Storage, Services
 6. **NAT-like Memory**: Remote memory addressing like network NAT
 7. **Privacy-Aware Sharing**: User controls exactly what to share
 8. **Federated Trust**: No central CA, matrix-based trust network
-9. **DNS as Asset**: Domain names are blockchain assets
+9. **DNS as Asset**: Domain names are blockchain assets (optional registration for rewards)
 10. **STOQ Intelligence**: Protocol learns and adapts to network
 11. **Quantum-Resistant**: FALCON-1024 throughout the stack
 12. **IPv6-Only**: Clean break from legacy infrastructure
@@ -110,6 +110,32 @@ The project has substantial implementation across core components (40-50% comple
 **Estimated Production Ready**: 3-6 months (integration-focused, not building from scratch)
 
 **See Full Analysis**: QUALITY_REVIEW_DOCUMENTATION_VS_CODE.md for component-by-component breakdown
+
+## 🔑 Critical Architecture: Blockchain Lifecycle & Network Independence
+
+### Local Blockchain Lifecycle (FUNDAMENTAL TRUTH)
+- **Blockchain starts IMMEDIATELY when node boots** - no network connectivity required
+- **Every node has its own independent blockchain** - begins with unique genesis block
+- **Network participation is OPTIONAL** - blockchain exists regardless of network status
+- **Node is self-sufficient from moment of creation** - localhost operations fully functional
+
+### User-Owned Distributed Networks
+- **Users can create private distributed networks** across their own devices
+- **Multiple devices can share the SAME blockchain** for maximum connectivity
+- **Example**: User's HyperMesh dashboard + personal devices + assets all on shared chain
+- **Private federated system** - not part of global public network
+
+### Privacy Flexibility Matrix
+- **Network layer (transport) is INDEPENDENT from blockchain layer (consensus)**
+- **Private blockchains CAN use Anonymous network** for maximum security
+- **Example**: User's private blockchain + Anonymous transport = untraceable + private
+- **Any combination possible**: Private chain on Public network, Public chain on Anonymous network
+
+### Public Network Bootstrap
+- **`trust.hypermesh.online`** - Global HyperMesh Public Gateway
+- **Public nodes bootstrap via gateway** to join global network
+- **After bootstrap**: Nodes register on global BlockMatrix blockchain
+- **Local blockchain continues independently** - can run both private and public simultaneously
 
 ## 🏗️ Architecture Overview
 

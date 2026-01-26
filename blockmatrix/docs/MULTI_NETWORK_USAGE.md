@@ -4,6 +4,23 @@
 
 The Multi-Network Coordinator enables a single BlockMatrix node to participate in multiple network types simultaneously while maintaining complete isolation between networks. This allows organizations to operate across different trust boundaries without compromising security.
 
+## Critical Architecture Understanding
+
+### Local Blockchain Lifecycle
+- **Every node starts with its own blockchain IMMEDIATELY on boot** - no network required
+- **Blockchain exists INDEPENDENTLY of network participation** - runs regardless of network status
+- **Network participation is OPTIONAL** - node is fully functional from genesis
+
+### User-Owned Networks
+- **Users can run multiple devices with the SAME blockchain** for personal cloud
+- **Example**: HyperMesh dashboard + all personal devices sharing one blockchain
+- **Complete isolation from global network** while maintaining full functionality
+
+### Privacy Flexibility
+- **Network transport layer is INDEPENDENT from blockchain consensus layer**
+- **Private blockchain CAN use Anonymous network** for maximum security
+- **Any combination possible**: Private chain on Public network, Public chain on Anonymous network, etc.
+
 ## Network Types
 
 ### 1. Anonymous Network
@@ -36,11 +53,13 @@ The Multi-Network Coordinator enables a single BlockMatrix node to participate i
 ### 4. Public Network
 - **Trust Model**: Global CA with blockchain-registered certificates
 - **Use Case**: Public HyperMesh participation
+- **Bootstrap**: Via `trust.hypermesh.online` gateway
 - **Features**:
   - Full Proof of State validation
   - Blockchain-registered certificates
-  - DNS-as-Asset registration
+  - DNS-as-Asset registration (optional for rewards)
   - CAESAR rewards enabled
+  - Local blockchain continues independently
 
 ## Basic Usage
 

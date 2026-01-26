@@ -11,7 +11,7 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 - **What works**:
   - ✅ Matrix Coordinate System (x,y,z positioning, 4 distance metrics, transformations, neighbor finding - 104 tests)
   - ✅ Tensor Operations Library (Vector3D, Matrix3x3, routing algorithms, A* pathfinding - 108 tests)
-  - ✅ Every-Node-Blockchain (independent chains, NO merkle consolidation, matrix propagation - 55+ tests)
+  - ✅ Every-Node-Blockchain (independent chains, starts immediately on boot, NO merkle consolidation, matrix propagation - 55+ tests)
   - ✅ Geospatial Integration (GPS↔matrix conversion, 50+ locations, 3 clustering algorithms, 5 load balancing - 75+ tests)
   - ✅ Matrix Persistence Layer (WAL recovery, incremental snapshots, zero data loss - 51+ tests)
   - ✅ Phase 1 Integration (MatrixFoundation unified API, 100-node E2E tests, benchmarks - 24 tests)
@@ -27,20 +27,50 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 
 ### Matrix Topology (LITERAL Matrix)
 - **Each Node = Matrix Cell**: Nodes have geospatial positions (x,y,z coordinates)
-- **Every Node = Own Blockchain**: Independent blockchain per node, no merkle consolidation
+- **Every Node = Own Blockchain**: Independent blockchain per node (starts immediately on boot, no network required)
 - **Tensor Operations**: Mathematical matrix operations for routing, resource allocation, path finding
 - **Neighbor Discovery**: Based on matrix position and distance calculations
 - **Intelligent Routing**: Matrix-aware shard distribution and data flow
+- **Self-Sufficient Nodes**: Each node fully functional from genesis, network participation optional
 
 ### Revolutionary Concepts
-1. **Node-as-DNS-Provider First** - Bootstraps independently before network registration
-2. **DNS-as-Asset** - DNS registration requires full Proof of State, blockchain-registered
-3. **Four Privacy Tiers** - Anonymous | Private P2P | Federated | Public
-4. **Multi-Network Participation** - Single node joins multiple isolated networks simultaneously (e.g., bank's public portal + customer network + employee network), complete traffic isolation, blockchain asset proofs validate across networks without bridging
-5. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
-6. **Instruction-Based Retrieval** - Send shard maps, not files
-7. **Bucket Deduplication** - Content-addressed storage with hash buckets mapped to matrix positions
-8. **Asset Pipeline** - Brotli compression → AES-256-GCM/Kyber-1024 encryption → Reed-Solomon sharding → Matrix-aware distribution (870 MB/s)
+1. **Immediate Blockchain Start** - Local blockchain starts on boot, no network required
+2. **Node-as-DNS-Provider First** - Bootstraps independently before optional network registration
+3. **DNS-as-Asset** - DNS registration requires full Proof of State (only for public rewards)
+4. **Four Privacy Tiers** - Anonymous | Private P2P | Federated | Public
+5. **User-Owned Networks** - Multiple devices sharing same blockchain, complete privacy
+6. **Privacy Flexibility** - Network transport layer independent from blockchain consensus
+7. **Multi-Network Participation** - Single node joins multiple isolated networks simultaneously
+8. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
+9. **Instruction-Based Retrieval** - Send shard maps, not files
+10. **Bucket Deduplication** - Content-addressed storage with hash buckets
+11. **Asset Pipeline** - Compression → Encryption → Sharding → Distribution (870 MB/s)
+
+## 🔑 Critical Architectural Truths
+
+### 1. Local Blockchain Lifecycle
+- **TRUTH**: Local BlockMatrix blockchain starts IMMEDIATELY when node comes online
+- **TRUTH**: Blockchain initialization happens REGARDLESS of network connectivity
+- **TRUTH**: Node does NOT need to connect to global network to have its own blockchain
+- **TRUTH**: Blockchain exists independently of Public/Federated/P2P/Anonymous network participation
+
+### 2. User-Owned Distributed Networks
+- **TRUTH**: Users can create distributed private networks across their own devices/systems
+- **TRUTH**: User devices can run the SAME blockchain for maximum connectivity and resource sharing
+- **Example**: User's HyperMesh dashboard + personal devices + assets all running shared blockchain
+- **TRUTH**: This is a private federated system (not global Public network)
+
+### 3. Privacy Flexibility Matrix
+- **TRUTH**: Private blockchains CAN communicate over Anonymous network for maximum security
+- **TRUTH**: Network layer (transport) is INDEPENDENT from blockchain layer (consensus)
+- **Example**: User's private blockchain nodes communicate via Anonymous network (untraceable transport + private consensus)
+- **TRUTH**: This enables maximum security: encrypted blockchain + untraceable communication
+
+### 4. Public Network Bootstrap
+- **TRUTH**: `trust.hypermesh.online` is the global HyperMesh Public Gateway
+- **TRUTH**: Public network nodes bootstrap via this gateway to join global network
+- **TRUTH**: After bootstrap, nodes register on global BlockMatrix blockchain (DNS-as-Asset)
+- **TRUTH**: Local blockchain still exists independently (can participate in global AND run private blockchain simultaneously)
 
 ## Primary Mission
 Create a **matrix-topology-based distributed computing platform** that provides:

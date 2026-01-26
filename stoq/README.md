@@ -64,10 +64,26 @@ STOQ provides deep integration with the Block-MATRIX topology system:
 - **Topology Awareness**: Understands matrix structure for efficient data distribution
 
 ### Privacy Tiers & Matrix Behavior
+
+**CRITICAL**: Network transport layer is INDEPENDENT from blockchain consensus layer
+
 - **Anonymous**: No coordinate tracking, randomized routing through matrix
+  - Can carry private blockchain traffic for maximum security
+  - Untraceable packets + encrypted consensus = complete privacy
 - **Private**: Direct tensor routing within trusted matrix regions
+  - P2P connections between known peers
+  - Can carry any blockchain type (private/public/federated)
 - **Federated**: Cross-region routing with federation-aware path selection
+  - Organization-level networks with controlled membership
+  - Supports multi-blockchain participation
 - **Public**: Full matrix visibility for optimal global routing
+  - Bootstrap via `trust.hypermesh.online` gateway
+  - Full transparency for maximum CAESAR rewards
+
+**Privacy Flexibility Examples**:
+- Private blockchain + Anonymous network = Maximum security
+- Public blockchain + Private network = Open ledger, controlled access
+- User's device network + Anonymous transport = Personal cloud with complete privacy
 
 ## 🔧 Configuration
 
