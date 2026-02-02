@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
 use dashmap::DashMap;
 use async_trait::async_trait;
+pub use trustchain::consensus::ConsensusProof;
 
 /// Bootstrap phase enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -238,15 +239,6 @@ pub struct Certificate {
     pub not_after: SystemTime,
     pub fingerprint: String,
     pub is_self_signed: bool,
-}
-
-/// Consensus proof abstraction
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusProof {
-    pub proof_type: String,
-    pub data_hash: Vec<u8>,
-    pub timestamp: SystemTime,
-    pub validators: Vec<String>,
 }
 
 /// Bootstrap metrics tracking
@@ -869,13 +861,17 @@ impl ConsensusProvider for NoOpConsensus {
         Ok(true)
     }
 
-    async fn generate_proof(&self, data: &[u8]) -> Result<ConsensusProof> {
-        Ok(ConsensusProof {
-            proof_type: "noop".to_string(),
-            data_hash: data.to_vec(),
-            timestamp: SystemTime::now(),
-            validators: vec![],
-        })
+    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
+        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use std::time::Duration;
+
+        // NoOp consensus - minimal proofs for traditional phase
+        Ok(ConsensusProof::new(
+            StakeProof::new("noop".to_string(), "noop".to_string(), 0),
+            TimeProof::new(Duration::from_secs(0)),
+            SpaceProof::new("noop".to_string(), "/dev/null".to_string(), 0),
+            WorkProof::new("noop".to_string(), "noop_work".to_string(), 0, 0, WorkloadType::Compute, WorkState::Completed),
+        ))
     }
 
     fn phase(&self) -> BootstrapPhase {
@@ -904,13 +900,17 @@ impl ConsensusProvider for OptionalConsensus {
         Ok(true)
     }
 
-    async fn generate_proof(&self, data: &[u8]) -> Result<ConsensusProof> {
-        Ok(ConsensusProof {
-            proof_type: "optional".to_string(),
-            data_hash: data.to_vec(),
-            timestamp: SystemTime::now(),
-            validators: vec!["validator1".to_string()],
-        })
+    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
+        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use std::time::Duration;
+
+        // Optional consensus - basic proofs for hybrid phase
+        Ok(ConsensusProof::new(
+            StakeProof::new("optional".to_string(), "validator1".to_string(), 1000),
+            TimeProof::new(Duration::from_secs(1)),
+            SpaceProof::new("optional".to_string(), "/tmp/optional".to_string(), 1024),
+            WorkProof::new("optional".to_string(), "optional_work".to_string(), 1, 100, WorkloadType::Compute, WorkState::Running),
+        ))
     }
 
     fn phase(&self) -> BootstrapPhase {
@@ -935,21 +935,21 @@ impl RequiredConsensus {
 #[async_trait]
 impl ConsensusProvider for RequiredConsensus {
     async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool> {
-        // Validate with quorum
-        Ok(proof.validators.len() >= 2)
+        // Validate with quorum - require meaningful stake
+        Ok(proof.stake_proof.stake_amount >= 2000)
     }
 
-    async fn generate_proof(&self, data: &[u8]) -> Result<ConsensusProof> {
-        Ok(ConsensusProof {
-            proof_type: "required".to_string(),
-            data_hash: data.to_vec(),
-            timestamp: SystemTime::now(),
-            validators: vec![
-                "validator1".to_string(),
-                "validator2".to_string(),
-                "validator3".to_string(),
-            ],
-        })
+    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
+        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use std::time::Duration;
+
+        // Required consensus - strong proofs for partial federation
+        Ok(ConsensusProof::new(
+            StakeProof::new("required".to_string(), "validator2".to_string(), 5000),
+            TimeProof::new(Duration::from_secs(5)),
+            SpaceProof::new("required".to_string(), "/tmp/required".to_string(), 10240),
+            WorkProof::new("required".to_string(), "required_work".to_string(), 2, 500, WorkloadType::Certificate, WorkState::Running),
+        ))
     }
 
     fn phase(&self) -> BootstrapPhase {
@@ -974,22 +974,23 @@ impl FullConsensus {
 #[async_trait]
 impl ConsensusProvider for FullConsensus {
     async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool> {
-        // Full four-proof validation
-        Ok(proof.validators.len() >= 3 && proof.proof_type == "four-proof")
+        // Full four-proof validation - all proofs must be valid
+        Ok(proof.stake_proof.stake_amount >= 10000
+            && proof.space_proof.total_storage >= 100000
+            && !proof.work_proof.work_challenges.is_empty())
     }
 
-    async fn generate_proof(&self, data: &[u8]) -> Result<ConsensusProof> {
-        Ok(ConsensusProof {
-            proof_type: "four-proof".to_string(),
-            data_hash: data.to_vec(),
-            timestamp: SystemTime::now(),
-            validators: vec![
-                "validator1".to_string(),
-                "validator2".to_string(),
-                "validator3".to_string(),
-                "validator4".to_string(),
-            ],
-        })
+    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
+        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use std::time::Duration;
+
+        // Full consensus - production-grade proofs for full federation
+        Ok(ConsensusProof::new(
+            StakeProof::new("full".to_string(), "validator4".to_string(), 100000),
+            TimeProof::new(Duration::from_secs(10)),
+            SpaceProof::new("full".to_string(), "/var/hypermesh".to_string(), 1048576),
+            WorkProof::new("full".to_string(), "full_work".to_string(), 4, 10000, WorkloadType::Certificate, WorkState::Running),
+        ))
     }
 
     fn phase(&self) -> BootstrapPhase {

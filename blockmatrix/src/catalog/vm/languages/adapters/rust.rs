@@ -17,8 +17,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
+pub use trustchain::consensus::ConsensusProof;
 
-use crate::consensus::proof::ConsensusProof;
+// Re-export for compatibility with existing code
+use crate::consensus::proof::ConsensusProof as _;
 use super::super::super::consensus::ConsensusVM;
 use super::super::super::execution::{ExecutionContext, ExecutionResult};
 use super::{
@@ -157,22 +159,6 @@ impl RustAdapter {
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::marker::PhantomData;
-
-// Consensus proof types
-#[derive(Debug, Clone)]
-pub struct ConsensusProof {
-    pub space_commitment: u64,
-    pub stake_authority: u64,
-    pub work_difficulty: u32,
-    pub time_sequence: u64,
-}
-
-impl ConsensusProof {
-    pub fn validate(&self) -> bool {
-        // Validation handled by Julia layer
-        true
-    }
-}
 
 // Consensus required attribute (procedural macro would be implemented)
 pub trait ConsensusRequired {

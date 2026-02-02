@@ -162,7 +162,7 @@ impl MatrixPositionValidator {
             "timestamp": registration.timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs(),
         });
 
-        let block = self.blockchain.add_block(
+        let block = self.blockchain.add_block_with_data(
             serde_json::to_vec(&registration_data)?
         ).await.map_err(|e| anyhow!("Failed to add block: {}", e))?;
 

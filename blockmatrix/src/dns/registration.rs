@@ -198,7 +198,7 @@ impl DnsRegistrar {
                     domain.full, record.data
                 );
                 let block = bc
-                    .add_block(tx_data.into_bytes())
+                    .add_block_with_data(tx_data.into_bytes())
                     .await
                     .map_err(|e| DnsError::BlockchainError(e.to_string()))?;
 

@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc, Duration};
 use tracing::{info, warn, error, debug};
 
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::assets::core::AssetId;
 use super::block::Block;
 use super::validation::ChainValidator;
 use super::genesis_auth::{GenesisAuthManager, GenesisCredentials};
@@ -95,7 +96,7 @@ impl NodeBlockchain {
     }
 
     /// Add a new block to this node's chain
-    pub async fn add_block(&self, data: Vec<u8>) -> Result<Block, String> {
+    pub async fn add_block(&self, assets: Vec<AssetId>) -> Result<Block, String> {
         let head = self.head.read().await;
         let previous = head.as_ref()
             .ok_or_else(|| "No head block found".to_string())?;
@@ -103,7 +104,7 @@ impl NodeBlockchain {
         let new_index = previous.index + 1;
         let new_block = Block::new(
             new_index,
-            data,
+            assets,
             previous.hash.clone(),
             self.node_coordinate.clone(),
         );
@@ -129,6 +130,28 @@ impl NodeBlockchain {
 
         Ok(new_block)
     }
+
+    /// Helper: Create asset from data and add block (temporary compatibility method)
+    /// TODO: Remove this once all callers properly create Assets
+    pub async fn add_block_with_data(&self, data: Vec<u8>) -> Result<Block, String> {
+        use crate::assets::core::asset_id::{AssetData, AssetCategory, BaseSystemType, NetworkScope};
+
+        // Create an asset from the data
+        let asset_data = AssetData {
+            config: Vec::new(),
+            definition: data.clone(),
+            metadata: format!("Block data at {:?}", std::time::SystemTime::now()).into_bytes(),
+        };
+
+        let asset_id = AssetId::from_asset_data(
+            &asset_data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Container),
+        );
+
+        self.add_block(vec![asset_id]).await
+    }
+
 
     /// Insert a block into the chain (internal helper)
     async fn insert_block(&self, block: Block) -> Result<(), String> {
@@ -414,12 +437,12 @@ mod tests {
         let chain = NodeBlockchain::new(coord);
 
         // Add first block
-        let block1 = chain.add_block(b"First block".to_vec()).await.unwrap();
+        let block1 = chain.add_block_with_data(b"First block".to_vec()).await.unwrap();
         assert_eq!(block1.index, 1);
         assert_eq!(chain.get_height().await, 1);
 
         // Add second block
-        let block2 = chain.add_block(b"Second block".to_vec()).await.unwrap();
+        let block2 = chain.add_block_with_data(b"Second block".to_vec()).await.unwrap();
         assert_eq!(block2.index, 2);
         assert_eq!(block2.previous_hash, block1.hash);
         assert_eq!(chain.get_height().await, 2);
@@ -433,7 +456,7 @@ mod tests {
         let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
         let chain = NodeBlockchain::new(coord);
 
-        let block = chain.add_block(b"Test data".to_vec()).await.unwrap();
+        let block = chain.add_block_with_data(b"Test data".to_vec()).await.unwrap();
 
         // Get by index
         let retrieved = chain.get_block(1).await.unwrap();
@@ -456,7 +479,7 @@ mod tests {
         // Add some blocks
         for i in 0..5 {
             let data = format!("Block {}", i);
-            chain.add_block(data.as_bytes().to_vec()).await.unwrap();
+            chain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
         }
 
         let stats = chain.get_stats().await;
@@ -473,7 +496,7 @@ mod tests {
 
         // Add blocks
         for i in 0..3 {
-            chain.add_block(vec![i as u8; 10]).await.unwrap();
+            chain.add_block_with_data(vec![i as u8; 10]).await.unwrap();
         }
 
         let full_chain = chain.get_chain().await;
@@ -492,7 +515,7 @@ mod tests {
 
         // Add 10 blocks
         for i in 0..10 {
-            chain.add_block(vec![i as u8]).await.unwrap();
+            chain.add_block_with_data(vec![i as u8]).await.unwrap();
         }
 
         // Get last 5 blocks
@@ -512,7 +535,7 @@ mod tests {
         // Add blocks with small delays
         for i in 0..3 {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            chain.add_block(vec![i]).await.unwrap();
+            chain.add_block_with_data(vec![i]).await.unwrap();
         }
 
         let end_time = Utc::now();
@@ -529,7 +552,7 @@ mod tests {
 
         // Add valid blocks
         for i in 0..5 {
-            chain.add_block(vec![i]).await.unwrap();
+            chain.add_block_with_data(vec![i]).await.unwrap();
         }
 
         // Chain should be valid
@@ -544,8 +567,8 @@ mod tests {
         let chain = NodeBlockchain::new(coord);
 
         // Add blocks with known sizes
-        chain.add_block(vec![0u8; 100]).await.unwrap();
-        chain.add_block(vec![0u8; 200]).await.unwrap();
+        chain.add_block_with_data(vec![0u8; 100]).await.unwrap();
+        chain.add_block_with_data(vec![0u8; 200]).await.unwrap();
 
         let total_size = chain.get_total_size().await;
         assert!(total_size >= 300); // At least the data we added

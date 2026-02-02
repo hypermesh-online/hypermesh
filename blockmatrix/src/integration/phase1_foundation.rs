@@ -265,7 +265,7 @@ impl MatrixFoundation {
         let node = self.get_node(node_id).await?;
         let mut blockchain = node.blockchain.write().await;
 
-        blockchain.add_block(data).await
+        blockchain.add_block_with_data(data).await
             .map_err(|e| Phase1Error::Blockchain(e))
     }
 
@@ -522,8 +522,8 @@ mod tests {
         let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
         foundation.add_node("node1".to_string(), coord).await.unwrap();
 
-        let block = foundation.add_block("node1", b"test data".to_vec()).await.unwrap();
-        assert_eq!(block.data, b"test data");
+        let block = foundation.add_block_with_data("node1", b"test data".to_vec()).await.unwrap();
+        assert_eq!(block.asset_count(), 1); // Block should contain one asset
 
         let height = foundation.get_blockchain_height("node1").await.unwrap();
         assert_eq!(height, 1); // Genesis + 1 block

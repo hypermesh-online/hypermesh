@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::assets::core::AssetId;
 use crate::matrix::coordinate::MatrixCoordinate;
 use rand;
 
@@ -23,8 +24,8 @@ pub struct Block {
     /// Timestamp of block creation
     pub timestamp: DateTime<Utc>,
 
-    /// Block data (transactions, state changes, etc.)
-    pub data: Vec<u8>,
+    /// Assets contained in this block (Blocks MUST contain Assets)
+    pub assets: Vec<AssetId>,
 
     /// Hash of the previous block in THIS node's chain
     pub previous_hash: String,
@@ -46,17 +47,20 @@ impl Block {
     /// Create a new block
     pub fn new(
         index: u64,
-        data: Vec<u8>,
+        assets: Vec<AssetId>,
         previous_hash: String,
         node_coordinate: MatrixCoordinate,
     ) -> Self {
+        // Blocks MUST contain at least one Asset
+        assert!(!assets.is_empty(), "Block must contain at least one Asset");
+
         let timestamp = Utc::now();
         let nonce = rand::random::<u64>();
 
         let mut block = Block {
             index,
             timestamp,
-            data: data.clone(),
+            assets: assets.clone(),
             previous_hash: previous_hash.clone(),
             hash: String::new(),
             node_coordinate: node_coordinate.clone(),
@@ -75,14 +79,12 @@ impl Block {
 
     /// Create the genesis block for a node
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
-        let genesis_data = format!(
-            "Genesis block for node at ({}, {}, {})",
-            node_coordinate.x, node_coordinate.y, node_coordinate.z
-        );
+        // Create a genesis AssetId for this node
+        let genesis_asset = AssetId::genesis(node_coordinate.clone());
 
         Block::new(
             0,
-            genesis_data.as_bytes().to_vec(),
+            vec![genesis_asset],
             String::from("0000000000000000000000000000000000000000000000000000000000000000"),
             node_coordinate,
         )
@@ -95,7 +97,12 @@ impl Block {
         // Hash all block components
         hasher.update(&self.index.to_le_bytes());
         hasher.update(self.timestamp.to_rfc3339().as_bytes());
-        hasher.update(&self.data);
+
+        // Hash all assets in the block
+        for asset in &self.assets {
+            hasher.update(asset.to_string().as_bytes());
+        }
+
         hasher.update(self.previous_hash.as_bytes());
         hasher.update(&self.node_coordinate.x.to_le_bytes());
         hasher.update(&self.node_coordinate.y.to_le_bytes());
@@ -137,12 +144,22 @@ impl Block {
     pub fn size(&self) -> usize {
         8 + // index
         8 + // timestamp (approximate)
-        self.data.len() +
+        (self.assets.len() * 32) + // AssetId size estimate
         64 + // previous_hash (hex string)
         64 + // hash (hex string)
         12 + // node_coordinate (3 * i32)
         self.node_signature.len() +
         8 // nonce
+    }
+
+    /// Get the assets in this block
+    pub fn get_assets(&self) -> &[AssetId] {
+        &self.assets
+    }
+
+    /// Get the number of assets in this block
+    pub fn asset_count(&self) -> usize {
+        self.assets.len()
     }
 
     /// Check if this is a genesis block
@@ -187,13 +204,14 @@ mod tests {
     #[test]
     fn test_block_creation() {
         let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let data = b"Test block data".to_vec();
+        let asset = AssetId::genesis(coord.clone());
         let prev_hash = "abc123".to_string();
 
-        let block = Block::new(1, data.clone(), prev_hash.clone(), coord.clone());
+        let block = Block::new(1, vec![asset.clone()], prev_hash.clone(), coord.clone());
 
         assert_eq!(block.index, 1);
-        assert_eq!(block.data, data);
+        assert_eq!(block.assets.len(), 1);
+        assert_eq!(block.assets[0], asset);
         assert_eq!(block.previous_hash, prev_hash);
         assert_eq!(block.node_coordinate, coord);
         assert!(!block.hash.is_empty());
@@ -203,17 +221,19 @@ mod tests {
     #[test]
     fn test_hash_verification() {
         let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let asset = AssetId::genesis(coord.clone());
         let mut block = Block::new(
             1,
-            b"data".to_vec(),
+            vec![asset.clone()],
             "prev".to_string(),
-            coord,
+            coord.clone(),
         );
 
         assert!(block.verify_hash());
 
-        // Tamper with data
-        block.data = b"tampered".to_vec();
+        // Tamper with assets
+        let tampered_asset = AssetId::genesis(MatrixCoordinate::new(1, 1, 1).unwrap());
+        block.assets = vec![tampered_asset];
         assert!(!block.verify_hash());
 
         // Fix the hash
@@ -235,16 +255,21 @@ mod tests {
     #[test]
     fn test_block_size() {
         let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        // Create multiple assets to test size calculation
+        let assets: Vec<AssetId> = (0..10)
+            .map(|i| AssetId::genesis(MatrixCoordinate::new(i, i, i).unwrap()))
+            .collect();
+
         let block = Block::new(
             100,
-            vec![0u8; 1024], // 1KB of data
+            assets,
             "x".repeat(64),
             coord,
         );
 
         let size = block.size();
-        assert!(size >= 1024); // At least the data size
-        assert!(size < 2048);  // But not too much overhead
+        assert!(size >= 320); // At least 10 assets * 32 bytes
+        assert!(size < 1024);  // But not too much overhead
     }
 
     #[test]
@@ -260,16 +285,16 @@ mod tests {
     #[test]
     fn test_deterministic_hash() {
         let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let data = b"test".to_vec();
+        let asset = AssetId::genesis(coord.clone());
 
-        // Create two blocks with same data but let nonce be random
-        let block1 = Block::new(1, data.clone(), "prev".to_string(), coord.clone());
-        let block2 = Block::new(1, data.clone(), "prev".to_string(), coord.clone());
+        // Create two blocks with same asset but let nonce be random
+        let block1 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord.clone());
+        let block2 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord.clone());
 
-        // Hashes should be different due to different nonce
+        // Hashes should be different due to different nonce/timestamp
         assert_ne!(block1.hash, block2.hash);
 
-        // But if we set same nonce, hashes should match
+        // But if we set same nonce and timestamp, hashes should match
         let mut block3 = block1.clone();
         block3.nonce = block1.nonce;
         block3.timestamp = block1.timestamp;
@@ -304,8 +329,32 @@ mod tests {
             genesis.previous_hash,
             "0000000000000000000000000000000000000000000000000000000000000000"
         );
-        assert!(genesis.data.len() > 0); // Has genesis message
+        assert!(genesis.assets.len() > 0); // Has genesis asset
+        assert_eq!(genesis.asset_count(), 1); // Exactly one genesis asset
         assert!(genesis.verify_hash());
         assert!(genesis.verify_signature());
+    }
+
+    #[test]
+    fn test_block_must_have_assets() {
+        let coord = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let result = std::panic::catch_unwind(|| {
+            Block::new(1, vec![], "prev".to_string(), coord)
+        });
+        assert!(result.is_err(), "Block creation with empty assets should panic");
+    }
+
+    #[test]
+    fn test_asset_helpers() {
+        let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let assets: Vec<AssetId> = (0..5)
+            .map(|i| AssetId::genesis(MatrixCoordinate::new(i, i, i).unwrap()))
+            .collect();
+
+        let block = Block::new(1, assets.clone(), "prev".to_string(), coord);
+
+        assert_eq!(block.asset_count(), 5);
+        assert_eq!(block.get_assets().len(), 5);
+        assert_eq!(block.get_assets(), &assets[..]);
     }
 }

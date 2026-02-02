@@ -40,7 +40,7 @@ mod tests {
         // Each node adds blocks to its own chain
         for (i, (blockchain, coord)) in nodes.iter().enumerate() {
             let data = format!("Node {} block 1", i);
-            let block = blockchain.add_block(data.as_bytes().to_vec()).await.unwrap();
+            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
 
             // Verify block belongs to this node
             assert!(block.belongs_to_node(coord));
@@ -85,7 +85,7 @@ mod tests {
         );
 
         // Add a block and propagate it
-        let block = blockchain.add_block(b"Test block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Test block".to_vec()).await.unwrap();
         let result = propagator.propagate_block(&block, &network_coords).await;
 
         // Should reach immediate neighbors
@@ -120,7 +120,7 @@ mod tests {
         // Add blocks and persist them
         for i in 0..5 {
             let data = format!("Block {}", i);
-            let block = blockchain.add_block(data.as_bytes().to_vec()).await.unwrap();
+            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
             state_manager.store_block(&block).await.unwrap();
         }
 
@@ -170,7 +170,7 @@ mod tests {
         );
 
         // Add block and propagate
-        let block = blockchain.add_block(b"Routed block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Routed block".to_vec()).await.unwrap();
         let result = propagator.propagate_block(&block, &network_coords).await;
 
         // Should reach strategic relay nodes
@@ -203,7 +203,7 @@ mod tests {
         );
 
         // Add critical block and flood propagate
-        let block = blockchain.add_block(b"Critical block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Critical block".to_vec()).await.unwrap();
         let result = propagator.flood_propagate(&block, &network_coords, 2).await;
 
         // Should reach many nodes within 2 hops
@@ -225,7 +225,7 @@ mod tests {
         // Build main chain
         for i in 0..5 {
             let data = format!("Main chain block {}", i);
-            blockchain.add_block(data.as_bytes().to_vec()).await.unwrap();
+            blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
         }
 
         let main_chain = blockchain.get_chain().await;
@@ -255,7 +255,7 @@ mod tests {
             let bc = &blockchain;
             let handle = tokio::spawn(async move {
                 let data = format!("Concurrent block {}", i);
-                bc.add_block(data.as_bytes().to_vec()).await
+                bc.add_block_with_data(data.as_bytes().to_vec()).await
             });
             handles.push(handle);
         }
@@ -291,7 +291,7 @@ mod tests {
         // Add 1000 blocks
         for i in 0..1000 {
             let data = vec![i as u8; 100];
-            blockchain.add_block(data).await.unwrap();
+            blockchain.add_block_with_data(data).await.unwrap();
         }
 
         let elapsed = start.elapsed();
@@ -326,14 +326,14 @@ mod tests {
         let chain3 = NodeBlockchain::new(coord3.clone());
 
         // Each node adds its own blocks
-        chain1.add_block(b"Node 1 data A".to_vec()).await.unwrap();
-        chain1.add_block(b"Node 1 data B".to_vec()).await.unwrap();
+        chain1.add_block_with_data(b"Node 1 data A".to_vec()).await.unwrap();
+        chain1.add_block_with_data(b"Node 1 data B".to_vec()).await.unwrap();
 
-        chain2.add_block(b"Node 2 data X".to_vec()).await.unwrap();
-        chain2.add_block(b"Node 2 data Y".to_vec()).await.unwrap();
-        chain2.add_block(b"Node 2 data Z".to_vec()).await.unwrap();
+        chain2.add_block_with_data(b"Node 2 data X".to_vec()).await.unwrap();
+        chain2.add_block_with_data(b"Node 2 data Y".to_vec()).await.unwrap();
+        chain2.add_block_with_data(b"Node 2 data Z".to_vec()).await.unwrap();
 
-        chain3.add_block(b"Node 3 data 1".to_vec()).await.unwrap();
+        chain3.add_block_with_data(b"Node 3 data 1".to_vec()).await.unwrap();
 
         // Verify independence
         assert_eq!(chain1.get_height().await, 2);

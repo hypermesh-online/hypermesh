@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::matrix::coordinate::MatrixCoordinate;
+
 /// Network scope defining asset isolation boundaries
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NetworkScope {
@@ -60,6 +62,7 @@ pub enum BaseSystemType {
     Network,
     Container,
     Economic,
+    Blockchain,
 }
 
 /// Application domain for user assets
@@ -214,6 +217,23 @@ impl AssetId {
         }
     }
 
+    /// Create a genesis asset for a node's blockchain
+    pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
+        let genesis_data = AssetData {
+            config: format!("Genesis asset for node at ({}, {}, {})",
+                node_coordinate.x, node_coordinate.y, node_coordinate.z
+            ).into_bytes(),
+            definition: b"GENESIS_BLOCK".to_vec(),
+            metadata: format!("Created at {:?}", SystemTime::now()).into_bytes(),
+        };
+
+        Self::from_asset_data(
+            &genesis_data,
+            NetworkScope::Global,
+            AssetCategory::BaseSystem(BaseSystemType::Blockchain),
+        )
+    }
+
     /// Generate content-based hash
     fn generate_content_hash(
         data: &AssetData,
@@ -251,6 +271,7 @@ impl AssetId {
                     BaseSystemType::Network => 4,
                     BaseSystemType::Container => 5,
                     BaseSystemType::Economic => 6,
+                    BaseSystemType::Blockchain => 7,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -429,6 +450,7 @@ impl AssetId {
                 BaseSystemType::Network => AssetType::Network,
                 BaseSystemType::Container => AssetType::Container,
                 BaseSystemType::Economic => AssetType::Economic,
+                BaseSystemType::Blockchain => AssetType::Container, // Map to Container for legacy
             }),
             AssetCategory::Application(_) => Some(AssetType::Library),
         }

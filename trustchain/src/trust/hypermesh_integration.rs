@@ -78,6 +78,20 @@ pub struct TrustScoringEngine {
     consensus_validator: Arc<FourProofValidator>,
 }
 
+/// Universal asset type enumeration
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum AssetType {
+    Cpu,
+    Gpu,
+    Memory,
+    Storage,
+    Network,
+    Container,
+    Economic,
+    VirtualMachine,
+    Library,
+}
+
 /// Asset identification in HyperMesh
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AssetId {
@@ -107,19 +121,6 @@ pub struct ProxyId {
     pub proxy_address: Ipv6Addr,
     pub target_address: Ipv6Addr,
     pub session_id: String,
-}
-
-/// Asset types in HyperMesh
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AssetType {
-    CPU,
-    GPU,
-    Memory,
-    Storage,
-    Network,
-    Container,
-    Service,
-    Certificate,
 }
 
 /// Node types in HyperMesh network

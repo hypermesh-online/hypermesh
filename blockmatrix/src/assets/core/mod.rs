@@ -202,6 +202,7 @@ impl AssetManager {
                 BaseSystemType::Network => AssetType::Network,
                 BaseSystemType::Container => AssetType::Container,
                 BaseSystemType::Economic => AssetType::Economic,
+                BaseSystemType::Blockchain => AssetType::Container,
             }),
             AssetCategory::Application(_) => Err(AssetError::AdapterError {
                 message: "Cannot determine asset type for application asset".to_string()
@@ -444,6 +445,7 @@ impl AssetManager {
                     BaseSystemType::Network => stats.network_assets += 1,
                     BaseSystemType::Container => stats.container_assets += 1,
                     BaseSystemType::Economic => stats.economic_assets += 1,
+                    BaseSystemType::Blockchain => stats.blockchain_assets += 1,
                 },
                 AssetCategory::Application(_) => {
                     // Application assets not tracked separately yet
@@ -477,6 +479,7 @@ pub struct AssetStatistics {
     pub network_assets: usize,
     pub container_assets: usize,
     pub economic_assets: usize,
+    pub blockchain_assets: usize,
     /// Assets by state
     pub available_assets: usize,
     pub allocated_assets: usize,

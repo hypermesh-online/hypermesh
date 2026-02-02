@@ -64,9 +64,6 @@ tempfile = { workspace = true }
 uuid = { workspace = true }
 lazy_static = { workspace = true }
 
-# Shared library - Common types
-hypermesh-lib = { path = "../lib" }
-
 # TrustChain - Consensus and certificate system
 # NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
 trustchain = { path = "../trustchain" }
