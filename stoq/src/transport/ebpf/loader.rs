@@ -35,6 +35,9 @@ pub struct EbpfLoader {
     sources: EbpfSources,
     /// Whether programs are loaded
     programs_loaded: bool,
+    /// Loaded BPF handle (only with ebpf feature and successful kernel load)
+    #[cfg(feature = "ebpf")]
+    bpf: Option<aya::Bpf>,
 }
 
 impl EbpfLoader {
@@ -48,6 +51,8 @@ impl EbpfLoader {
         Self {
             sources,
             programs_loaded: false,
+            #[cfg(feature = "ebpf")]
+            bpf: None,
         }
     }
 
@@ -119,13 +124,15 @@ impl EbpfLoader {
             .is_ok()
     }
 
-    /// Load compiled eBPF programs
+    /// Load compiled eBPF programs into the kernel
+    ///
+    /// With the `ebpf` feature enabled, uses aya to load the compiled BPF object
+    /// into the kernel. Without the feature, logs a message and returns Ok.
+    /// Failures are non-fatal: the system degrades gracefully to userspace mode.
     pub fn load(&mut self) -> Result<()> {
-        // Check if compiled programs exist
         let xdp_path = self.sources.output_dir.join("stoq_xdp.o");
 
         if !xdp_path.exists() {
-            // Try to compile if not exists
             self.compile()?;
 
             if !xdp_path.exists() {
@@ -134,16 +141,46 @@ impl EbpfLoader {
             }
         }
 
-        // In a real implementation, we would load the bytecode with aya
-        self.programs_loaded = true;
+        #[cfg(feature = "ebpf")]
+        {
+            match aya::Bpf::load_file(&xdp_path) {
+                Ok(bpf) => {
+                    self.bpf = Some(bpf);
+                    self.programs_loaded = true;
+                    tracing::info!("eBPF program loaded from {:?}", xdp_path);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load eBPF program from {:?}: {}. Falling back to userspace.",
+                        xdp_path, e
+                    );
+                    // Non-fatal: graceful degradation to userspace
+                }
+            }
+        }
 
-        tracing::info!("eBPF programs loaded (placeholder)");
+        #[cfg(not(feature = "ebpf"))]
+        {
+            tracing::info!("eBPF feature not compiled in, skipping kernel load");
+        }
+
         Ok(())
     }
 
     /// Check if programs are loaded
     pub fn are_programs_loaded(&self) -> bool {
         self.programs_loaded
+    }
+
+    /// Get the output path for the compiled XDP object
+    pub fn output_path(&self) -> PathBuf {
+        self.sources.output_dir.join("stoq_xdp.o")
+    }
+
+    /// Take ownership of the loaded BPF handle (if any)
+    #[cfg(feature = "ebpf")]
+    pub fn take_bpf(&mut self) -> Option<aya::Bpf> {
+        self.bpf.take()
     }
 
     /// Verify eBPF program before loading

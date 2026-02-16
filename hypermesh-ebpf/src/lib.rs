@@ -15,6 +15,11 @@ pub mod packet_filter;
 pub mod validation;
 pub mod metrics;
 
+/// Re-export aya when kernel-attach is enabled, allowing downstream crates
+/// to use the same aya version for BPF operations.
+#[cfg(feature = "kernel-attach")]
+pub use aya;
+
 pub use policy_maps::{ValidationPolicy, PolicyManager};
 pub use hypermesh_headers::{
     ProofOfStateHeader,
@@ -50,7 +55,7 @@ impl HyperMeshEbpf {
     /// Attach HyperMesh intelligence to network interface
     #[cfg(feature = "kernel-attach")]
     pub fn attach(&mut self, interface: &str) -> anyhow::Result<()> {
-        let filter = HyperMeshPacketFilter::new(
+        let mut filter = HyperMeshPacketFilter::new(
             interface,
             self.policy_manager.clone(),
         )?;

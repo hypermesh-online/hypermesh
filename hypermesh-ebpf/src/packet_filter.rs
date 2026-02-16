@@ -28,8 +28,8 @@ pub struct HyperMeshPacketFilter {
 
 #[cfg(feature = "kernel-attach")]
 struct XdpProgram {
-    // Placeholder for actual eBPF program handle
-    _handle: (),
+    /// Loaded BPF object containing the XDP program and maps
+    bpf: aya::Bpf,
 }
 
 impl HyperMeshPacketFilter {
@@ -44,29 +44,70 @@ impl HyperMeshPacketFilter {
     }
 
     /// Attach filter to network interface
+    ///
+    /// With `kernel-attach` feature: loads the HyperMesh XDP program into the kernel
+    /// and attaches it to the specified interface using aya.
+    /// Without: returns an error indicating the feature is not enabled.
     #[cfg(feature = "kernel-attach")]
     pub fn attach(&mut self) -> Result<()> {
-        // In production, this would:
-        // 1. Compile eBPF XDP program with HyperMesh validation logic
-        // 2. Load program into kernel
-        // 3. Attach to network interface
-        // 4. Sync policies to eBPF maps
+        use aya::programs::{Xdp, XdpFlags};
 
         tracing::info!("Attaching HyperMesh XDP filter to {}", self.interface);
 
-        // Placeholder for actual attachment
-        self._xdp_program = Some(XdpProgram { _handle: () });
+        // Look for pre-compiled HyperMesh eBPF object
+        let bpf_paths = [
+            std::path::PathBuf::from("/sys/fs/bpf/hypermesh_xdp"),
+            std::path::PathBuf::from("target/bpf/hypermesh_xdp.o"),
+        ];
 
-        // Sync policies to kernel
+        let load_path = bpf_paths.iter().find(|p| p.exists());
+
+        match load_path {
+            Some(path) => {
+                let mut bpf = aya::Bpf::load_file(path)
+                    .map_err(|e| anyhow!("Failed to load HyperMesh eBPF from {:?}: {}", path, e))?;
+
+                // Try to find and attach the XDP filter program
+                if let Some(program) = bpf.program_mut("hypermesh_xdp_filter") {
+                    let xdp: &mut Xdp = program.try_into()
+                        .map_err(|e| anyhow!("Program is not XDP type: {}", e))?;
+                    xdp.load()
+                        .map_err(|e| anyhow!("Failed to load XDP program: {}", e))?;
+                    // Use SKB_MODE (generic) for maximum compatibility
+                    xdp.attach(&self.interface, XdpFlags::SKB_MODE)
+                        .map_err(|e| anyhow!("Failed to attach XDP to {}: {}", self.interface, e))?;
+
+                    tracing::info!(
+                        "HyperMesh XDP filter attached to {} (kernel mode)",
+                        self.interface
+                    );
+                } else {
+                    tracing::warn!(
+                        "No 'hypermesh_xdp_filter' program in {:?}, filter not attached",
+                        path
+                    );
+                }
+
+                self._xdp_program = Some(XdpProgram { bpf });
+            }
+            None => {
+                tracing::warn!(
+                    "No compiled HyperMesh eBPF object found. XDP filter not attached to {}. \
+                     Userspace validation remains active.",
+                    self.interface
+                );
+            }
+        }
+
+        // Sync policies to kernel maps (or log if not kernel-attached)
         self.policy_manager.sync_to_kernel()?;
 
-        tracing::info!("HyperMesh XDP filter attached successfully");
         Ok(())
     }
 
     #[cfg(not(feature = "kernel-attach"))]
     pub fn attach(&mut self) -> Result<()> {
-        Err(anyhow!("kernel-attach feature not enabled"))
+        Err(anyhow!("kernel-attach feature not enabled; use validate_packet_userspace() instead"))
     }
 
     /// Detach filter from interface
