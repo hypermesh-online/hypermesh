@@ -44,7 +44,7 @@ This document describes the VISION and ARCHITECTURE for BlockMatrix. Most featur
 8. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
 9. **Instruction-Based Retrieval** - Send shard maps, not files
 10. **Bucket Deduplication** - Content-addressed storage with hash buckets
-11. **Asset Pipeline** - Compression → Encryption → Sharding → Distribution (870 MB/s)
+11. **Asset Pipeline** - Compression (Brotli) → Encryption (Kyber-1024) → Sharding (Reed-Solomon) → Distribution (tensor-based) — code currently wrong order, needs fix
 
 ## 🔑 Critical Architectural Truths
 

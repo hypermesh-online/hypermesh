@@ -552,43 +552,50 @@ impl CrossChainValidationManager {
     /// Asset financing workflow validation
     async fn validate_asset_financing_workflow(
         &mut self,
-        asset_id: AssetId,
-        entities: Vec<String>,
+        _asset_id: AssetId,
+        _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
-        // Implementation for asset financing workflow
-        // This would include credit checks, asset valuation, etc.
-        todo!("Implement asset financing workflow validation")
+        Err(CrossChainValidationError::NetworkValidationFailed {
+            network_usage: "asset_financing".to_string(),
+            error: "Cross-chain asset financing workflow validation not yet implemented".to_string(),
+        })
     }
 
     /// Insurance claim workflow validation
     async fn validate_insurance_claim_workflow(
         &mut self,
-        asset_id: AssetId,
-        entities: Vec<String>,
+        _asset_id: AssetId,
+        _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
-        // Implementation for insurance claim workflow
-        todo!("Implement insurance claim workflow validation")
+        Err(CrossChainValidationError::NetworkValidationFailed {
+            network_usage: "insurance_claim".to_string(),
+            error: "Cross-chain insurance claim workflow validation not yet implemented".to_string(),
+        })
     }
 
     /// Supply chain workflow validation
     async fn validate_supply_chain_workflow(
         &mut self,
-        asset_id: AssetId,
-        entities: Vec<String>,
+        _asset_id: AssetId,
+        _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
-        // Implementation for supply chain workflow
-        todo!("Implement supply chain workflow validation")
+        Err(CrossChainValidationError::NetworkValidationFailed {
+            network_usage: "supply_chain".to_string(),
+            error: "Cross-chain supply chain workflow validation not yet implemented".to_string(),
+        })
     }
 
     /// Custom workflow validation
     async fn validate_custom_workflow(
         &mut self,
         workflow_name: String,
-        asset_id: AssetId,
-        entities: Vec<String>,
+        _asset_id: AssetId,
+        _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
-        // Implementation for custom workflow validation
-        todo!("Implement custom workflow validation")
+        Err(CrossChainValidationError::NetworkValidationFailed {
+            network_usage: workflow_name,
+            error: "Cross-chain custom workflow validation not yet implemented".to_string(),
+        })
     }
 
     /// Validate individual network step

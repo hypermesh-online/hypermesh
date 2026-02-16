@@ -3,7 +3,6 @@
 //! Ultra-fast resource discovery and management using Layer 1 (IFR) for <52µs
 //! resource lookups, achieving 88.6% latency improvement over traditional systems.
 
-use crate::orchestration::integration::MfnBridge;
 use crate::NodeId;
 use super::ResourceRequirements;
 use anyhow::Result;
@@ -18,8 +17,6 @@ use tracing::{debug, info, warn};
 pub struct IfrResourceManager {
     /// IFR resource lookup enabled
     ifr_enabled: bool,
-    /// MFN bridge for IFR layer access
-    mfn_bridge: Arc<MfnBridge>,
     /// Resource allocation tracking
     resource_allocations: Arc<RwLock<HashMap<NodeId, HashMap<String, ResourceAllocation>>>>,
     /// Resource constraints registry
@@ -204,14 +201,12 @@ impl IfrResourceManager {
     /// Create a new IFR-powered resource manager
     pub async fn new(
         ifr_enabled: bool,
-        mfn_bridge: Arc<MfnBridge>,
     ) -> Result<Self> {
         info!("Initializing IFR resource manager");
         info!("  - IFR resource lookup: {}", if ifr_enabled { "enabled" } else { "disabled" });
-        
+
         Ok(Self {
             ifr_enabled,
-            mfn_bridge,
             resource_allocations: Arc::new(RwLock::new(HashMap::new())),
             resource_constraints: Arc::new(RwLock::new(HashMap::new())),
             lookup_cache: Arc::new(RwLock::new(HashMap::new())),
@@ -268,45 +263,10 @@ impl IfrResourceManager {
         Ok(suitable_nodes)
     }
     
-    /// IFR-powered resource lookup with 88.6% improvement
+    /// IFR-powered resource lookup (delegates to traditional lookup)
     async fn ifr_resource_lookup(&self, requirements: &ResourceRequirements) -> Result<Vec<NodeId>> {
-        // Create context for IFR lookup
-        let mut context = HashMap::new();
-        context.insert("cpu_cores".to_string(), requirements.cpu_cores.to_string());
-        context.insert("memory_bytes".to_string(), requirements.memory_bytes.to_string());
-        context.insert("storage_bytes".to_string(), requirements.storage_bytes.to_string());
-        context.insert("gpu_units".to_string(), requirements.gpu_units.unwrap_or(0).to_string());
-        context.insert("network_bandwidth".to_string(), 
-                      requirements.network_bandwidth.unwrap_or(0).to_string());
-        
-        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::IfkLookup {
-            resource_id: "node_resources".to_string(),
-            context,
-        };
-
-        match self.mfn_bridge.execute_operation(operation).await? {
-            crate::orchestration::integration::mfn_bridge::LayerResponse::IfkResult { found, resource_data, .. } => {
-                if found {
-                    if let Some(data) = resource_data {
-                        // Parse resource data to extract suitable nodes
-                        let mut suitable_nodes = Vec::new();
-
-                        // Simulate node discovery based on resource data
-                        // In a real implementation, this would query the actual resource registry
-                        for i in 1..=3 {
-                            suitable_nodes.push(format!("node-{}", i));
-                        }
-
-                        Ok(suitable_nodes)
-                    } else {
-                        Ok(Vec::new())
-                    }
-                } else {
-                    Ok(Vec::new())
-                }
-            },
-            _ => Ok(Vec::new()),
-        }
+        // Use traditional resource lookup as the implementation
+        self.traditional_resource_lookup(requirements).await
     }
     
     /// Traditional resource lookup (fallback)

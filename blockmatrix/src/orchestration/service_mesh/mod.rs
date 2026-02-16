@@ -11,7 +11,6 @@ pub mod discovery;
 pub use routing::{AlmRoutingEngine, RoutingPolicy, PathOptimization};
 pub use discovery::{CpeServiceDiscovery, ServiceRegistry, DiscoveryEvent, ServiceHealth};
 
-use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -80,8 +79,6 @@ pub type ServiceMesh = ServiceMeshController;
 pub struct ServiceMeshController {
     /// Configuration
     config: ServiceMeshConfig,
-    /// MFN bridge for layer coordination
-    mfn_bridge: Arc<MfnBridge>,
     /// ALM-powered routing engine
     routing_engine: Arc<AlmRoutingEngine>,
     /// CPE-enhanced service discovery
@@ -236,18 +233,16 @@ pub struct ServiceMeshStats {
 }
 
 impl ServiceMeshController {
-    /// Create a new service mesh controller with MFN integration
-    pub async fn new(config: ServiceMeshConfig, mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
+    /// Create a new service mesh controller
+    pub async fn new(config: ServiceMeshConfig) -> Result<Self> {
         // Initialize ALM-powered routing engine
         let routing_engine = Arc::new(AlmRoutingEngine::new(
             config.alm_routing_enabled,
-            mfn_bridge.clone(),
         ).await?);
-        
+
         // Initialize CPE-enhanced service discovery
         let service_discovery = Arc::new(CpeServiceDiscovery::new(
             config.cpe_discovery_enabled,
-            mfn_bridge.clone(),
         ).await?);
         
         // Initialize load balancer (placeholder)
@@ -278,7 +273,6 @@ impl ServiceMeshController {
         
         Ok(Self {
             config,
-            mfn_bridge,
             routing_engine,
             service_discovery,
             load_balancer,
@@ -533,28 +527,13 @@ impl ServiceMeshController {
         Ok(())
     }
     
-    /// Predict recovery probability using MFN intelligence
+    /// Predict recovery probability based on endpoint metrics
     async fn predict_recovery_probability(&self, metrics: &EndpointMetrics) -> Result<f64> {
-        // Use MFN bridge to predict recovery
-        let operation = MfnOperation::CpePrediction {
-            context_history: vec![vec![
-                metrics.error_rate,
-                metrics.avg_response_time_ms / 1000.0, // Normalize to seconds
-                metrics.cpu_utilization,
-                metrics.memory_utilization,
-                metrics.request_rate / 1000.0, // Normalize
-            ]],
-            prediction_horizon: 1, // Predict next time step
-        };
-        
-        match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::CpeResult { predictions, confidence, .. } => {
-                // Extract recovery probability from predictions
-                let recovery_prob = predictions.get(0).cloned().unwrap_or(0.5).max(0.0).min(1.0);
-                Ok(recovery_prob * confidence) // Weight by confidence
-            },
-            _ => Ok(0.5), // Default neutral probability
-        }
+        // Heuristic-based recovery prediction using endpoint metrics
+        let error_factor = 1.0 - metrics.error_rate.min(1.0);
+        let load_factor = 1.0 - ((metrics.cpu_utilization + metrics.memory_utilization) / 2.0).min(1.0);
+        let recovery_prob = (error_factor * 0.6 + load_factor * 0.4).max(0.0).min(1.0);
+        Ok(recovery_prob)
     }
     
     /// Record routing decision and update active decisions
@@ -664,13 +643,10 @@ impl ServiceMeshController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::orchestration::integration::{MfnBridge, IntegrationConfig};
     use std::net::{IpAddr, Ipv4Addr};
-    
+
     #[tokio::test]
     async fn test_service_mesh_controller_creation() {
-        let integration_config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
@@ -687,14 +663,12 @@ mod tests {
             },
         };
         
-        let controller = ServiceMeshController::new(config, mfn_bridge).await;
+        let controller = ServiceMeshController::new(config).await;
         assert!(controller.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_routing_decision_performance() {
-        let integration_config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
         let config = ServiceMeshConfig {
             alm_routing_enabled: true,
             cpe_discovery_enabled: true,
@@ -711,7 +685,7 @@ mod tests {
             },
         };
         
-        let controller = ServiceMeshController::new(config, mfn_bridge).await.unwrap();
+        let controller = ServiceMeshController::new(config).await.unwrap();
         
         // Register a test endpoint
         let endpoint = ServiceEndpoint {

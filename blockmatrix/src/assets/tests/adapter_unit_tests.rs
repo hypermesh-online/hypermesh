@@ -15,12 +15,12 @@ use hypermesh_assets::core::{
     AssetAdapter, AdapterCapabilities,
 };
 
-/// Create a mock consensus proof for testing (since consensus module won't compile)
+/// Create a consensus proof for testing.
+/// Currently unused - adapters are tested without consensus validation.
+/// When needed, use ConsensusProof::new_for_testing() from the trustchain crate.
+#[allow(dead_code)]
 fn create_mock_consensus_proof() -> hypermesh_assets::core::ConsensusProof {
-    // TODO: This would normally create a real ConsensusProof, but since the consensus
-    // module has compilation errors, we'll need to fix that first or create a mock.
-    // For now, we'll test the adapters without consensus validation.
-    unimplemented!("Consensus module needs to be fixed first")
+    panic!("Consensus proof creation requires trustchain integration - use ConsensusProof::new_for_testing()")
 }
 
 /// Test adapter basic functionality without consensus validation

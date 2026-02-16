@@ -3,7 +3,6 @@
 //! Advanced container migration using MFN intelligence for optimal migration decisions,
 //! supporting live migration with minimal downtime.
 
-use crate::orchestration::integration::MfnBridge;
 use crate::{NodeId, ContainerId};
 use super::ResourceRequirements;
 use anyhow::Result;
@@ -16,8 +15,6 @@ use tracing::{debug, info};
 
 /// Container migrator with MFN intelligence
 pub struct ContainerMigrator {
-    /// MFN bridge for optimization
-    mfn_bridge: Arc<MfnBridge>,
     /// Active migrations
     active_migrations: Arc<RwLock<HashMap<String, MigrationExecution>>>,
     /// Migration history
@@ -537,11 +534,10 @@ pub struct MigrationMetrics {
 
 impl ContainerMigrator {
     /// Create a new container migrator
-    pub async fn new(mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
-        info!("Initializing container migrator with MFN intelligence");
-        
+    pub async fn new() -> Result<Self> {
+        info!("Initializing container migrator");
+
         Ok(Self {
-            mfn_bridge,
             active_migrations: Arc::new(RwLock::new(HashMap::new())),
             migration_history: Arc::new(RwLock::new(Vec::new())),
             metrics: Arc::new(RwLock::new(MigrationMetrics {
@@ -672,21 +668,6 @@ impl ContainerMigrator {
         strategy: &MigrationStrategy,
         _reason: &MigrationReason,
     ) -> Result<MigrationPlan> {
-        // Use MFN to optimize migration plan
-        let context_history = vec![vec![
-            1.0, // Migration complexity
-            0.8, // Target node suitability
-            0.9, // Network connectivity
-            0.7, // Resource availability
-        ]];
-        
-        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::CpePrediction {
-            context_history,
-            prediction_horizon: 1,
-        };
-        
-        let _optimization_result = self.mfn_bridge.execute_operation(operation).await?;
-        
         // Create phases based on strategy
         let phases = match strategy {
             MigrationStrategy::LiveMigration => {

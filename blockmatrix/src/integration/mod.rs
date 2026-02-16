@@ -125,19 +125,6 @@ impl IntegrationManager {
 pub type NodeId = String;
 pub type ServiceId = String;
 
-// MFN Bridge types (temporary exports for compatibility)
-// These are actually in orchestration/integration/mfn_bridge.rs
-pub struct MfnBridge;
-pub struct MfnOperation;
-pub struct LayerResponse;
-
-impl MfnBridge {
-    pub async fn execute_operation(&self, _operation: MfnOperation) -> anyhow::Result<LayerResponse> {
-        // Stub implementation - real implementation in orchestration/integration/mfn_bridge.rs
-        Ok(LayerResponse)
-    }
-}
-
 pub use self::lifecycle::{
     LifecycleManager,
 };

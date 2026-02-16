@@ -28,7 +28,6 @@ pub use scaling::{PredictiveScaler, ScalingTrigger, WorkloadPrediction, ScalingD
 pub use resource_manager::{IfrResourceManager, ResourceAllocation, ResourceConstraint, NodeResources};
 pub use migration::{ContainerMigrator, MigrationDecision, MigrationReason, MigrationPlan};
 
-use crate::orchestration::integration::MfnBridge;
 use crate::{ContainerConfig, ServiceId, NodeId, ContainerId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -43,8 +42,6 @@ use uuid::Uuid;
 pub struct ContainerOrchestrator {
     /// Configuration
     config: ContainerConfig,
-    /// MFN bridge for layer coordination
-    mfn_bridge: Arc<MfnBridge>,
     /// DSR-powered scheduler
     scheduler: Arc<DsrScheduler>,
     /// CPE placement engine
@@ -480,36 +477,26 @@ pub struct ContainerStats {
 
 impl ContainerOrchestrator {
     /// Create a new container orchestrator with MFN integration
-    pub async fn new(config: ContainerConfig, mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
+    pub async fn new(config: ContainerConfig) -> Result<Self> {
         // Initialize DSR-powered scheduler
-        // Use default values since these fields don't exist in ContainerConfig yet
         let scheduler = Arc::new(DsrScheduler::new(
             true,  // Enable DSR scheduling by default
             10,    // Max 10 scheduling candidates by default
-            mfn_bridge.clone(),
         ).await?);
-        
+
         // Initialize CPE placement engine
-        let placement_engine = Arc::new(CpePlacementEngine::new(
-            mfn_bridge.clone(),
-        ).await?);
-        
+        let placement_engine = Arc::new(CpePlacementEngine::new().await?);
+
         // Initialize predictive scaler
-        let predictive_scaler = Arc::new(PredictiveScaler::new(
-            mfn_bridge.clone(),
-        ).await?);
-        
+        let predictive_scaler = Arc::new(PredictiveScaler::new().await?);
+
         // Initialize IFR resource manager
-        // Use default value since field doesn't exist in ContainerConfig yet
         let resource_manager = Arc::new(IfrResourceManager::new(
             true,  // Enable IFR resource lookup by default
-            mfn_bridge.clone(),
         ).await?);
-        
+
         // Initialize container migrator
-        let migrator = Arc::new(ContainerMigrator::new(
-            mfn_bridge.clone(),
-        ).await?);
+        let migrator = Arc::new(ContainerMigrator::new().await?);
         
         // Initialize performance metrics
         let performance_metrics = Arc::new(RwLock::new(ContainerMetrics {
@@ -536,7 +523,6 @@ impl ContainerOrchestrator {
         
         Ok(Self {
             config,
-            mfn_bridge,
             scheduler,
             placement_engine,
             predictive_scaler,
@@ -960,26 +946,21 @@ pub enum ScalingAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::orchestration::integration::{MfnBridge, IntegrationConfig};
     use std::net::{IpAddr, Ipv4Addr};
-    
+
     #[tokio::test]
     async fn test_container_orchestrator_creation() {
-        let integration_config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
         let config = ContainerConfig::default();
-        
-        let orchestrator = ContainerOrchestrator::new(config, mfn_bridge).await;
+
+        let orchestrator = ContainerOrchestrator::new(config).await;
         assert!(orchestrator.is_ok());
     }
     
     #[tokio::test]
     async fn test_container_scheduling_performance() {
-        let integration_config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(integration_config).await.unwrap());
         let config = ContainerConfig::default();
-        
-        let orchestrator = ContainerOrchestrator::new(config, mfn_bridge).await.unwrap();
+
+        let orchestrator = ContainerOrchestrator::new(config).await.unwrap();
         
         // Register a test node
         let node_state = NodeState {

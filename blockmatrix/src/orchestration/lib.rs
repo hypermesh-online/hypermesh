@@ -20,7 +20,6 @@
 
 pub mod service_mesh;
 pub mod container;
-pub mod integration;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -33,7 +32,6 @@ use uuid::Uuid;
 // Re-export key types
 pub use service_mesh::{ServiceMeshController, ServiceEndpoint};
 pub use container::{ContainerOrchestrator, ContainerSpec, NodeSelector, ScalingDecision};
-pub use integration::{MfnBridge, LayerCoordination, PerformanceValidator};
 
 /// Orchestration API version
 pub const ORCHESTRATION_VERSION: &str = "1.0.0";
@@ -64,8 +62,6 @@ pub struct OrchestrationConfig {
     pub scaling: ScalingConfig,
     /// Monitoring configuration
     pub monitoring: MonitoringConfig,
-    /// MFN integration settings
-    pub mfn_integration: MfnIntegrationConfig,
 }
 
 /// Service mesh configuration
@@ -118,21 +114,6 @@ pub struct MonitoringConfig {
     pub alert_interval_ms: u64,
     /// Retention period for metrics
     pub metrics_retention_hours: u64,
-}
-
-/// MFN integration configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MfnIntegrationConfig {
-    /// Enable Layer 1 (IFR) integration
-    pub ifr_enabled: bool,
-    /// Enable Layer 2 (DSR) integration
-    pub dsr_enabled: bool,
-    /// Enable Layer 3 (ALM) integration
-    pub alm_enabled: bool,
-    /// Enable Layer 4 (CPE) integration
-    pub cpe_enabled: bool,
-    /// Performance targets validation
-    pub validate_performance_targets: bool,
 }
 
 /// Circuit breaker configuration
@@ -294,10 +275,6 @@ pub struct OrchestrationEngine {
     auto_scaler: Arc<AutoScaler>,
     /// Monitoring system
     monitor: Arc<OrchestrationMonitor>,
-    /// MFN integration bridge
-    mfn_bridge: Arc<MfnBridge>,
-    /// Performance validator
-    performance_validator: Arc<PerformanceValidator>,
     /// Active orchestration decisions
     active_decisions: Arc<RwLock<HashMap<Uuid, OrchestrationDecision>>>,
     /// Performance metrics
@@ -307,34 +284,21 @@ pub struct OrchestrationEngine {
 impl OrchestrationEngine {
     /// Create a new orchestration engine
     pub async fn new(config: OrchestrationConfig) -> Result<Self> {
-        // Initialize MFN bridge first
-        let mfn_bridge = Arc::new(MfnBridge::new(config.mfn_integration.clone()).await?);
-        
-        // Initialize performance validator
-        let performance_validator = Arc::new(PerformanceValidator::new(
-            mfn_bridge.clone(),
-            config.monitoring.performance_validation_enabled,
-        ).await?);
-        
-        // Initialize components with MFN integration
+        // Initialize components
         let service_mesh = Arc::new(ServiceMeshController::new(
             config.service_mesh.clone(),
-            mfn_bridge.clone(),
         ).await?);
-        
+
         let container = Arc::new(ContainerOrchestrator::new(
             config.container.clone(),
-            mfn_bridge.clone(),
         ).await?);
-        
+
         let auto_scaler = Arc::new(AutoScaler::new(
             config.scaling.clone(),
-            mfn_bridge.clone(),
         ).await?);
-        
+
         let monitor = Arc::new(OrchestrationMonitor::new(
             config.monitoring.clone(),
-            mfn_bridge.clone(),
         ).await?);
         
         // Initialize performance metrics
@@ -374,8 +338,6 @@ impl OrchestrationEngine {
             container,
             auto_scaler,
             monitor,
-            mfn_bridge,
-            performance_validator,
             active_decisions: Arc::new(RwLock::new(HashMap::new())),
             performance_metrics,
         })
@@ -401,19 +363,9 @@ impl OrchestrationEngine {
         self.monitor.clone()
     }
     
-    /// Get the MFN bridge
-    pub fn mfn_bridge(&self) -> Arc<MfnBridge> {
-        self.mfn_bridge.clone()
-    }
-    
     /// Get current performance metrics
     pub async fn performance_metrics(&self) -> OrchestrationPerformance {
         self.performance_metrics.read().await.clone()
-    }
-    
-    /// Validate performance targets are met
-    pub async fn validate_performance_targets(&self) -> Result<bool> {
-        self.performance_validator.validate_orchestration_targets().await
     }
     
     /// Record an orchestration decision
@@ -509,13 +461,6 @@ impl Default for OrchestrationConfig {
                 alert_interval_ms: 5000,
                 metrics_retention_hours: 24,
             },
-            mfn_integration: MfnIntegrationConfig {
-                ifr_enabled: true,
-                dsr_enabled: true,
-                alm_enabled: true,
-                cpe_enabled: true,
-                validate_performance_targets: true,
-            },
         }
     }
 }
@@ -543,10 +488,6 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = OrchestrationConfig::default();
-        assert!(config.mfn_integration.ifr_enabled);
-        assert!(config.mfn_integration.dsr_enabled);
-        assert!(config.mfn_integration.alm_enabled);
-        assert!(config.mfn_integration.cpe_enabled);
         assert!(matches!(config.service_mesh.load_balancing.strategy, LoadBalancingStrategy::NeuralOptimal));
     }
 }

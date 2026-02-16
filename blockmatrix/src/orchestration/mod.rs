@@ -5,7 +5,7 @@
 
 pub mod hypermesh_integration;
 pub mod container;
-pub mod integration;
+// integration module removed - was MFN bridge simulation layer
 pub mod service_mesh;
 
 // Re-export main types

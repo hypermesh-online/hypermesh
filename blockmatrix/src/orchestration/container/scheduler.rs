@@ -3,7 +3,6 @@
 //! Revolutionary container scheduling that uses Layer 2 (DSR) neural pattern recognition
 //! for optimal container placement decisions, achieving <100ms scheduling with 96%+ accuracy.
 
-use crate::orchestration::integration::MfnBridge;
 use crate::{NodeId, ServiceId};
 use super::{ContainerSpec, NodeState, ResourceRequirements, NodeHealth};
 use anyhow::Result;
@@ -20,8 +19,6 @@ pub struct DsrScheduler {
     dsr_enabled: bool,
     /// Maximum candidates to evaluate
     max_candidates: usize,
-    /// MFN bridge for DSR pattern matching
-    mfn_bridge: Arc<MfnBridge>,
     /// Learned scheduling patterns
     scheduling_patterns: Arc<RwLock<HashMap<String, SchedulingPattern>>>,
     /// Node scoring cache
@@ -311,16 +308,14 @@ impl DsrScheduler {
     pub async fn new(
         dsr_enabled: bool,
         max_candidates: usize,
-        mfn_bridge: Arc<MfnBridge>,
     ) -> Result<Self> {
         info!("Initializing DSR container scheduler");
         info!("  - DSR pattern matching: {}", if dsr_enabled { "enabled" } else { "disabled" });
         info!("  - Max candidates: {}", max_candidates);
-        
+
         Ok(Self {
             dsr_enabled,
             max_candidates,
-            mfn_bridge,
             scheduling_patterns: Arc::new(RwLock::new(HashMap::new())),
             node_scoring_cache: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(SchedulerMetrics {
@@ -551,30 +546,9 @@ impl DsrScheduler {
         if !self.dsr_enabled || pattern.is_empty() {
             return Ok((0.0, None));
         }
-        
-        // Use MFN DSR layer for similarity matching
-        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::DsrSimilarity {
-            input_data: pattern.to_vec(),
-            threshold: 0.7,
-        };
-        
-        match self.mfn_bridge.execute_operation(operation).await? {
-            crate::orchestration::integration::mfn_bridge::LayerResponse::DsrResult { similarity_score, confidence, matches, .. } => {
-                let pattern_match = if !matches.is_empty() && similarity_score > 0.7 {
-                    Some(PatternMatch {
-                        pattern_id: matches[0].clone(),
-                        similarity: similarity_score,
-                        confidence,
-                        expected_success_rate: similarity_score * confidence,
-                    })
-                } else {
-                    None
-                };
-                
-                Ok((similarity_score * confidence, pattern_match))
-            },
-            _ => Ok((0.0, None)),
-        }
+
+        // Pattern matching not available without MFN bridge; return default
+        Ok((0.0, None))
     }
     
     /// Calculate resource fit score

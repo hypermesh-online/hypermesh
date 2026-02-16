@@ -165,14 +165,20 @@ pub struct EphemeralKey {
 }
 
 impl EphemeralKey {
-    /// Create new ephemeral key
+    /// Create new ephemeral key with random key material.
+    /// Uses random bytes until FALCON-1024 key generation is integrated.
     pub fn generate() -> Self {
-        // In production, use proper crypto library like ring or ed25519-dalek
-        // This is a placeholder implementation
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let mut public_key = vec![0u8; 32];
+        rng.fill(public_key.as_mut_slice());
+        let mut private_key = vec![0u8; 32];
+        rng.fill(private_key.as_mut_slice());
+
         EphemeralKey {
             session_id: Uuid::new_v4(),
-            public_key: vec![0; 32],  // Placeholder
-            private_key: vec![0; 32],  // Placeholder
+            public_key,
+            private_key,
         }
     }
 }

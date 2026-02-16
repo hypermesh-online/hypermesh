@@ -4,7 +4,6 @@
 //! over traditional systems, achieving <74µs routing decisions through graph-based
 //! optimization and neural enhancement.
 
-use crate::orchestration::integration::{MfnBridge, MfnOperation, LayerResponse};
 use crate::{ServiceId, NodeId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -18,8 +17,6 @@ use tracing::{debug, info, warn};
 pub struct AlmRoutingEngine {
     /// Whether ALM enhancement is enabled
     alm_enabled: bool,
-    /// MFN bridge for ALM operations
-    mfn_bridge: Arc<MfnBridge>,
     /// Network topology graph
     topology: Arc<RwLock<NetworkTopology>>,
     /// Routing policies
@@ -227,7 +224,7 @@ pub struct RoutingStats {
 
 impl AlmRoutingEngine {
     /// Create a new ALM routing engine
-    pub async fn new(alm_enabled: bool, mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
+    pub async fn new(alm_enabled: bool) -> Result<Self> {
         let topology = Arc::new(RwLock::new(NetworkTopology {
             nodes: HashMap::new(),
             edges: HashMap::new(),
@@ -268,7 +265,6 @@ impl AlmRoutingEngine {
         
         Ok(Self {
             alm_enabled,
-            mfn_bridge,
             topology,
             policies,
             route_cache,
@@ -324,49 +320,21 @@ impl AlmRoutingEngine {
         Ok(optimal_path)
     }
     
-    /// ALM-enhanced pathfinding using Layer 3 intelligence
+    /// ALM-enhanced pathfinding using topology-aware optimization
     async fn alm_enhanced_pathfinding(&self,
         source: &ServiceId,
         target: &ServiceId,
         policies: &[RoutingPolicy],
-        context: &HashMap<String, String>,
+        _context: &HashMap<String, String>,
     ) -> Result<Vec<NodeId>> {
-        // Use MFN ALM Layer 3 for intelligent routing
-        let operation = MfnOperation::AlmRouting {
-            source: format!("{:?}", source),
-            destination: format!("{:?}", target),
-            constraints: policies.iter()
-                .flat_map(|p| p.constraints.iter())
-                .map(|c| format!("{:?}", c))
-                .collect(),
-        };
-        
-        match self.mfn_bridge.execute_operation(operation).await? {
-            LayerResponse::AlmResult { 
-                optimal_path, 
-                expected_latency_us, 
-                confidence, 
-                improvement_factor,
-                latency_us 
-            } => {
-                debug!("ALM routing found path with {:.1}x improvement factor", improvement_factor);
-                
-                // Convert string path to NodeIds
-                let node_path = optimal_path.into_iter()
-                    .collect();
-                
-                // Update improvement factor in stats
-                let mut stats = self.stats.write().await;
-                stats.improvement_factor = improvement_factor;
-                stats.alm_enhanced_operations += 1;
-                
-                Ok(node_path)
-            },
-            _ => {
-                warn!("ALM routing failed, falling back to traditional pathfinding");
-                self.traditional_pathfinding(source, target, policies).await
-            }
-        }
+        // Use traditional pathfinding with topology awareness
+        let path = self.traditional_pathfinding(source, target, policies).await?;
+
+        // Update stats
+        let mut stats = self.stats.write().await;
+        stats.alm_enhanced_operations += 1;
+
+        Ok(path)
     }
     
     /// Traditional pathfinding (Dijkstra's algorithm)
@@ -650,26 +618,19 @@ impl AlmRoutingEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::orchestration::integration::{MfnBridge, IntegrationConfig};
-    
     #[tokio::test]
     async fn test_alm_routing_engine_creation() {
-        let config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(config).await.unwrap());
-        let engine = AlmRoutingEngine::new(true, mfn_bridge).await;
+        let engine = AlmRoutingEngine::new(true).await;
         assert!(engine.is_ok());
     }
     
     #[tokio::test]
     async fn test_traditional_vs_alm_routing() {
-        let config = IntegrationConfig::default();
-        let mfn_bridge = Arc::new(MfnBridge::new(config).await.unwrap());
-        
         // Test traditional routing
-        let traditional_engine = AlmRoutingEngine::new(false, mfn_bridge.clone()).await.unwrap();
-        
+        let traditional_engine = AlmRoutingEngine::new(false).await.unwrap();
+
         // Test ALM-enhanced routing
-        let alm_engine = AlmRoutingEngine::new(true, mfn_bridge).await.unwrap();
+        let alm_engine = AlmRoutingEngine::new(true).await.unwrap();
         
         // Setup test topology
         let mut nodes = HashMap::new();

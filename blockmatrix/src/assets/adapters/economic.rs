@@ -472,11 +472,14 @@ impl AssetAdapter for EconomicAssetAdapter {
     }
 
     async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
-        // TODO(Phase 11): Implement NAT-like proxy addressing for economic assets
-        // This is a core feature per CLAUDE.md but requires dedicated design
-        // Economic assets need proxy addressing for cross-chain operations
-        // For now, create a placeholder AssetId based on proxy address
-        todo!("Proxy address resolution for economic assets - requires NAT-like addressing design")
+        // NAT-like proxy addressing for economic assets requires dedicated design (Phase 11).
+        // Economic assets need proxy addressing for cross-chain operations.
+        Err(AssetError::AdapterError {
+            message: format!(
+                "Proxy address resolution for economic assets not yet implemented (address: {:?})",
+                proxy_addr
+            ),
+        })
     }
 }
 

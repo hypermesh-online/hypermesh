@@ -31,7 +31,48 @@ pub mod workflows;
 pub mod integration;
 pub mod validation;
 pub mod performance;
-mod trustchain_stub;
+// Inline stub for TrustChainClient (trustchain_stub module removed - was zeroed-key placeholder)
+mod inline_trustchain_stub {
+    use async_trait::async_trait;
+    use crate::assets::multi_node::network_membership::{
+        TrustChainClient, NetworkCredentials, NetworkDiscovery,
+    };
+    use crate::assets::multi_node::NetworkId;
+    use crate::assets::core::AssetResult;
+
+    pub struct StubTrustChainClient;
+
+    impl StubTrustChainClient {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    #[async_trait]
+    impl TrustChainClient for StubTrustChainClient {
+        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
+            Ok(NetworkCredentials {
+                certificate: vec![],
+                public_key: vec![],
+                private_key_encrypted: vec![],
+                session_tokens: vec![],
+                expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(86400),
+            })
+        }
+
+        async fn revoke_credentials(&self, _network_id: NetworkId) -> AssetResult<()> {
+            Ok(())
+        }
+
+        async fn validate_certificate(&self, _cert: &[u8]) -> AssetResult<bool> {
+            Ok(true)
+        }
+
+        async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
+            Ok(vec![])
+        }
+    }
+}
 
 // Re-exports for external use
 pub use workflows::{
@@ -286,7 +327,7 @@ impl IntelligenceLayer {
         let network_config = crate::assets::multi_node::MultiNetworkConfig::default();
         let local_node_id = crate::transport::NodeId::from_name("intelligence-layer-node");
         let trustchain_client: Arc<dyn crate::assets::multi_node::network_membership::TrustChainClient> =
-            Arc::new(trustchain_stub::StubTrustChainClient::new());
+            Arc::new(inline_trustchain_stub::StubTrustChainClient::new());
         let network_coordinator = Arc::new(
             MultiNetworkCoordinator::new(local_node_id, trustchain_client, network_config)
         );

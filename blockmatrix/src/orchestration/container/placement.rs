@@ -3,7 +3,6 @@
 //! Advanced container placement optimization using Layer 4 (CPE) for <1.2ms ML-driven
 //! placement decisions with 96.8% accuracy, enabling proactive placement optimization.
 
-use crate::orchestration::integration::MfnBridge;
 use crate::{NodeId, ServiceId};
 use super::{ContainerSpec, NodeCandidate};
 use anyhow::Result;
@@ -16,8 +15,6 @@ use tracing::{debug, info, warn};
 
 /// CPE-powered placement engine for predictive optimization
 pub struct CpePlacementEngine {
-    /// MFN bridge for CPE predictions
-    mfn_bridge: Arc<MfnBridge>,
     /// Placement history for learning
     placement_history: Arc<RwLock<Vec<PlacementRecord>>>,
     /// Placement strategies cache
@@ -278,11 +275,10 @@ pub struct PlacementMetrics {
 
 impl CpePlacementEngine {
     /// Create a new CPE placement engine
-    pub async fn new(mfn_bridge: Arc<MfnBridge>) -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         info!("Initializing CPE placement engine");
-        
+
         Ok(Self {
-            mfn_bridge,
             placement_history: Arc::new(RwLock::new(Vec::new())),
             strategy_cache: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(PlacementMetrics {
@@ -396,94 +392,47 @@ impl CpePlacementEngine {
         })
     }
     
-    /// Predict optimal placement using CPE
+    /// Predict optimal placement using best scoring candidate
     async fn predict_optimal_placement(
         &self,
-        spec: &ContainerSpec,
+        _spec: &ContainerSpec,
         node_candidates: &[NodeCandidate],
-        placement_context: &PlacementContext,
+        _placement_context: &PlacementContext,
     ) -> Result<PlacementDecision> {
-        // Prepare context history for CPE prediction
-        let context_history = self.prepare_context_history(spec, placement_context).await?;
-        
-        // Use CPE for prediction
-        let operation = crate::orchestration::integration::mfn_bridge::MfnOperation::CpePrediction {
-            context_history,
-            prediction_horizon: 1, // Predict optimal placement
-        };
-        
-        match self.mfn_bridge.execute_operation(operation).await? {
-            crate::orchestration::integration::mfn_bridge::LayerResponse::CpeResult { predictions, confidence, accuracy, .. } => {
-                // Interpret CPE predictions to select optimal node
-                let optimal_node = self.select_node_from_predictions(
-                    &predictions,
-                    node_candidates,
-                    confidence,
-                ).await?;
-                
-                // Generate placement decision
-                let expected_performance = ExpectedPerformance {
-                    expected_startup_ms: 2000,
-                    expected_response_ms: 50.0,
-                    expected_efficiency: 0.85,
-                    expected_network_ms: 10.0,
-                    overall_score: confidence * accuracy,
-                    prediction_confidence: confidence,
-                };
-                
-                let reasoning = self.generate_placement_reasoning(
-                    &optimal_node,
-                    node_candidates,
-                    &predictions,
-                ).await;
-                
-                Ok(PlacementDecision {
-                    selected_node: optimal_node,
-                    strategy: PlacementStrategy::CpePredictive,
-                    confidence: confidence * accuracy,
-                    expected_performance,
-                    reasoning,
-                    cpe_enhanced: true,
-                    decision_latency_ms: 1, // Target <1.2ms
-                })
+        // Select best scoring candidate
+        let best_candidate = node_candidates.iter()
+            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap();
+
+        Ok(PlacementDecision {
+            selected_node: best_candidate.node_id.clone(),
+            strategy: PlacementStrategy::LoadBalancing,
+            confidence: 0.7,
+            expected_performance: ExpectedPerformance {
+                expected_startup_ms: 3000,
+                expected_response_ms: 100.0,
+                expected_efficiency: 0.75,
+                expected_network_ms: 20.0,
+                overall_score: 0.7,
+                prediction_confidence: 0.7,
             },
-            _ => {
-                // Fallback to best scoring candidate
-                let best_candidate = node_candidates.iter()
-                    .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
-                    .unwrap();
-                
-                Ok(PlacementDecision {
-                    selected_node: best_candidate.node_id.clone(),
-                    strategy: PlacementStrategy::LoadBalancing,
-                    confidence: 0.7,
-                    expected_performance: ExpectedPerformance {
-                        expected_startup_ms: 3000,
-                        expected_response_ms: 100.0,
-                        expected_efficiency: 0.75,
-                        expected_network_ms: 20.0,
-                        overall_score: 0.7,
-                        prediction_confidence: 0.7,
-                    },
-                    reasoning: PlacementReasoning {
-                        primary_factors: vec![
-                            DecisionFactor {
-                                factor_name: "Node Score".to_string(),
-                                weight: 1.0,
-                                value: best_candidate.score,
-                                description: "Fallback to highest scoring node".to_string(),
-                            }
-                        ],
-                        secondary_factors: vec![],
-                        identified_risks: vec![],
-                        risk_mitigations: vec![],
-                        alternatives_considered: vec![],
-                    },
-                    cpe_enhanced: false,
-                    decision_latency_ms: 1,
-                })
-            }
-        }
+            reasoning: PlacementReasoning {
+                primary_factors: vec![
+                    DecisionFactor {
+                        factor_name: "Node Score".to_string(),
+                        weight: 1.0,
+                        value: best_candidate.score,
+                        description: "Highest scoring node selected".to_string(),
+                    }
+                ],
+                secondary_factors: vec![],
+                identified_risks: vec![],
+                risk_mitigations: vec![],
+                alternatives_considered: vec![],
+            },
+            cpe_enhanced: false,
+            decision_latency_ms: 1,
+        })
     }
     
     /// Prepare context history for CPE prediction

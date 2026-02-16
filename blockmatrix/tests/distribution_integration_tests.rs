@@ -10,11 +10,69 @@
 
 use blockmatrix::{
     distribution::{
-        distribute_shards_pos_aware, NodeInfo, pos_validator::MockConsensusValidator,
+        distribute_shards_pos_aware, NodeInfo,
+        pos_validator::{ConsensusValidator, StorageAccessValidation, ProofType},
     },
     assets::pipeline::sharding::{Sharder, ShardingConfig, Shard},
+    assets::core::AssetResult,
     matrix::coordinate::MatrixCoordinate,
 };
+use async_trait::async_trait;
+use std::time::SystemTime;
+
+/// Local mock for integration tests (the library-side mock is #[cfg(test)] only)
+struct MockConsensusValidator {
+    allow_all: bool,
+}
+
+impl MockConsensusValidator {
+    fn new(allow_all: bool) -> Self {
+        Self { allow_all }
+    }
+}
+
+#[async_trait]
+impl ConsensusValidator for MockConsensusValidator {
+    async fn validate_storage_access(
+        &self,
+        _node_id: &str,
+        _asset_id: &str,
+        _shard_id: &str,
+    ) -> AssetResult<StorageAccessValidation> {
+        Ok(StorageAccessValidation {
+            can_store: self.allow_all,
+            reason: if self.allow_all {
+                None
+            } else {
+                Some("Denied by mock validator".to_string())
+            },
+            required_proofs: vec![
+                ProofType::PoSpace,
+                ProofType::PoStake,
+                ProofType::PoWork,
+                ProofType::PoTime,
+            ],
+            validation_timestamp: SystemTime::now(),
+            validator_node_id: "mock-validator".to_string(),
+        })
+    }
+
+    async fn batch_validate_storage_access(
+        &self,
+        nodes: &[String],
+        asset_id: &str,
+        shard_id: &str,
+    ) -> AssetResult<Vec<StorageAccessValidation>> {
+        let mut results = Vec::new();
+        for node in nodes {
+            results.push(
+                self.validate_storage_access(node, asset_id, shard_id)
+                    .await?,
+            );
+        }
+        Ok(results)
+    }
+}
 
 /// Create test sharder
 fn create_sharder() -> Sharder {

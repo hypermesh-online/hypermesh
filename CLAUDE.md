@@ -16,7 +16,7 @@
 |-----------|------------|--------|-------|
 | **NGauge** | `/ngauge` | 🚧 Planning | Engagement platform concept |
 | **Caesar** | `/caesar` | ⚡ **40% Complete** | HTTP→STOQ migration in progress |
-| **Catalog** | `/catalog` | ⚡ **30% Complete** | Asset package manager - compiles with warnings, integration needed |
+| **Catalog** | `/catalog` | ⚡ **30% Complete** | Asset package registry/template library ONLY - NOT asset manager |
 | **BlockMatrix** | `/blockmatrix` | ⚠️ **10% Complete** | Single blockchain per node, multi-scope pending |
 | **STOQ** | `/stoq` | ✅ **92% Complete** | QUIC transport with eBPF integration |
 | **TrustChain** | `/trustchain` | ✅ **95% Complete** | FALCON-1024 CA production-ready |
@@ -391,10 +391,12 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 **Compression → Encryption → Sharding → Distribution**
 
-1. **Compression First**: Reduce data size (better compression on raw data)
-2. **Encryption Second**: Apply Kyber/FALCON-1024 quantum-resistant encryption
-3. **Sharding Third**: Split encrypted data into matrix-aware shards
-4. **Distribution Fourth**: Place shards at calculated matrix positions
+1. **Compression First**: Brotli streaming compression (levels 1-11) on raw data
+2. **Encryption Second**: Kyber-1024 quantum-resistant encryption of the compressed blob (NOT per-shard, NOT AES wrapping)
+3. **Sharding Third**: Reed-Solomon erasure coding (10+4) splits the encrypted blob into matrix-aware shards
+4. **Distribution Fourth**: Tensor-based placement at calculated matrix positions
+
+**Current Implementation GAP**: Code currently does Compress→Shard→Encrypt (wrong order, per-shard AES-256-GCM). Needs reorder to Compress→Encrypt→Shard and replacement of AES-256-GCM with Kyber-1024. Brotli compression is correct. Reed-Solomon sharding is correct. FALCON-1024 is for STOQ protocol signing. Kyber-1024 is for asset encryption.
 
 **Bucket Deduplication**: Hash buckets mapped to matrix positions prevent duplicate storage while maintaining redundancy through matrix topology.
 
@@ -447,7 +449,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ **Node-as-DNS-Provider First**: Self-sufficient bootstrap, no upstream dependency
 - ✅ **DNS-as-Asset**: Requires full Proof of State, blockchain-registered
 - ✅ **STOQ Protocol Intelligence**: PoS validation, shard addressing at protocol layer
-- ✅ **Compression→Encryption→Sharding→Distribution**: Exact pipeline order
+- ⚡ **Compression→Encryption→Sharding→Distribution**: Whole-blob Kyber-1024 encryption before sharding (code currently wrong order + AES-256-GCM, needs fix)
 - ✅ **Instruction-Based Retrieval**: Send maps not files
 - ✅ **Matrix-Aware Coordination**: Tensor operations for resource allocation
 - ✅ Separate protocols (TrustChain, STOQ, Catalog) from BlockMatrix

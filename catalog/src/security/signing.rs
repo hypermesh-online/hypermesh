@@ -239,16 +239,16 @@ impl PackageSigner {
     }
 
     /// Sign with ED25519
-    fn sign_with_ed25519(&self, hash: &[u8], private_key: &[u8]) -> Result<Vec<u8>> {
-        // TODO: Implement actual ED25519 signing using ed25519-dalek
-        // For now, return placeholder
-        warn!("ED25519 signing not yet implemented, using placeholder");
-
-        // Placeholder: concatenate hash with marker
-        let mut signature = vec![0xED, 0x25, 0x51]; // ED25519 marker
-        signature.extend_from_slice(hash);
-
-        Ok(signature)
+    ///
+    /// NOTE: This project uses FALCON-1024 as the target signing algorithm
+    /// (quantum-resistant). ED25519 signing is not implemented and callers
+    /// should use SignatureAlgorithm::Falcon1024 instead. This method returns
+    /// an error to prevent silent use of an incorrect algorithm.
+    fn sign_with_ed25519(&self, _hash: &[u8], _private_key: &[u8]) -> Result<Vec<u8>> {
+        Err(anyhow!(
+            "ED25519 signing is not implemented. This project uses FALCON-1024 \
+             for signing. Use SignatureAlgorithm::Falcon1024 instead."
+        ))
     }
 
     /// Sign with hybrid FALCON + ED25519

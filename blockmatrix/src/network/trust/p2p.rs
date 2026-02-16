@@ -62,6 +62,7 @@ impl P2PNetworkHandler {
     /// Generate self-signed certificate for P2P
     fn generate_self_signed_cert() -> Certificate {
         use std::time::{SystemTime, UNIX_EPOCH};
+        use rand::Rng;
 
         let node_id = format!("p2p-node-{}", uuid::Uuid::new_v4());
         let now = SystemTime::now()
@@ -69,11 +70,18 @@ impl P2PNetworkHandler {
             .unwrap_or_default()
             .as_secs();
 
+        // Generate random key material (placeholder until FALCON-1024 integration)
+        let mut rng = rand::thread_rng();
+        let mut public_key = vec![0u8; 32];
+        rng.fill(public_key.as_mut_slice());
+        let mut signature = vec![0u8; 64];
+        rng.fill(signature.as_mut_slice());
+
         Certificate {
             subject: node_id.clone(),
             issuer: node_id.clone(), // Self-signed
-            public_key: vec![0; 32], // Placeholder - would use real crypto
-            signature: vec![0; 64],  // Placeholder
+            public_key,
+            signature,
             fingerprint: format!("fingerprint:{}", node_id),
             expires_at: now + 365 * 24 * 3600, // 1 year
             network_type: NetworkType::P2P,

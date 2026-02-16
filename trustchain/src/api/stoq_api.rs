@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
-use tracing::{info, debug, instrument};
+use tracing::{info, debug, warn, instrument};
 
 use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
 use stoq::StoqApiServer;
@@ -189,12 +189,16 @@ impl ApiHandler for IssueCertificateHandler {
         use crate::ca::CertificateRequest;
         use crate::consensus::ConsensusProof;
 
+        // SECURITY: This uses a test consensus proof. In production, the proof must be
+        // extracted from the request or validated via the consensus network. This handler
+        // must not be exposed to untrusted callers until real proof validation is added.
+        warn!("Certificate issuance using test consensus proof - not safe for production");
         let cert_request = CertificateRequest {
             common_name: "placeholder.trustchain.local".to_string(), // TODO: Extract from CSR
             san_entries: vec![],
             node_id: "api_node".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::new_for_testing(), // TODO: Get actual proof
+            consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: std::time::SystemTime::now(),
         };
 

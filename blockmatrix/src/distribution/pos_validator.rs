@@ -189,17 +189,21 @@ fn privacy_level_allows_node(asset_privacy: &str, node_privacy: &str) -> bool {
     }
 }
 
-/// Implementation of ConsensusValidator for testing
+/// Mock ConsensusValidator for testing only.
+/// Gated behind cfg(test) so it is never included in production builds.
+#[cfg(test)]
 pub struct MockConsensusValidator {
     pub allow_all: bool,
 }
 
+#[cfg(test)]
 impl MockConsensusValidator {
     pub fn new(allow_all: bool) -> Self {
         Self { allow_all }
     }
 }
 
+#[cfg(test)]
 #[async_trait]
 impl ConsensusValidator for MockConsensusValidator {
     async fn validate_storage_access(
