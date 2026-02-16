@@ -2,31 +2,17 @@
 name = "hypermesh-lib"
 version = "0.1.0"
 edition = "2021"
+description = "HyperMesh shared types and traits"
+
+[lints]
+workspace = true
 
 [dependencies]
-# BlockMatrix asset system (canonical AssetType source)
-blockmatrix = { path = "../blockmatrix" }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Error handling
-thiserror = "1.0"
-anyhow = "1.0"
-
-# Identifiers
-uuid = { version = "1.10", features = ["v4", "serde"] }
-
-# Async runtime (for Proof of State consensus)
-tokio = { version = "1.38", features = ["full"] }
-
-# Cryptography (for consensus proofs)
-sha2 = "0.10"
-blake3 = "1.5"
-
-# Time handling
-chrono = { version = "0.4", features = ["serde"] }
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
 
 [lib]
 name = "hypermesh_lib"

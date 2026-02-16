@@ -1,14 +1,12 @@
-//! HyperMesh Shared Library
-//! Common types, traits, and utilities used across all components
+//! HyperMesh shared types and traits
 //!
-//! This library contains:
-//! - Asset system (universal asset types and IDs)
-//! - Common utilities and error types
-//!
-//! Note: Consensus/Proof of State system is in blockmatrix crate
+//! Canonical definitions for types shared across all HyperMesh crates.
+//! Every crate should import shared types from here, not define their own.
 
-pub mod assets;
-pub mod common;
+pub mod types;
+pub mod error;
+pub mod crypto;
 
-// Re-export commonly used types
-pub use assets::{AssetId, AssetType, AssetMetadata};
+// Re-export commonly used types at crate root
+pub use types::*;
+pub use error::HypermeshError;

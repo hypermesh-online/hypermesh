@@ -29,7 +29,7 @@ pub mod stoq_ca_client;
 pub mod security_integration; // Security integration module
 
 pub use certificate_manager::*;
-pub use certificate_store::CertificateStore as CertStore;
+pub use certificate_store::{CertificateStore as CertStore, CertificateStoreMetrics};
 pub use policy::*;
 // AWS CloudHSM dependencies REMOVED - software-only operation
 pub use stoq_ca_client::*;

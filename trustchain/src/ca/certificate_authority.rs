@@ -7,7 +7,6 @@
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
-use dashmap::DashMap;
 use tokio::sync::{RwLock, Mutex};
 use tracing::{info, warn};
 use hex;
@@ -18,6 +17,7 @@ use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult, F
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
+use super::certificate_store::{CertificateStore, CertificateStoreMetrics};
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.
@@ -81,20 +81,6 @@ pub struct CAMetrics {
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
     pub performance_violations: std::sync::atomic::AtomicU64,
-}
-
-/// Certificate store for managing issued certificates
-pub struct CertificateStore {
-    certificates: Arc<DashMap<String, IssuedCertificate>>,
-    metrics: Arc<CertificateStoreMetrics>,
-}
-
-/// Certificate store metrics
-#[derive(Default)]
-pub struct CertificateStoreMetrics {
-    pub total_certificates: std::sync::atomic::AtomicU64,
-    pub revoked_certificates: std::sync::atomic::AtomicU64,
-    pub expired_certificates: std::sync::atomic::AtomicU64,
 }
 
 /// Certificate rotation manager
@@ -373,35 +359,6 @@ impl TrustChainCA {
     pub async fn get_root_certificate(&self) -> TrustChainResult<CACertificate> {
         let root_ca = self.root_ca.read().await;
         Ok(root_ca.clone())
-    }
-}
-
-// Certificate Store Implementation
-impl CertificateStore {
-    pub async fn new() -> TrustChainResult<Self> {
-        Ok(Self {
-            certificates: Arc::new(DashMap::new()),
-            metrics: Arc::new(CertificateStoreMetrics::default()),
-        })
-    }
-
-    pub async fn store_certificate(&self, certificate: &IssuedCertificate) -> TrustChainResult<()> {
-        self.certificates.insert(certificate.serial_number.clone(), certificate.clone());
-        self.metrics.total_certificates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Ok(())
-    }
-
-    pub async fn get_certificate(&self, serial_number: &str) -> TrustChainResult<Option<IssuedCertificate>> {
-        Ok(self.certificates.get(serial_number).map(|cert| cert.clone()))
-    }
-
-    pub async fn revoke_certificate(&self, serial_number: &str, _reason: String) -> TrustChainResult<()> {
-        if let Some(cert) = self.certificates.get_mut(serial_number) {
-            // Update certificate status to revoked
-            self.metrics.revoked_certificates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            info!("Certificate revoked: {}", serial_number);
-        }
-        Ok(())
     }
 }
 
