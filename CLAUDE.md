@@ -492,3 +492,66 @@ DNS names are blockchain assets earning CAESAR rewards.
 - STOQ provides protocol-level intelligence, not just transport
 - Everything runs through STOQ - no HTTP, no traditional networking
 - Matrix operations (tensor math) drive all routing and resource decisions
+
+---
+
+## 📊 **Crate Status Tracking (Single Source of Truth)**
+
+### How It Works
+Each Rust crate has a `crate-status.toml` file that is the **single source of truth** for feature status. A sync script reads these files and generates TypeScript data files for the website.
+
+### Files
+- `<crate>/crate-status.toml` - Feature status per crate (8 crates)
+- `scripts/sync-status.ts` - Reads toml files, counts code metrics, generates output
+- `scripts/sync-status.sh` - Shell wrapper for the sync script
+- `scripts/output/status.ts` - Auto-generated: feature status per crate
+- `scripts/output/stats.ts` - Auto-generated: code metrics per crate (files, lines, tests)
+
+### Managing Feature Status
+
+When a feature changes status, update the relevant `crate-status.toml`:
+
+```toml
+[crate]
+id = "stoq"
+name = "STOQ Protocol"
+description = "..."
+phase = "alpha"  # planning | alpha | beta | stable
+completion = 92
+
+[features.working]
+items = [
+    "Feature that works",
+]
+
+[features.in_development]
+items = [
+    "Feature being built",
+]
+
+[features.planned]
+items = [
+    "Feature not started",
+]
+
+[roadmap]
+current_sprint = "Sprint name"
+next_milestone = "Next goal"
+blockers = ["Known blocker"]
+```
+
+### Workflow
+1. **Feature completed**: Move from `in_development` to `working` in the crate's toml
+2. **New feature started**: Move from `planned` to `in_development`
+3. **New feature identified**: Add to `planned`
+4. **Update phase**: Change `phase` field as crate matures
+5. **Run sync**: `./scripts/sync-status.sh` (also runs automatically on git push)
+
+### Auto-Sync
+A git pre-push hook automatically runs the sync script and amends the commit with updated output files. The website at `../public/` imports these generated files directly.
+
+### Rules
+- **NEVER edit** `scripts/output/status.ts` or `scripts/output/stats.ts` directly
+- **ALWAYS edit** the `crate-status.toml` in the relevant crate directory
+- Keep feature descriptions concise (one line each)
+- Update `completion` percentage when significant progress is made

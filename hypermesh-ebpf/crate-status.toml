@@ -1,0 +1,29 @@
+[crate]
+name = "HyperMesh eBPF"
+id = "hypermesh-ebpf"
+description = "Kernel-level packet validation and intelligence layer using eBPF"
+phase = "alpha"
+
+[features.working]
+items = [
+    "Userspace packet validation framework",
+    "PoS header parsing and validation",
+    "Asset hash verification (BLAKE3)",
+    "Matrix routing path validation",
+    "Policy map management",
+    "Metrics collection framework",
+]
+
+[features.in_development]
+items = [
+    "XDP program loading via aya (feature-gated)",
+    "BPF map synchronization",
+    "Privacy tier header enforcement",
+]
+
+[features.planned]
+items = [
+    "Kernel-space PoS validation",
+    "AF_XDP zero-copy fast path",
+    "Hardware offload support",
+]

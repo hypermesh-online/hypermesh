@@ -1,0 +1,33 @@
+[crate]
+name = "Block-MATRIX"
+id = "block-matrix"
+description = "3D mesh topology, matrix-aware distributed computing, and asset pipeline"
+phase = "alpha"
+
+[features.working]
+items = [
+    "3D coordinate system (x,y,z positioning)",
+    "Tensor math library (Vector3D, Matrix3x3, A*)",
+    "Every-node blockchain (independent chains)",
+    "Geospatial module (GPS conversion, clustering)",
+    "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
+    "Privacy allocation (5 levels, 4 tiers)",
+    "Matrix persistence (WAL, snapshots, recovery)",
+    "Proof of State four-proof validation",
+]
+
+[features.in_development]
+items = [
+    "Asset pipeline reorder (Compress-Encrypt-Shard)",
+    "Kyber-1024 for asset encryption",
+    "Instruction-based retrieval system",
+    "OS integration layer (Linux/macOS/Windows)",
+]
+
+[features.planned]
+items = [
+    "Multi-scope blockchain (User/Group/Org/Public)",
+    "Container runtime with isolation",
+    "Multi-node production deployment",
+    "Dynamic shard rebalancing",
+]

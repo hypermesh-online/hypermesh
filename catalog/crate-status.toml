@@ -1,0 +1,30 @@
+[crate]
+name = "Catalog"
+id = "catalog"
+description = "Asset package registry and template library"
+phase = "alpha"
+
+[features.working]
+items = [
+    "Asset package types and metadata",
+    "Asset registry with publish/install/search",
+    "Template generation framework",
+    "Asset validation pipeline",
+    "Semantic versioning and dependency resolution",
+    "HyperMesh execution delegation",
+    "Scripting engine (syntax validation)",
+]
+
+[features.in_development]
+items = [
+    "STOQ transport for distribution",
+    "Content-addressed storage (DHT)",
+    "TrustChain security integration",
+]
+
+[features.planned]
+items = [
+    "Full asset marketplace",
+    "Peer-to-peer package sharing",
+    "Consensus proof validation for packages",
+]

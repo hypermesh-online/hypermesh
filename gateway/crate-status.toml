@@ -1,0 +1,29 @@
+[crate]
+name = "Gateway"
+id = "gateway"
+description = "HTTP/3 gateway for trustchain.hypermesh.online and federated entry points"
+phase = "planning"
+
+[features.working]
+items = [
+    "QUIC/HTTP3 server setup (quinn + h3)",
+    "TLS certificate loading (PEM/DER)",
+    "Connection pool with health checks",
+    "Router with path-based backend selection",
+    "Circuit breaker and retry logic",
+    "CORS middleware and request logging",
+]
+
+[features.in_development]
+items = [
+    "Request handling (h3 API fix needed)",
+    "HTTP/3 backend proxying",
+]
+
+[features.planned]
+items = [
+    "Federated gateway mesh",
+    "STOQ protocol bridge",
+    "Load balancing across backends",
+    "Rate limiting and DDoS protection",
+]

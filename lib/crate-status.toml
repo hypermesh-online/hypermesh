@@ -1,0 +1,30 @@
+[crate]
+name = "HyperMesh Lib"
+id = "hypermesh-lib"
+description = "Shared canonical types for the HyperMesh ecosystem"
+phase = "alpha"
+
+[features.working]
+items = [
+    "NodeId and AssetId newtypes",
+    "NetworkPrivacyTier enum (4 tiers)",
+    "BlockchainScope enum (6 scopes)",
+    "ProofType enum (PoSpace/PoStake/PoWork/PoTime)",
+    "MatrixPosition coordinate type",
+    "PipelineStage enum",
+    "CryptoAlgorithm enum (Falcon/Kyber/AES)",
+    "HypermeshError unified error type",
+]
+
+[features.in_development]
+items = [
+    "Additional shared trait definitions",
+    "Cross-crate validation helpers",
+]
+
+[features.planned]
+items = [
+    "Canonical consensus proof types",
+    "Shared serialization formats",
+    "Common test utilities",
+]

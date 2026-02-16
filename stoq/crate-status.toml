@@ -1,0 +1,33 @@
+[crate]
+name = "STOQ Protocol"
+id = "stoq"
+description = "QUIC-based transport protocol with eBPF acceleration and FALCON-1024 signing"
+phase = "alpha"
+
+[features.working]
+items = [
+    "QUIC transport over IPv6",
+    "Connection pool with health checks",
+    "FALCON-1024 key generation and signing",
+    "Certificate management (4 strategies)",
+    "Network isolation (4 privacy tiers)",
+    "Adaptive congestion control",
+    "Transport metrics collection",
+    "Protocol extension framework (packets/tokens/shards)",
+]
+
+[features.in_development]
+items = [
+    "eBPF capability detection (wired up)",
+    "XDP packet filtering (feature-gated)",
+    "AF_XDP zero-copy sockets (feature-gated)",
+    "PoS protocol-level validation stubs",
+]
+
+[features.planned]
+items = [
+    "Kernel eBPF program loading",
+    "Protocol-level PoS token validation",
+    "Adaptive transport tiers",
+    "Multi-path QUIC",
+]
