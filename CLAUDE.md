@@ -517,7 +517,6 @@ id = "stoq"
 name = "STOQ Protocol"
 description = "..."
 phase = "alpha"  # planning | alpha | beta | stable
-completion = 92
 
 [features.working]
 items = [
@@ -533,12 +532,9 @@ items = [
 items = [
     "Feature not started",
 ]
-
-[roadmap]
-current_sprint = "Sprint name"
-next_milestone = "Next goal"
-blockers = ["Known blocker"]
 ```
+
+Note: `completion` percentage is auto-computed from `working / total * 100`.
 
 ### Workflow
 1. **Feature completed**: Move from `in_development` to `working` in the crate's toml
