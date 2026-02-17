@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Content-Addressed Storage - Revolutionary Concept #7 (Bucket Deduplication)
 //!
 //! This module implements network-wide deduplication using hash buckets mapped to

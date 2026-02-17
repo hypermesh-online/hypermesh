@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! TrustChain CA Service - Certificate Authority for Multi-Node Communication
 //!
 //! This service provides certificate issuance and validation for BlockMatrix nodes,

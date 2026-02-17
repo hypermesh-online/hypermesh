@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Comprehensive Proof of State Validation
 //!
 //! This module implements full validation of all four Proof of State proofs

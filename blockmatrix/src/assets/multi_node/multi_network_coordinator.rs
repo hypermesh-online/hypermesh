@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Multi-Network Coordinator - Primary Component for Sprint 2.3
 //!
 //! Revolutionary Concept #4: Multi-Network Participation

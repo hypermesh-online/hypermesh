@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // Windows OS Abstraction - Implementation using WMI and Performance Counters
 //
 // Sprint 3: Full Windows integration with WMI for hardware detection and

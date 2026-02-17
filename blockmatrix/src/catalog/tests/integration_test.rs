@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Integration Test for Blockchain-Native Compute System
 //!
 //! Tests the complete end-to-end flow of blockchain-native compute execution

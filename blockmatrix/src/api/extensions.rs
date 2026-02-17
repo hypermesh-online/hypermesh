@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Extension Management API handlers for HyperMesh using STOQ protocol
 //!
 //! This module provides STOQ API handlers for managing extensions

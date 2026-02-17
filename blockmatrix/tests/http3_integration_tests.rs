@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // BlockMatrix HTTP/3 Integration Tests
 // Comprehensive test suite for validating HTTP/3 server endpoints
 

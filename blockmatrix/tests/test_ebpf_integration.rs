@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // eBPF Integration Tests for Sprint 3
 // Tests Linux eBPF kernel integration with XDP, kprobe, and map operations
 // Requires: Linux kernel 4.4+, CAP_BPF or root privileges

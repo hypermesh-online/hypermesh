@@ -1,4 +1,9 @@
 #!/usr/bin/env rust-script
+
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // Standalone test for eBPF kernel integration
 // Run with: rustc test_ebpf_standalone.rs && ./test_ebpf_standalone
 

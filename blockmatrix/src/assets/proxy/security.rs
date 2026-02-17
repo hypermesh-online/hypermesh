@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Quantum-Resistant Security for Proxy System
 //!
 //! Implements FALCON-1024 signatures and Kyber encryption for quantum-resistant security

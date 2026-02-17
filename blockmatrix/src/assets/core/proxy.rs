@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Remote Proxy/NAT Addressing System for HyperMesh
 //!
 //! CRITICAL IMPLEMENTATION: Complete NAT-like addressing system for memory/resources

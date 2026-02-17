@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! eBPF Transport Acceleration for STOQ
 //!
 //! Provides kernel-level optimizations for the STOQ transport layer including:

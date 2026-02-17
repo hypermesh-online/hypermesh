@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Instruction-Based Retrieval System - Revolutionary Concept #6
 //!
 //! Revolutionary approach: Instead of transferring entire files (potentially multi-GB),

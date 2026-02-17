@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Proof of State (PoS) Validator for Node Eligibility
 //!
 //! CRITICAL: All permission rules live in blockchain Asset records.

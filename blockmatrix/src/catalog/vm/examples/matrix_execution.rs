@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Matrix Chain VM Execution Examples
 //!
 //! Demonstrates how to use the Catalog VM with matrix chain integration

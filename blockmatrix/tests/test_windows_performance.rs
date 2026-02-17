@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // Windows Performance Counter Tests for Sprint 3
 // Tests Windows performance monitoring via WMI and Performance Counters
 // Requires: Windows 10+

@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // Kprobe Execve Monitor - Track process execution for HyperMesh
 // This program monitors sys_execve calls to track new processes
 

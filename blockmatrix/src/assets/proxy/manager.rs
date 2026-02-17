@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Remote Proxy Manager - Core NAT-like system for HyperMesh
 //!
 //! CRITICAL IMPLEMENTATION: The main proxy manager that coordinates all NAT-like

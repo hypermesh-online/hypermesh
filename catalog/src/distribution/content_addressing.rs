@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Content Addressing System for P2P Distribution
 //!
 //! Provides content-addressed storage with Merkle trees for integrity verification

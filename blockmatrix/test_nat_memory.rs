@@ -1,5 +1,10 @@
 #!/usr/bin/env -S cargo +nightly -Zscript
 
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
+
 //! Test NAT memory mapping implementation
 //! Run with: ./test_nat_memory.rs
 

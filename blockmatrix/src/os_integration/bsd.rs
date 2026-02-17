@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // BSD OS Abstraction - Implementation using sysctl, pciconf, and bpf(4)
 //
 // NOTE: This is a Sprint 2 stub implementation. Full implementation will use:

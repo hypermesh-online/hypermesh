@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Phase 1 End-to-End Integration Tests
 //!
 //! Comprehensive tests for the complete Block-MATRIX Foundation spanning

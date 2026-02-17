@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! JavaScript Language Adapter - JavaScriptCall Integration with Consensus
 //!
 //! This adapter provides JavaScript execution through Julia's JavaScriptCall package,

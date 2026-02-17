@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Execution Scheduler - Consensus-aware task scheduling with asset optimization
 //!
 //! This scheduler coordinates execution tasks with asset allocation and consensus

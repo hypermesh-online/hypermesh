@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Rust Language Adapter - RustCall Integration with Consensus
 //!
 //! This adapter provides Rust code compilation and execution through Julia's RustCall

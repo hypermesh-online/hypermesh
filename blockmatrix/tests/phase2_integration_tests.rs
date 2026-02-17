@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Phase 2 Integration Tests
 //!
 //! Comprehensive end-to-end tests for all Phase 2 components working together.

@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Package Signing and Verification Module
 //!
 //! Implements quantum-resistant package signing using FALCON-1024 and ED25519

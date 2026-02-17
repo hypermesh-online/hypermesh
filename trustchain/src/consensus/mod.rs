@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Proof of State Consensus Integration for TrustChain
 //!
 //! This module implements the four-proof consensus system extracted from Proof of State

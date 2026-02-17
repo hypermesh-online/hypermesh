@@ -1,4 +1,9 @@
 #!/usr/bin/env rust-script
+
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! ```cargo
 //! [dependencies]
 //! criterion = "0.5"

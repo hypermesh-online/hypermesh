@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! FALCON-1024 Post-Quantum Cryptography Integration Example
 //!
 //! Demonstrates how to use FALCON-1024 post-quantum signatures with TrustChain

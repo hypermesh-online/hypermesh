@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# Copyright © 2026 Hypermesh Foundation. All rights reserved.
+# Licensed under the Business Source License 1.1.
+# See the LICENSE file in the repository root for full license text.
+
 """
 HyperMesh Comprehensive Testing Suite
 Tests actual functionality of the HyperMesh asset management system

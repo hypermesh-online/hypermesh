@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Asset adapter trait and resource management
 //!
 //! Defines the universal AssetAdapter interface that all asset types

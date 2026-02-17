@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Comprehensive test suite for Nexus core components
 //! 
 //! This crate contains unit tests, integration tests, and end-to-end tests

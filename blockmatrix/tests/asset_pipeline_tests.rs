@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Comprehensive tests for the Asset Pipeline (Sprint 2.4)
 //!
 //! Tests Brotli compression, AES-256-GCM + Kyber-1024 encryption,

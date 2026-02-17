@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // STOQ Phase 5: Comprehensive Performance Benchmarking Suite
 // Validates 10+ Gbps throughput, <1ms latency, and scalability claims
 

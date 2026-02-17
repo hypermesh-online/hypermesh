@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Consensus Operations - VM-native proof operations
 //!
 //! This module defines VM operations that are inherently consensus-aware.

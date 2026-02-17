@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Coordinate transformation operations
 //!
 //! Provides translation, rotation, and scaling operations for matrix coordinates.

@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Simplified Certificate Transparency Storage
 //! 
 //! In-memory storage implementation for CT logs (for initial build success)

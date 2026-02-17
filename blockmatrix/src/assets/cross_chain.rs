@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Cross-Chain Validation System for HyperMesh Matrix Chains
 //!
 //! Privacy-preserving cross-chain validation following Proof of State patterns.

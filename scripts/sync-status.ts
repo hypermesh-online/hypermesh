@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 // sync-status.ts - Reads crate-status.toml files and generates website data
 // Usage: node --experimental-strip-types scripts/sync-status.ts
 

@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Genesis Block User Authentication with MFA
 //!
 //! Implements user-specific authentication for genesis block creation:

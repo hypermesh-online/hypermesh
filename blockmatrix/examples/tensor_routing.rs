@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Example: Using tensor operations for intelligent routing in Block-MATRIX
 //!
 //! This example demonstrates how to use the tensor operations library

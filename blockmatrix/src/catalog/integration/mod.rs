@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Catalog Integration Module - Bridge between Catalog and HyperMesh systems
 //!
 //! This module provides the integration layer between the Catalog system

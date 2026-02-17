@@ -1,3 +1,7 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
 //! Native monitoring system for TrustChain
 //!
 //! Built-in monitoring without external dependencies for production deployment
