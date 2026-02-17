@@ -1,0 +1,369 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "RateLimiter",
+  "sourceName": "contracts/security/RateLimiter.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "maxTx",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timeWindow",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "minInterval",
+          "type": "uint256"
+        }
+      ],
+      "name": "CustomRateLimitSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "EmergencyRateLimitActivated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "transactionCount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "RateLimitExceeded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_MAX_TRANSACTIONS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_MIN_INTERVAL",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_TIME_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EMERGENCY_MAX_TRANSACTIONS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EMERGENCY_MIN_INTERVAL",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EMERGENCY_TIME_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "customMaxTransactions",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "customMinInterval",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "customTimeWindow",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "emergencyRateLimit",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getRateLimitStatus",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "currentCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxTransactions",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "windowStart",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastTransaction",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isEmergency",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getRateLimits",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "maxTransactions",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timeWindow",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minInterval",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getTimeUntilNextTransaction",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isWithinRateLimit",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "rateLimits",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "transactionCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "windowStart",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastTransaction",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610653908161001c8239f35b600080fdfe6040608081526004908136101561001557600080fd5b600091823560e01c806302694c0c146103fd5780631bf45902146103e1578063480e8cfd1461039f578063567bdcdf14610366578063650d94a71461036157806366a6552c146103285780637a14c7d2146102d85780637a774fbc146102bc5780637d56dff21461026b578063aa09fe0d14610234578063b47ddfe514610218578063e918fea1146101f8578063eab8e2b81461013e578063f1bd1050146101025763fd7fed17146100c657600080fd5b346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526002845220549051908152f35b8280fd5b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b575061013260209261055d565b90519015158152f35b80fd5b50913461013b57602036600319011261013b5782356001600160a01b038116908181036100fe5781835282602052838320938051936060850185811067ffffffffffffffff8211176101e55760ff9160a09884928352885488526101b8600260018b01549a60208b019b8c52015496848a0197885261041f565b50509751985195519682526020522054169381519586526020860152840152606083015215156080820152f35b634e487b7160e01b825260418852602482fd5b5050346102145781600319360112610214576020905160148152f35b5080fd5b5050346102145781600319360112610214576020905160018152f35b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b57506102646020926104be565b9051908152f35b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b575061029c6102b89261041f565b9251918252602082015260408101919091529081906060820190565b0390f35b50503461021457816003193601126102145760209051600a8152f35b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe578252602082815291819020805460018201546002909201549251908152928301526040820152606090f35b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526001845220549051908152f35b6103fd565b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526003845220549051908152f35b50346100fe5760203660031901126100fe5780356001600160a01b038116908190036103dd578360ff92849260209652855220541690519015158152f35b8380fd5b5050346102145781600319360112610214576020905160058152f35b3461041a57600036600319011261041a576020604051610e108152f35b600080fd5b6001600160a01b031660009081526004602052604081205460ff1661048e57600160205260408120548015610486575b60026020526040822054909290801561047d575b600360205260409092205480156104775790565b50600190565b50610e10610463565b50601461044f565b50600590610e1090600a90565b919082039182116104a857565b634e487b7160e01b600052601160045260246000fd5b6001600160a01b03811660009081526020819052604080822090519192906060830167ffffffffffffffff8111848210176105495760026105199392604092835280548652600181015460208701520154930192835261041f565b929150505180156105445761052e904261049b565b908082101561054457610541925061049b565b90565b505090565b634e487b7160e01b85526041600452602485fd5b6001600160a01b038116600090815260208190526040808220905191906060830167ffffffffffffffff81118482101761060957604052805483526105b96002600183015492602086019384520154946040850195865261041f565b90939195519081151591826105f5575b50506105ed57506105db90514261049b565b10156105e657511090565b5050600190565b935050505090565b6106019192504261049b565b1038806105c9565b634e487b7160e01b83526041600452602483fdfea2646970667358221220c059c7ed65f59ee131af8bfca9a0c87a43c9ffe9f6c51b7ee8bb54edd75b488164736f6c63430008160033",
+  "deployedBytecode": "0x6040608081526004908136101561001557600080fd5b600091823560e01c806302694c0c146103fd5780631bf45902146103e1578063480e8cfd1461039f578063567bdcdf14610366578063650d94a71461036157806366a6552c146103285780637a14c7d2146102d85780637a774fbc146102bc5780637d56dff21461026b578063aa09fe0d14610234578063b47ddfe514610218578063e918fea1146101f8578063eab8e2b81461013e578063f1bd1050146101025763fd7fed17146100c657600080fd5b346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526002845220549051908152f35b8280fd5b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b575061013260209261055d565b90519015158152f35b80fd5b50913461013b57602036600319011261013b5782356001600160a01b038116908181036100fe5781835282602052838320938051936060850185811067ffffffffffffffff8211176101e55760ff9160a09884928352885488526101b8600260018b01549a60208b019b8c52015496848a0197885261041f565b50509751985195519682526020522054169381519586526020860152840152606083015215156080820152f35b634e487b7160e01b825260418852602482fd5b5050346102145781600319360112610214576020905160148152f35b5080fd5b5050346102145781600319360112610214576020905160018152f35b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b57506102646020926104be565b9051908152f35b50346100fe5760203660031901126100fe5735916001600160a01b038316830361013b575061029c6102b89261041f565b9251918252602082015260408101919091529081906060820190565b0390f35b50503461021457816003193601126102145760209051600a8152f35b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe578252602082815291819020805460018201546002909201549251908152928301526040820152606090f35b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526001845220549051908152f35b6103fd565b50346100fe5760203660031901126100fe57356001600160a01b038116908190036100fe57828291602094526003845220549051908152f35b50346100fe5760203660031901126100fe5780356001600160a01b038116908190036103dd578360ff92849260209652855220541690519015158152f35b8380fd5b5050346102145781600319360112610214576020905160058152f35b3461041a57600036600319011261041a576020604051610e108152f35b600080fd5b6001600160a01b031660009081526004602052604081205460ff1661048e57600160205260408120548015610486575b60026020526040822054909290801561047d575b600360205260409092205480156104775790565b50600190565b50610e10610463565b50601461044f565b50600590610e1090600a90565b919082039182116104a857565b634e487b7160e01b600052601160045260246000fd5b6001600160a01b03811660009081526020819052604080822090519192906060830167ffffffffffffffff8111848210176105495760026105199392604092835280548652600181015460208701520154930192835261041f565b929150505180156105445761052e904261049b565b908082101561054457610541925061049b565b90565b505090565b634e487b7160e01b85526041600452602485fd5b6001600160a01b038116600090815260208190526040808220905191906060830167ffffffffffffffff81118482101761060957604052805483526105b96002600183015492602086019384520154946040850195865261041f565b90939195519081151591826105f5575b50506105ed57506105db90514261049b565b10156105e657511090565b5050600190565b935050505090565b6106019192504261049b565b1038806105c9565b634e487b7160e01b83526041600452602483fdfea2646970667358221220c059c7ed65f59ee131af8bfca9a0c87a43c9ffe9f6c51b7ee8bb54edd75b488164736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

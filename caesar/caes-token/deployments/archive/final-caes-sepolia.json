@@ -1,0 +1,14 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "timestamp": "2025-09-08T16:47:12.997Z",
+  "deployer": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "contracts": {
+    "FinalCAES": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C"
+  },
+  "tokenDetails": {
+    "name": "CAESAR",
+    "symbol": "CAES",
+    "totalSupply": "0.0"
+  }
+}

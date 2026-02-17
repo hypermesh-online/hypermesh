@@ -1,0 +1,150 @@
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+import { PriceData } from '../types';
+
+const PriceChart: React.FC = () => {
+  const [priceData, setPriceData] = useState<PriceData[]>([]);
+  const [timeframe, setTimeframe] = useState('1D');
+  const [currentPrice, setCurrentPrice] = useState(0.0);
+  const [priceChange, setPriceChange] = useState(0.0);
+
+  useEffect(() => {
+    // Generate mock price data - in real app, fetch from API
+    const generateMockData = () => {
+      const data: PriceData[] = [];
+      let price = 0.15; // Starting price for CAES token
+      
+      for (let i = 0; i < 24; i++) {
+        const timestamp = Date.now() - (24 - i) * 60 * 60 * 1000;
+        const change = (Math.random() - 0.5) * 0.02; // ±1% change
+        price = Math.max(0.01, price * (1 + change));
+        
+        data.push({
+          timestamp,
+          open: price,
+          high: price * 1.02,
+          low: price * 0.98,
+          close: price,
+          volume: Math.random() * 100000,
+        });
+      }
+      
+      return data;
+    };
+
+    const data = generateMockData();
+    setPriceData(data);
+    
+    if (data.length > 0) {
+      const latest = data[data.length - 1];
+      const previous = data[data.length - 2];
+      setCurrentPrice(latest.close);
+      
+      if (previous) {
+        const change = ((latest.close - previous.close) / previous.close) * 100;
+        setPriceChange(change);
+      }
+    }
+  }, [timeframe]);
+
+  const formatPrice = (value: number) => `$${value.toFixed(4)}`;
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const isPositive = priceChange >= 0;
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-xl font-semibold mb-1">CAES/WETH</h3>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold">
+              {formatPrice(currentPrice)}
+            </span>
+            <div className={`flex items-center gap-1 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+              {isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              <span className="font-medium">
+                {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex bg-caesar-gray rounded-lg p-1">
+          {['1H', '1D', '1W', '1M'].map((period) => (
+            <button
+              key={period}
+              onClick={() => setTimeframe(period)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                timeframe === period
+                  ? 'bg-caesar-gold text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {period}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={priceData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatTime}
+              stroke="#9CA3AF"
+              fontSize={12}
+            />
+            <YAxis
+              tickFormatter={formatPrice}
+              stroke="#9CA3AF"
+              fontSize={12}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1F2937',
+                border: '1px solid #374151',
+                borderRadius: '8px',
+              }}
+              labelFormatter={(value) => formatTime(value as number)}
+              formatter={(value) => [formatPrice(value as number), 'Price']}
+            />
+            <Line
+              type="monotone"
+              dataKey="close"
+              stroke="#FFD700"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, stroke: '#FFD700', strokeWidth: 2 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-700">
+        <div>
+          <p className="text-gray-400 text-sm">24h Volume</p>
+          <p className="font-semibold">$45,231</p>
+        </div>
+        <div>
+          <p className="text-gray-400 text-sm">24h High</p>
+          <p className="font-semibold text-green-500">{formatPrice(Math.max(...priceData.map(d => d.high)))}</p>
+        </div>
+        <div>
+          <p className="text-gray-400 text-sm">24h Low</p>
+          <p className="font-semibold text-red-500">{formatPrice(Math.min(...priceData.map(d => d.low)))}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PriceChart;

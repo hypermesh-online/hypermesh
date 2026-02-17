@@ -1,0 +1,74 @@
+[package]
+name = "caesar"
+version = "1.0.0"
+edition = "2021"
+authors = ["Caesar Economic System"]
+description = "Economic backend for HyperMesh - Token management, rewards, staking"
+license = "MIT OR Apache-2.0"
+
+[lints]
+workspace = true
+
+[lib]
+name = "caesar"
+path = "src/lib.rs"
+
+[dependencies]
+# Core async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Web framework for API endpoints
+# axum = ... # REMOVED: STOQ-only transport
+# tower = ... # REMOVED: STOQ-only transport (HTTP middleware)
+# tower-http = ... # REMOVED: STOQ-only transport
+
+# Storage (using BlockMatrix assets, not traditional databases)
+redis = { workspace = true }  # For caching only
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Blockchain integration
+ethers = "2.0"
+primitive-types = "0.12"
+# reqwest = ... # REMOVED: STOQ-only transport
+
+# Security
+argon2 = "0.5"
+# jwt-simple = "0.12"  # REMOVED: Pulls in RSA via superboring - use FALCON-1024 signatures instead
+
+# Economics and mathematics
+rust_decimal = { version = "1.35", features = ["serde"] }
+rust_decimal_macros = "1.35"
+num-traits = "0.2"
+
+# Time and utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+
+# Error handling and logging
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# STOQ Protocol Integration
+stoq = { path = "../stoq" }
+
+# Shared types (single source of truth)
+hypermesh-lib = { workspace = true }
+
+# Performance monitoring
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[features]
+default = ["production"]
+production = ["redis-cache"]
+development = []
+redis-cache = []
+hypermesh = []

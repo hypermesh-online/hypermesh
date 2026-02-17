@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-09-11T13:12:45.234Z",
+  "current": {
+    "size": "2.6MB",
+    "chunks": [
+      {
+        "name": "web3",
+        "size": "835.8KB"
+      },
+      {
+        "name": "core",
+        "size": "477.3KB"
+      },
+      {
+        "name": "index_1",
+        "size": "367.8KB"
+      },
+      {
+        "name": "index_2",
+        "size": "322.8KB"
+      },
+      {
+        "name": "react",
+        "size": "138.1KB"
+      },
+      {
+        "name": "index_3",
+        "size": "126.4KB"
+      },
+      {
+        "name": "index_4",
+        "size": "33.6KB"
+      }
+    ]
+  },
+  "changes": null,
+  "budgetViolations": [],
+  "status": "OK"
+}

@@ -1,0 +1,26 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "timestamp": "2025-09-08T16:47:49.661Z",
+  "migrator": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "contracts": {
+    "OldCESAR": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+    "NewCAES": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C"
+  },
+  "migration": {
+    "method": "owner_mint",
+    "amount": "1000000.0",
+    "transactionHash": "0x8e6676b4c3d97d99cfee4cfcd6907ad3642e09112e52a4c5b5ad80484d32c982",
+    "blockNumber": 9161331,
+    "gasUsed": "70364"
+  },
+  "balances": {
+    "originalCESAR": "1000000.0",
+    "finalCESAR": "1000000.0",
+    "finalCAES": "1000000.0"
+  },
+  "verification": {
+    "migrationComplete": true,
+    "amountMatches": true
+  }
+}

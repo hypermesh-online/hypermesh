@@ -1,0 +1,107 @@
+{
+  "bootstrap_nodes": [
+    {
+      "id": "caesar-token-nexus-primary",
+      "addresses": [
+        "/ip4/172.20.0.10/tcp/4001/quic",
+        "/ip6/::1/tcp/4001/quic"
+      ],
+      "public_key": "ED25519_PUBLIC_KEY_PLACEHOLDER",
+      "protocols": ["hypermesh/1.0.0", "stoq/1.0.0"],
+      "priority": 100,
+      "region": "us-east-1",
+      "capabilities": [
+        "consensus",
+        "state_management",
+        "cross_chain_bridge",
+        "economic_model"
+      ]
+    },
+    {
+      "id": "caesar-token-stoq-primary", 
+      "addresses": [
+        "/ip4/172.20.0.11/tcp/4002/quic",
+        "/ip6/::1/tcp/4002/quic"
+      ],
+      "public_key": "ED25519_PUBLIC_KEY_PLACEHOLDER_STOQ",
+      "protocols": ["stoq/1.0.0", "ml-inference/1.0.0"],
+      "priority": 90,
+      "region": "us-east-1",
+      "capabilities": [
+        "statistics_collection",
+        "anomaly_detection",
+        "threat_scoring",
+        "economic_monitoring"
+      ]
+    },
+    {
+      "id": "caesar-token-p2p-primary",
+      "addresses": [
+        "/ip4/172.20.0.12/tcp/4003/quic",
+        "/ip6/::1/tcp/4003/quic"
+      ],
+      "public_key": "ED25519_PUBLIC_KEY_PLACEHOLDER_P2P",
+      "protocols": ["libp2p/1.0.0", "dht/1.0.0"],
+      "priority": 80,
+      "region": "us-east-1",
+      "capabilities": [
+        "peer_discovery",
+        "routing",
+        "relay",
+        "circuit_breaker"
+      ]
+    }
+  ],
+  "discovery": {
+    "dht_enabled": true,
+    "mdns_enabled": false,
+    "bootstrap_interval": "30s",
+    "connection_timeout": "10s",
+    "max_connections": 100,
+    "min_connections": 3
+  },
+  "routing": {
+    "algorithm": "kademlia",
+    "replication_factor": 3,
+    "max_record_age": "24h",
+    "republish_interval": "12h",
+    "record_ttl": "48h"
+  },
+  "security": {
+    "enable_encryption": true,
+    "require_authentication": true,
+    "allowed_protocols": [
+      "hypermesh/1.0.0",
+      "stoq/1.0.0",
+      "libp2p/1.0.0",
+      "dht/1.0.0",
+      "ml-inference/1.0.0"
+    ],
+    "blacklist": [],
+    "whitelist": []
+  },
+  "performance": {
+    "connection_pool_size": 50,
+    "message_timeout": "30s",
+    "heartbeat_interval": "10s",
+    "keep_alive_interval": "60s",
+    "max_message_size": "10MB"
+  },
+  "regions": {
+    "us-east-1": {
+      "latency_threshold": "100ms",
+      "bandwidth_threshold": "100Mbps",
+      "preferred": true
+    },
+    "us-west-1": {
+      "latency_threshold": "150ms", 
+      "bandwidth_threshold": "100Mbps",
+      "preferred": false
+    },
+    "eu-west-1": {
+      "latency_threshold": "200ms",
+      "bandwidth_threshold": "100Mbps", 
+      "preferred": false
+    }
+  }
+}

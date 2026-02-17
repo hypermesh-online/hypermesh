@@ -1,0 +1,76 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "AdvancedMathUtils",
+  "sourceName": "contracts/libs/AdvancedMathUtils.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "BASIS_POINTS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "CONVERGENCE_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "E_APPROXIMATION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_ITERATIONS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PRECISION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001a5761010e9081610020823930815050f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c9081631d92c26d1460bf575080633a7981a01460a5578063aaf5eb68146088578063dc8249b314606b5763e1f1c4a714605257600080fd5b8060031936011260685760206040516127108152f35b80fd5b508060031936011260685760206040516725b946ebc0b361738152f35b50806003193601126068576020604051670de0b6b3a76400008152f35b5080600319360112606857602060405164e8d4a510008152f35b90508160031936011260d45780603260209252f35b5080fdfea264697066735822122047c76bf9a270ff0cd433cfb2c3201f28644187a293d11725ad0fb4638bf90e4464736f6c63430008160033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c9081631d92c26d1460bf575080633a7981a01460a5578063aaf5eb68146088578063dc8249b314606b5763e1f1c4a714605257600080fd5b8060031936011260685760206040516127108152f35b80fd5b508060031936011260685760206040516725b946ebc0b361738152f35b50806003193601126068576020604051670de0b6b3a76400008152f35b5080600319360112606857602060405164e8d4a510008152f35b90508160031936011260d45780603260209252f35b5080fdfea264697066735822122047c76bf9a270ff0cd433cfb2c3201f28644187a293d11725ad0fb4638bf90e4464736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

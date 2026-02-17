@@ -1,0 +1,322 @@
+# STOQ Protocol Configuration for Caesar Token
+# Statistical framework integration with ML inference
+apiVersion: v1
+kind: Config
+metadata:
+  name: caesar-token-stoq
+  namespace: caesar-token
+  version: "1.0.0"
+
+# Core STOQ Engine Configuration
+stoq:
+  node:
+    id: "caesar-token-stoq-primary"
+    cluster_name: "caesar-token-production"
+    region: "us-east-1"
+    zone: "us-east-1a"
+  
+  api:
+    port: 8081
+    bind_address: "0.0.0.0"
+    enable_swagger: true
+    cors_enabled: true
+    rate_limit: 5000  # requests per minute
+  
+  metrics:
+    port: 9091
+    path: "/metrics"
+    interval: "5s"
+    retention: "24h"
+
+# Nexus Integration
+nexus_integration:
+  enabled: true
+  endpoint: "http://hypermesh-nexus:8080"
+  api_key: "caesar-token-nexus-integration"
+  heartbeat_interval: "10s"
+  timeout: "30s"
+  retry_attempts: 3
+
+# Statistical Framework Configuration
+statistics:
+  collection:
+    enabled: true
+    interval: "1s"
+    buffer_size: 10000
+    batch_size: 1000
+    flush_interval: "10s"
+  
+  metrics:
+    # Core system metrics
+    system:
+      - cpu_usage
+      - memory_usage
+      - disk_io
+      - network_io
+      - process_count
+    
+    # Caesar Token specific metrics
+    gateway_coin:
+      - transaction_count
+      - transaction_volume
+      - bridge_operations
+      - cross_chain_transfers
+      - token_supply
+      - demurrage_calculations
+      - circuit_breaker_events
+      - liquidity_pool_status
+    
+    # Network metrics
+    network:
+      - peer_count
+      - message_latency
+      - consensus_rounds
+      - block_production_time
+      - state_sync_time
+    
+    # Economic metrics
+    economic:
+      - token_velocity
+      - price_stability
+      - speculation_detection
+      - arbitrage_opportunities
+      - liquidity_depth
+
+# eBPF Integration for Kernel-level Statistics
+ebpf:
+  enabled: true
+  programs:
+    network_stats:
+      enabled: true
+      program_path: "/opt/stoq/ebpf/network_stats.o"
+      collection_interval: "1s"
+      metrics:
+        - packet_count
+        - byte_count
+        - connection_count
+        - tcp_retransmissions
+        - udp_drops
+    
+    memory_stats:
+      enabled: true
+      program_path: "/opt/stoq/ebpf/memory_stats.o"
+      collection_interval: "5s"
+      metrics:
+        - memory_allocation
+        - memory_fragmentation
+        - page_faults
+        - cache_hits
+        - swap_usage
+    
+    cpu_stats:
+      enabled: true
+      program_path: "/opt/stoq/ebpf/cpu_stats.o"
+      collection_interval: "1s"
+      metrics:
+        - cpu_utilization
+        - context_switches
+        - interrupt_count
+        - system_calls
+        - process_schedule_delay
+    
+    transaction_stats:
+      enabled: true
+      program_path: "/opt/stoq/ebpf/transaction_stats.o"
+      collection_interval: "100ms"
+      metrics:
+        - transaction_latency
+        - transaction_throughput
+        - validation_time
+        - signature_verification_time
+        - state_update_time
+    
+    consensus_stats:
+      enabled: true
+      program_path: "/opt/stoq/ebpf/consensus_stats.o"
+      collection_interval: "1s"
+      metrics:
+        - proposal_time
+        - vote_collection_time
+        - commit_time
+        - view_change_count
+        - leader_election_time
+
+# ML Inference Engine Integration
+ml_inference:
+  enabled: true
+  endpoint: "http://ml-inference:8082"
+  timeout: "10s"
+  batch_size: 100
+  inference_interval: "60s"
+  
+  models:
+    anomaly_detection:
+      enabled: true
+      model_path: "/models/anomaly_detection_v1.onnx"
+      threshold: 0.85
+      features:
+        - transaction_volume_deviation
+        - transaction_frequency_spike
+        - cross_chain_imbalance
+        - gas_price_anomaly
+        - network_latency_spike
+    
+    threat_scoring:
+      enabled: true
+      model_path: "/models/threat_scoring_v1.onnx"
+      threshold: 0.75
+      features:
+        - failed_transaction_rate
+        - unusual_transaction_patterns
+        - consensus_manipulation_attempts
+        - sybil_attack_indicators
+        - eclipse_attack_patterns
+    
+    economic_model:
+      enabled: true
+      model_path: "/models/economic_model_v1.onnx"
+      update_interval: "300s"
+      features:
+        - token_velocity_trend
+        - liquidity_pool_efficiency
+        - arbitrage_profit_margins
+        - speculation_indicators
+        - demurrage_effectiveness
+
+# Time Series Analysis
+time_series:
+  backend: "influxdb"
+  
+  influxdb:
+    url: "http://influxdb:8086"
+    token: "caesar-token-influx-token-2025"
+    organization: "caesar-token"
+    bucket: "stoq-metrics"
+    timeout: "30s"
+    batch_size: 5000
+    flush_interval: "10s"
+  
+  analysis:
+    enabled: true
+    window_sizes: ["1m", "5m", "15m", "1h", "24h"]
+    algorithms:
+      - moving_average
+      - exponential_smoothing
+      - seasonal_decomposition
+      - trend_analysis
+      - anomaly_detection
+    
+    alerts:
+      enabled: true
+      channels:
+        - webhook
+        - email
+      rules:
+        - name: "high_transaction_volume"
+          condition: "transaction_count > 1000 per minute"
+          severity: "warning"
+        - name: "anomaly_detected"
+          condition: "anomaly_score > 0.9"
+          severity: "critical"
+        - name: "threat_detected"
+          condition: "threat_score > 0.8"
+          severity: "critical"
+        - name: "economic_instability"
+          condition: "price_deviation > 5%"
+          severity: "warning"
+
+# Caesar Token Economic Monitoring
+economic_monitoring:
+  enabled: true
+  
+  demurrage:
+    monitoring_enabled: true
+    calculation_interval: "1h"
+    validation_enabled: true
+    alerts:
+      - condition: "demurrage_calculation_error > 0.01%"
+        severity: "high"
+      - condition: "demurrage_application_delay > 5m"
+        severity: "medium"
+  
+  anti_speculation:
+    monitoring_enabled: true
+    detection_algorithms:
+      - volume_spike_detection
+      - price_manipulation_detection
+      - wash_trading_detection
+      - front_running_detection
+    
+    circuit_breakers:
+      - name: "transaction_volume_breaker"
+        threshold: "10000 GATE per minute"
+        cool_down: "300s"
+      - name: "price_volatility_breaker"
+        threshold: "5% price change per hour"
+        cool_down: "600s"
+      - name: "arbitrage_prevention_breaker"
+        threshold: "1000 arbitrage transactions per hour"
+        cool_down: "1800s"
+  
+  stability_metrics:
+    - peg_deviation_percentage
+    - liquidity_depth
+    - trading_volume_stability
+    - cross_chain_balance
+    - fiat_backing_ratio
+
+# Security and Compliance
+security:
+  audit_logging:
+    enabled: true
+    log_level: "INFO"
+    include_request_data: false
+    include_response_data: false
+    retention_days: 90
+  
+  rate_limiting:
+    enabled: true
+    global_limit: "10000 requests per minute"
+    per_ip_limit: "100 requests per minute"
+    burst_size: 200
+  
+  authentication:
+    method: "api_key"
+    header_name: "X-STOQ-API-KEY"
+    require_https: true
+
+# Performance Configuration
+performance:
+  workers: 8
+  queue_size: 10000
+  batch_processing: true
+  compression: "zstd"
+  cache:
+    enabled: true
+    size: "1GB"
+    ttl: "300s"
+  
+  optimization:
+    enable_jit_compilation: true
+    enable_vectorization: true
+    parallel_processing: true
+    memory_pool: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  output: "stdout"
+  fields:
+    - timestamp
+    - level
+    - component
+    - message
+    - request_id
+    - user_id
+    - duration
+  
+  structured_logging:
+    enabled: true
+    include_stack_trace: false
+    max_field_length: 1000

@@ -1,0 +1,175 @@
+import React, { useState } from 'react';
+import { ArrowUpDown, Settings } from 'lucide-react';
+import { DEFAULT_TOKENS } from '../utils/constants';
+import { useWallet } from '../hooks/useWallet';
+import { useTokenBalance } from '../hooks/useTokenBalance';
+import { formatTokenAmount, parseTokenAmount } from '../utils/formatters';
+
+const TradingInterface: React.FC = () => {
+  const { wallet } = useWallet();
+  const [fromToken, setFromToken] = useState(DEFAULT_TOKENS[0]);
+  const [toToken, setToToken] = useState(DEFAULT_TOKENS[1]);
+  const [fromAmount, setFromAmount] = useState('');
+  const [toAmount, setToAmount] = useState('');
+  const [slippage, setSlippage] = useState(0.5);
+
+  const fromBalance = useTokenBalance(fromToken.address, wallet.account, wallet.provider);
+  const toBalance = useTokenBalance(toToken.address, wallet.account, wallet.provider);
+
+  const handleSwapTokens = () => {
+    setFromToken(toToken);
+    setToToken(fromToken);
+    setFromAmount(toAmount);
+    setToAmount(fromAmount);
+  };
+
+  const handleMaxClick = () => {
+    setFromAmount(fromBalance.balance);
+    // Calculate estimated output amount (simplified calculation)
+    const estimated = (parseFloat(fromBalance.balance) * 0.998).toString(); // 0.2% fee
+    setToAmount(estimated);
+  };
+
+  const handleTrade = async () => {
+    if (!wallet.isConnected || !fromAmount || !toAmount) {
+      alert('Please connect wallet and enter amounts');
+      return;
+    }
+
+    try {
+      // Here would be the actual trading logic with the DEX contract
+      console.log('Trading:', {
+        from: fromToken.symbol,
+        to: toToken.symbol,
+        amount: fromAmount,
+        estimated: toAmount,
+        slippage
+      });
+      
+      alert('Trading functionality will be implemented with smart contract integration');
+    } catch (error) {
+      console.error('Trade failed:', error);
+      alert('Trade failed: ' + (error as Error).message);
+    }
+  };
+
+  return (
+    <div className="card max-w-md mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold">Trade</h3>
+        <button className="p-2 hover:bg-gray-700 rounded-lg transition-colors">
+          <Settings size={20} />
+        </button>
+      </div>
+
+      {/* From Token */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm text-gray-400">From</label>
+          <span className="text-sm text-gray-400">
+            Balance: {formatTokenAmount(fromBalance.balance)}
+          </span>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <input
+              type="number"
+              value={fromAmount}
+              onChange={(e) => setFromAmount(e.target.value)}
+              placeholder="0.0"
+              className="bg-transparent text-2xl font-medium outline-none flex-1"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMaxClick}
+                className="text-caesar-gold text-sm hover:underline"
+              >
+                MAX
+              </button>
+              <div className="flex items-center gap-2 bg-gray-700 px-3 py-2 rounded-lg">
+                <img
+                  src={fromToken.logoURI || '/caesar-logo.png'}
+                  alt={fromToken.symbol}
+                  className="w-6 h-6 rounded-full"
+                />
+                <span className="font-medium">{fromToken.symbol}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Swap Button */}
+      <div className="flex justify-center mb-4">
+        <button
+          onClick={handleSwapTokens}
+          className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <ArrowUpDown size={20} />
+        </button>
+      </div>
+
+      {/* To Token */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm text-gray-400">To</label>
+          <span className="text-sm text-gray-400">
+            Balance: {formatTokenAmount(toBalance.balance)}
+          </span>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <input
+              type="number"
+              value={toAmount}
+              onChange={(e) => setToAmount(e.target.value)}
+              placeholder="0.0"
+              className="bg-transparent text-2xl font-medium outline-none flex-1"
+            />
+            <div className="flex items-center gap-2 bg-gray-700 px-3 py-2 rounded-lg">
+              <img
+                src={toToken.logoURI || '/weth-logo.png'}
+                alt={toToken.symbol}
+                className="w-6 h-6 rounded-full"
+              />
+              <span className="font-medium">{toToken.symbol}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Trading Details */}
+      {fromAmount && toAmount && (
+        <div className="bg-gray-800 rounded-lg p-4 mb-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-400">Rate</span>
+            <span>1 {fromToken.symbol} = {(parseFloat(toAmount) / parseFloat(fromAmount)).toFixed(6)} {toToken.symbol}</span>
+          </div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-400">Network Fee</span>
+            <span>~$2.50</span>
+          </div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-400">Trading Fee (0.3%)</span>
+            <span>{(parseFloat(fromAmount) * 0.003).toFixed(6)} {fromToken.symbol}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400">Slippage Tolerance</span>
+            <span>{slippage}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Trade Button */}
+      <button
+        onClick={handleTrade}
+        disabled={!wallet.isConnected || !fromAmount || !toAmount}
+        className="w-full btn-primary disabled:bg-gray-600 disabled:cursor-not-allowed"
+      >
+        {!wallet.isConnected ? 'Connect Wallet' : 'Trade'}
+      </button>
+    </div>
+  );
+};
+
+export default TradingInterface;

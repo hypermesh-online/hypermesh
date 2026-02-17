@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-09-10T00:30:54.785Z",
+  "network": "sepolia",
+  "deployer": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "contracts": {
+    "oldCesar": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+    "migrationCaes": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+    "newCaesar": "0x7DcfC3F620634A7DE2d065faD5A20C3a9092269b"
+  },
+  "analysis": {
+    "oldCesarDeprecated": true,
+    "migrationCaesIntermediate": true,
+    "newCaesarProduction": true
+  },
+  "recommendations": {
+    "migrateFromIntermediate": true,
+    "disableOldContracts": true,
+    "focusOnNewSystem": true
+  }
+}

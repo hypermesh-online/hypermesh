@@ -1,0 +1,2340 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "EconomicEngine",
+  "sourceName": "contracts/core/EconomicEngine.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "EnforcedPause",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ExpectedPause",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ReentrancyGuardReentrantCall",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint32",
+          "name": "chainId",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "stateHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "CrossChainSync",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "rate",
+          "type": "uint256"
+        }
+      ],
+      "name": "DemurrageApplied",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "EconomicParametersUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "EmergencyModeActivated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "activityType",
+          "type": "uint8"
+        }
+      ],
+      "name": "FiatActivityRecorded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "overallHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "priceStability",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "liquidityHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participationRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "reserveRatio",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "demurrageEfficiency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "antiSpeculationEffectiveness",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "systemStress",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct IEconomicEngine.EconomicHealthMetrics",
+          "name": "metrics",
+          "type": "tuple"
+        }
+      ],
+      "name": "HealthMetricsUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "proposalId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "proposer",
+          "type": "address"
+        }
+      ],
+      "name": "ParameterProposalCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Paused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "enum IEconomicEngine.ReserveOperationType",
+          "name": "operationType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "name": "ReserveOperationExecuted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "penalty",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "SpeculationPenaltyApplied",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "enum IEconomicEngine.InterventionType",
+          "name": "interventionType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "StabilityIntervention",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Unpaused",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "BASIS_POINTS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "INITIAL_REFERENCE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_DEMURRAGE_RATE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_DEMURRAGE_RATE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PRECISION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SECONDS_PER_HOUR",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "STABILITY_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "accountData",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "lastActivity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastDemurrageApplication",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalDemurragePaid",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalPenaltiesPaid",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "transactionCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalVolume",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastTransactionTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isNewUser",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "graceEndTime",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "activateEmergencyMode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "addEmergencyOperator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "transactionType",
+          "type": "uint8"
+        }
+      ],
+      "name": "analyzeTransactionPattern",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "riskScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "penalty",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "antiSpeculationEngine",
+      "outputs": [
+        {
+          "internalType": "contract AntiSpeculationEngine",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "applyCrossChainThrottling",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        }
+      ],
+      "name": "applyDemurrage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "appliedAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "penalty",
+          "type": "uint256"
+        }
+      ],
+      "name": "applySpeculationPenalty",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateDemurrage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "demurrageAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "transactionType",
+          "type": "uint8"
+        }
+      ],
+      "name": "calculateDynamicTransactionFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "fee",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "dailyTransactions",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "crossChainTransfers",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateNetworkUtilityScore",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "score",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "caesarPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculatePositionBasedPenalty",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "penalty",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "chainStates",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "parameters",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalSupply",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reserveAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastSync",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "syncHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "caesarPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "checkGoldBasedCircuitBreakers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "halt",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "emergency",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "rebase",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "crossChainThrottleWindow",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "deactivateEmergencyMode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "demurrageManager",
+      "outputs": [
+        {
+          "internalType": "contract DemurrageManager",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "economicParams",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseDemurrageRate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxDemurrageRate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "stabilityThreshold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fiatDiscountFactor",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "gracePeriodsHours",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "interventionThreshold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "rebalanceFrequency",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "emergencyThreshold",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "emergencyMode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "emergencyOperators",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "emergencyTimestamp",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "exemptAccounts",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "fiatActivity",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalFiatVolume",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastFiatActivity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "activityCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "discountEligible",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "discountPercentage",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getAccountEconomicData",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "lastActivity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastDemurrageApplication",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalDemurragePaid",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalPenaltiesPaid",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "transactionCount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalVolume",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastTransactionTime",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "riskScore",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isNewUser",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "graceEndTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.AccountEconomicData",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "chainId",
+          "type": "uint32"
+        }
+      ],
+      "name": "getChainEconomicState",
+      "outputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "baseDemurrageRate",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "maxDemurrageRate",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "stabilityThreshold",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "fiatDiscountFactor",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "gracePeriodsHours",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "interventionThreshold",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "rebalanceFrequency",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "emergencyThreshold",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct IEconomicEngine.EconomicParameters",
+              "name": "parameters",
+              "type": "tuple"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalSupply",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "reserveAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastSync",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "syncHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.ChainEconomicState",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getCurrentDemurrageRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getEconomicParameters",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getFiatActivityData",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "totalFiatVolume",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastFiatActivity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "activityCount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "discountEligible",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "discountPercentage",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.FiatActivityData",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getGoldBasedMetrics",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "currentGoldPrice",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "goldMovingAverage",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "goldStandardDeviation",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int256",
+              "name": "caesarDeviationScore",
+              "type": "int256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "upperStatisticalBand",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lowerStatisticalBand",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "marketPressure",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastUpdate",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct EconomicEngine.GoldBasedMetrics",
+          "name": "metrics",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getHealthMetrics",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "overallHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "priceStability",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "liquidityHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participationRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "reserveRatio",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "demurrageEfficiency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "antiSpeculationEffectiveness",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "systemStress",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicHealthMetrics",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getMarketMetrics",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "totalDemurrageCollected",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalPenaltiesCollected",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "averageHoldingPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "networkVelocity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participationScore",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastMetricUpdate",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.MarketMetrics",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getSpeculationRiskScore",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getSystemHealth",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "priceStability",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "liquidityHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participationRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "reserveRatio",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastUpdate",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.SystemHealth",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "goldMetrics",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "currentGoldPrice",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "goldMovingAverage",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "goldStandardDeviation",
+          "type": "uint256"
+        },
+        {
+          "internalType": "int256",
+          "name": "caesarDeviationScore",
+          "type": "int256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "upperStatisticalBand",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lowerStatisticalBand",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "marketPressure",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastUpdate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "goldOracle",
+      "outputs": [
+        {
+          "internalType": "contract GoldPriceOracle",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "healthMetrics",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "overallHealth",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "priceStability",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "liquidityHealth",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "participationRate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reserveRatio",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "demurrageEfficiency",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "antiSpeculationEffectiveness",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "systemStress",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "interventionCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isAccountExempt",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "lastCrossChainTx",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastHealthUpdate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maintainPegStability",
+      "outputs": [
+        {
+          "internalType": "enum IEconomicEngine.StabilityAction",
+          "name": "action",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "marketMetrics",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalDemurrageCollected",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalPenaltiesCollected",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "averageHoldingPeriod",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "networkVelocity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "participationScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastMetricUpdate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxCrossChainVolume",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "monitorEconomicHealth",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "overallHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "priceStability",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "liquidityHealth",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participationRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lastUpdate",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.HealthMetrics",
+          "name": "metrics",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "parameterProposals",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "proposedParams",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "proposer",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "proposalTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "votes",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "executed",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "paused",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rebalanceReserves",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "enum IEconomicEngine.ReserveOperationType",
+              "name": "operationType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "targetChain",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "success",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.ReserveOperation",
+          "name": "operation",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "activityType",
+          "type": "uint8"
+        }
+      ],
+      "name": "recordFiatActivity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "removeEmergencyOperator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "exempt",
+          "type": "bool"
+        }
+      ],
+      "name": "setAccountExemption",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "stabilityPool",
+      "outputs": [
+        {
+          "internalType": "contract StabilityPool",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "chainId",
+          "type": "uint32"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "parameters",
+          "type": "tuple"
+        }
+      ],
+      "name": "synchronizeParameters",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "systemHealth",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "priceStability",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "liquidityHealth",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "participationRate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reserveRatio",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastUpdate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "txVolumeTracking",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unpause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "baseDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxDemurrageRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "stabilityThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fiatDiscountFactor",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriodsHours",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "interventionThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rebalanceFrequency",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "emergencyThreshold",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEconomicEngine.EconomicParameters",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "updateEconomicParameters",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "caesarPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateGoldBasedMetrics",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "updated",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "windowSeconds",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxVolume",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateThrottlingParameters",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "expectedBacking",
+          "type": "uint256"
+        }
+      ],
+      "name": "validateFiatBacking",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "isValid",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "actualBacking",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

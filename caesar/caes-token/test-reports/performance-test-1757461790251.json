@@ -1,0 +1,100 @@
+{
+  "timestamp": "2025-09-09T23:49:50.251Z",
+  "network": "sepolia",
+  "contractAddress": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+  "performanceTests": [
+    {
+      "operation": "balanceOf",
+      "type": "read",
+      "duration": 211,
+      "success": true
+    },
+    {
+      "operation": "totalSupply",
+      "type": "read",
+      "duration": 64,
+      "success": true
+    },
+    {
+      "operation": "name",
+      "type": "read",
+      "duration": 55,
+      "success": true
+    },
+    {
+      "operation": "symbol",
+      "type": "read",
+      "duration": 50,
+      "success": true
+    },
+    {
+      "operation": "getCurrentEpoch",
+      "type": "read",
+      "duration": 56,
+      "success": true
+    },
+    {
+      "operation": "getNetworkHealthIndex",
+      "type": "read",
+      "duration": 60,
+      "success": true
+    },
+    {
+      "operation": "getStabilityPoolBalance",
+      "type": "read",
+      "duration": 54,
+      "success": true
+    },
+    {
+      "operation": "calculateDemurrage",
+      "type": "read",
+      "duration": 70,
+      "success": true
+    },
+    {
+      "operation": "transfer(self, 1 CAES)",
+      "type": "gas_estimate",
+      "duration": 0,
+      "success": false,
+      "error": "ProviderError: execution reverted: Insufficient balance after demurrage"
+    },
+    {
+      "operation": "updateAccountActivity",
+      "type": "gas_estimate",
+      "duration": 64,
+      "gasEstimate": 33156,
+      "success": true
+    },
+    {
+      "operation": "applyDemurrage",
+      "type": "gas_estimate",
+      "duration": 3141,
+      "gasEstimate": 28165,
+      "success": true
+    },
+    {
+      "operation": "advanceEpoch",
+      "type": "gas_estimate",
+      "duration": 1112,
+      "gasEstimate": 62045,
+      "success": true
+    },
+    {
+      "operation": "getBlockNumber",
+      "type": "network",
+      "duration": 61,
+      "success": true
+    },
+    {
+      "operation": "getBalance",
+      "type": "network",
+      "duration": 52,
+      "success": true
+    }
+  ],
+  "summary": {
+    "successRate": 0.9285714285714286,
+    "avgReadTime": 77.5,
+    "avgGasUsage": 41122
+  }
+}

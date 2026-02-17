@@ -1,0 +1,19 @@
+{
+  "name": "@stoq/stoq-wasm",
+  "type": "module",
+  "collaborators": [
+    "HyperMesh Team"
+  ],
+  "description": "STOQ Protocol WebAssembly Client for Internet 2.0",
+  "version": "0.1.0",
+  "files": [
+    "stoq_wasm_bg.wasm",
+    "stoq_wasm.js",
+    "stoq_wasm.d.ts"
+  ],
+  "main": "stoq_wasm.js",
+  "types": "stoq_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

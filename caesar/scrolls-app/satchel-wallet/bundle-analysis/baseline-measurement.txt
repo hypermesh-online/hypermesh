@@ -1,0 +1,11 @@
+
+> satchel-wallet@1.0.0 bundle:size
+> du -sh dist/ && echo '--- Detailed Bundle Analysis ---' && ls -lh dist/assets/*.js | grep -E '(index|core).*\.js' | sort -k5 -hr
+
+2.9M	dist/
+--- Detailed Bundle Analysis ---
+-rw-r--r-- 1 persist persist 478K Sep 11 08:10 dist/assets/core-BGtwV6Oj.js
+-rw-r--r-- 1 persist persist 368K Sep 11 08:10 dist/assets/index-DDZ_dOR2.js
+-rw-r--r-- 1 persist persist 323K Sep 11 08:10 dist/assets/index-DeISHRTC.js
+-rw-r--r-- 1 persist persist 127K Sep 11 08:10 dist/assets/index-D-clFgya.js
+-rw-r--r-- 1 persist persist  34K Sep 11 08:10 dist/assets/index-DczvLsbo.js

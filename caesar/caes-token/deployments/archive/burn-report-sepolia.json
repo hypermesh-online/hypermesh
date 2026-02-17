@@ -1,0 +1,22 @@
+{
+  "network": "sepolia",
+  "chainId": "11155111",
+  "timestamp": "2025-09-09T17:36:50.317Z",
+  "burner": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "contracts": {
+    "oldCESAR": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+    "newCAES": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+    "burnAddress": "0x000000000000000000000000000000000000dEaD"
+  },
+  "burnDetails": {
+    "amountBurned": "1000000.0",
+    "method": "transfer_to_burn_address",
+    "transactionHash": "completed"
+  },
+  "finalBalances": {
+    "deployerOldCESAR": "0.0",
+    "deployerNewCAES": "1000000.0",
+    "oldCESARTotalSupply": "1000000.0",
+    "newCAESTotalSupply": "1000000.0"
+  }
+}

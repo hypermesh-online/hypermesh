@@ -1,0 +1,159 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockPriceOracle",
+  "sourceName": "contracts/mocks/MockPriceOracle.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "initialPrice",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "PriceUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "decimals",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLatestPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isValidPrice",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "latestRoundData",
+      "outputs": [
+        {
+          "internalType": "uint80",
+          "name": "roundId",
+          "type": "uint80"
+        },
+        {
+          "internalType": "int256",
+          "name": "answer",
+          "type": "int256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "startedAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "updatedAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint80",
+          "name": "answeredInRound",
+          "type": "uint80"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "newDecimals",
+          "type": "uint8"
+        }
+      ],
+      "name": "setDecimals",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "valid",
+          "type": "bool"
+        }
+      ],
+      "name": "setValidPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60803461006057601f6102d238819003918201601f19168301916001600160401b0383118484101761006557808492602094604052833981010312610060575160005561011261ffff196001541617600155604051610256908161007c8239f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe608080604052600436101561001357600080fd5b600090813560e01c908163313ce5671461018b575080637a1395aa1461015d5780638dcfccb5146101375780638e15f473146100ed57806391b7f5ed146100f257806398d5fdca146100ed578063ebcd4458146100b25763feaf968c1461007957600080fd5b346100af57806003193601126100af5760a090546040519060018252602082015242604082015242606082015260016080820152f35b80fd5b50346100af5760203660031901126100af576004358015158091036100e95761ff006001549160081b169061ff0019161760015580f35b5080fd5b6101aa565b50346100af5760203660031901126100af577f66cbca4f3c64fecf1dcb9ce094abcf7f68c3450a1d4e3a8e917dd621edb4ebe06020600435808455604051908152a180f35b50346100af57806003193601126100af57602060ff60015460081c166040519015158152f35b50346100af5760203660031901126100af5760043560ff81168091036100e95760ff19600154161760015580f35b9050346100e957816003193601126100e95760209060ff600154168152f35b3461021b57600036600319011261021b5760ff60015460081c16156101d6576020600054604051908152f35b60405162461bcd60e51b815260206004820152601e60248201527f4d6f636b50726963654f7261636c653a20496e76616c696420707269636500006044820152606490fd5b600080fdfea26469706673582212207df921cca679f0a0a8296f9b766d05c0a463c70b2da47a0c037117a924e7b54864736f6c63430008160033",
+  "deployedBytecode": "0x608080604052600436101561001357600080fd5b600090813560e01c908163313ce5671461018b575080637a1395aa1461015d5780638dcfccb5146101375780638e15f473146100ed57806391b7f5ed146100f257806398d5fdca146100ed578063ebcd4458146100b25763feaf968c1461007957600080fd5b346100af57806003193601126100af5760a090546040519060018252602082015242604082015242606082015260016080820152f35b80fd5b50346100af5760203660031901126100af576004358015158091036100e95761ff006001549160081b169061ff0019161760015580f35b5080fd5b6101aa565b50346100af5760203660031901126100af577f66cbca4f3c64fecf1dcb9ce094abcf7f68c3450a1d4e3a8e917dd621edb4ebe06020600435808455604051908152a180f35b50346100af57806003193601126100af57602060ff60015460081c166040519015158152f35b50346100af5760203660031901126100af5760043560ff81168091036100e95760ff19600154161760015580f35b9050346100e957816003193601126100e95760209060ff600154168152f35b3461021b57600036600319011261021b5760ff60015460081c16156101d6576020600054604051908152f35b60405162461bcd60e51b815260206004820152601e60248201527f4d6f636b50726963654f7261636c653a20496e76616c696420707269636500006044820152606490fd5b600080fdfea26469706673582212207df921cca679f0a0a8296f9b766d05c0a463c70b2da47a0c037117a924e7b54864736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

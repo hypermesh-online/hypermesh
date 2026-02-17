@@ -1,0 +1,116 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockLZEndpoint",
+  "sourceName": "contracts/mocks/MockLZEndpoint.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "defaultReceiveLibrary",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "defaultSendLibrary",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isValidReceiveLibrary",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "quote",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "send",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "setConfig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "setDelegate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "setReceiveLibrary",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "setSendLibrary",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461002857600080546001600160a01b03191633179055610175908161002e8239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c80631828c0701461010b5780634afb422b146100a957806373d5ae5c146100ae5780638b673e7a146100ae5780638da5cb5b146100e4578063999b93af146100c2578063b46300ec146100b3578063b9aa2598146100ae578063da64f587146100a95763eb683ad71461008b57600080fd5b346100a657806003193601126100a657602060405160018152f35b80fd5b610123565b61010b565b50806003193601126100a65780f35b50346100a657806003193601126100a657602060405166038d7ea4c680008152f35b50346100a657806003193601126100a657546040516001600160a01b039091168152602090f35b3461011e57600036600319011261011e57005b600080fd5b3461011e57600036600319011261011e57602060405160008152f3fea26469706673582212208368cc44bde65d83e04a89f1c2d08644567302462dfba4b06e3481badcdded9d64736f6c63430008160033",
+  "deployedBytecode": "0x6080604052600436101561001257600080fd5b6000803560e01c80631828c0701461010b5780634afb422b146100a957806373d5ae5c146100ae5780638b673e7a146100ae5780638da5cb5b146100e4578063999b93af146100c2578063b46300ec146100b3578063b9aa2598146100ae578063da64f587146100a95763eb683ad71461008b57600080fd5b346100a657806003193601126100a657602060405160018152f35b80fd5b610123565b61010b565b50806003193601126100a65780f35b50346100a657806003193601126100a657602060405166038d7ea4c680008152f35b50346100a657806003193601126100a657546040516001600160a01b039091168152602090f35b3461011e57600036600319011261011e57005b600080fd5b3461011e57600036600319011261011e57602060405160008152f3fea26469706673582212208368cc44bde65d83e04a89f1c2d08644567302462dfba4b06e3481badcdded9d64736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-09-08T16:57:29.079Z",
+  "network": {
+    "name": "sepolia",
+    "chainId": "11155111",
+    "currentBlock": 9161378
+  },
+  "accounts": [
+    {
+      "name": "Main Deployer (b331)",
+      "address": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+      "shortName": "b331"
+    },
+    {
+      "name": "Test Wallet (8595)",
+      "address": "0x08CF6C943C42d9cF56A73e47e095c33716c28595",
+      "shortName": "8595"
+    }
+  ],
+  "tokens": [
+    {
+      "name": "Original CAESAR",
+      "address": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+      "symbol": "CAESAR",
+      "type": "ERC20"
+    },
+    {
+      "name": "New CAESAR (CAES)",
+      "address": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+      "symbol": "CAES",
+      "type": "BasicCAES"
+    }
+  ],
+  "balances": {
+    "8595": {
+      "address": "0x08CF6C943C42d9cF56A73e47e095c33716c28595",
+      "eth": null,
+      "tokens": {
+        "CAESAR": {
+          "balance": "0",
+          "formatted": "0.0",
+          "contract": "0x62F1AA31e9A5713EEb56086681e009B392E860C2"
+        },
+        "CAES": {
+          "balance": "0",
+          "formatted": "0.0",
+          "contract": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C"
+        }
+      }
+    },
+    "b331": {
+      "address": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+      "eth": null,
+      "tokens": {
+        "CAESAR": {
+          "balance": "1000000000000000000000000",
+          "formatted": "1000000.0",
+          "contract": "0x62F1AA31e9A5713EEb56086681e009B392E860C2"
+        },
+        "CAES": {
+          "balance": "1000000000000000000000000",
+          "formatted": "1000000.0",
+          "contract": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C"
+        }
+      }
+    }
+  },
+  "totals": {
+    "caesar": "1000000.0",
+    "caes": "1000000.0"
+  },
+  "migrationStatus": {
+    "cesarTotal": "1000000000000000000000000",
+    "caesTotal": "1000000000000000000000000",
+    "isComplete": true,
+    "isBalanced": true
+  }
+}

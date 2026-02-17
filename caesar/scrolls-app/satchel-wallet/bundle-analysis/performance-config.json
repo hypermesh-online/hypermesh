@@ -1,0 +1,90 @@
+{
+  "bundleBudgets": {
+    "total": {
+      "limit": "3MB",
+      "current": "2.9MB",
+      "status": "within_budget"
+    },
+    "criticalPath": {
+      "limit": "1MB", 
+      "current": "1.7MB",
+      "status": "exceeds_budget",
+      "action": "optimize_web3_bundle"
+    },
+    "framework": {
+      "limit": "200KB",
+      "current": "142KB", 
+      "status": "within_budget"
+    },
+    "vendor": {
+      "limit": "1.5MB",
+      "current": "1.7MB",
+      "status": "exceeds_budget",
+      "action": "tree_shake_web3_libs"
+    }
+  },
+  "chunkAnalysis": {
+    "web3": {
+      "size": "854KB",
+      "gzipped": "255KB", 
+      "percentage": 29.4,
+      "priority": "high",
+      "optimization": "tree_shaking"
+    },
+    "core": {
+      "size": "488KB",
+      "gzipped": "131KB",
+      "percentage": 16.8,
+      "priority": "medium",
+      "optimization": "code_splitting"
+    },
+    "react": {
+      "size": "142KB",
+      "gzipped": "45KB",
+      "percentage": 4.9,
+      "priority": "low",
+      "optimization": "framework_migration"
+    }
+  },
+  "performanceMetrics": {
+    "compressionRatio": 0.74,
+    "loadTime": "estimated_3_5s_on_3g",
+    "cacheability": "high",
+    "treeshaking": "active"
+  },
+  "migrationROI": {
+    "sveltekit": {
+      "estimatedSavings": "100-200KB",
+      "percentageImprovement": "5-7%",
+      "developmentBenefit": "high",
+      "migrationCost": "medium",
+      "recommendation": "proceed_after_web3_optimization"
+    }
+  },
+  "optimizationPriority": [
+    {
+      "task": "web3_tree_shaking",
+      "impact": "high",
+      "effort": "medium",
+      "savings": "200-400KB"
+    },
+    {
+      "task": "lazy_loading",
+      "impact": "medium", 
+      "effort": "low",
+      "savings": "improve_initial_load"
+    },
+    {
+      "task": "sveltekit_migration",
+      "impact": "medium",
+      "effort": "high", 
+      "savings": "100-200KB"
+    }
+  ],
+  "monitoringSchedule": {
+    "baseline_updates": "after_major_changes",
+    "performance_tracking": "weekly",
+    "budget_alerts": "on_build",
+    "comparison_reports": "pre_release"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "PacketDecoder",
+  "sourceName": "@layerzerolabs/lz-evm-oapp-v2/contracts/precrime/libs/Packet.sol",
+  "abi": [],
+  "bytecode": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea26469706673582212208b741dd6707006dd8ee21d091a3877fdf9e2b573cfedd48fa10db6aaa46d971164736f6c63430008160033",
+  "deployedBytecode": "0x600080fdfea26469706673582212208b741dd6707006dd8ee21d091a3877fdf9e2b573cfedd48fa10db6aaa46d971164736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

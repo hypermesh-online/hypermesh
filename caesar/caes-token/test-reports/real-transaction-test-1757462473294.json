@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-09-10T00:01:13.294Z",
+  "network": "sepolia",
+  "contractAddress": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+  "transactions": [
+    {
+      "type": "self_transfer",
+      "amount": "100.0",
+      "gasUsed": 26728,
+      "balanceAfter": "1000000.0",
+      "txHash": "0xc40b7639b4ca0c8eff5703f28d24e6ee3ad4143ebfd01b1488a8f6ff6a471f26"
+    }
+  ],
+  "summary": {
+    "totalTransactions": 1,
+    "totalGasUsed": 26728,
+    "averageGasPerTransaction": 26728,
+    "estimatedCostUSD": 1.3364e-18
+  }
+}

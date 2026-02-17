@@ -1,0 +1,33 @@
+[crate]
+name = "Caesar"
+id = "caesar"
+description = "Gold-pegged interop bridge for multi-chain and fiat payment integration"
+phase = "planning"
+
+[features.working]
+items = [
+    "Token economics configuration",
+    "Wallet creation and balance tracking",
+    "Transaction processing engine",
+    "Reward calculation framework",
+    "Staking manager with APY",
+    "Exchange rate engine",
+    "Cross-chain bridge types (8 networks)",
+]
+
+[features.in_development]
+items = [
+    "Banking provider STOQ migration",
+    "Analytics engine integration",
+    "STOQ API server endpoints",
+]
+
+[features.planned]
+items = [
+    "Live multi-chain bridge (BTC/ETH/SOL)",
+    "Fiat payment processing",
+    "Reward distribution system",
+    "Gold peg stabilization mechanism",
+    "Actual stake storage implementation",
+    "Balance lookup service (actual implementation)",
+]

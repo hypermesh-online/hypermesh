@@ -1,0 +1,327 @@
+# Caesar Token Hypermesh Infrastructure
+# Production-ready deployment for STOQ protocol integration
+version: '3.8'
+
+services:
+  # Hypermesh Nexus Core System - Main orchestrator
+  hypermesh-nexus:
+    image: nexusgroup/hypermesh-nexus:latest
+    container_name: caesar-token-nexus
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # HTTP API
+      - "8443:8443"   # HTTPS API
+      - "9090:9090"   # Metrics
+      - "4001:4001"   # QUIC over IPv6
+    environment:
+      - NEXUS_NODE_ID=caesar-token-nexus-primary
+      - NEXUS_CLUSTER_NAME=caesar-token-production
+      - NEXUS_LOG_LEVEL=INFO
+      - NEXUS_CONSENSUS_ALGORITHM=byzantine-fault-tolerant
+      - NEXUS_QUIC_ENABLE=true
+      - NEXUS_IPV6_ENABLE=true
+      - NEXUS_CERT_AUTHORITY_PATH=/certs/ca
+      - NEXUS_STATE_BACKEND=distributed-redis
+      - NEXUS_METRICS_ENABLED=true
+      - STOQ_INTEGRATION_ENABLED=true
+      - STOQ_EBPF_ENABLED=true
+    volumes:
+      - ./certs:/certs:ro
+      - ./config/nexus:/config:ro
+      - nexus-data:/data
+      - /sys/kernel/debug:/sys/kernel/debug:ro  # eBPF access
+    networks:
+      - hypermesh-network
+    depends_on:
+      - redis-cluster-1
+      - redis-cluster-2
+      - redis-cluster-3
+    cap_add:
+      - SYS_ADMIN  # Required for eBPF programs
+      - NET_ADMIN  # Network administration for QUIC
+    privileged: true  # Required for kernel-level statistics
+
+  # STOQ Protocol Integration Engine
+  stoq-engine:
+    image: nexusgroup/stoq-engine:latest
+    container_name: caesar-token-stoq
+    restart: unless-stopped
+    ports:
+      - "8081:8081"   # STOQ API
+      - "9091:9091"   # STOQ Metrics
+    environment:
+      - STOQ_NODE_ID=caesar-token-stoq-primary
+      - STOQ_NEXUS_ENDPOINT=http://hypermesh-nexus:8080
+      - STOQ_ML_ENGINE_ENABLED=true
+      - STOQ_ANOMALY_DETECTION=true
+      - STOQ_TIME_SERIES_BACKEND=influxdb
+      - STOQ_THREAT_SCORING_ENABLED=true
+      - STOQ_ECONOMIC_MONITORING=true
+      - STOQ_GATEWAY_COIN_METRICS=true
+    volumes:
+      - ./config/stoq:/config:ro
+      - stoq-data:/data
+      - stoq-models:/models
+    networks:
+      - hypermesh-network
+    depends_on:
+      - influxdb
+      - hypermesh-nexus
+
+  # ML Inference Engine for Anomaly Detection
+  ml-inference:
+    image: nexusgroup/ml-inference:latest
+    container_name: caesar-token-ml
+    restart: unless-stopped
+    ports:
+      - "8082:8082"   # ML API
+      - "9092:9092"   # ML Metrics
+    environment:
+      - ML_NODE_ID=caesar-token-ml-primary
+      - ML_STOQ_ENDPOINT=http://stoq-engine:8081
+      - ML_MODEL_PATH=/models
+      - ML_INFERENCE_WORKERS=4
+      - ML_GPU_ENABLED=false  # Set to true if GPU available
+      - ML_ANOMALY_THRESHOLD=0.85
+      - ML_ECONOMIC_MODEL_ENABLED=true
+    volumes:
+      - stoq-models:/models
+      - ml-cache:/cache
+    networks:
+      - hypermesh-network
+    depends_on:
+      - stoq-engine
+
+  # Distributed State Management - Redis Cluster
+  redis-cluster-1:
+    image: redis/redis-stack-server:latest
+    container_name: redis-cluster-1
+    restart: unless-stopped
+    ports:
+      - "7001:7001"
+    command: >
+      redis-server 
+      --port 7001
+      --cluster-enabled yes
+      --cluster-config-file nodes-7001.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-1-data:/data
+    networks:
+      - hypermesh-network
+
+  redis-cluster-2:
+    image: redis/redis-stack-server:latest
+    container_name: redis-cluster-2
+    restart: unless-stopped
+    ports:
+      - "7002:7002"
+    command: >
+      redis-server 
+      --port 7002
+      --cluster-enabled yes
+      --cluster-config-file nodes-7002.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-2-data:/data
+    networks:
+      - hypermesh-network
+
+  redis-cluster-3:
+    image: redis/redis-stack-server:latest
+    container_name: redis-cluster-3
+    restart: unless-stopped
+    ports:
+      - "7003:7003"
+    command: >
+      redis-server 
+      --port 7003
+      --cluster-enabled yes
+      --cluster-config-file nodes-7003.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-3-data:/data
+    networks:
+      - hypermesh-network
+
+  # P2P Mesh Networking Node
+  p2p-mesh-node:
+    image: nexusgroup/p2p-mesh:latest
+    container_name: caesar-token-p2p
+    restart: unless-stopped
+    ports:
+      - "4002:4002"   # P2P Communication
+      - "4003:4003"   # DHT Service Discovery
+    environment:
+      - P2P_NODE_ID=caesar-token-p2p-primary
+      - P2P_NEXUS_ENDPOINT=http://hypermesh-nexus:8080
+      - P2P_DHT_ENABLED=true
+      - P2P_SERVICE_DISCOVERY=true
+      - P2P_LOAD_BALANCING=health-aware
+      - P2P_CIRCUIT_BREAKER=true
+      - P2P_BOOTSTRAP_NODES=/config/bootstrap-nodes.json
+      - P2P_ENCRYPTION=true
+    volumes:
+      - ./config/p2p:/config:ro
+      - p2p-data:/data
+    networks:
+      - hypermesh-network
+    depends_on:
+      - hypermesh-nexus
+
+  # Container Runtime with Secure Isolation
+  container-runtime:
+    image: nexusgroup/secure-runtime:latest
+    container_name: caesar-token-runtime
+    restart: unless-stopped
+    ports:
+      - "8083:8083"   # Runtime API
+    environment:
+      - RUNTIME_NODE_ID=caesar-token-runtime-primary
+      - RUNTIME_NEXUS_ENDPOINT=http://hypermesh-nexus:8080
+      - RUNTIME_SECURITY_MODEL=capability-based
+      - RUNTIME_ISOLATION=hardware-assisted
+      - RUNTIME_VIRTUALIZATION=enabled
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runtime-data:/data
+    networks:
+      - hypermesh-network
+    depends_on:
+      - hypermesh-nexus
+    privileged: true
+
+  # Time Series Database for STOQ Metrics
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: caesar-token-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=caesar-token-metrics-2025
+      - DOCKER_INFLUXDB_INIT_ORG=caesar-token
+      - DOCKER_INFLUXDB_INIT_BUCKET=stoq-metrics
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=caesar-token-influx-token-2025
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    networks:
+      - hypermesh-network
+
+  # Grafana for Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: caesar-token-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=caesar-token-grafana-2025
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=http://localhost:3000/
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - hypermesh-network
+    depends_on:
+      - influxdb
+
+  # Load Balancer with Health Awareness
+  load-balancer:
+    image: nginx:alpine
+    container_name: caesar-token-lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx:/etc/nginx:ro
+      - ./certs:/etc/ssl/certs:ro
+    networks:
+      - hypermesh-network
+    depends_on:
+      - hypermesh-nexus
+      - stoq-engine
+
+  # Certificate Management
+  cert-manager:
+    image: nexusgroup/cert-manager:latest
+    container_name: caesar-token-certs
+    restart: unless-stopped
+    environment:
+      - CERT_AUTHORITY_NAME=caesar-token-ca
+      - CERT_AUTO_ROTATION=true
+      - CERT_ROTATION_INTERVAL=720h  # 30 days
+      - CERT_KEY_SIZE=4096
+      - CERT_ALGORITHM=RSA
+    volumes:
+      - ./certs:/certs
+      - cert-data:/data
+    networks:
+      - hypermesh-network
+
+networks:
+  hypermesh-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+
+volumes:
+  nexus-data:
+    driver: local
+  stoq-data:
+    driver: local
+  stoq-models:
+    driver: local
+  ml-cache:
+    driver: local
+  redis-1-data:
+    driver: local
+  redis-2-data:
+    driver: local
+  redis-3-data:
+    driver: local
+  p2p-data:
+    driver: local
+  runtime-data:
+    driver: local
+  influxdb-data:
+    driver: local
+  influxdb-config:
+    driver: local
+  grafana-data:
+    driver: local
+  cert-data:
+    driver: local

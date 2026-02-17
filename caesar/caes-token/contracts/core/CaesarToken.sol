@@ -1,0 +1,526 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.22;
+
+import { OFT } from "@layerzerolabs/oft-evm/contracts/OFT.sol";
+import { SendParam, MessagingFee } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../interfaces/ICaesar.sol";
+import "./DemurrageManager.sol";
+import "./AntiSpeculationEngine.sol";
+import "../libs/MathUtils.sol";
+import "../oracles/GoldPriceOracle.sol";
+
+/**
+ * @title Caesar (CAES)
+ * @dev LayerZero V2 OFT implementation with demurrage and anti-speculation mechanisms
+ * Updated version with CAESAR name and CAES symbol for migration
+ */
+contract CaesarToken is OFT, ICaesar, ReentrancyGuard {
+    using MathUtils for uint256;
+    
+    // Core components
+    GoldPriceOracle public immutable goldOracle;
+    DemurrageManager public immutable demurrageManager;
+    AntiSpeculationEngine public immutable antiSpeculationEngine;
+    
+    // Migration tracking
+    address public migrationContract;
+    bool public migrationEnabled;
+    
+    // State variables
+    uint256 public currentEpoch;
+    uint256 public epochDuration = 1 days;
+    uint256 public lastEpochUpdate;
+    uint256 public targetPrice = 1e18; // 1 USDC in wei
+    uint256 public lastRebaseTime;
+    uint256 public rebaseInterval = 7 days;
+    uint256 public maxRebasePercent = 1000; // 10%
+    
+    // Account tracking
+    mapping(address => AccountInfo) public accounts;
+    mapping(uint256 => uint256) public epochSupply;
+    
+    // Network metrics
+    uint256 public totalHolders;
+    uint256 public activeParticipants;
+    uint256 public stabilityPoolBalance;
+    
+    // Cross-chain state
+    mapping(uint32 => uint256) public chainSupply; // Track supply per chain
+    
+    // Events
+    event EpochAdvanced(uint256 indexed newEpoch, uint256 timestamp);
+    event AccountActivityUpdated(address indexed account, uint256 timestamp);
+    event CrossChainSupplySync(uint32 indexed chainId, uint256 supply);
+    event MigrationContractSet(address indexed migrationContract);
+    event MigrationEnabled(bool enabled);
+    
+    /**
+     * @dev Constructor
+     * @param lzEndpoint LayerZero endpoint address
+     * @param owner Contract owner
+     */
+    constructor(
+        address lzEndpoint,
+        address owner
+    ) OFT("CAESAR", "CAES", lzEndpoint, owner) Ownable(owner) {
+        goldOracle = new GoldPriceOracle(owner);
+        demurrageManager = new DemurrageManager(owner, address(goldOracle));
+        antiSpeculationEngine = new AntiSpeculationEngine(owner);
+        
+        currentEpoch = 1;
+        lastEpochUpdate = block.timestamp;
+        lastRebaseTime = block.timestamp;
+        
+        // Initialize with zero supply - will be minted during migration
+        epochSupply[currentEpoch] = 0;
+    }
+    
+    /**
+     * @dev Set migration contract address
+     */
+    function setMigrationContract(address _migrationContract) external onlyOwner {
+        require(_migrationContract != address(0), "Invalid migration contract");
+        migrationContract = _migrationContract;
+        emit MigrationContractSet(_migrationContract);
+    }
+    
+    /**
+     * @dev Enable/disable migration
+     */
+    function setMigrationEnabled(bool _enabled) external onlyOwner {
+        migrationEnabled = _enabled;
+        emit MigrationEnabled(_enabled);
+    }
+    
+    /**
+     * @dev Mint tokens during migration (only callable by migration contract)
+     */
+    function migrationMint(address to, uint256 amount) external {
+        require(msg.sender == migrationContract, "Only migration contract");
+        require(migrationEnabled, "Migration not enabled");
+        _mint(to, amount);
+    }
+    
+    /**
+     * @dev Transfer function with demurrage and anti-speculation
+     */
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        address from = msg.sender;
+        
+        // Apply demurrage before transfer
+        uint256 demurrageFrom = _applyDemurrage(from);
+        _applyDemurrage(to);
+        
+        // Check if balance is sufficient after demurrage
+        uint256 balanceAfterDemurrage = balanceOf(from);
+        require(balanceAfterDemurrage >= amount, "Insufficient balance after demurrage");
+        
+        // Check anti-speculation penalties
+        uint256 penalty = antiSpeculationEngine.calculateSpeculationPenalty(from, amount);
+        if (penalty > 0) {
+            uint256 netAmount = amount - penalty;
+            require(netAmount > 0, "Penalty exceeds transfer amount");
+            require(balanceAfterDemurrage >= amount, "Insufficient balance for penalty and transfer");
+            
+            // Transfer penalty to stability pool
+            _transfer(from, address(this), penalty);
+            stabilityPoolBalance += penalty;
+            
+            // Transfer remaining amount
+            _transfer(from, to, netAmount);
+            
+            // Update participation scores
+            antiSpeculationEngine.updateParticipationScore(from, amount);
+        } else {
+            _transfer(from, to, amount);
+        }
+        
+        // Update account activity
+        _updateAccountActivity(from);
+        _updateAccountActivity(to);
+        
+        return true;
+    }
+    
+    /**
+     * @dev Transfer from function with demurrage and anti-speculation
+     */
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        // Apply demurrage before transfer
+        _applyDemurrage(from);
+        _applyDemurrage(to);
+        
+        // Check if balance is sufficient after demurrage
+        uint256 balanceAfterDemurrage = balanceOf(from);
+        require(balanceAfterDemurrage >= amount, "Insufficient balance after demurrage");
+        
+        // Check anti-speculation penalties
+        uint256 penalty = antiSpeculationEngine.calculateSpeculationPenalty(from, amount);
+        if (penalty > 0) {
+            uint256 netAmount = amount - penalty;
+            require(netAmount > 0, "Penalty exceeds transfer amount");
+            require(balanceAfterDemurrage >= amount, "Insufficient balance for penalty and transfer");
+            
+            // Update allowance for full amount
+            _spendAllowance(from, msg.sender, amount);
+            
+            // Transfer penalty to stability pool
+            _transfer(from, address(this), penalty);
+            stabilityPoolBalance += penalty;
+            
+            // Transfer remaining amount
+            _transfer(from, to, netAmount);
+        } else {
+            _spendAllowance(from, msg.sender, amount);
+            _transfer(from, to, amount);
+        }
+        
+        // Update account activity
+        _updateAccountActivity(from);
+        _updateAccountActivity(to);
+        
+        return true;
+    }
+    
+    /**
+     * @dev Apply demurrage to an account
+     */
+    function applyDemurrage(address account) external returns (uint256 appliedAmount) {
+        return _applyDemurrage(account);
+    }
+    
+    /**
+     * @dev Calculate demurrage for an account
+     */
+    function calculateDemurrage(address account) external view returns (uint256 demurrageAmount) {
+        if (accounts[account].isExempt || balanceOf(account) == 0) {
+            return 0;
+        }
+        
+        AccountInfo memory accountInfo = accounts[account];
+        
+        // Only calculate demurrage if there has been activity before
+        if (accountInfo.lastActivity == 0) {
+            return 0;
+        }
+        
+        return demurrageManager.calculateDemurrage(
+            account,
+            balanceOf(account),
+            accountInfo.lastActivity
+        );
+    }
+    
+    /**
+     * @dev Get current decay rate
+     */
+    function getCurrentDecayRate() external view returns (uint256 decayRate) {
+        return demurrageManager.getCurrentDecayRate();
+    }
+    
+    /**
+     * @dev Set demurrage configuration
+     */
+    function setDemurrageConfig(DemurrageConfig calldata config) external onlyOwner {
+        // For simplicity, we'll just validate the config here
+        // In a production system, you'd want to properly integrate with DemurrageManager
+        require(config.baseRate <= config.maxRate, "Invalid rate configuration");
+        require(config.maxRate <= 1000, "Max rate too high");
+        require(config.decayInterval > 0, "Invalid decay interval");
+        // Configuration accepted (would normally pass to DemurrageManager)
+    }
+    
+    /**
+     * @dev Calculate speculation penalty
+     */
+    function calculateSpeculationPenalty(address account) external view returns (uint256 penalty) {
+        return antiSpeculationEngine.calculateSpeculationPenalty(account, balanceOf(account));
+    }
+    
+    /**
+     * @dev Update participation score
+     */
+    function updateParticipationScore(address account, uint256 transactionVolume) external onlyOwner {
+        uint256 newScore = antiSpeculationEngine.updateParticipationScore(account, transactionVolume);
+        accounts[account].participationScore = newScore;
+    }
+    
+    /**
+     * @dev Set anti-speculation configuration
+     */
+    function setAntiSpeculationConfig(AntiSpeculationConfig calldata config) external onlyOwner {
+        antiSpeculationEngine.setAntiSpeculationConfig(config);
+    }
+    
+    /**
+     * @dev Check if account is exempt from demurrage
+     */
+    function isAccountExempt(address account) external view returns (bool exempt) {
+        return accounts[account].isExempt;
+    }
+    
+    /**
+     * @dev Get current epoch
+     */
+    function getCurrentEpoch() external view returns (uint256 epoch) {
+        return currentEpoch;
+    }
+    
+    /**
+     * @dev Advance to next epoch
+     */
+    function advanceEpoch() external {
+        require(block.timestamp >= lastEpochUpdate + epochDuration, "Epoch duration not elapsed");
+        
+        currentEpoch++;
+        lastEpochUpdate = block.timestamp;
+        epochSupply[currentEpoch] = totalSupply();
+        
+        emit EpochAdvanced(currentEpoch, block.timestamp);
+        emit TensorEpochUpdate(currentEpoch, block.timestamp);
+    }
+    
+    /**
+     * @dev Get epoch duration
+     */
+    function getEpochDuration() external view returns (uint256 duration) {
+        return epochDuration;
+    }
+    
+    /**
+     * @dev Perform rebase operation
+     */
+    function rebase() external returns (uint256 newSupply) {
+        require(shouldRebase(), "Rebase conditions not met");
+        
+        uint256 rebaseRatio = getRebaseRatio();
+        uint256 currentSupply = totalSupply();
+        
+        if (rebaseRatio > 10000) {
+            // Increase supply
+            uint256 increase = ((rebaseRatio - 10000) * currentSupply) / 10000;
+            _mint(address(this), increase);
+            stabilityPoolBalance += increase;
+        } else if (rebaseRatio < 10000) {
+            // Decrease supply
+            uint256 decrease = ((10000 - rebaseRatio) * currentSupply) / 10000;
+            uint256 availableBalance = balanceOf(address(this));
+            if (decrease > availableBalance) {
+                decrease = availableBalance;
+            }
+            _burn(address(this), decrease);
+            if (stabilityPoolBalance > decrease) {
+                stabilityPoolBalance -= decrease;
+            } else {
+                stabilityPoolBalance = 0;
+            }
+        }
+        
+        lastRebaseTime = block.timestamp;
+        newSupply = totalSupply();
+        
+        emit RebaseOccurred(currentEpoch, rebaseRatio, newSupply);
+        return newSupply;
+    }
+    
+    /**
+     * @dev Get current rebase ratio
+     */
+    function getRebaseRatio() public view returns (uint256 ratio) {
+        // This would typically get price from an oracle
+        // For now, return base ratio (no rebase needed)
+        return 10000; // 1.0x ratio
+    }
+    
+    /**
+     * @dev Check if rebase should occur
+     */
+    function shouldRebase() public view returns (bool shouldRebaseNow) {
+        if (block.timestamp < lastRebaseTime + rebaseInterval) {
+            return false;
+        }
+        
+        uint256 ratio = getRebaseRatio();
+        return ratio != 10000; // Rebase if ratio is not 1.0x
+    }
+    
+    /**
+     * @dev Contribute to stability pool
+     */
+    function contributeToStabilityPool(uint256 amount) external {
+        require(amount > 0, "Amount must be positive");
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        
+        _transfer(msg.sender, address(this), amount);
+        stabilityPoolBalance += amount;
+        
+        emit StabilityPoolContribution(amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Get stability pool balance
+     */
+    function getStabilityPoolBalance() external view returns (uint256 balance) {
+        return stabilityPoolBalance;
+    }
+    
+    /**
+     * @dev Withdraw from stability pool (owner only)
+     */
+    function withdrawFromStabilityPool(uint256 amount) external onlyOwner {
+        require(amount <= stabilityPoolBalance, "Insufficient stability pool balance");
+        
+        _transfer(address(this), owner(), amount);
+        stabilityPoolBalance -= amount;
+    }
+    
+    /**
+     * @dev Get network health index
+     */
+    function getNetworkHealthIndex() external view returns (uint256 healthIndex) {
+        if (totalHolders == 0) {
+            return 0;
+        }
+        
+        uint256 participationRatio = (activeParticipants * 1000) / totalHolders;
+        uint256 liquidityRatio = getLiquidityRatio();
+        uint256 stabilityRatio = stabilityPoolBalance > 0 ? 
+            (stabilityPoolBalance * 1000) / totalSupply() : 0;
+        
+        return (participationRatio + liquidityRatio + stabilityRatio) / 3;
+    }
+    
+    /**
+     * @dev Get liquidity ratio
+     */
+    function getLiquidityRatio() public view returns (uint256 liquidityRatio) {
+        // Calculate based on active vs total supply
+        // This is a simplified implementation
+        if (totalHolders == 0) {
+            return 0;
+        }
+        return (activeParticipants * 1000) / totalHolders;
+    }
+    
+    /**
+     * @dev Get active participants count
+     */
+    function getActiveParticipants() external view returns (uint256 activeCount) {
+        return activeParticipants;
+    }
+    
+    /**
+     * @dev Get account information
+     */
+    function getAccountInfo(address account) external view returns (AccountInfo memory info) {
+        return accounts[account];
+    }
+    
+    /**
+     * @dev Set account exemption status
+     */
+    function setAccountExemption(address account, bool exempt) external onlyOwner {
+        accounts[account].isExempt = exempt;
+        // Note: DemurrageManager ownership would need to be transferred to this contract
+        // For testing, we'll handle exemptions internally
+    }
+    
+    /**
+     * @dev Update account activity
+     */
+    function updateAccountActivity(address account) external {
+        _updateAccountActivity(account);
+    }
+    
+    /**
+     * @dev Internal function to apply demurrage
+     */
+    function _applyDemurrage(address account) internal returns (uint256 appliedAmount) {
+        if (accounts[account].isExempt || balanceOf(account) == 0) {
+            return 0;
+        }
+        
+        AccountInfo storage accountInfo = accounts[account];
+        
+        // Only apply demurrage if there has been some activity before
+        if (accountInfo.lastActivity == 0) {
+            return 0;
+        }
+        
+        appliedAmount = demurrageManager.calculateDemurrage(
+            account,
+            balanceOf(account),
+            accountInfo.lastActivity
+        );
+        
+        if (appliedAmount > 0 && appliedAmount <= balanceOf(account)) {
+            _transfer(account, address(this), appliedAmount);
+            stabilityPoolBalance += appliedAmount;
+            // Update the last demurrage application time to prevent double-application
+            accountInfo.lastActivity = block.timestamp;
+            emit DemurrageApplied(account, appliedAmount, block.timestamp);
+        }
+        
+        return appliedAmount;
+    }
+    
+    /**
+     * @dev Internal function to update account activity
+     */
+    function _updateAccountActivity(address account) internal {
+        AccountInfo storage accountInfo = accounts[account];
+        
+        if (accountInfo.lastActivity == 0) {
+            totalHolders++;
+        }
+        
+        accountInfo.lastActivity = block.timestamp;
+        
+        // Update active participants (active in last 24 hours)
+        if (block.timestamp - accountInfo.lastActivity <= 1 days) {
+            // This is simplified - in production you'd track this more efficiently
+            _updateActiveParticipants();
+        }
+        
+        emit AccountActivityUpdated(account, block.timestamp);
+    }
+    
+    /**
+     * @dev Internal function to update active participants count
+     */
+    function _updateActiveParticipants() internal {
+        // Simplified implementation - in production this would be more sophisticated
+        // Could use a more efficient data structure to track active participants
+        activeParticipants = totalHolders; // Placeholder
+    }
+    
+    /**
+     * @dev Bridge with decay implementation for LayerZero OFT
+     */
+    function bridgeWithDecay(
+        SendParam calldata sendParam,
+        MessagingFee calldata fee,
+        address refundAddress
+    ) external payable returns (MessagingFee memory messagingFee) {
+        // Apply demurrage before bridge operation
+        _applyDemurrage(msg.sender);
+        
+        // For now, return the provided fee structure
+        // In production, this would include decay calculations and actual bridging
+        return fee;
+    }
+    
+    /**
+     * @dev Quote bridge with decay for LayerZero OFT
+     */
+    function quoteBridgeWithDecay(
+        SendParam calldata sendParam,
+        bool payInLzToken
+    ) external view returns (MessagingFee memory messagingFee) {
+        // For now, return a basic fee structure
+        // In production, this would include decay calculation fees
+        return MessagingFee({ nativeFee: 0.001 ether, lzTokenFee: 0 });
+    }
+}

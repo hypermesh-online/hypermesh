@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-09-10T01:20:39.040Z",
+  "network": "sepolia",
+  "chainId": 11155111,
+  "migration": {
+    "from": {
+      "contract": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+      "name": "Legacy CAES",
+      "amount": "1000000.0"
+    },
+    "to": {
+      "contract": "0x7DcfC3F620634A7DE2d065faD5A20C3a9092269b",
+      "name": "Production CAESAR",
+      "amount": "1045000.0"
+    }
+  },
+  "result": {
+    "success": true,
+    "finalBalance": "1045000.0",
+    "totalSupply": "1050000.0",
+    "economicSystemActive": true
+  },
+  "contracts": {
+    "production": "0x7DcfC3F620634A7DE2d065faD5A20C3a9092269b",
+    "deprecated": [
+      {
+        "address": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+        "name": "Original CESAR",
+        "status": "empty"
+      },
+      {
+        "address": "0x69e35749eB8f5Ae282A883329C7d0BF44bCed59C",
+        "name": "Migration CAES",
+        "status": "migrated_out"
+      }
+    ]
+  }
+}

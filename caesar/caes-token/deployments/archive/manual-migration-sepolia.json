@@ -1,0 +1,21 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "timestamp": "2025-09-08T16:44:59.904Z",
+  "deployer": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "contracts": {
+    "OldCESAR": "0x62F1AA31e9A5713EEb56086681e009B392E860C2",
+    "NewCAES": "0x3Ce0827df6c2f69D02B73Aa682C7afb3e0459EBB",
+    "Migration": "0x9Ec3E0E5FA97e34bBBB0ce90D1d386cD5364e7c6"
+  },
+  "tokenDetails": {
+    "name": "CAESAR",
+    "symbol": "CAES",
+    "totalSupply": "0.0"
+  },
+  "migrationDetails": {
+    "migrationPeriodDays": 90,
+    "migrationStarted": true,
+    "tokensToMigrate": "1000000.0 CAESAR"
+  }
+}

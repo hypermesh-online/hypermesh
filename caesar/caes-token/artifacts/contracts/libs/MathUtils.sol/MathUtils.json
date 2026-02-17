@@ -1,0 +1,63 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MathUtils",
+  "sourceName": "contracts/libs/MathUtils.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "BASIS_POINTS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PRECISION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SECONDS_PER_DAY",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SECONDS_PER_YEAR",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346100195760e8908161001f823930815050f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c90816374f0314f14609757508063aaf5eb6814607a578063e1f1c4a71460635763e6a69ab814604857600080fd5b8060031936011260605760206040516301e133808152f35b80fd5b508060031936011260605760206040516127108152f35b50806003193601126060576020604051670de0b6b3a76400008152f35b90508160031936011260ae57806201518060209252f35b5080fdfea264697066735822122071f46c1b162b18929e6e4b787f367b4629837a1795da37ad135ed63f250f9bb164736f6c63430008160033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c90816374f0314f14609757508063aaf5eb6814607a578063e1f1c4a71460635763e6a69ab814604857600080fd5b8060031936011260605760206040516301e133808152f35b80fd5b508060031936011260605760206040516127108152f35b50806003193601126060576020604051670de0b6b3a76400008152f35b90508160031936011260ae57806201518060209252f35b5080fdfea264697066735822122071f46c1b162b18929e6e4b787f367b4629837a1795da37ad135ed63f250f9bb164736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

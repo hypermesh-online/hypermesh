@@ -1,0 +1,618 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockLZEndpointV2",
+  "sourceName": "contracts/mocks/MockLZEndpointV2.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "encodedPacket",
+          "type": "bytes"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "options",
+          "type": "bytes"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "sendLibrary",
+          "type": "address"
+        }
+      ],
+      "name": "PacketSent",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "srcEid",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "sender",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "nonce",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct Origin",
+          "name": "",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "name": "clear",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "delegates",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "eid",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "getConfig",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "config",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "getReceiveLibrary",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "lib",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "isDefault",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getRegisteredLibraries",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "getSendLibrary",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "lib",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "isDefaultSendLibrary",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "isRegisteredLibrary",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lzToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nativeToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "dstEid",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "receiver",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes",
+              "name": "message",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "options",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "payInLzToken",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct MessagingParams",
+          "name": "",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "quote",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "nativeFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lzTokenFee",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MessagingFee",
+          "name": "fee",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "receiveLibraryTimeout",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "lib",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiry",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "registerLibrary",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "dstEid",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "receiver",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes",
+              "name": "message",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "options",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "payInLzToken",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct MessagingParams",
+          "name": "",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "send",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "nativeFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lzTokenFee",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MessagingFee",
+          "name": "fee",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "eid",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "configType",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes",
+              "name": "config",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct SetConfigParam[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "setConfig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setDelegate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setLzToken",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "setReceiveLibrary",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "setReceiveLibraryTimeout",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setSendLibrary",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346100165761070a908161001c8239f35b600080fdfe604060808152600436101561001357600080fd5b6000803560e01c8063183c834f146103b45780632637a450146105455780632a56c1b0146104e65780632b3197b914610425578063402f8468146103f4578063416ecebf146103d8578063587cde1e146103b95780636a14d715146103b45780636dbd9f90146103505780639132e5c3146102c05780639535ff301461029d578063b96a277f1461026f578063c0c53b8b1461023f578063c28e0eed14610142578063ca5eb5e114610142578063dc706a6214610221578063dc93c8a2146101f3578063ddc28c5814610195578063e1758bd814610166578063e4fe1d9414610147578063e8964e81146101425763ef667aa11461011057600080fd5b3461013f578160031936011261013f576101286105a3565b506101316105ea565b508151908082526020820152f35b80fd5b610683565b50903461016257816003193601126101625751908152602090f35b5080fd5b5090346101625781600319360112610162576020905173eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee8152f35b50903461016257906101ef916101aa3661063d565b50508160206101b761069e565b82815201526101c461069e565b9166038d7ea4c680008352602083015251918291829190916020806040830194805184520151910152565b0390f35b5090346101625780600319360112610162576020906102106105a3565b506102196105ea565b505160018152f35b509034610162576020366003190112610162576020906102196105a3565b503461013f57606036600319011261013f576102596105a3565b506102626105be565b5061026b6105d4565b5080f35b5090346101625780600319360112610162579060209161028d6105a3565b506102966105ea565b5051908152f35b503461013f57606036600319011261013f576102b76105a3565b506102626105ea565b503461013f578060031936011261013f57815160208082019282841067ffffffffffffffff85111761033c5790939291828452818152835194859460208601926020875251809352850193925b82811061031c57505050500390f35b83516001600160a01b03168552869550938101939281019260010161030d565b634e487b7160e01b81526041600452602490fd5b503461013f57606036600319011261013f5761036a6105a3565b506103736105be565b5067ffffffffffffffff6044358181116103b057366023820112156103b05780600401359182116103b057602490369260051b01011161013f5780f35b8280fd5b6105fd565b50903461016257602036600319011261016257906020916102966105a3565b5090346101625781600319360112610162576020905160018152f35b503461013f578160031936011261013f5761040d6105a3565b506104166105ea565b50815190815260016020820152f35b509034610162576080366003190112610162576104406105a3565b506104496105be565b5063ffffffff604435818116036103b057606435908116036101625780516020926020820182811067ffffffffffffffff8211176104d257839492919452838152825193849260208452825192836020860152825b8481106104bc57505050828201840152601f01601f19168101030190f35b818101830151888201880152879550820161049e565b634e487b7160e01b82526041600452602482fd5b503461013f5760c036600319011261013f576105006105a3565b50606036602319011261013f5760a43567ffffffffffffffff8082116103b057366023830112156103b05781600401359081116103b0573691016024011161013f5780f35b506101ef916105533661063d565b505081602061056061069e565b828152015234156105955734915b61057661069e565b8381526020908101918252915192835251908201529081906040820190565b66038d7ea4c680009161056e565b600435906001600160a01b03821682036105b957565b600080fd5b602435906001600160a01b03821682036105b957565b604435906001600160a01b03821682036105b957565b6024359063ffffffff821682036105b957565b346105b95760803660031901126105b9576001600160a01b03600435818116036105b95760243563ffffffff8116036105b957604435908116036105b957005b600319906040818301126105b9576004359167ffffffffffffffff83116105b9578260a0920301126105b957600401906024356001600160a01b03811681036105b95790565b346105b95760203660031901126105b95761069c6105a3565b005b604051906040820182811067ffffffffffffffff8211176106be57604052565b634e487b7160e01b600052604160045260246000fdfea2646970667358221220cd7a12a64610079a41e681c9a6eab3595169ffb486a11273ce4d1c4880baf41364736f6c63430008160033",
+  "deployedBytecode": "0x604060808152600436101561001357600080fd5b6000803560e01c8063183c834f146103b45780632637a450146105455780632a56c1b0146104e65780632b3197b914610425578063402f8468146103f4578063416ecebf146103d8578063587cde1e146103b95780636a14d715146103b45780636dbd9f90146103505780639132e5c3146102c05780639535ff301461029d578063b96a277f1461026f578063c0c53b8b1461023f578063c28e0eed14610142578063ca5eb5e114610142578063dc706a6214610221578063dc93c8a2146101f3578063ddc28c5814610195578063e1758bd814610166578063e4fe1d9414610147578063e8964e81146101425763ef667aa11461011057600080fd5b3461013f578160031936011261013f576101286105a3565b506101316105ea565b508151908082526020820152f35b80fd5b610683565b50903461016257816003193601126101625751908152602090f35b5080fd5b5090346101625781600319360112610162576020905173eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee8152f35b50903461016257906101ef916101aa3661063d565b50508160206101b761069e565b82815201526101c461069e565b9166038d7ea4c680008352602083015251918291829190916020806040830194805184520151910152565b0390f35b5090346101625780600319360112610162576020906102106105a3565b506102196105ea565b505160018152f35b509034610162576020366003190112610162576020906102196105a3565b503461013f57606036600319011261013f576102596105a3565b506102626105be565b5061026b6105d4565b5080f35b5090346101625780600319360112610162579060209161028d6105a3565b506102966105ea565b5051908152f35b503461013f57606036600319011261013f576102b76105a3565b506102626105ea565b503461013f578060031936011261013f57815160208082019282841067ffffffffffffffff85111761033c5790939291828452818152835194859460208601926020875251809352850193925b82811061031c57505050500390f35b83516001600160a01b03168552869550938101939281019260010161030d565b634e487b7160e01b81526041600452602490fd5b503461013f57606036600319011261013f5761036a6105a3565b506103736105be565b5067ffffffffffffffff6044358181116103b057366023820112156103b05780600401359182116103b057602490369260051b01011161013f5780f35b8280fd5b6105fd565b50903461016257602036600319011261016257906020916102966105a3565b5090346101625781600319360112610162576020905160018152f35b503461013f578160031936011261013f5761040d6105a3565b506104166105ea565b50815190815260016020820152f35b509034610162576080366003190112610162576104406105a3565b506104496105be565b5063ffffffff604435818116036103b057606435908116036101625780516020926020820182811067ffffffffffffffff8211176104d257839492919452838152825193849260208452825192836020860152825b8481106104bc57505050828201840152601f01601f19168101030190f35b818101830151888201880152879550820161049e565b634e487b7160e01b82526041600452602482fd5b503461013f5760c036600319011261013f576105006105a3565b50606036602319011261013f5760a43567ffffffffffffffff8082116103b057366023830112156103b05781600401359081116103b0573691016024011161013f5780f35b506101ef916105533661063d565b505081602061056061069e565b828152015234156105955734915b61057661069e565b8381526020908101918252915192835251908201529081906040820190565b66038d7ea4c680009161056e565b600435906001600160a01b03821682036105b957565b600080fd5b602435906001600160a01b03821682036105b957565b604435906001600160a01b03821682036105b957565b6024359063ffffffff821682036105b957565b346105b95760803660031901126105b9576001600160a01b03600435818116036105b95760243563ffffffff8116036105b957604435908116036105b957005b600319906040818301126105b9576004359167ffffffffffffffff83116105b9578260a0920301126105b957600401906024356001600160a01b03811681036105b95790565b346105b95760203660031901126105b95761069c6105a3565b005b604051906040820182811067ffffffffffffffff8211176106be57604052565b634e487b7160e01b600052604160045260246000fdfea2646970667358221220cd7a12a64610079a41e681c9a6eab3595169ffb486a11273ce4d1c4880baf41364736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

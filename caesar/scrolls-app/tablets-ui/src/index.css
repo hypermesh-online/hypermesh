@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-caesar-dark text-white font-caesar;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-tablets-purple text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-600 transition-colors;
+  }
+  .btn-secondary {
+    @apply bg-caesar-gray text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-600 transition-colors;
+  }
+  .btn-cyan {
+    @apply bg-tablets-cyan text-white px-4 py-2 rounded-lg font-medium hover:bg-cyan-600 transition-colors;
+  }
+  .card {
+    @apply bg-caesar-gray rounded-lg p-6 border border-gray-700;
+  }
+  .card-analytics {
+    @apply bg-gradient-to-br from-tablets-purple to-tablets-cyan rounded-xl p-6 text-white shadow-lg;
+  }
+  .metric-card {
+    @apply bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors;
+  }
+  .input-field {
+    @apply bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:border-tablets-purple focus:outline-none;
+  }
+}

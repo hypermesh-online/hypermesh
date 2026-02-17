@@ -1,0 +1,30 @@
+{
+  "name": "caesar-scrolls-app",
+  "version": "1.0.0",
+  "description": "Caesar Token Ecosystem - Complete DeFi Platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix agora-dex\" \"npm run dev --prefix satchel-wallet\" \"npm run dev --prefix tablets-ui\"",
+    "dev:agora": "npm run dev --prefix agora-dex",
+    "dev:satchel": "npm run dev --prefix satchel-wallet", 
+    "dev:tablets": "npm run dev --prefix tablets-ui",
+    "build": "npm run build --prefix agora-dex && npm run build --prefix satchel-wallet && npm run build --prefix tablets-ui",
+    "install:all": "npm install && cd agora-dex && npm install && cd ../satchel-wallet && npm install && cd ../tablets-ui && npm install",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "caesar",
+    "token",
+    "defi",
+    "dex",
+    "wallet",
+    "analytics",
+    "demurrage",
+    "layerzero"
+  ],
+  "author": "Caesar Token Team",
+  "license": "MIT"
+}

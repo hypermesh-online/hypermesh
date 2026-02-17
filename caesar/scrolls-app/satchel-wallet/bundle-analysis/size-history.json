@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2025-09-11T13:12:45.234Z",
+    "totalSize": 2735926,
+    "chunks": {
+      "web3": 855889,
+      "core": 488769,
+      "index_1": 376658,
+      "index_2": 330588,
+      "react": 141463,
+      "index_3": 129465,
+      "index_4": 34439
+    },
+    "formattedSize": "2.6MB"
+  }
+]

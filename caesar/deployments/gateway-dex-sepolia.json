@@ -1,0 +1,21 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0xfD33Cf15893DaC5a0ACFdE12f06DAC63a330b331",
+  "timestamp": "2025-01-09T15:00:00.000Z",
+  "contracts": {
+    "factory": "0xAe0DfF19f44D3544139d900a3f9f6c03C6764538",
+    "pairs": {
+      "CAES/WETH": "pending_creation"
+    }
+  },
+  "tokens": {
+    "CAESAR": "0x6299744254422aadb6a57183f47eaae1678cf86cc58a0c78dfc4fd2caa3ba2a4",
+    "WETH": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
+  },
+  "configuration": {
+    "tradingFee": "0.3%",
+    "protocolFee": "16.67%"
+  },
+  "status": "deployed_and_ready"
+}
