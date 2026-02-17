@@ -380,14 +380,14 @@ impl IntegrationValidator {
 
         match pipeline.process_asset(test_asset).await {
             Ok(processed) => {
-                if processed.encrypted_shards.is_empty() {
+                if processed.shards.is_empty() {
                     ValidationResult::Failed {
                         reason: "Pipeline produced no shards".to_string(),
                         details: vec![],
                     }
                 } else {
                     ValidationResult::Passed {
-                        message: format!("Pipeline produced {} shards", processed.encrypted_shards.len()),
+                        message: format!("Pipeline produced {} shards", processed.shards.len()),
                         duration_ms: start.elapsed().as_millis() as u64,
                     }
                 }
@@ -451,12 +451,8 @@ impl IntegrationValidator {
         };
 
         // Step 3: Storage deduplication
-        // ProcessedAsset has encrypted_shards
-        for encrypted_shard in &processed.encrypted_shards {
-            let shard = crate::assets::pipeline::Shard {
-                data: encrypted_shard.ciphertext.clone(),
-                metadata: Default::default(),
-            };
+        // ProcessedAsset has shards (already encrypted before sharding)
+        for shard in &processed.shards {
             if let Err(e) = storage.store_shard(shard.clone()).await {
                 return ValidationResult::Failed {
                     reason: "Storage integration failed".to_string(),
@@ -518,12 +514,8 @@ impl IntegrationValidator {
             };
 
             // Store and deduplicate
-            // ProcessedAsset has encrypted_shards
-        for encrypted_shard in &processed.encrypted_shards {
-            let shard = crate::assets::pipeline::Shard {
-                data: encrypted_shard.ciphertext.clone(),
-                metadata: Default::default(),
-            };
+            // ProcessedAsset has shards (already encrypted before sharding)
+            for shard in &processed.shards {
                 if let Err(e) = storage.store_shard(shard.clone()).await {
                     return ValidationResult::Failed {
                         reason: format!("E2E storage failed for {}", label),

@@ -89,7 +89,7 @@ impl Default for ShardMetadata {
 }
 
 /// Individual shard
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Shard {
     /// Shard data
     #[serde(with = "serde_bytes")]

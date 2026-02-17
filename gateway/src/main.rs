@@ -19,7 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::GatewayConfig;
@@ -96,15 +96,23 @@ async fn handle_connection(
     // Create HTTP/3 connection
     let mut h3_conn: h3::server::Connection<_, Bytes> = Connection::new(h3_quinn::Connection::new(connection)).await?;
 
-    // Handle requests - simplified for h3 0.0.8 API
+    // Handle requests via h3 0.0.8 RequestResolver API
     loop {
         match h3_conn.accept().await {
-            Ok(Some(_request_resolver)) => {
-                // TODO: Fix RequestResolver API incompatibility
-                // For now, skip RequestResolver and handle next iteration
-                // This is a temporary workaround for h3 0.0.8 API differences
-                warn!("Request received but RequestResolver API incompatible - skipping");
-                continue;
+            Ok(Some(resolver)) => {
+                let router = router.clone();
+                tokio::spawn(async move {
+                    match resolver.resolve_request().await {
+                        Ok((req, stream)) => {
+                            if let Err(e) = handle_request(req, stream, router).await {
+                                error!("Failed to handle request: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to resolve request: {}", e);
+                        }
+                    }
+                });
             }
             Ok(None) => {
                 // Connection closed

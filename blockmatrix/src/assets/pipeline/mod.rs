@@ -6,18 +6,19 @@
 //!
 //! Revolutionary asset processing pipeline with matrix-aware distribution.
 //!
-//! ## Pipeline Stages
+//! ## Pipeline Stages (EXACT ORDER)
 //!
-//! 1. **Compression** (Brotli): Configurable compression levels 1-11 with streaming support
-//! 2. **Encryption** (Kyber-1024 + AES-256-GCM): Quantum-resistant encryption
-//! 3. **Sharding** (Reed-Solomon): Erasure coding with configurable redundancy
-//! 4. **Distribution** (Matrix-aware): Optimal shard placement using tensor operations
+//! 1. **Compression** (Brotli): Compress raw data first for best ratio (levels 1-11)
+//! 2. **Encryption** (AES-256-GCM, whole blob): Encrypt the entire compressed blob
+//!    NOTE: Target is Kyber-1024 whole-blob encryption; currently uses AES-256-GCM
+//! 3. **Sharding** (Reed-Solomon): Split encrypted data into erasure-coded shards
+//! 4. **Distribution** (Matrix-aware): Place shards at optimal matrix positions
 //!
 //! ## Performance Targets
 //!
 //! - **Throughput**: 1GB/s end-to-end
 //! - **Compression**: Brotli level 4 (balance speed/ratio)
-//! - **Encryption**: AES-256-GCM with hardware acceleration
+//! - **Encryption**: AES-256-GCM whole-blob (target: Kyber-1024)
 //! - **Sharding**: 10+4 Reed-Solomon (10 data, 4 parity)
 //! - **Distribution**: <100ms to calculate placement
 

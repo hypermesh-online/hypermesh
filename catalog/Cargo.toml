@@ -12,6 +12,9 @@ keywords = ["assets", "hypermesh", "package-manager", "trustchain", "distributed
 # HyperMesh integration for consensus and asset management
 blockmatrix = { path = "../blockmatrix" }
 
+# STOQ transport layer for P2P communication
+stoq = { path = "../stoq" }
+
 # Core async runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }

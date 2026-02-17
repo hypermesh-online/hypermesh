@@ -306,7 +306,7 @@ async fn test_end_to_end_pipeline() {
     println!("Original size: {} bytes", test_data.len());
     println!("Compressed size: {} bytes", processed.stats.compression.compressed_size);
     println!("Compression ratio: {:.2}%", processed.stats.compression.ratio * 100.0);
-    println!("Encrypted shards: {}", processed.encrypted_shards.len());
+    println!("Shards: {}", processed.shards.len());
     println!("Total time: {:.2} ms", duration.as_secs_f64() * 1000.0);
     println!("Throughput: {:.2} MB/s", throughput_mbps);
 
@@ -319,8 +319,7 @@ async fn test_end_to_end_pipeline() {
     // Test partial reconstruction (with missing shards)
     // Remove last 4 shards (simulating loss of 4 parity shards)
     let mut partial_processed = processed.clone();
-    partial_processed.encrypted_shards.truncate(10);
-    partial_processed.shard_keys.truncate(10);
+    partial_processed.shards.truncate(10);
 
     let reconstructed = pipeline.reconstruct_asset(&partial_processed).await.unwrap();
     assert_eq!(reconstructed, test_data);
@@ -517,15 +516,14 @@ async fn test_integration_with_sprint_2_3_multi_network() {
 
     println!("Asset processed for multi-network distribution:");
     println!("  Asset ID: {}", processed.asset_id);
-    println!("  Total shards: {}", processed.encrypted_shards.len());
+    println!("  Total shards: {}", processed.shards.len());
     println!("  Can be validated across networks: ✓");
     println!("  Blockchain proof ready: ✓");
 
     // Simulate recovery from different network participants
     // Network A has 7 shards, Network B has 3 shards
     let mut partial_processed = processed.clone();
-    partial_processed.encrypted_shards.truncate(10);
-    partial_processed.shard_keys.truncate(10);
+    partial_processed.shards.truncate(10);
 
     let reconstructed = pipeline.reconstruct_asset(&partial_processed).await.unwrap();
     assert_eq!(reconstructed, test_data);

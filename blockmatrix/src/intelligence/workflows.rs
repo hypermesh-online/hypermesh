@@ -558,8 +558,12 @@ mod tests {
             let asset_id = asset.id.clone();
             Ok(ProcessedAsset {
                 asset_id: asset.id,
-                encrypted_shards: vec![],
-                shard_keys: vec![],
+                shards: vec![],
+                encryption_key: crate::assets::pipeline::ShardKey {
+                    key: vec![0u8; 32],
+                    nonce: vec![0u8; 12],
+                    shard_index: 0,
+                },
                 distributed: DistributedAsset {
                     asset_id,
                     placements: vec![],

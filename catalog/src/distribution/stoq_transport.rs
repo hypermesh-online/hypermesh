@@ -4,7 +4,9 @@
 
 //! STOQ Transport Layer Integration for P2P Distribution
 //!
-//! Uses STOQ for instruction-based retrieval patterns
+//! Uses the real STOQ crate (stoq::StoqTransport) for QUIC-over-IPv6 P2P
+//! communication. StoqTransport manages connection pooling, FALCON crypto,
+//! adaptive optimization, and bidirectional streams internally.
 
 use anyhow::{Result, Context};
 use std::sync::Arc;
@@ -20,11 +22,16 @@ use crate::assets::{AssetPackage, AssetPackageId};
 use super::{DistributionConfig, PackageManager};
 use super::dht::NodeId;
 
-/// STOQ transport layer for P2P communication
+/// STOQ transport layer for P2P communication.
+///
+/// Wraps `stoq::StoqTransport` which provides QUIC-over-IPv6 with connection
+/// pooling, FALCON quantum-resistant crypto, adaptive optimization, and eBPF
+/// acceleration. Each connection yields `quinn::SendStream`/`quinn::RecvStream`
+/// bidirectional streams that implement `AsyncWrite`/`AsyncRead`.
 pub struct StoqTransportLayer {
-    /// STOQ endpoint
-    endpoint: Arc<stoq::Endpoint>,
-    /// Active connections
+    /// Real STOQ transport (manages quinn endpoint, connection pools, crypto)
+    transport: Arc<stoq::StoqTransport>,
+    /// Active connections keyed by peer NodeId
     connections: Arc<RwLock<HashMap<NodeId, Arc<stoq::Connection>>>>,
     /// Incoming connection handler
     incoming_handler: Arc<RwLock<Option<mpsc::Sender<IncomingRequest>>>>,
@@ -162,7 +169,7 @@ pub struct ChunkData {
     pub hash: String,
 }
 
-/// Connection pool for multiplexing
+/// Connection pool for multiplexing (uses real stoq::Connection)
 pub struct ConnectionPool {
     /// Pool of connections per peer
     pools: Arc<RwLock<HashMap<NodeId, Vec<Arc<stoq::Connection>>>>>,
@@ -193,27 +200,31 @@ struct RateLimiter {
 }
 
 impl StoqTransportLayer {
-    /// Create a new STOQ transport layer
+    /// Create a new STOQ transport layer backed by real stoq::StoqTransport.
+    ///
+    /// This initializes the QUIC-over-IPv6 transport with connection pooling,
+    /// FALCON quantum-resistant crypto, and adaptive optimization.
     pub async fn new(dist_config: DistributionConfig) -> Result<Self> {
-        // Create STOQ configuration
+        // Build real STOQ TransportConfig from distribution settings
         let mut stoq_config = stoq::TransportConfig::default();
         stoq_config.bind_address = Ipv6Addr::UNSPECIFIED;
-        stoq_config.port = 8080; // Default port, can be configured
+        stoq_config.port = stoq::DEFAULT_PORT;
         stoq_config.max_connections = Some(dist_config.max_concurrent_transfers as u32);
-        stoq_config.enable_0rtt = true;
+        // 0-RTT disabled by default in STOQ for security (replay attack risk)
+        stoq_config.enable_0rtt = false;
         stoq_config.enable_migration = true;
 
-        // Create STOQ endpoint
-        let endpoint = Arc::new(
-            stoq::Endpoint::new(stoq_config)
+        // Create real STOQ transport (manages quinn endpoint internally)
+        let transport = Arc::new(
+            stoq::StoqTransport::new(stoq_config)
                 .await
-                .context("Failed to create STOQ endpoint")?
+                .context("Failed to create STOQ transport")?
         );
 
-        // Create transport configuration
+        // Create transport layer configuration
         let config = TransportLayerConfig {
             bind_addr: Ipv6Addr::UNSPECIFIED,
-            port: 8080,
+            port: stoq::DEFAULT_PORT,
             max_connections: dist_config.max_concurrent_transfers,
             connection_timeout: Duration::from_secs(30),
             max_buffer_size: 16 * 1024 * 1024, // 16MB
@@ -234,7 +245,7 @@ impl StoqTransportLayer {
         ));
 
         Ok(Self {
-            endpoint,
+            transport,
             connections: Arc::new(RwLock::new(HashMap::new())),
             incoming_handler: Arc::new(RwLock::new(None)),
             config,
@@ -243,19 +254,32 @@ impl StoqTransportLayer {
         })
     }
 
-    /// Connect to a peer
+    /// Connect to a peer using real STOQ transport.
+    ///
+    /// Creates a stoq::Endpoint from the socket address and uses
+    /// StoqTransport::connect() which handles TLS, FALCON crypto,
+    /// connection pooling, and adaptive optimization internally.
     pub async fn connect(&self, peer_addr: SocketAddr) -> Result<NodeId> {
-        // Create connection using STOQ
-        let connection = self.endpoint
-            .connect(peer_addr)
+        // Build STOQ endpoint from peer address (IPv6 required)
+        let ipv6_addr = match peer_addr {
+            SocketAddr::V6(v6) => *v6.ip(),
+            SocketAddr::V4(_) => {
+                return Err(anyhow::anyhow!(
+                    "STOQ requires IPv6 addresses, got IPv4: {}",
+                    peer_addr
+                ));
+            }
+        };
+        let stoq_endpoint = stoq::Endpoint::new(ipv6_addr, peer_addr.port());
+
+        // Connect using real STOQ transport (handles TLS, pooling, crypto)
+        let connection = self.transport
+            .connect(&stoq_endpoint)
             .await
-            .context("Failed to connect to peer")?;
+            .context("Failed to connect to peer via STOQ")?;
 
         // Generate node ID from peer address
         let node_id = NodeId::from_address(&peer_addr);
-
-        // Wrap connection in Arc for sharing
-        let connection = Arc::new(connection);
 
         // Store connection
         {
@@ -269,7 +293,11 @@ impl StoqTransportLayer {
         Ok(node_id)
     }
 
-    /// Send a request to a peer
+    /// Send a request to a peer over a STOQ bidirectional stream.
+    ///
+    /// Opens a quinn bidirectional stream via stoq::Connection::open_bi(),
+    /// serializes the request with bincode, sends it, then reads the response.
+    /// quinn::SendStream implements AsyncWrite, quinn::RecvStream implements AsyncRead.
     pub async fn send_request(
         &self,
         peer_id: &NodeId,
@@ -277,26 +305,27 @@ impl StoqTransportLayer {
     ) -> Result<ResponseData> {
         let connection = self.get_connection(peer_id).await?;
 
-        // Open a bidirectional stream
+        // Open a bidirectional stream (returns quinn::SendStream, quinn::RecvStream)
         let (mut send, mut recv) = connection
             .open_bi()
             .await
-            .context("Failed to open stream")?;
+            .context("Failed to open bidirectional stream")?;
 
         // Apply bandwidth limiting for upload
         let request_data = bincode::serialize(&request)?;
         self.bandwidth_manager.limit_upload(request_data.len()).await?;
 
-        // Send request using AsyncWriteExt
+        // Send request (quinn::SendStream implements AsyncWrite via tokio)
         send.write_all(&request_data).await
             .context("Failed to write request data")?;
-        // Shutdown the send stream (STOQ's SendStream doesn't have finish(), use shutdown)
-        send.shutdown().await
-            .context("Failed to shutdown send stream")?;
+        // Signal end of request by finishing the send stream
+        send.finish()
+            .context("Failed to finish send stream")?;
 
-        // Receive response using AsyncReadExt
-        let mut response_data = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
-        recv.read_to_end(&mut response_data).await
+        // Receive response (quinn::RecvStream implements AsyncRead)
+        let response_data = recv
+            .read_to_end(self.config.max_buffer_size)
+            .await
             .context("Failed to read response data")?;
 
         // Apply bandwidth limiting for download
@@ -308,31 +337,36 @@ impl StoqTransportLayer {
         Ok(response)
     }
 
-    /// Listen for incoming package requests
+    /// Listen for incoming package requests via STOQ transport.
+    ///
+    /// Spawns a background task that accepts incoming STOQ connections
+    /// and handles package requests (metadata, chunks, etc.) on each.
     pub async fn listen_for_package_requests(
         &self,
         package_id: AssetPackageId,
         package_manager: Arc<PackageManager>,
     ) -> Result<()> {
-        let endpoint = self.endpoint.clone();
-        let connections = self.connections.clone();
+        let transport = self.transport.clone();
 
-        // Spawn listener task
+        // Spawn listener task that accepts connections via StoqTransport
         tokio::spawn(async move {
-            while let Some(incoming) = endpoint.accept().await {
-                let connection = match incoming.accept().await {
+            loop {
+                let connection = match transport.accept().await {
                     Ok(conn) => conn,
                     Err(e) => {
-                        tracing::warn!("Failed to accept connection: {}", e);
+                        tracing::warn!("Failed to accept STOQ connection: {}", e);
+                        // Brief backoff before retrying
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                         continue;
                     }
                 };
 
-                // Handle connection
+                // Handle each connection in its own task
+                let pm = package_manager.clone();
                 tokio::spawn(Self::handle_connection(
-                    Arc::new(connection),
+                    connection,
                     package_id,
-                    package_manager.clone(),
+                    pm,
                 ));
             }
         });
@@ -340,19 +374,23 @@ impl StoqTransportLayer {
         Ok(())
     }
 
-    /// Handle incoming connection
+    /// Handle incoming connection streams.
+    ///
+    /// Accepts bidirectional streams from a stoq::Connection, reads bincode
+    /// requests, dispatches to handle_request, and writes bincode responses.
+    /// quinn::SendStream/RecvStream provide the AsyncWrite/AsyncRead impls.
     async fn handle_connection(
         connection: Arc<stoq::Connection>,
         package_id: AssetPackageId,
         package_manager: Arc<PackageManager>,
     ) {
         loop {
+            // accept_bi returns (quinn::SendStream, quinn::RecvStream)
             match connection.accept_bi().await {
-                Ok((mut send, mut recv)) => {
-                    // Receive request
-                    let mut request_data = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
-                    let request_data = match recv.read_to_end(&mut request_data).await {
-                        Ok(_) => request_data,
+                Ok((mut send, recv)) => {
+                    // Receive request via quinn::RecvStream::read_to_end
+                    let request_data = match recv.read_to_end(16 * 1024 * 1024).await {
+                        Ok(data) => data,
                         Err(e) => {
                             tracing::warn!("Failed to receive request: {}", e);
                             break;
@@ -375,7 +413,7 @@ impl StoqTransportLayer {
                         package_manager.clone(),
                     ).await;
 
-                    // Send response
+                    // Send response via quinn::SendStream (implements AsyncWrite)
                     let response_data = match bincode::serialize(&response) {
                         Ok(data) => data,
                         Err(e) => {
@@ -387,7 +425,8 @@ impl StoqTransportLayer {
                     if let Err(e) = send.write_all(&response_data).await {
                         tracing::warn!("Failed to send response: {}", e);
                     }
-                    let _ = send.shutdown().await;
+                    // Signal end of response
+                    let _ = send.finish();
                 }
                 Err(e) => {
                     tracing::debug!("Connection closed: {}", e);
@@ -455,11 +494,11 @@ impl StoqTransportLayer {
             .ok_or_else(|| anyhow::anyhow!("Not connected to peer {}", peer_id))
     }
 
-    /// Disconnect from a peer
+    /// Disconnect from a peer by closing the STOQ connection.
     pub async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
         let mut connections = self.connections.write().await;
         if let Some(connection) = connections.remove(peer_id) {
-            connection.close(0u32.into(), b"disconnect");
+            connection.close();
         }
         Ok(())
     }
@@ -591,120 +630,11 @@ impl RateLimiter {
     }
 }
 
-// Mock STOQ types for compilation (will be replaced with actual STOQ integration)
-mod stoq {
-    use super::*;
-
-    #[derive(Clone)]
-    pub struct TransportConfig {
-        pub bind_address: Ipv6Addr,
-        pub port: u16,
-        pub max_connections: Option<u32>,
-        pub enable_0rtt: bool,
-        pub enable_migration: bool,
-    }
-
-    impl Default for TransportConfig {
-        fn default() -> Self {
-            Self {
-                bind_address: Ipv6Addr::UNSPECIFIED,
-                port: 8080,
-                max_connections: None,
-                enable_0rtt: true,
-                enable_migration: true,
-            }
-        }
-    }
-
-    pub struct Endpoint {
-        config: TransportConfig,
-    }
-
-    impl Endpoint {
-        pub async fn new(_config: TransportConfig) -> Result<Self> {
-            Ok(Self {
-                config: TransportConfig::default(),
-            })
-        }
-
-        pub async fn connect(&self, _addr: SocketAddr) -> Result<Connection> {
-            Ok(Connection::new())
-        }
-
-        pub async fn accept(&self) -> Option<IncomingConnection> {
-            None
-        }
-    }
-
-    pub struct Connection;
-
-    impl Connection {
-        fn new() -> Self {
-            Self
-        }
-
-        pub async fn open_bi(&self) -> Result<(SendStream, RecvStream)> {
-            Ok((SendStream, RecvStream))
-        }
-
-        pub async fn accept_bi(&self) -> Result<(SendStream, RecvStream)> {
-            Ok((SendStream, RecvStream))
-        }
-
-        pub fn close(&self, _code: VarInt, _reason: &[u8]) {}
-    }
-
-    pub struct IncomingConnection;
-
-    impl IncomingConnection {
-        pub async fn accept(self) -> Result<Connection> {
-            Ok(Connection::new())
-        }
-    }
-
-    pub struct SendStream;
-
-    impl tokio::io::AsyncWrite for SendStream {
-        fn poll_write(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-            buf: &[u8],
-        ) -> std::task::Poll<std::io::Result<usize>> {
-            std::task::Poll::Ready(Ok(buf.len()))
-        }
-
-        fn poll_flush(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-        ) -> std::task::Poll<std::io::Result<()>> {
-            std::task::Poll::Ready(Ok(()))
-        }
-
-        fn poll_shutdown(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-        ) -> std::task::Poll<std::io::Result<()>> {
-            std::task::Poll::Ready(Ok(()))
-        }
-    }
-
-    pub struct RecvStream;
-
-    impl tokio::io::AsyncRead for RecvStream {
-        fn poll_read(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-            _buf: &mut tokio::io::ReadBuf<'_>,
-        ) -> std::task::Poll<std::io::Result<()>> {
-            std::task::Poll::Ready(Ok(()))
-        }
-    }
-
-    pub struct VarInt(u32);
-
-    impl From<u32> for VarInt {
-        fn from(v: u32) -> Self {
-            Self(v)
-        }
-    }
-}
+// Real STOQ integration: The `stoq` crate is imported at crate level via
+// Cargo.toml dependency. All types (StoqTransport, Connection, Endpoint,
+// TransportConfig) come from the real stoq crate.
+//
+// stoq::Connection::open_bi() returns (quinn::SendStream, quinn::RecvStream)
+// which implement tokio::io::AsyncWrite and tokio::io::AsyncRead respectively.
+// stoq::Connection::accept_bi() does the same for incoming streams.
+// stoq::Connection::close() gracefully closes with code 0.

@@ -68,10 +68,11 @@ impl Default for PipelineStages {
 pub struct ProcessedAsset {
     /// Original asset ID
     pub asset_id: String,
-    /// Encrypted shards
-    pub encrypted_shards: Vec<EncryptedData>,
-    /// Shard encryption keys
-    pub shard_keys: Vec<ShardKey>,
+    /// Shards of the encrypted blob
+    pub shards: Vec<Shard>,
+    /// Encryption key for the whole compressed blob
+    /// TODO: Should use Kyber-1024 for whole-blob encryption instead of per-shard AES-256-GCM
+    pub encryption_key: ShardKey,
     /// Distribution information
     pub distributed: DistributedAsset,
     /// Complete pipeline statistics
@@ -145,13 +146,22 @@ impl AssetPipeline {
     }
 
     /// Process asset through complete pipeline
+    ///
+    /// Pipeline order: Compress -> Encrypt (whole blob) -> Shard -> Distribute
+    ///
+    /// This order ensures:
+    /// 1. Compression operates on raw data for best ratio
+    /// 2. Encryption covers the entire compressed blob (not per-shard)
+    /// 3. Sharding splits already-encrypted data into erasure-coded shards
+    /// 4. Distribution places shards at optimal matrix positions
     pub async fn process_asset(&self, asset: Asset) -> PipelineResult<ProcessedAsset> {
         let start = std::time::Instant::now();
         let original_size = asset.data.len();
 
         tracing::info!("Starting pipeline for asset {} ({} bytes)", asset.id, original_size);
 
-        // Stage 1: Compression
+        // Stage 1: Compression (Brotli)
+        // Compress raw data first for best compression ratio
         let (compressed_data, compression_stats) = if self.config.stages_enabled.compression {
             tracing::debug!("Stage 1: Compression");
             self.compressor.compress(&asset.data)?
@@ -165,21 +175,40 @@ impl AssetPipeline {
             compression_stats.ratio
         );
 
-        // Stage 2: Sharding
+        // Stage 2: Encryption (whole blob)
+        // Encrypt the entire compressed blob, NOT per-shard
+        // TODO: Should use Kyber-1024 for whole-blob encryption instead of per-shard AES-256-GCM
+        let (encrypted_blob, encryption_key, encryption_stats) = if self.config.stages_enabled.encryption {
+            tracing::debug!("Stage 2: Encryption (whole blob)");
+            let key = self.encryptor.generate_key()?;
+            let (encrypted, stats) = self.encryptor.encrypt(&compressed_data, &key)?;
+            (encrypted.ciphertext, key, stats)
+        } else {
+            let key = self.encryptor.generate_key()?;
+            (compressed_data, key, EncryptionStats::default())
+        };
+
+        tracing::info!("Encrypted: {} bytes -> {} bytes",
+            encryption_stats.original_size,
+            encryption_stats.encrypted_size
+        );
+
+        // Stage 3: Sharding (Reed-Solomon)
+        // Shard the encrypted blob into erasure-coded pieces
         let (shards, sharding_stats) = if self.config.stages_enabled.sharding {
-            tracing::debug!("Stage 2: Sharding");
-            self.sharder.shard(&compressed_data)?
+            tracing::debug!("Stage 3: Sharding");
+            self.sharder.shard(&encrypted_blob)?
         } else {
             // No sharding - create single shard
             let metadata = crate::assets::pipeline::sharding::ShardMetadata {
                 index: 0,
                 is_parity: false,
-                size: compressed_data.len(),
-                original_size: compressed_data.len(),
-                hash: hex::encode(&compressed_data),
+                size: encrypted_blob.len(),
+                original_size: encrypted_blob.len(),
+                hash: hex::encode(&encrypted_blob),
             };
             let shard = Shard {
-                data: compressed_data,
+                data: encrypted_blob,
                 metadata,
             };
             (vec![shard], ShardingStats::default())
@@ -190,42 +219,15 @@ impl AssetPipeline {
             sharding_stats.parity_shards
         );
 
-        // Stage 3: Encryption
-        let (encrypted_shards, shard_keys, encryption_stats) = if self.config.stages_enabled.encryption {
-            tracing::debug!("Stage 3: Encryption");
-
-            // Generate keys for each shard
-            let keys = self.encryptor.generate_shard_keys(shards.len())?;
-
-            // Encrypt each shard
-            let shard_data: Vec<_> = shards.iter().map(|s| s.data.clone()).collect();
-            let (encrypted, stats) = self.encryptor.encrypt_shards(&shard_data, &keys)?;
-
-            (encrypted, keys, stats)
-        } else {
-            // No encryption - wrap shards as "encrypted"
-            let encrypted: Vec<_> = shards.iter().map(|s| EncryptedData {
-                ciphertext: s.data.clone(),
-                nonce: vec![],
-                original_size: s.data.len(),
-            }).collect();
-            let keys = self.encryptor.generate_shard_keys(shards.len())?;
-            (encrypted, keys, EncryptionStats::default())
-        };
-
-        tracing::info!("Encrypted: {} shards ({} bytes total)",
-            encryption_stats.shards_encrypted,
-            encryption_stats.encrypted_size
-        );
-
-        // Stage 4: Distribution
+        // Stage 4: Distribution (tensor-based)
+        // Place shards at optimal matrix positions
         let (distributed, distribution_stats) = if self.config.stages_enabled.distribution {
             tracing::debug!("Stage 4: Distribution");
-            self.distributor.distribute(asset.id.clone(), encrypted_shards.len())?
+            self.distributor.distribute(asset.id.clone(), shards.len())?
         } else {
             // No distribution - return empty stats
             let metadata = crate::assets::pipeline::distribution::DistributionMetadata {
-                total_shards: encrypted_shards.len(),
+                total_shards: shards.len(),
                 networks_used: 1,
                 avg_shard_distance: 0.0,
                 quality_score: 0.0,
@@ -247,7 +249,7 @@ impl AssetPipeline {
 
         // Calculate total statistics
         let total_duration_ms = start.elapsed().as_millis() as u64;
-        let final_size: usize = encrypted_shards.iter().map(|s| s.ciphertext.len()).sum();
+        let final_size: usize = shards.iter().map(|s| s.data.len()).sum();
 
         let stats = PipelineStats {
             compression: compression_stats,
@@ -270,58 +272,43 @@ impl AssetPipeline {
 
         Ok(ProcessedAsset {
             asset_id: asset.id,
-            encrypted_shards,
-            shard_keys,
+            shards,
+            encryption_key,
             distributed,
             stats,
         })
     }
 
     /// Reconstruct asset from processed components
+    ///
+    /// Reverse pipeline order: Reconstruct shards -> Decrypt -> Decompress
     pub async fn reconstruct_asset(
         &self,
         processed: &ProcessedAsset,
     ) -> PipelineResult<Vec<u8>> {
         tracing::info!("Reconstructing asset {}", processed.asset_id);
 
-        // Stage 1: Decrypt shards
-        let decrypted_shards = if self.config.stages_enabled.encryption {
-            tracing::debug!("Stage 1: Decryption");
-            self.encryptor.decrypt_shards(&processed.encrypted_shards, &processed.shard_keys)?
+        // Stage 1: Reconstruct encrypted blob from shards
+        let encrypted_blob = if self.config.stages_enabled.sharding {
+            tracing::debug!("Stage 1: Shard reconstruction");
+            self.sharder.reconstruct(&processed.shards)?
         } else {
-            processed.encrypted_shards.iter()
-                .map(|e| e.ciphertext.clone())
-                .collect()
+            processed.shards.first()
+                .map(|s| s.data.clone())
+                .unwrap_or_default()
         };
 
-        // Stage 2: Reconstruct from shards
-        let compressed_data = if self.config.stages_enabled.sharding {
-            tracing::debug!("Stage 2: Shard reconstruction");
-
-            // Convert decrypted data back to Shard objects
-            // Note: We create new hashes since the data has been through encryption
-            let shards: Vec<Shard> = decrypted_shards.iter().enumerate().map(|(i, data)| {
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(data);
-                let hash = hex::encode(hasher.finalize());
-
-                let metadata = crate::assets::pipeline::sharding::ShardMetadata {
-                    index: i,
-                    is_parity: i >= self.config.sharding.data_shards,
-                    size: data.len(),
-                    original_size: data.len(),
-                    hash,
-                };
-                Shard {
-                    data: data.clone(),
-                    metadata,
-                }
-            }).collect();
-
-            self.sharder.reconstruct(&shards)?
+        // Stage 2: Decrypt the whole blob
+        let compressed_data = if self.config.stages_enabled.encryption {
+            tracing::debug!("Stage 2: Decryption (whole blob)");
+            let encrypted = EncryptedData {
+                ciphertext: encrypted_blob,
+                nonce: processed.encryption_key.nonce.clone(),
+                original_size: 0, // Not needed for decryption
+            };
+            self.encryptor.decrypt(&encrypted, &processed.encryption_key)?
         } else {
-            decrypted_shards.into_iter().next().unwrap_or_default()
+            encrypted_blob
         };
 
         // Stage 3: Decompress
@@ -373,8 +360,8 @@ mod tests {
 
         // Verify processing
         assert_eq!(processed.asset_id, "test-asset-1");
-        assert!(!processed.encrypted_shards.is_empty());
-        assert_eq!(processed.encrypted_shards.len(), processed.shard_keys.len());
+        assert!(!processed.shards.is_empty());
+        assert_eq!(processed.encryption_key.key.len(), 32); // AES-256 key
         assert!(processed.stats.total_throughput_mbps > 0.0);
 
         // Reconstruct and verify
@@ -469,7 +456,7 @@ mod tests {
         assert!(processed.stats.final_size > 0);
         assert!(processed.stats.total_duration_ms > 0);
         assert!(processed.stats.compression.ratio > 0.0);
-        assert!(processed.stats.encryption.shards_encrypted > 0);
+        assert!(processed.stats.encryption.encrypted_size > 0);
         assert!(processed.stats.sharding.data_shards > 0);
         assert!(processed.stats.distribution.shards_distributed > 0);
     }
@@ -504,7 +491,7 @@ mod tests {
 
         assert_eq!(processed.stats.sharding.data_shards, 6);
         assert_eq!(processed.stats.sharding.parity_shards, 2);
-        assert_eq!(processed.encrypted_shards.len(), 8);
+        assert_eq!(processed.shards.len(), 8);
 
         let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
         assert_eq!(reconstructed, original_data);

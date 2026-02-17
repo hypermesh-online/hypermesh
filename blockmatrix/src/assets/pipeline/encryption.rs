@@ -2,9 +2,10 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Encryption Stage - Kyber-1024 + AES-256-GCM quantum-resistant encryption
+//! Encryption Stage - AES-256-GCM encryption for the asset pipeline
 //!
-//! Provides per-shard encryption with quantum-resistant key exchange.
+//! Encrypts the whole compressed blob before sharding (not per-shard).
+//! TODO: Should use Kyber-1024 for whole-blob encryption instead of AES-256-GCM
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
 use serde::{Serialize, Deserialize};

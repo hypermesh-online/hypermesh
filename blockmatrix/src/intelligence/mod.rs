@@ -447,15 +447,10 @@ impl IntelligenceLayer {
 
         // Step 4: Deduplicate via content addressing
         let mut deduplicated_handles = Vec::new();
-        // ProcessedAsset has encrypted_shards, not shards
-        for encrypted_shard in &processed.encrypted_shards {
-            // ContentAddressedStorage has store_shard() method
-            let shard = crate::assets::pipeline::Shard {
-                data: encrypted_shard.ciphertext.clone(),
-                metadata: Default::default(),
-            };
+        // ProcessedAsset has shards (already encrypted before sharding)
+        for shard in &processed.shards {
             let dedup_result = self.content_storage
-                .store_shard(shard)
+                .store_shard(shard.clone())
                 .await
                 .context("Failed to deduplicate shard")?;
             deduplicated_handles.push(dedup_result);
@@ -530,8 +525,8 @@ impl IntelligenceLayer {
         // ContentAddressedStorage has get_content_address() method
         use crate::assets::storage::compute_hash;
         let file_hash = compute_hash(&asset.data);
-        let shard_hashes: Vec<crate::assets::storage::Hash> = processed.encrypted_shards.iter()
-            .map(|s| compute_hash(&s.ciphertext))
+        let shard_hashes: Vec<crate::assets::storage::Hash> = processed.shards.iter()
+            .map(|s| compute_hash(&s.data))
             .collect();
 
         // Store content mapping for retrieval
@@ -780,7 +775,7 @@ impl IntelligenceLayer {
     ) -> Result<Vec<MatrixCoordinate>> {
         // MatrixFoundation doesn't have calculate_shard_positions
         // Create positions based on shard count
-        let shard_count = processed.encrypted_shards.len();
+        let shard_count = processed.shards.len();
         let mut positions = Vec::new();
 
         // Create a grid of positions for shards
