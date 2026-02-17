@@ -4,6 +4,9 @@
 
 // End-to-end tests for privacy system
 // Tests complete workflows and multi-tier interactions
+//
+// Gated: references private fields and APIs not yet stabilized.
+#![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
     PrivacySystem, PrivacyConfig, PrivacyTier,

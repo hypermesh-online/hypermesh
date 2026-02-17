@@ -533,6 +533,7 @@ pub struct CacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assets::pipeline::distribution::DistributedAsset;
 
     #[tokio::test]
     async fn test_asset_workflow_batch_processing() {

@@ -599,6 +599,7 @@ impl Default for GeographicClustering {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::matrix::geospatial::hierarchy::{GeographicLevel, GeographicBounds};
 
     fn create_test_nodes() -> Vec<MatrixCoordinate> {
         vec![

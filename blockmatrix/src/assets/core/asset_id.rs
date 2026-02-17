@@ -214,6 +214,38 @@ impl AssetId {
     }
 
 
+    /// Create a new asset ID with a random content hash for the given asset type.
+    ///
+    /// Uses a random hash for convenience in examples and tests.
+    /// For production, prefer `from_asset_data` with actual content-based hashing.
+    pub fn new(asset_type: AssetType) -> Self {
+        use sha2::{Sha256, Digest};
+        let random_bytes: [u8; 16] = rand::random();
+        let mut hasher = Sha256::new();
+        hasher.update(&random_bytes);
+        hasher.update(&[asset_type.type_id()]);
+        let hash: [u8; 32] = hasher.finalize().into();
+
+        let base_type = match asset_type {
+            AssetType::Cpu => BaseSystemType::Cpu,
+            AssetType::Gpu => BaseSystemType::Gpu,
+            AssetType::Memory => BaseSystemType::Memory,
+            AssetType::Storage => BaseSystemType::Storage,
+            AssetType::Network => BaseSystemType::Network,
+            AssetType::Container => BaseSystemType::Container,
+            AssetType::Economic => BaseSystemType::Economic,
+            AssetType::VirtualMachine => BaseSystemType::Container,
+            AssetType::Library => BaseSystemType::Container,
+        };
+
+        Self {
+            content_hash: hash,
+            network_scope: NetworkScope::Global,
+            category: AssetCategory::BaseSystem(base_type),
+            creation_timestamp: SystemTime::now(),
+        }
+    }
+
     /// Create asset ID from hash (for default/test purposes)
     pub fn new_from_hash(hash: &[u8; 32]) -> Self {
         Self {

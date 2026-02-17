@@ -396,6 +396,7 @@ impl Default for PublicNetworkHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::network::trust::{PeerId, PeerInfo};
 
     #[tokio::test]
     async fn test_public_bootstrap_requires_proof() {

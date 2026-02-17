@@ -239,6 +239,8 @@ criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = { workspace = true }
 lazy_static = { workspace = true }
+trustchain = { path = "trustchain", features = ["localhost-testing"] }
+blockmatrix = { path = "blockmatrix" }
 
 [features]
 default = ["blockmatrix-full", "high-performance"]
@@ -261,6 +263,7 @@ production = ["blockmatrix-full", "high-performance", "consensus-mandatory"]
 development = ["blockmatrix-full", "legacy-compatibility"]
 consensus-mandatory = []
 legacy-compatibility = []
+future-tests = []
 
 # [[bin]]
 # name = "blockmatrix-server"

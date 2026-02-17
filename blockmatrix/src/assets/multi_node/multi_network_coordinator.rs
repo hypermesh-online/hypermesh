@@ -556,6 +556,7 @@ pub struct IsolationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use crate::assets::core::AssetType;
     use crate::test_utils::test_asset_id;
 

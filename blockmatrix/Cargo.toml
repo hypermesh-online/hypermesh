@@ -196,3 +196,20 @@ default = ["consensus", "assets"]
 consensus = []
 assets = []
 multi-node = []
+future-tests = []
+
+# Explicit example entries for gated examples (require future-tests feature)
+[[example]]
+name = "pipeline_demo"
+path = "examples/pipeline_demo.rs"
+required-features = ["future-tests"]
+
+[[example]]
+name = "quic_basic"
+path = "examples/quic_basic.rs"
+required-features = ["future-tests"]
+
+[[example]]
+name = "quic_working"
+path = "examples/quic_working.rs"
+required-features = ["future-tests"]

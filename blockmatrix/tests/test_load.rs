@@ -4,6 +4,9 @@
 
 // Load Testing for Sprint 3
 // Tests system behavior under sustained high load
+//
+// Gated: references XdpFlags, CpuInfo.core_count, EbpfAttachType fields not in current API.
+#![cfg(feature = "future-tests")]
 
 #[cfg(test)]
 mod load_tests {

@@ -30,6 +30,14 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetId {
     AssetId::from_asset_data(&data, NetworkScope::Global, category)
 }
 
+/// Create a vector of test AssetIds for use in Block::new() tests.
+/// The count parameter determines how many AssetIds to generate.
+pub fn test_asset_ids(count: usize) -> Vec<AssetId> {
+    (0..count.max(1)).map(|i| {
+        test_asset_id_with_content(AssetType::Storage, vec![i as u8])
+    }).collect()
+}
+
 /// Create a test AssetId with custom content
 pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> AssetId {
     let data = AssetData {

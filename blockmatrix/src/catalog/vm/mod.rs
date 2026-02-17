@@ -577,7 +577,12 @@ impl Default for ResourceSharingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     use crate::test_utils::test_asset_id;
+    use crate::catalog::vm::execution::context::{
+        BlockchainExecutionContext, P2PExecutionContext,
+        NetworkTopology, RoutingPreferences,
+    };
     
     #[tokio::test]
     async fn test_consensus_proof_vm_creation() {

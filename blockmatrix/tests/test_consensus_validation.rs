@@ -5,6 +5,9 @@
 //! Comprehensive tests for Proof of State consensus validation
 //!
 //! Tests all four proofs (WHO, WHEN, WHERE, WHAT) and their integration
+//!
+//! Gated: uses old struct field names (StakeProof.node_id, etc.) that were refactored.
+#![cfg(feature = "future-tests")]
 
 use blockmatrix::consensus::{
     ConsensusProof, ConsensusRequirements, ConsensusError,

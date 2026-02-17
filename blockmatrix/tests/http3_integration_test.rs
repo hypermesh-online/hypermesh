@@ -2,6 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
+// Gated: depends on reqwest crate which was removed (STOQ-only transport).
+#![cfg(feature = "future-tests")]
+
 use std::process::Command;
 use std::thread;
 use std::time::Duration;

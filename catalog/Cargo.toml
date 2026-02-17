@@ -112,6 +112,7 @@ default = ["hypermesh-integration"]
 
 # HyperMesh integration features
 hypermesh-integration = []
+future-tests = []
 
 # Scripting support (template/config only - no execution)
 lua-scripting = []

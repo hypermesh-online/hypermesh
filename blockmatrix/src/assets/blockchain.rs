@@ -398,7 +398,9 @@ pub struct ActualResourceUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     use crate::assets::core::asset_id::AssetType;
+    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
     use crate::test_utils::test_asset_id;
 
     #[tokio::test]

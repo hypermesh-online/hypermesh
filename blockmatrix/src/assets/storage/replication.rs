@@ -385,6 +385,7 @@ impl ReplicationStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::integration::phase1_foundation::MatrixFoundationConfig;
 
     #[test]
     fn test_popularity_metrics() {

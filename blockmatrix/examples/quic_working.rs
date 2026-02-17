@@ -3,6 +3,9 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Working QUIC example with proper certificate handling
+//!
+//! Gated: uses old rustls API (Certificate, PrivateKey types removed in rustls 0.23).
+#![cfg(feature = "future-tests")]
 
 use quinn::{Endpoint, ServerConfig, ClientConfig};
 use std::error::Error;

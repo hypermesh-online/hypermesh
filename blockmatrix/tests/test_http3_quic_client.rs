@@ -2,6 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
+// Gated: depends on h3/h3_quinn/http crates which were removed (STOQ-only transport).
+#![cfg(feature = "future-tests")]
+
 use anyhow::Result;
 use bytes::Bytes;
 use h3::client::SendRequest;

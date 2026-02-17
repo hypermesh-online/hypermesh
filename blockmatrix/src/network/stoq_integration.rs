@@ -458,6 +458,7 @@ impl MatrixStoqIntegration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use stoq::TransportConfig;
 
     #[test]
     fn test_matrix_message_serialization() {

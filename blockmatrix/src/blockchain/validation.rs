@@ -290,9 +290,10 @@ impl ChainValidator {
 mod tests {
     use super::*;
     use chrono::Duration;
+    use crate::test_utils::test_asset_ids;
 
     fn create_test_block(index: u64, previous_hash: String, coord: MatrixCoordinate) -> Block {
-        Block::new(index, vec![0u8; 100], previous_hash, coord)
+        Block::new(index, test_asset_ids(1), previous_hash, coord)
     }
 
     #[test]
@@ -341,12 +342,12 @@ mod tests {
         let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
 
         let block1 = create_test_block(1, "genesis".to_string(), coord.clone());
-        let block2 = Block::new(2, vec![1u8; 50], block1.hash.clone(), coord.clone());
+        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord.clone());
 
         assert!(validator.validate_block_continuity(&block2, &block1));
 
         // Wrong previous hash
-        let bad_block = Block::new(2, vec![2u8; 50], "wrong_hash".to_string(), coord.clone());
+        let bad_block = Block::new(2, test_asset_ids(1), "wrong_hash".to_string(), coord.clone());
         assert!(!validator.validate_block_continuity(&bad_block, &block1));
     }
 
@@ -358,11 +359,11 @@ mod tests {
         let block1 = create_test_block(1, "genesis".to_string(), coord.clone());
 
         // Correct sequence
-        let block2 = Block::new(2, vec![1u8; 50], block1.hash.clone(), coord.clone());
+        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord.clone());
         assert!(validator.validate_block(&block2, Some(&block1)));
 
         // Wrong index
-        let bad_block = Block::new(3, vec![2u8; 50], block1.hash.clone(), coord.clone());
+        let bad_block = Block::new(3, test_asset_ids(1), block1.hash.clone(), coord.clone());
         assert!(!validator.validate_block(&bad_block, Some(&block1)));
     }
 
@@ -394,7 +395,7 @@ mod tests {
         // Build valid chain
         for i in 1..5 {
             let prev_hash = chain.last().unwrap().hash.clone();
-            chain.push(Block::new(i, vec![i as u8; 100], prev_hash, coord.clone()));
+            chain.push(Block::new(i, test_asset_ids(1), prev_hash, coord.clone()));
         }
 
         assert!(validator.validate_chain(&chain));

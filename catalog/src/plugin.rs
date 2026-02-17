@@ -20,8 +20,8 @@ use tokio::sync::RwLock;
 use blockmatrix::extensions::{
     AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
-    ExtensionResponse, ExtensionResult, ExtensionStateData, ExtensionStatus,
-    HyperMeshExtension, ResourceLimits, ValidationReport,
+    ExtensionResponse, ExtensionResult, ExtensionStateData,
+    ExtensionStatus, HyperMeshExtension, ResourceLimits, ValidationReport,
 };
 use blockmatrix::assets::core::AssetType;
 
@@ -331,6 +331,7 @@ mod tests {
 
         // Get status
         let status = plugin.status().await;
+        use blockmatrix::extensions::ExtensionState;
         assert!(matches!(status.state, ExtensionState::Running | ExtensionState::Error(_)));
 
         // Shutdown

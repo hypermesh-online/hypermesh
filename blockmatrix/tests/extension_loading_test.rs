@@ -6,6 +6,9 @@
 //!
 //! This test demonstrates loading the Catalog extension into HyperMesh
 //! at runtime using the dynamic loading mechanism.
+//!
+//! Gated: references `hypermesh` crate which does not exist.
+#![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyLevel};
 use blockmatrix::extensions::{

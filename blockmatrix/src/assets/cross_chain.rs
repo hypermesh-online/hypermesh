@@ -754,7 +754,7 @@ pub enum CrossChainValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::asset_id::AssetId;
+    use crate::assets::core::asset_id::{AssetId, AssetType};
     use crate::test_utils::test_asset_id;
 
     #[test]

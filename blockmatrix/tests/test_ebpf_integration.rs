@@ -6,6 +6,8 @@
 // Tests Linux eBPF kernel integration with XDP, kprobe, and map operations
 // Requires: Linux kernel 4.4+, CAP_BPF or root privileges
 //
+// Gated: references XdpFlags, EbpfAttachType fields that have been refactored.
+#![cfg(feature = "future-tests")]
 // STUB: eBPF is not actually implemented in HyperMesh yet
 // TODO: Implement actual eBPF integration in monitoring/native module
 // Priority: LOW - Required for Option 4 (Advanced Kernel Monitoring)

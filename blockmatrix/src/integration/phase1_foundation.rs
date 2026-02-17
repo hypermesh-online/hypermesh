@@ -457,12 +457,12 @@ mod tests {
     use tempfile::TempDir;
 
     async fn create_test_foundation() -> (MatrixFoundation, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test");
         let config = MatrixFoundationConfig {
             storage_path: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        let foundation = MatrixFoundation::new(config).await.unwrap();
+        let foundation = MatrixFoundation::new(config).await.expect("test");
         (foundation, temp_dir)
     }
 
@@ -476,8 +476,8 @@ mod tests {
     async fn test_add_node() {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let node_id = foundation.add_node("node1".to_string(), coord).await.unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
+        let node_id = foundation.add_node("node1".to_string(), coord).await.expect("test");
 
         assert_eq!(node_id, "node1");
         assert_eq!(foundation.node_count().await, 1);
@@ -488,8 +488,8 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         for i in 0..10 {
-            let coord = MatrixCoordinate::new(i, i, i).unwrap();
-            foundation.add_node(format!("node{}", i), coord).await.unwrap();
+            let coord = MatrixCoordinate::new(i, i, i).expect("test");
+            foundation.add_node(format!("node{}", i), coord).await.expect("test");
         }
 
         assert_eq!(foundation.node_count().await, 10);
@@ -499,10 +499,10 @@ mod tests {
     async fn test_get_node() {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        foundation.add_node("test_node".to_string(), coord.clone()).await.unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test");
+        foundation.add_node("test_node".to_string(), coord.clone()).await.expect("test");
 
-        let node = foundation.get_node("test_node").await.unwrap();
+        let node = foundation.get_node("test_node").await.expect("test");
         assert_eq!(node.coordinate, coord);
         assert_eq!(node.node_id, "test_node");
     }
@@ -511,11 +511,11 @@ mod tests {
     async fn test_remove_node() {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        foundation.add_node("node1".to_string(), coord).await.unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
+        foundation.add_node("node1".to_string(), coord).await.expect("test");
         assert_eq!(foundation.node_count().await, 1);
 
-        foundation.remove_node("node1").await.unwrap();
+        foundation.remove_node("node1").await.expect("test");
         assert_eq!(foundation.node_count().await, 0);
     }
 
@@ -523,13 +523,13 @@ mod tests {
     async fn test_add_block() {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        foundation.add_node("node1".to_string(), coord).await.unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
+        foundation.add_node("node1".to_string(), coord).await.expect("test");
 
-        let block = foundation.add_block_with_data("node1", b"test data".to_vec()).await.unwrap();
+        let block = foundation.add_block("node1", b"test data".to_vec()).await.expect("test");
         assert_eq!(block.asset_count(), 1); // Block should contain one asset
 
-        let height = foundation.get_blockchain_height("node1").await.unwrap();
+        let height = foundation.get_blockchain_height("node1").await.expect("test");
         assert_eq!(height, 1); // Genesis + 1 block
     }
 
@@ -540,12 +540,12 @@ mod tests {
         // Add nodes in a grid
         for x in 0..5 {
             for y in 0..5 {
-                let coord = MatrixCoordinate::new(x, y, 0).unwrap();
-                foundation.add_node(format!("node_{}_{}", x, y), coord).await.unwrap();
+                let coord = MatrixCoordinate::new(x, y, 0).expect("test");
+                foundation.add_node(format!("node_{}_{}", x, y), coord).await.expect("test");
             }
         }
 
-        let center = MatrixCoordinate::new(2, 2, 0).unwrap();
+        let center = MatrixCoordinate::new(2, 2, 0).expect("test");
         let nearest = foundation.find_k_nearest_nodes(&center, 5).await;
 
         assert_eq!(nearest.len(), 5);
@@ -564,11 +564,11 @@ mod tests {
         ];
 
         for (i, (x, y, z)) in coords.iter().enumerate() {
-            let coord = MatrixCoordinate::new(*x, *y, *z).unwrap();
-            foundation.add_node(format!("node{}", i), coord).await.unwrap();
+            let coord = MatrixCoordinate::new(*x, *y, *z).expect("test");
+            foundation.add_node(format!("node{}", i), coord).await.expect("test");
         }
 
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test");
         let neighbors = foundation.find_neighbors_in_radius(&center, 2.0).await;
 
         // Should find node at (1,0,0) and (0,1,0), but not (10,10,10)
@@ -584,8 +584,8 @@ mod tests {
         for x in 0..10 {
             for y in 0..10 {
                 for z in 0..10 {
-                    let coord = MatrixCoordinate::new(x, y, z).unwrap();
-                    foundation.add_node(format!("node_{}_{}", x, y * 10 + z), coord).await.unwrap();
+                    let coord = MatrixCoordinate::new(x, y, z).expect("test");
+                    foundation.add_node(format!("node_{}_{}", x, y * 10 + z), coord).await.expect("test");
                 }
             }
         }

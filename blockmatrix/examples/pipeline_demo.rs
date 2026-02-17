@@ -6,6 +6,10 @@
 //!
 //! Demonstrates the complete asset processing pipeline:
 //! Compression → Encryption → Sharding → Distribution
+//!
+//! Gated: references CompressionAlgorithm::Zstd variant and CompressionConfig
+//! fields that have been refactored.
+#![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::pipeline::{
     Asset, AssetMetadata, AssetPipeline, PipelineConfig,

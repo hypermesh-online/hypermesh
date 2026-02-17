@@ -763,6 +763,7 @@ impl Clone for OrchestrationMetrics {
 mod tests {
     use super::*;
     use crate::container::ContainerConfig;
+    use crate::catalog::vm::VMConfig;
     
     #[tokio::test]
     async fn test_orchestrator_creation() {

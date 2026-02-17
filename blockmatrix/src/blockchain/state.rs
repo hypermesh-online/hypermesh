@@ -389,6 +389,7 @@ pub struct StorageStats {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use crate::test_utils::test_asset_ids;
 
     async fn create_test_manager() -> (ChainStateManager, TempDir) {
         let temp_dir = TempDir::new().unwrap();
@@ -433,7 +434,7 @@ mod tests {
         for i in 0..5 {
             let block = Block::new(
                 i,
-                vec![i as u8],
+                test_asset_ids(1),
                 format!("prev_{}", i),
                 coord.clone(),
             );
@@ -455,7 +456,7 @@ mod tests {
         for i in 0..10 {
             let block = Block::new(
                 i,
-                vec![i as u8],
+                test_asset_ids(1),
                 format!("prev_{}", i),
                 coord.clone(),
             );
@@ -483,7 +484,7 @@ mod tests {
 
         // Add blocks
         for i in 0..10 {
-            let block = Block::new(i, vec![i as u8], format!("prev_{}", i), coord.clone());
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
             manager.store_block(&block).await.unwrap();
         }
 
@@ -542,7 +543,7 @@ mod tests {
 
         // Add some blocks
         for i in 0..5 {
-            let block = Block::new(i, vec![0u8; 100], format!("prev_{}", i), coord.clone());
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
             manager.store_block(&block).await.unwrap();
         }
 
@@ -561,7 +562,7 @@ mod tests {
 
         // Add blocks
         for i in 0..5 {
-            let block = Block::new(i, vec![i as u8], format!("prev_{}", i), coord.clone());
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
             manager.store_block(&block).await.unwrap();
         }
 

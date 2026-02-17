@@ -52,6 +52,7 @@ async fn test_certificate_rotation() {
         common_name: "test.localhost".to_string(),
         rotation_interval: Duration::from_secs(1),
         trustchain_endpoint: None,
+        network_type: None,
     };
 
     let manager = create_certificate_manager(config).await;

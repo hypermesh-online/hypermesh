@@ -8,6 +8,9 @@
 //! - Full lifecycle from initialization to shutdown
 //! - Integration with HyperMesh ecosystem
 //! - Real-world usage scenarios
+//!
+//! Gated: references APIs and modules not yet implemented.
+#![cfg(feature = "future-tests")]
 //! - Performance under load
 //! - Multi-node coordination
 

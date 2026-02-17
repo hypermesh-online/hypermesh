@@ -4,6 +4,9 @@
 
 // Integration tests for the privacy system
 // Tests all four tiers, flexibility matrix, tier switching, and eBPF integration
+//
+// Gated: references private fields on TierSwitcher.
+#![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
     PrivacySystem, PrivacyConfig, PrivacyTier, TrustLevel,

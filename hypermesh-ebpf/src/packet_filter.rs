@@ -9,6 +9,8 @@
 
 use anyhow::{Result, anyhow};
 use crate::policy_maps::PolicyManager;
+#[cfg(test)]
+use crate::policy_maps::ValidationPolicy;
 use crate::hypermesh_headers::*;
 
 /// Filter action for packets
