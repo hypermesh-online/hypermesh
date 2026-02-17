@@ -42,9 +42,10 @@ pub struct RegistryId(pub [u8; 32]);
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FederationId(pub [u8; 32]);
 
-/// Node identifier (node's unique blockchain ID)
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String), this uses NodeId(pub [u8; 32]))
+/// BlockMatrix's domain-specific node identifier (32-byte blockchain ID).
+/// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries a
+/// cryptographic 32-byte identifier suitable for blockchain operations,
+/// consensus proof binding, and content-addressed lookups.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeId(pub [u8; 32]);
 
@@ -178,9 +179,9 @@ impl fmt::Display for AssetType {
     }
 }
 
-/// Universal asset identifier with content-based hashing and network scoping
-// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
-// (lib uses AssetId(pub String), this has {content_hash, network_scope, category, creation_timestamp})
+/// BlockMatrix's domain-specific asset identifier. Unlike hypermesh_lib::AssetId
+/// (simple String wrapper), this is content-addressed with a cryptographic hash,
+/// network scope, asset category, and creation timestamp for blockchain registration.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AssetId {
     /// Content-based hash (derived from asset data, not UUID)

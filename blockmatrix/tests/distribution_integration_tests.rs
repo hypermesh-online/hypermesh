@@ -15,7 +15,7 @@
 use blockmatrix::{
     distribution::{
         distribute_shards_pos_aware, NodeInfo,
-        pos_validator::{ConsensusValidator, StorageAccessValidation, ProofType},
+        pos_validator::{ConsensusValidator, StorageAccessValidation, DistributionProofType},
     },
     assets::pipeline::sharding::{Sharder, ShardingConfig, Shard},
     assets::core::AssetResult,
@@ -51,10 +51,10 @@ impl ConsensusValidator for MockConsensusValidator {
                 Some("Denied by mock validator".to_string())
             },
             required_proofs: vec![
-                ProofType::PoSpace,
-                ProofType::PoStake,
-                ProofType::PoWork,
-                ProofType::PoTime,
+                DistributionProofType::PoSpace,
+                DistributionProofType::PoStake,
+                DistributionProofType::PoWork,
+                DistributionProofType::PoTime,
             ],
             validation_timestamp: SystemTime::now(),
             validator_node_id: "mock-validator".to_string(),

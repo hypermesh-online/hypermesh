@@ -152,7 +152,7 @@ pub use core::adapter::{
     AdapterCapabilities, AdapterHealth,
 };
 
-// Privacy system exports  
+// Privacy system exports
 pub use core::privacy::{
     PrivacyLevel, AssetAllocation, AllocationConfig,
     AccessConfig, AccessPermissions, RateLimits,
@@ -225,7 +225,7 @@ pub use cross_chain::{
 // Matrix blockchain system exports
 pub use matrix_blockchain::{
     MatrixBlockchainManager, EntityBlockchain, EntityType, EntityConfig,
-    MatrixCoordinate, ValidationRequest, PublicValidationResponse, ValidationResult,
+    BlockchainMatrixCoordinate, ValidationRequest, PublicValidationResponse, ValidationResult,
 };
 
 /// Library version information

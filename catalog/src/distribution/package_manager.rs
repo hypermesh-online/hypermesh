@@ -19,7 +19,7 @@ use super::{
     ContentStore, ContentAddress,
     content_addressing::{MerkleTree, ContentChunker, CompressionType, Chunk},
     stoq_transport::{StoqTransportLayer, PackageInfo, ChunkData, RequestType, ResponseData, PackageMetadata},
-    dht::NodeId,
+    dht::DhtNodeId,
 };
 
 /// Package manager for handling package storage and transfers
@@ -161,7 +161,7 @@ impl PackageManager {
     pub async fn download_from_peers(
         &self,
         package_id: &AssetPackageId,
-        peers: &[NodeId],
+        peers: &[DhtNodeId],
         transport: Arc<StoqTransportLayer>,
     ) -> Result<AssetPackage> {
         if peers.is_empty() {
@@ -200,7 +200,7 @@ impl PackageManager {
     async fn get_package_info_from_peers(
         &self,
         package_id: &AssetPackageId,
-        peers: &[NodeId],
+        peers: &[DhtNodeId],
         transport: &Arc<StoqTransportLayer>,
     ) -> Result<PackageInfo> {
         for peer in peers {
@@ -222,7 +222,7 @@ impl PackageManager {
         &self,
         package_id: &AssetPackageId,
         chunk_indices: &[usize],
-        peers: &[NodeId],
+        peers: &[DhtNodeId],
         transport: &Arc<StoqTransportLayer>,
     ) -> Result<Vec<Chunk>> {
         let mut chunks = Vec::with_capacity(chunk_indices.len());

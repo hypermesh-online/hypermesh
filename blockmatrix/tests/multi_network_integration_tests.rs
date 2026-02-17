@@ -16,7 +16,7 @@
 use blockmatrix::assets::multi_node::{
     MultiNetworkCoordinator, MultiNetworkConfig, TrustChainClient,
     NetworkId, NetworkDiscovery, PrivacyTier, MembershipStatus,
-    NetworkMembership, EngagementEventType, MatrixPosition,
+    NetworkMembership, EngagementEventType, IntegerMatrixPosition,
 };
 use blockmatrix::assets::multi_node::network_membership::{
     JoinRequirements, ApprovalProcess, NetworkCredentials,
@@ -331,7 +331,7 @@ async fn test_cross_network_asset_validation() {
     let car_title = AssetId::new(AssetType::Storage);
 
     // Add asset to bank network with matrix position
-    let position = MatrixPosition { x: 10, y: 20, z: 5 };
+    let position = IntegerMatrixPosition { x: 10, y: 20, z: 5 };
     coordinator.add_asset_to_network(bank_network, car_title.clone(), position).await.unwrap();
 
     // Validate asset across networks using blockchain proof
@@ -381,7 +381,7 @@ async fn test_car_purchase_scenario() {
     // Step 2: Create car asset on blockchain
     println!("  2. Creating car asset on blockchain...");
     let car_asset = AssetId::new(AssetType::Storage);
-    let car_position = MatrixPosition { x: 100, y: 50, z: 10 };
+    let car_position = IntegerMatrixPosition { x: 100, y: 50, z: 10 };
     coordinator.add_asset_to_network(bank_network, car_asset.clone(), car_position.clone()).await.unwrap();
 
     // Record engagement

@@ -4,8 +4,8 @@
 
 //! Matrix coordinate types and distance calculations
 //!
-//! Provides the core `MatrixCoordinate` type representing positions in the
-//! Block-MATRIX 3D coordinate space with various distance metrics.
+//! Re-exports the canonical `MatrixCoordinate` from hypermesh_lib and provides
+//! BlockMatrix-specific extension methods via `MatrixCoordinateExt` trait.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -13,6 +13,25 @@ use thiserror::Error;
 /// Maximum coordinate value to prevent overflow in calculations
 const MAX_COORD: i64 = i64::MAX / 4;
 const MIN_COORD: i64 = i64::MIN / 4;
+
+/// 3D integer coordinate in Block-MATRIX topology.
+///
+/// Each node in the matrix has an (x,y,z) position used for tensor-based
+/// routing, neighbor discovery, and resource allocation. Uses i64 for
+/// integer-precision matrix operations (distinct from `hypermesh_lib::MatrixPosition`
+/// which uses f64 for geospatial positioning).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MatrixCoordinate {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64,
+}
+
+impl std::fmt::Display for MatrixCoordinate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({},{},{})", self.x, self.y, self.z)
+    }
+}
 
 /// Errors that can occur during coordinate operations
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -38,90 +57,20 @@ pub enum CoordinateError {
     InvalidRotation(f64),
 }
 
-/// Represents a position in the Block-MATRIX 3D coordinate space
-///
-/// Each node in the Block-MATRIX network has a unique geospatial position
-/// defined by (x, y, z) coordinates. These coordinates enable:
-/// - Distance-based neighbor discovery
-/// - Tensor operations for routing
-/// - Matrix-aware shard distribution
-/// - Hierarchical addressing through transformations
-///
-/// # Coordinate Bounds
-///
-/// Coordinates are bounded to prevent overflow in distance calculations:
-/// - Min: i64::MIN / 4
-/// - Max: i64::MAX / 4
-///
-/// # Examples
-///
-/// ```
-/// use blockmatrix::matrix::MatrixCoordinate;
-///
-/// // Create coordinates
-/// let origin = MatrixCoordinate::origin();
-/// let node = MatrixCoordinate::new(10, 20, 30).unwrap();
-///
-/// // Calculate distances
-/// let euclidean = origin.euclidean_distance(&node);
-/// let manhattan = origin.manhattan_distance(&node);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MatrixCoordinate {
-    /// X coordinate
-    pub x: i64,
-    /// Y coordinate
-    pub y: i64,
-    /// Z coordinate
-    pub z: i64,
-}
-
 impl MatrixCoordinate {
     /// Create a new coordinate with validation
-    ///
-    /// Validates that coordinates are within bounds to prevent overflow
-    /// in distance calculations and transformations.
-    ///
-    /// # Errors
-    ///
-    /// Returns `CoordinateError::OutOfBounds` if any coordinate is outside
-    /// the valid range [MIN_COORD, MAX_COORD].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let coord = MatrixCoordinate::new(100, 200, 300).unwrap();
-    /// assert_eq!(coord.x, 100);
-    /// ```
-    pub fn new(x: i64, y: i64, z: i64) -> Result<Self, CoordinateError> {
-        let coord = Self { x, y, z };
+    pub fn new(x: i64, y: i64, z: i64) -> Result<MatrixCoordinate, CoordinateError> {
+        let coord = MatrixCoordinate { x, y, z };
         coord.validate()?;
         Ok(coord)
     }
 
     /// Create the origin coordinate (0, 0, 0)
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let origin = MatrixCoordinate::origin();
-    /// assert_eq!(origin.x, 0);
-    /// assert_eq!(origin.y, 0);
-    /// assert_eq!(origin.z, 0);
-    /// ```
-    pub fn origin() -> Self {
-        Self { x: 0, y: 0, z: 0 }
+    pub fn origin() -> MatrixCoordinate {
+        MatrixCoordinate { x: 0, y: 0, z: 0 }
     }
 
     /// Validate that coordinate is within bounds
-    ///
-    /// # Errors
-    ///
-    /// Returns `CoordinateError::OutOfBounds` if any coordinate exceeds bounds.
     pub fn validate(&self) -> Result<(), CoordinateError> {
         if self.x < MIN_COORD || self.x > MAX_COORD
             || self.y < MIN_COORD || self.y > MAX_COORD
@@ -133,20 +82,7 @@ impl MatrixCoordinate {
     }
 
     /// Calculate Euclidean distance to another coordinate
-    ///
-    /// Returns the straight-line distance in 3D space:
-    /// √((x₂-x₁)² + (y₂-y₁)² + (z₂-z₁)²)
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    /// let b = MatrixCoordinate::new(3, 4, 0).unwrap();
-    /// assert_eq!(a.euclidean_distance(&b), 5.0);
-    /// ```
-    pub fn euclidean_distance(&self, other: &Self) -> f64 {
+    pub fn euclidean_distance(&self, other: &MatrixCoordinate) -> f64 {
         let dx = (other.x - self.x) as f64;
         let dy = (other.y - self.y) as f64;
         let dz = (other.z - self.z) as f64;
@@ -155,94 +91,37 @@ impl MatrixCoordinate {
     }
 
     /// Calculate Manhattan distance to another coordinate
-    ///
-    /// Returns the sum of absolute differences along each axis:
-    /// |x₂-x₁| + |y₂-y₁| + |z₂-z₁|
-    ///
-    /// Useful for grid-based routing where diagonal movement isn't allowed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    /// let b = MatrixCoordinate::new(3, 4, 5).unwrap();
-    /// assert_eq!(a.manhattan_distance(&b), 12);
-    /// ```
-    pub fn manhattan_distance(&self, other: &Self) -> i64 {
-        (other.x - self.x).abs()
-            + (other.y - self.y).abs()
-            + (other.z - self.z).abs()
+    pub fn manhattan_distance(&self, other: &MatrixCoordinate) -> i64 {
+        let dx = other.x.saturating_sub(self.x).saturating_abs();
+        let dy = other.y.saturating_sub(self.y).saturating_abs();
+        let dz = other.z.saturating_sub(self.z).saturating_abs();
+        dx.saturating_add(dy).saturating_add(dz)
     }
 
     /// Calculate Chebyshev distance to another coordinate
-    ///
-    /// Returns the maximum absolute difference along any axis:
-    /// max(|x₂-x₁|, |y₂-y₁|, |z₂-z₁|)
-    ///
-    /// Useful for determining minimum steps when diagonal movement is allowed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    /// let b = MatrixCoordinate::new(3, 4, 2).unwrap();
-    /// assert_eq!(a.chebyshev_distance(&b), 4);
-    /// ```
-    pub fn chebyshev_distance(&self, other: &Self) -> i64 {
-        let dx = (other.x - self.x).abs();
-        let dy = (other.y - self.y).abs();
-        let dz = (other.z - self.z).abs();
+    pub fn chebyshev_distance(&self, other: &MatrixCoordinate) -> i64 {
+        let dx = other.x.saturating_sub(self.x).saturating_abs();
+        let dy = other.y.saturating_sub(self.y).saturating_abs();
+        let dz = other.z.saturating_sub(self.z).saturating_abs();
 
         dx.max(dy).max(dz)
     }
 
     /// Check if coordinate is within distance threshold of another
-    ///
-    /// Uses Euclidean distance for comparison.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    /// let b = MatrixCoordinate::new(3, 4, 0).unwrap();
-    /// assert!(a.is_within_distance(&b, 10.0));
-    /// assert!(!a.is_within_distance(&b, 4.0));
-    /// ```
-    pub fn is_within_distance(&self, other: &Self, threshold: f64) -> bool {
+    pub fn is_within_distance(&self, other: &MatrixCoordinate, threshold: f64) -> bool {
         self.euclidean_distance(other) <= threshold
     }
 
-    /// Calculate squared Euclidean distance (avoids sqrt for performance)
-    ///
-    /// Useful for comparisons where relative distance is sufficient.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use blockmatrix::matrix::MatrixCoordinate;
-    ///
-    /// let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    /// let b = MatrixCoordinate::new(3, 4, 0).unwrap();
-    /// assert_eq!(a.squared_euclidean_distance(&b), 25);
-    /// ```
-    pub fn squared_euclidean_distance(&self, other: &Self) -> i64 {
-        let dx = other.x - self.x;
-        let dy = other.y - self.y;
-        let dz = other.z - self.z;
+    /// Calculate squared Euclidean distance (avoids sqrt for performance).
+    /// Uses saturating arithmetic to prevent overflow at extreme coordinates.
+    pub fn squared_euclidean_distance(&self, other: &MatrixCoordinate) -> i64 {
+        let dx = other.x.saturating_sub(self.x);
+        let dy = other.y.saturating_sub(self.y);
+        let dz = other.z.saturating_sub(self.z);
 
-        dx * dx + dy * dy + dz * dz
-    }
-}
-
-impl std::fmt::Display for MatrixCoordinate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.x, self.y, self.z)
+        dx.saturating_mul(dx)
+            .saturating_add(dy.saturating_mul(dy))
+            .saturating_add(dz.saturating_mul(dz))
     }
 }
 
@@ -342,7 +221,8 @@ mod tests {
     #[test]
     fn test_coordinate_display() {
         let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        assert_eq!(format!("{}", coord), "(10, 20, 30)");
+        // hypermesh_lib Display uses no-space format: (10,20,30)
+        assert_eq!(format!("{}", coord), "(10,20,30)");
     }
 
     #[test]
@@ -351,6 +231,7 @@ mod tests {
         let b = MatrixCoordinate::new(10, 20, 30).unwrap();
 
         let dist = a.euclidean_distance(&b);
-        assert!((dist - 63.245553).abs() < 0.0001);
+        // sqrt(20^2 + 40^2 + 60^2) = sqrt(5600) = 74.83315...
+        assert!((dist - 74.83315).abs() < 0.001);
     }
 }

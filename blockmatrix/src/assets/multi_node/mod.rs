@@ -69,7 +69,7 @@ pub use network_membership::{
     NetworkCredentials, JoinRequirements, ApprovalProcess,
 };
 pub use multi_network_coordinator::{
-    MultiNetworkCoordinator, MultiNetworkConfig, MatrixPosition,
+    MultiNetworkCoordinator, MultiNetworkConfig, IntegerMatrixPosition,
     NetworkAssetRouter, CrossNetworkValidator, EngagementMonitor,
     IsolationReport, EngagementEventType, NetworkEngagementMetrics,
 };

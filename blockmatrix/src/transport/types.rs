@@ -8,9 +8,10 @@ use serde::{Serialize, Deserialize};
 use std::fmt;
 use std::net::Ipv6Addr;
 
-/// Canonical node identifier for HyperMesh network
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String), this has {name, id, address, pub_key} fields)
+/// BlockMatrix's transport-layer node identifier with network addressing.
+/// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries the full
+/// transport context: human-readable name, 32-byte cryptographic ID, IPv6 address,
+/// and public key for peer verification during STOQ connections.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct NodeId {
     /// Human-readable node name

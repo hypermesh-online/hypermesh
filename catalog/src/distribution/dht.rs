@@ -17,15 +17,14 @@ use sha2::{Sha256, Digest};
 use crate::assets::AssetPackageId;
 use super::stoq_transport::{StoqTransportLayer, RequestType, ResponseData, PackageAnnouncement};
 
-/// Node ID in the DHT network (256-bit)
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String), this uses NodeId { id: [u8; 32] } with DHT methods)
+/// Kademlia DHT node identity (256-bit, XOR-distance).
+/// Distinct from hypermesh_lib::NodeId which is a human-readable string identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct NodeId {
+pub struct DhtNodeId {
     id: [u8; 32],
 }
 
-impl NodeId {
+impl DhtNodeId {
     /// Create a new random node ID
     pub fn random() -> Self {
         let mut id = [0u8; 32];
@@ -54,7 +53,7 @@ impl NodeId {
     }
 
     /// Calculate XOR distance between two node IDs
-    pub fn distance(&self, other: &NodeId) -> Distance {
+    pub fn distance(&self, other: &DhtNodeId) -> Distance {
         let mut dist = [0u8; 32];
         for i in 0..32 {
             dist[i] = self.id[i] ^ other.id[i];
@@ -68,7 +67,7 @@ impl NodeId {
     }
 }
 
-impl std::fmt::Display for NodeId {
+impl std::fmt::Display for DhtNodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.to_hex()[..8])
     }
@@ -96,7 +95,7 @@ impl Distance {
 #[allow(dead_code)] // DHT fields for Kademlia operations
 pub struct DhtNetwork {
     /// Our node ID
-    local_id: NodeId,
+    local_id: DhtNodeId,
     /// Transport layer for communication
     transport: Arc<StoqTransportLayer>,
     /// Routing table
@@ -159,7 +158,7 @@ struct KBucket {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeInfo {
     /// Node ID
-    pub id: NodeId,
+    pub id: DhtNodeId,
     /// Node address
     pub address: std::net::SocketAddr,
     /// Last seen timestamp
@@ -208,7 +207,7 @@ struct StoredValue {
     /// The actual value data
     data: ValueData,
     /// Publisher node ID
-    publisher: NodeId,
+    publisher: DhtNodeId,
     /// Publication timestamp
     published_at: SystemTime,
     /// Expiration time
@@ -223,7 +222,7 @@ enum ValueData {
     /// Peer list for a package
     PackagePeers {
         package_id: AssetPackageId,
-        peers: Vec<NodeId>,
+        peers: Vec<DhtNodeId>,
     },
     /// Search index entry
     SearchIndex {
@@ -243,9 +242,9 @@ struct PendingQuery {
     /// Target key
     target: ValueKey,
     /// Nodes to query
-    to_query: Vec<NodeId>,
+    to_query: Vec<DhtNodeId>,
     /// Nodes already queried
-    queried: HashSet<NodeId>,
+    queried: HashSet<DhtNodeId>,
     /// Best nodes found so far
     best_nodes: BTreeMap<Distance, NodeInfo>,
     /// Values found
@@ -268,7 +267,7 @@ impl DhtNetwork {
         transport: Arc<StoqTransportLayer>,
         bootstrap_nodes: Vec<String>,
     ) -> Result<Self> {
-        let local_id = NodeId::random();
+        let local_id = DhtNodeId::random();
         let config = DhtConfig::default();
 
         let routing_table = Arc::new(RwLock::new(RoutingTable::new(config.clone())));
@@ -368,7 +367,7 @@ impl DhtNetwork {
     /// Refresh routing table by looking up random nodes
     async fn refresh_routing_table(_routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
         // Generate random node ID and look it up
-        let _random_id = NodeId::random();
+        let _random_id = DhtNodeId::random();
         // TODO: Implement node lookup
         Ok(())
     }
@@ -422,7 +421,7 @@ impl DhtNetwork {
     }
 
     /// Find peers that have a specific package
-    pub async fn find_package_peers(&self, package_id: &AssetPackageId) -> Result<Vec<NodeId>> {
+    pub async fn find_package_peers(&self, package_id: &AssetPackageId) -> Result<Vec<DhtNodeId>> {
         let key = ValueKey::from_package_id(package_id);
 
         // Look up the value in DHT
@@ -499,7 +498,7 @@ impl DhtNetwork {
     }
 
     /// Look up nodes closest to a target
-    async fn lookup_nodes(&self, target: &NodeId) -> Result<Vec<NodeInfo>> {
+    async fn lookup_nodes(&self, target: &DhtNodeId) -> Result<Vec<NodeInfo>> {
         let key = ValueKey(target.id);
         self.find_closest_nodes(&key, self.config.k).await
     }
@@ -526,7 +525,7 @@ impl DhtNetwork {
 
     /// Find k closest nodes to a key
     async fn find_closest_nodes(&self, key: &ValueKey, k: usize) -> Result<Vec<NodeInfo>> {
-        let target_id = NodeId { id: key.0 };
+        let target_id = DhtNodeId { id: key.0 };
         let mut closest = self.routing_table.read().await.get_closest_nodes(&target_id, k);
 
         // Iterative lookup
@@ -627,7 +626,7 @@ impl RoutingTable {
         }
     }
 
-    fn get_closest_nodes(&self, target: &NodeId, k: usize) -> Vec<NodeInfo> {
+    fn get_closest_nodes(&self, target: &DhtNodeId, k: usize) -> Vec<NodeInfo> {
         let mut nodes = Vec::new();
 
         // Collect all nodes
@@ -717,8 +716,8 @@ mod tests {
 
     #[test]
     fn test_node_id_distance() {
-        let id1 = NodeId { id: [0u8; 32] };
-        let id2 = NodeId { id: [1u8; 32] };
+        let id1 = DhtNodeId { id: [0u8; 32] };
+        let id2 = DhtNodeId { id: [1u8; 32] };
 
         let distance = id1.distance(&id2);
         assert_eq!(distance.0[0], 1);

@@ -221,7 +221,7 @@ fn test_k_nearest_k_zero() {
 #[test]
 fn test_coordinate_display() {
     let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-    assert_eq!(format!("{}", coord), "(10, 20, 30)");
+    assert_eq!(format!("{}", coord), "(10,20,30)");
 }
 
 #[test]

@@ -125,16 +125,16 @@ pub struct NetworkAssetRouter {
     /// Assets visible in this network
     visible_assets: HashSet<AssetId>,
     /// Matrix positions for assets
-    asset_positions: HashMap<AssetId, MatrixPosition>,
+    asset_positions: HashMap<AssetId, IntegerMatrixPosition>,
     /// Routing table
-    routing_table: HashMap<AssetId, Vec<MatrixPosition>>,
+    routing_table: HashMap<AssetId, Vec<IntegerMatrixPosition>>,
 }
 
-/// Matrix position for asset routing
-// TODO: Migrate to hypermesh_lib::MatrixPosition once field compatibility is resolved
-// (lib uses f64 coordinates, this uses i64 coordinates)
+/// Integer matrix position for asset routing within multi-network coordinator.
+/// Unlike hypermesh_lib::MatrixPosition (f64 coordinates for GPS),
+/// this uses i64 for discrete grid-based asset routing.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MatrixPosition {
+pub struct IntegerMatrixPosition {
     /// X coordinate
     pub x: i64,
     /// Y coordinate
@@ -154,7 +154,7 @@ impl NetworkAssetRouter {
     }
 
     /// Add asset to network
-    pub fn add_asset(&mut self, asset_id: AssetId, position: MatrixPosition) {
+    pub fn add_asset(&mut self, asset_id: AssetId, position: IntegerMatrixPosition) {
         self.visible_assets.insert(asset_id.clone());
         self.asset_positions.insert(asset_id, position);
     }
@@ -172,19 +172,19 @@ impl NetworkAssetRouter {
     }
 
     /// Get matrix position for asset
-    pub fn get_position(&self, asset_id: &AssetId) -> Option<&MatrixPosition> {
+    pub fn get_position(&self, asset_id: &AssetId) -> Option<&IntegerMatrixPosition> {
         self.asset_positions.get(asset_id)
     }
 
     /// Calculate route to asset (tensor-based pathfinding)
-    pub fn calculate_route(&self, from: &MatrixPosition, to_asset: &AssetId) -> Option<Vec<MatrixPosition>> {
+    pub fn calculate_route(&self, from: &IntegerMatrixPosition, to_asset: &AssetId) -> Option<Vec<IntegerMatrixPosition>> {
         let to_position = self.asset_positions.get(to_asset)?;
 
         // Simple linear path (production would use A* with matrix operations)
         let mut path = vec![from.clone()];
 
         // Add intermediate positions (simplified)
-        let mid = MatrixPosition {
+        let mid = IntegerMatrixPosition {
             x: (from.x + to_position.x) / 2,
             y: (from.y + to_position.y) / 2,
             z: (from.z + to_position.z) / 2,
@@ -463,7 +463,7 @@ impl MultiNetworkCoordinator {
         &self,
         network_id: NetworkId,
         asset_id: AssetId,
-        matrix_position: MatrixPosition,
+        matrix_position: IntegerMatrixPosition,
     ) -> AssetResult<()> {
         // Add to membership visibility
         self.membership.add_asset_to_network(network_id, asset_id.clone()).await?;

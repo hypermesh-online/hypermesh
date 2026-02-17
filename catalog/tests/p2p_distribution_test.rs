@@ -129,11 +129,11 @@ async fn test_content_addressing() {
 /// Test DHT node ID generation and distance calculation
 #[tokio::test]
 async fn test_dht_node_id() {
-    use catalog::distribution::dht::NodeId;
+    use catalog::distribution::dht::DhtNodeId;
     use std::net::{SocketAddr, IpAddr, Ipv6Addr};
 
-    let id1 = NodeId::random();
-    let id2 = NodeId::random();
+    let id1 = DhtNodeId::random();
+    let id2 = DhtNodeId::random();
 
     assert_ne!(id1, id2, "Random IDs should be different");
 
@@ -141,10 +141,10 @@ async fn test_dht_node_id() {
         IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
         8080,
     );
-    let id_from_addr = NodeId::from_address(&addr);
+    let id_from_addr = DhtNodeId::from_address(&addr);
 
     // Same address should generate same ID
-    let id_from_addr2 = NodeId::from_address(&addr);
+    let id_from_addr2 = DhtNodeId::from_address(&addr);
     assert_eq!(id_from_addr, id_from_addr2);
 
     // Test distance calculation

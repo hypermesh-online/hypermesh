@@ -145,18 +145,16 @@ pub struct JoinRequirements {
     /// Minimum reputation score
     pub min_reputation: Option<f64>,
     /// Required proofs
-    pub required_proofs: HashSet<ProofType>,
+    pub required_proofs: HashSet<NetworkProofType>,
     /// Geographic restrictions
     pub geo_restrictions: Option<GeoRestriction>,
     /// Approval process
     pub approval_process: ApprovalProcess,
 }
 
-/// Proof types required for network
-// TODO: Migrate to hypermesh_lib::ProofType once extra Identity variant is handled
-// (lib has Space/Stake/Work/Time, this has Space/Stake/Work/Time/Identity)
+/// Domain-specific proof type with Identity variant; canonical ProofType in hypermesh_lib.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ProofType {
+pub enum NetworkProofType {
     /// Proof of Space
     Space,
     /// Proof of Stake
@@ -165,7 +163,7 @@ pub enum ProofType {
     Work,
     /// Proof of Time
     Time,
-    /// Identity verification
+    /// Identity verification (network-specific, not in canonical ProofType)
     Identity,
 }
 

@@ -26,7 +26,7 @@ use crate::assets::core::{
 };
 use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityConfig,
-    EntityType, MatrixCoordinate, GeographicDimension,
+    EntityType, BlockchainMatrixCoordinate, GeographicDimension,
     OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
     AssetPrivacyLevel
 };
@@ -444,8 +444,8 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
     Ok(())
 }
 
-fn create_matrix_coordinate(country: &str, state: &str, node_id: &str) -> MatrixCoordinate {
-    MatrixCoordinate {
+fn create_matrix_coordinate(country: &str, state: &str, node_id: &str) -> BlockchainMatrixCoordinate {
+    BlockchainMatrixCoordinate {
         geographic: GeographicDimension {
             region: "north-america".to_string(),
             country: country.to_string(),

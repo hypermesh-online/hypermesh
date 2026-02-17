@@ -270,20 +270,8 @@ pub struct PrivacyConfig {
     pub anonymization_enabled: bool,
 }
 
-/// Privacy levels for resource sharing (from Proof of State analysis)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PrivacyLevel {
-    /// No public access
-    Private,
-    /// Specific networks/groups only
-    PrivateNetwork,
-    /// Trusted peer sharing
-    P2P,
-    /// Specific public networks
-    PublicNetwork,
-    /// Maximum CAESAR rewards, full HyperMesh participation
-    FullPublic,
-}
+// Re-export blockmatrix's canonical PrivacyLevel for sub-modules.
+pub use crate::assets::core::PrivacyLevel;
 
 /// Resource sharing configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

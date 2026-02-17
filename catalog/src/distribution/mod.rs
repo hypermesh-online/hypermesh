@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use crate::assets::{AssetPackage, AssetPackageId};
 use crate::security::{SecurityManager, SecurityConfig};
 use stoq_transport::StoqTransportLayer;
-use dht::{DhtNetwork, NodeId};
+use dht::{DhtNetwork, DhtNodeId};
 use content_addressing::{ContentAddress, MerkleTree};
 use package_manager::PackageManager;
 use peer_discovery::PeerDiscovery;
@@ -113,7 +113,7 @@ pub struct TransferState {
     /// Transfer speed (bytes/sec)
     pub speed: u64,
     /// Peers involved in transfer
-    pub peers: Vec<NodeId>,
+    pub peers: Vec<DhtNodeId>,
     /// Transfer start time
     pub started_at: std::time::Instant,
     /// Estimated time remaining

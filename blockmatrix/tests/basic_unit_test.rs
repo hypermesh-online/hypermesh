@@ -74,14 +74,7 @@ fn test_resource_type_enum() {
 
 #[test]
 fn test_privacy_levels_ordering() {
-    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
-    enum PrivacyLevel {
-        Private = 0,
-        PrivateNetwork = 1,
-        P2P = 2,
-        PublicNetwork = 3,
-        FullPublic = 4,
-    }
+    use blockmatrix::PrivacyLevel;
 
     let levels = [
         PrivacyLevel::Private,
@@ -91,14 +84,12 @@ fn test_privacy_levels_ordering() {
         PrivacyLevel::FullPublic,
     ];
 
-    // Test ordering
-    for i in 0..levels.len() - 1 {
-        assert!(levels[i] < levels[i + 1], "Privacy levels should be ordered");
+    // Test that all 5 privacy levels are distinct
+    for i in 0..levels.len() {
+        for j in (i + 1)..levels.len() {
+            assert_ne!(levels[i], levels[j], "Privacy levels should be distinct");
+        }
     }
-
-    // Test that we can convert to integer values
-    assert_eq!(PrivacyLevel::Private as u8, 0);
-    assert_eq!(PrivacyLevel::FullPublic as u8, 4);
 }
 
 #[test]

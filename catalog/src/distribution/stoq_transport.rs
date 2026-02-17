@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use crate::assets::AssetPackageId;
 use super::{DistributionConfig, PackageManager};
-use super::dht::NodeId;
+use super::dht::DhtNodeId;
 
 /// STOQ transport layer for P2P communication.
 ///
@@ -30,8 +30,8 @@ use super::dht::NodeId;
 pub struct StoqTransportLayer {
     /// Real STOQ transport (manages quinn endpoint, connection pools, crypto)
     transport: Arc<stoq::StoqTransport>,
-    /// Active connections keyed by peer NodeId
-    connections: Arc<RwLock<HashMap<NodeId, Arc<stoq::Connection>>>>,
+    /// Active connections keyed by peer DhtNodeId
+    connections: Arc<RwLock<HashMap<DhtNodeId, Arc<stoq::Connection>>>>,
     /// Incoming connection handler
     incoming_handler: Arc<RwLock<Option<mpsc::Sender<IncomingRequest>>>>,
     /// Transport configuration
@@ -65,7 +65,7 @@ pub struct TransportLayerConfig {
 #[derive(Debug)]
 pub struct IncomingRequest {
     /// Peer node ID
-    pub peer_id: NodeId,
+    pub peer_id: DhtNodeId,
     /// Request type
     pub request_type: RequestType,
     /// Response channel
@@ -109,7 +109,7 @@ pub enum ResponseData {
     /// Search results
     SearchResults(Vec<AssetPackageId>),
     /// Peer list
-    Peers(Vec<NodeId>),
+    Peers(Vec<DhtNodeId>),
     /// Acknowledgment
     Ack,
     /// Error response
@@ -171,7 +171,7 @@ pub struct ChunkData {
 /// Connection pool for multiplexing (uses real stoq::Connection)
 pub struct ConnectionPool {
     /// Pool of connections per peer
-    pools: Arc<RwLock<HashMap<NodeId, Vec<Arc<stoq::Connection>>>>>,
+    pools: Arc<RwLock<HashMap<DhtNodeId, Vec<Arc<stoq::Connection>>>>>,
     /// Maximum connections per peer
     max_per_peer: usize,
 }
@@ -258,7 +258,7 @@ impl StoqTransportLayer {
     /// Creates a stoq::Endpoint from the socket address and uses
     /// StoqTransport::connect() which handles TLS, FALCON crypto,
     /// connection pooling, and adaptive optimization internally.
-    pub async fn connect(&self, peer_addr: SocketAddr) -> Result<NodeId> {
+    pub async fn connect(&self, peer_addr: SocketAddr) -> Result<DhtNodeId> {
         // Build STOQ endpoint from peer address (IPv6 required)
         let ipv6_addr = match peer_addr {
             SocketAddr::V6(v6) => *v6.ip(),
@@ -278,7 +278,7 @@ impl StoqTransportLayer {
             .context("Failed to connect to peer via STOQ")?;
 
         // Generate node ID from peer address
-        let node_id = NodeId::from_address(&peer_addr);
+        let node_id = DhtNodeId::from_address(&peer_addr);
 
         // Store connection
         {
@@ -299,7 +299,7 @@ impl StoqTransportLayer {
     /// quinn::SendStream implements AsyncWrite, quinn::RecvStream implements AsyncRead.
     pub async fn send_request(
         &self,
-        peer_id: &NodeId,
+        peer_id: &DhtNodeId,
         request: RequestType,
     ) -> Result<ResponseData> {
         let connection = self.get_connection(peer_id).await?;
@@ -485,7 +485,7 @@ impl StoqTransportLayer {
     }
 
     /// Get connection to a peer
-    async fn get_connection(&self, peer_id: &NodeId) -> Result<Arc<stoq::Connection>> {
+    async fn get_connection(&self, peer_id: &DhtNodeId) -> Result<Arc<stoq::Connection>> {
         let connections = self.connections.read().await;
         connections
             .get(peer_id)
@@ -494,7 +494,7 @@ impl StoqTransportLayer {
     }
 
     /// Disconnect from a peer by closing the STOQ connection.
-    pub async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
+    pub async fn disconnect(&self, peer_id: &DhtNodeId) -> Result<()> {
         let mut connections = self.connections.write().await;
         if let Some(connection) = connections.remove(peer_id) {
             connection.close();
@@ -503,7 +503,7 @@ impl StoqTransportLayer {
     }
 
     /// Get connected peers
-    pub async fn get_connected_peers(&self) -> Vec<NodeId> {
+    pub async fn get_connected_peers(&self) -> Vec<DhtNodeId> {
         let connections = self.connections.read().await;
         connections.keys().cloned().collect()
     }
@@ -511,7 +511,7 @@ impl StoqTransportLayer {
 
 impl ConnectionPool {
     /// Add a connection to the pool
-    async fn add_connection(&self, node_id: NodeId, connection: Arc<stoq::Connection>) -> Result<()> {
+    async fn add_connection(&self, node_id: DhtNodeId, connection: Arc<stoq::Connection>) -> Result<()> {
         let mut pools = self.pools.write().await;
         let pool = pools.entry(node_id).or_insert_with(Vec::new);
 
@@ -524,14 +524,14 @@ impl ConnectionPool {
 
     /// Get a connection from the pool
     #[allow(dead_code)] // Pool access method for P2P operations
-    async fn get_connection(&self, node_id: &NodeId) -> Option<Arc<stoq::Connection>> {
+    async fn get_connection(&self, node_id: &DhtNodeId) -> Option<Arc<stoq::Connection>> {
         let pools = self.pools.read().await;
         pools.get(node_id)?.first().cloned()
     }
 
     /// Remove all connections for a peer
     #[allow(dead_code)] // Cleanup method for connection management
-    async fn remove_peer(&self, node_id: &NodeId) {
+    async fn remove_peer(&self, node_id: &DhtNodeId) {
         let mut pools = self.pools.write().await;
         pools.remove(node_id);
     }

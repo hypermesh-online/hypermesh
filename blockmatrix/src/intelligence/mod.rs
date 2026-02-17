@@ -470,8 +470,8 @@ impl IntelligenceLayer {
         // attempts registration but continues if network membership is not established.
         for network in &networks {
             // MultiNetworkCoordinator has add_asset_to_network() method
-            use crate::assets::multi_node::multi_network_coordinator::MatrixPosition;
-            let matrix_pos = MatrixPosition {
+            use crate::assets::multi_node::multi_network_coordinator::IntegerMatrixPosition;
+            let matrix_pos = IntegerMatrixPosition {
                 x: matrix_positions.first().map(|p| p.x).unwrap_or(0),
                 y: matrix_positions.first().map(|p| p.y).unwrap_or(0),
                 z: matrix_positions.first().map(|p| p.z).unwrap_or(0),

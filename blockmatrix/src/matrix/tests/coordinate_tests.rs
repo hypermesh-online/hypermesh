@@ -95,10 +95,10 @@ fn test_coordinate_equality() {
 #[test]
 fn test_coordinate_display() {
     let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-    assert_eq!(format!("{}", coord), "(10, 20, 30)");
+    assert_eq!(format!("{}", coord), "(10,20,30)");
 
     let negative = MatrixCoordinate::new(-5, -10, -15).unwrap();
-    assert_eq!(format!("{}", negative), "(-5, -10, -15)");
+    assert_eq!(format!("{}", negative), "(-5,-10,-15)");
 }
 
 #[test]

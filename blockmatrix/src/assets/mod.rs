@@ -49,7 +49,7 @@ pub use blockchain::{
 };
 
 pub use matrix_blockchain::{
-    MatrixCoordinate, EntityBlockchain, EntityType,
+    BlockchainMatrixCoordinate, EntityBlockchain, EntityType,
     MatrixBlockchainManager,
 };
 

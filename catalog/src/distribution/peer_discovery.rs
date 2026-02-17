@@ -16,7 +16,7 @@ use std::str::FromStr;
 
 use super::{
     stoq_transport::StoqTransportLayer,
-    dht::{DhtNetwork, NodeId},
+    dht::{DhtNetwork, DhtNodeId},
 };
 
 /// Peer discovery service
@@ -71,20 +71,20 @@ impl Default for DiscoveryConfig {
 /// Peer registry for managing known peers
 struct PeerRegistry {
     /// Known peers by node ID
-    peers: HashMap<NodeId, PeerInfo>,
+    peers: HashMap<DhtNodeId, PeerInfo>,
     /// Peers by capability
-    peers_by_capability: HashMap<PeerCapability, HashSet<NodeId>>,
+    peers_by_capability: HashMap<PeerCapability, HashSet<DhtNodeId>>,
     /// Connected peers
-    connected: HashSet<NodeId>,
+    connected: HashSet<DhtNodeId>,
     /// Blacklisted peers
-    blacklist: HashSet<NodeId>,
+    blacklist: HashSet<DhtNodeId>,
 }
 
 /// Information about a peer
 #[derive(Debug, Clone)]
 pub struct PeerInfo {
     /// Node ID
-    pub id: NodeId,
+    pub id: DhtNodeId,
     /// Network addresses
     pub addresses: Vec<SocketAddr>,
     /// Peer capabilities
@@ -273,7 +273,7 @@ impl PeerDiscovery {
         let discovered = mdns.discover_peers().await?;
 
         for (addr, capabilities) in discovered {
-            let node_id = NodeId::from_address(&addr);
+            let node_id = DhtNodeId::from_address(&addr);
             let peer_info = PeerInfo {
                 id: node_id,
                 addresses: vec![addr],
@@ -294,7 +294,7 @@ impl PeerDiscovery {
     /// Discover peers via DHT
     async fn discover_from_dht(&self) -> Result<()> {
         // Query DHT for random nodes to discover new peers
-        let _random_id = NodeId::random();
+        let _random_id = DhtNodeId::random();
         // Note: This would use the actual DHT lookup method
         Ok(())
     }
@@ -386,13 +386,13 @@ impl PeerDiscovery {
     }
 
     /// Get connected peers
-    pub async fn get_connected_peers(&self) -> Vec<NodeId> {
+    pub async fn get_connected_peers(&self) -> Vec<DhtNodeId> {
         let registry = self.known_peers.read().await;
         registry.connected.iter().cloned().collect()
     }
 
     /// Get peers with specific capability
-    pub async fn get_peers_with_capability(&self, capability: PeerCapability) -> Vec<NodeId> {
+    pub async fn get_peers_with_capability(&self, capability: PeerCapability) -> Vec<DhtNodeId> {
         let registry = self.known_peers.read().await;
         registry.peers_by_capability
             .get(&capability)
@@ -401,32 +401,32 @@ impl PeerDiscovery {
     }
 
     /// Get peer info
-    pub async fn get_peer_info(&self, peer_id: &NodeId) -> Option<PeerInfo> {
+    pub async fn get_peer_info(&self, peer_id: &DhtNodeId) -> Option<PeerInfo> {
         let registry = self.known_peers.read().await;
         registry.peers.get(peer_id).cloned()
     }
 
     /// Mark peer as connected
-    pub async fn mark_connected(&self, peer_id: NodeId) {
+    pub async fn mark_connected(&self, peer_id: DhtNodeId) {
         let mut registry = self.known_peers.write().await;
         registry.connected.insert(peer_id);
     }
 
     /// Mark peer as disconnected
-    pub async fn mark_disconnected(&self, peer_id: &NodeId) {
+    pub async fn mark_disconnected(&self, peer_id: &DhtNodeId) {
         let mut registry = self.known_peers.write().await;
         registry.connected.remove(peer_id);
     }
 
     /// Blacklist a peer
-    pub async fn blacklist_peer(&self, peer_id: NodeId) {
+    pub async fn blacklist_peer(&self, peer_id: DhtNodeId) {
         let mut registry = self.known_peers.write().await;
         registry.blacklist.insert(peer_id.clone());
         registry.remove_peer(&peer_id);
     }
 
     /// Update peer quality score
-    pub async fn update_peer_quality(&self, peer_id: &NodeId, quality: f64) {
+    pub async fn update_peer_quality(&self, peer_id: &DhtNodeId, quality: f64) {
         let mut registry = self.known_peers.write().await;
         if let Some(peer) = registry.peers.get_mut(peer_id) {
             peer.quality_score = quality.clamp(0.0, 1.0);
@@ -444,7 +444,7 @@ impl PeerRegistry {
         }
     }
 
-    fn remove_peer(&mut self, peer_id: &NodeId) {
+    fn remove_peer(&mut self, peer_id: &DhtNodeId) {
         if let Some(peer_info) = self.peers.remove(peer_id) {
             // Remove from capability index
             for capability in peer_info.capabilities {
@@ -520,7 +520,7 @@ mod tests {
     fn test_peer_registry() {
         let mut registry = PeerRegistry::new();
 
-        let peer_id = NodeId::random();
+        let peer_id = DhtNodeId::random();
         let peer_info = PeerInfo {
             id: peer_id.clone(),
             addresses: vec![],

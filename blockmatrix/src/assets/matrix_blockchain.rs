@@ -15,9 +15,11 @@ use crate::assets::core::asset_id::AssetId;
 pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel};
 use crate::consensus::ConsensusProof;
 
-/// Matrix coordinate system for entity organization
+/// Blockchain-specific matrix coordinate with geographic/organizational dimensions.
+/// Unlike hypermesh_lib::MatrixCoordinate (simple x,y,z integers), this type captures
+/// rich entity metadata for cross-chain validation scenarios.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MatrixCoordinate {
+pub struct BlockchainMatrixCoordinate {
     /// Geographic location dimension
     pub geographic: GeographicDimension,
     /// Organizational hierarchy dimension
@@ -86,7 +88,7 @@ pub struct EntityBlockchain {
     /// Pending transactions
     pub pending_transactions: Vec<EntityBlockData>,
     /// Known neighbor entities and their coordinates
-    pub neighbor_entities: HashMap<String, MatrixCoordinate>,
+    pub neighbor_entities: HashMap<String, BlockchainMatrixCoordinate>,
     /// Last validated block index
     pub last_validated_index: u64,
     /// Current chain state hash
@@ -102,7 +104,7 @@ pub struct EntityConfig {
     /// Entity type (DMV, Dealer, Insurance, Bank, Manufacturer, etc.)
     pub entity_type: EntityType,
     /// Matrix position of this entity
-    pub matrix_coordinate: MatrixCoordinate,
+    pub matrix_coordinate: BlockchainMatrixCoordinate,
     /// Privacy policies for cross-chain sharing
     pub privacy_policies: PrivacyPolicyConfig,
     /// Trusted partner entities for federated validation
@@ -478,7 +480,7 @@ impl EntityBlockchain {
     }
 
     /// Add trusted partner entity
-    pub fn add_trusted_partner(&mut self, partner_domain: String, coordinate: MatrixCoordinate) {
+    pub fn add_trusted_partner(&mut self, partner_domain: String, coordinate: BlockchainMatrixCoordinate) {
         self.neighbor_entities.insert(partner_domain.clone(), coordinate);
         if !self.config.trusted_partners.contains(&partner_domain) {
             self.config.trusted_partners.push(partner_domain);
@@ -492,7 +494,7 @@ pub struct MatrixBlockchainManager {
     /// All entity blockchains in the matrix
     entity_chains: HashMap<String, EntityBlockchain>,
     /// Matrix routing table
-    routing_table: HashMap<String, MatrixCoordinate>,
+    routing_table: HashMap<String, BlockchainMatrixCoordinate>,
     /// Cross-chain validation protocols
     validation_protocols: HashMap<String, ValidationProtocol>,
 }
@@ -567,7 +569,7 @@ mod tests {
 
     #[test]
     fn test_matrix_coordinate_creation() {
-        let coordinate = MatrixCoordinate {
+        let coordinate = BlockchainMatrixCoordinate {
             geographic: GeographicDimension {
                 region: "north-america".to_string(),
                 country: "US".to_string(),
@@ -599,7 +601,7 @@ mod tests {
         let config = EntityConfig {
             network_domain: "honda.hypermesh.online".to_string(),
             entity_type: EntityType::Manufacturer,
-            matrix_coordinate: MatrixCoordinate {
+            matrix_coordinate: BlockchainMatrixCoordinate {
                 geographic: GeographicDimension {
                     region: "north-america".to_string(),
                     country: "US".to_string(),
@@ -643,7 +645,7 @@ mod tests {
         let dmv_config = EntityConfig {
             network_domain: "dmv.hypermesh.online".to_string(),
             entity_type: EntityType::DMV,
-            matrix_coordinate: MatrixCoordinate {
+            matrix_coordinate: BlockchainMatrixCoordinate {
                 geographic: GeographicDimension {
                     region: "north-america".to_string(),
                     country: "US".to_string(),

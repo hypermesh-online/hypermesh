@@ -22,18 +22,16 @@ pub struct StorageAccessValidation {
     /// Reason for denial (if can_store is false)
     pub reason: Option<String>,
     /// Required proofs that passed validation
-    pub required_proofs: Vec<ProofType>,
+    pub required_proofs: Vec<DistributionProofType>,
     /// Validation timestamp
     pub validation_timestamp: SystemTime,
     /// Validator node ID
     pub validator_node_id: String,
 }
 
-/// Proof types in Four-Proof consensus
-// TODO: Migrate to hypermesh_lib::ProofType once variant names are unified
-// (lib uses Space/Stake/Work/Time, this uses PoSpace/PoStake/PoWork/PoTime)
+/// Distribution-specific proof type with PoX naming; canonical ProofType in hypermesh_lib.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ProofType {
+pub enum DistributionProofType {
     /// Proof of Space (WHERE)
     PoSpace,
     /// Proof of Stake (WHO)
@@ -226,10 +224,10 @@ impl ConsensusValidator for MockConsensusValidator {
                 Some("Denied by mock validator".to_string())
             },
             required_proofs: vec![
-                ProofType::PoSpace,
-                ProofType::PoStake,
-                ProofType::PoWork,
-                ProofType::PoTime,
+                DistributionProofType::PoSpace,
+                DistributionProofType::PoStake,
+                DistributionProofType::PoWork,
+                DistributionProofType::PoTime,
             ],
             validation_timestamp: SystemTime::now(),
             validator_node_id: "mock-validator".to_string(),
@@ -275,10 +273,10 @@ impl ConsensusValidator for crate::consensus::validation::DefaultConsensusValida
                 Some("Node not authorized by blockchain Asset record".to_string())
             },
             required_proofs: vec![
-                ProofType::PoSpace,
-                ProofType::PoStake,
-                ProofType::PoWork,
-                ProofType::PoTime,
+                DistributionProofType::PoSpace,
+                DistributionProofType::PoStake,
+                DistributionProofType::PoWork,
+                DistributionProofType::PoTime,
             ],
             validation_timestamp: SystemTime::now(),
             validator_node_id: format!("validator-for-{}", node_id),

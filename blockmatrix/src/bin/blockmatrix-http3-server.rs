@@ -26,7 +26,7 @@ struct HealthResponse {
 #[derive(Serialize)]
 struct StatusResponse {
     node_id: String,
-    matrix_position: MatrixPosition,
+    matrix_position: MatrixPositionDto,
     blockchain_height: u64,
     peers_connected: usize,
     assets_managed: u64,
@@ -35,8 +35,9 @@ struct StatusResponse {
     gpu_available: bool,
 }
 
+/// Local DTO for HTTP/3 API responses; canonical MatrixPosition in hypermesh_lib.
 #[derive(Serialize, Deserialize)]
-struct MatrixPosition {
+struct MatrixPositionDto {
     x: i32,
     y: i32,
     z: i32,
@@ -78,7 +79,7 @@ struct AssetInfo {
 #[derive(Serialize)]
 struct MatrixShard {
     shard_id: String,
-    position: MatrixPosition,
+    position: MatrixPositionDto,
     size_bytes: u64,
     redundancy_level: u32,
 }
@@ -99,7 +100,7 @@ struct HyperMeshSystemStatus {
     status: String,
     uptime_seconds: u64,
     version: String,
-    matrix_position: MatrixPosition,
+    matrix_position: MatrixPositionDto,
     resources: ResourceStatus,
 }
 
@@ -162,7 +163,7 @@ struct NodeHealth {
     status: String,
     last_seen: String,
     latency_ms: f32,
-    matrix_position: MatrixPosition,
+    matrix_position: MatrixPositionDto,
 }
 
 #[derive(Serialize)]
@@ -259,7 +260,7 @@ async fn main() -> Result<()> {
         .get("/api/v1/blockmatrix/status", |_req| async move {
             let response = StatusResponse {
                 node_id: uuid::Uuid::new_v4().to_string(),
-                matrix_position: MatrixPosition { x: 10, y: 20, z: 1 },
+                matrix_position: MatrixPositionDto { x: 10, y: 20, z: 1 },
                 blockchain_height: 54321,
                 peers_connected: 12,
                 assets_managed: 256,
@@ -299,13 +300,13 @@ async fn main() -> Result<()> {
                     matrix_shards: vec![
                         MatrixShard {
                             shard_id: "shard_001_a".to_string(),
-                            position: MatrixPosition { x: 5, y: 10, z: 0 },
+                            position: MatrixPositionDto { x: 5, y: 10, z: 0 },
                             size_bytes: 1048576,
                             redundancy_level: 3,
                         },
                         MatrixShard {
                             shard_id: "shard_001_b".to_string(),
-                            position: MatrixPosition { x: 15, y: 20, z: 0 },
+                            position: MatrixPositionDto { x: 15, y: 20, z: 0 },
                             size_bytes: 1048576,
                             redundancy_level: 3,
                         },
@@ -328,7 +329,7 @@ async fn main() -> Result<()> {
                     matrix_shards: vec![
                         MatrixShard {
                             shard_id: "shard_002_a".to_string(),
-                            position: MatrixPosition { x: 8, y: 12, z: 1 },
+                            position: MatrixPositionDto { x: 8, y: 12, z: 1 },
                             size_bytes: 2097152,
                             redundancy_level: 5,
                         },
@@ -351,7 +352,7 @@ async fn main() -> Result<()> {
                     matrix_shards: vec![
                         MatrixShard {
                             shard_id: "shard_003_a".to_string(),
-                            position: MatrixPosition { x: 3, y: 7, z: 2 },
+                            position: MatrixPositionDto { x: 3, y: 7, z: 2 },
                             size_bytes: 10485760,
                             redundancy_level: 7,
                         },
@@ -429,19 +430,19 @@ async fn main() -> Result<()> {
                 matrix_shards: vec![
                     MatrixShard {
                         shard_id: format!("{}_shard_1", asset_id),
-                        position: MatrixPosition { x: 25, y: 30, z: 0 },
+                        position: MatrixPositionDto { x: 25, y: 30, z: 0 },
                         size_bytes: 4194304,
                         redundancy_level: 3,
                     },
                     MatrixShard {
                         shard_id: format!("{}_shard_2", asset_id),
-                        position: MatrixPosition { x: 35, y: 40, z: 0 },
+                        position: MatrixPositionDto { x: 35, y: 40, z: 0 },
                         size_bytes: 4194304,
                         redundancy_level: 3,
                     },
                     MatrixShard {
                         shard_id: format!("{}_shard_3", asset_id),
-                        position: MatrixPosition { x: 45, y: 50, z: 0 },
+                        position: MatrixPositionDto { x: 45, y: 50, z: 0 },
                         size_bytes: 4194304,
                         redundancy_level: 3,
                     },
@@ -480,7 +481,7 @@ async fn main() -> Result<()> {
                     status: "operational".to_string(),
                     uptime_seconds: uptime,
                     version: env!("CARGO_PKG_VERSION").to_string(),
-                    matrix_position: MatrixPosition { x: 10, y: 20, z: 1 },
+                    matrix_position: MatrixPositionDto { x: 10, y: 20, z: 1 },
                     resources: ResourceStatus {
                         cpu_usage_percent: cpu_usage,
                         memory_used_gb,
@@ -524,7 +525,7 @@ async fn main() -> Result<()> {
                     matrix_shards: vec![
                         MatrixShard {
                             shard_id: "shard_001_a".to_string(),
-                            position: MatrixPosition { x: 5, y: 10, z: 0 },
+                            position: MatrixPositionDto { x: 5, y: 10, z: 0 },
                             size_bytes: 1048576,
                             redundancy_level: 3,
                         },
@@ -547,7 +548,7 @@ async fn main() -> Result<()> {
                     matrix_shards: vec![
                         MatrixShard {
                             shard_id: "shard_002_a".to_string(),
-                            position: MatrixPosition { x: 8, y: 12, z: 1 },
+                            position: MatrixPositionDto { x: 8, y: 12, z: 1 },
                             size_bytes: 2097152,
                             redundancy_level: 5,
                         },
@@ -728,28 +729,28 @@ async fn main() -> Result<()> {
                     status: "healthy".to_string(),
                     last_seen: chrono::Utc::now().to_rfc3339(),
                     latency_ms: 12.5,
-                    matrix_position: MatrixPosition { x: 10, y: 20, z: 1 },
+                    matrix_position: MatrixPositionDto { x: 10, y: 20, z: 1 },
                 },
                 NodeHealth {
                     node_id: uuid::Uuid::new_v4().to_string(),
                     status: "healthy".to_string(),
                     last_seen: chrono::Utc::now().to_rfc3339(),
                     latency_ms: 18.3,
-                    matrix_position: MatrixPosition { x: 15, y: 25, z: 1 },
+                    matrix_position: MatrixPositionDto { x: 15, y: 25, z: 1 },
                 },
                 NodeHealth {
                     node_id: uuid::Uuid::new_v4().to_string(),
                     status: "degraded".to_string(),
                     last_seen: (chrono::Utc::now() - chrono::Duration::minutes(2)).to_rfc3339(),
                     latency_ms: 145.7,
-                    matrix_position: MatrixPosition { x: 30, y: 40, z: 2 },
+                    matrix_position: MatrixPositionDto { x: 30, y: 40, z: 2 },
                 },
                 NodeHealth {
                     node_id: uuid::Uuid::new_v4().to_string(),
                     status: "healthy".to_string(),
                     last_seen: chrono::Utc::now().to_rfc3339(),
                     latency_ms: 8.9,
-                    matrix_position: MatrixPosition { x: 5, y: 15, z: 0 },
+                    matrix_position: MatrixPositionDto { x: 5, y: 15, z: 0 },
                 },
             ];
 
