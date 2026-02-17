@@ -6,6 +6,18 @@ logs/
 *.log
 .DS_Store
 
+# Compiled binaries and object files
+*.o
+*.so
+*.dylib
+*.exe
+baseline_perf_test
+standalone_bench
+test_ebpf_standalone
+final-bench
+blockmatrix/interface/phase2-c2/cli/nexus
+scripts/test_port
+
 # Environment and secrets
 .env
 .env.local

@@ -12,8 +12,6 @@ use anyhow::{Result, Context};
 use std::sync::Arc;
 use std::net::{SocketAddr, Ipv6Addr};
 use tokio::sync::{RwLock, mpsc};
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use bytes::{Bytes, BytesMut};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -387,7 +385,7 @@ impl StoqTransportLayer {
         loop {
             // accept_bi returns (quinn::SendStream, quinn::RecvStream)
             match connection.accept_bi().await {
-                Ok((mut send, recv)) => {
+                Ok((mut send, mut recv)) => {
                     // Receive request via quinn::RecvStream::read_to_end
                     let request_data = match recv.read_to_end(16 * 1024 * 1024).await {
                         Ok(data) => data,
