@@ -16,15 +16,14 @@
 
 use async_trait::async_trait;
 use anyhow::{Result, anyhow};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, debug, warn};
 
 use super::{
     NetworkHandler, NetworkConfig, NetworkConnection, NetworkType, NetworkId,
-    StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate, PeerId,
-    ProofOfState, request_blockchain_certificate, register_dns_asset,
+    StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate,
+    ProofOfState,
 };
 
 /// Public network handler - BlockMatrix blockchain-registered certificates
@@ -56,6 +55,7 @@ struct BlockchainState {
 
 /// DNS asset registration details
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during DNS asset registration
 struct DnsAsset {
     /// DNS name registered
     dns_name: String,
@@ -69,6 +69,7 @@ struct DnsAsset {
 
 /// Proof of State submission record
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during proof submission
 struct ProofSubmission {
     /// Submission timestamp
     timestamp: u64,
@@ -130,7 +131,7 @@ impl PublicNetworkHandler {
     }
 
     /// Register certificate on LOCAL BlockMatrix blockchain
-    async fn register_on_local_blockchain(&self, stoq: &Arc<StoqTransport>, proof: &ProofOfState) -> Result<Certificate> {
+    async fn register_on_local_blockchain(&self, _stoq: &Arc<StoqTransport>, proof: &ProofOfState) -> Result<Certificate> {
         info!("Registering certificate on LOCAL BlockMatrix blockchain");
 
         // In production, this would:
@@ -319,7 +320,7 @@ impl NetworkHandler for PublicNetworkHandler {
         debug!("Handling public network asset request: {}", request.asset_id);
 
         // In public mode, authorization is based on blockchain validation
-        let authorized = if let Some(peer_id) = &request.peer_id {
+        let authorized = if let Some(_peer_id) = &request.peer_id {
             // Would validate peer's blockchain certificate and permissions
             true // Placeholder
         } else {

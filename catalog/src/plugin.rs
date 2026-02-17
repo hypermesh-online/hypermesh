@@ -20,9 +20,8 @@ use tokio::sync::RwLock;
 use blockmatrix::extensions::{
     AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
     ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
-    ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStateData, ExtensionStatus,
-    HyperMeshExtension, AssetLibraryExtension, ResourceLimits, ValidationReport,
-    PackageFilter,
+    ExtensionResponse, ExtensionResult, ExtensionStateData, ExtensionStatus,
+    HyperMeshExtension, ResourceLimits, ValidationReport,
 };
 use blockmatrix::assets::core::AssetType;
 
@@ -35,6 +34,7 @@ pub const PLUGIN_VERSION: &str = "1.0.0";
 pub const REQUIRED_HYPERMESH_VERSION: &str = "1.0.0";
 
 /// Catalog plugin wrapper for HyperMesh integration
+#[allow(dead_code)] // Plugin fields used during lifecycle
 pub struct CatalogPlugin {
     /// Inner catalog extension
     inner: Arc<RwLock<CatalogExtension>>,
@@ -131,7 +131,7 @@ impl HyperMeshExtension for CatalogPlugin {
         self.config = config;
 
         // Extract catalog-specific configuration
-        let catalog_config = if let Some(settings) = self.config.settings.as_object() {
+        let _catalog_config = if let Some(settings) = self.config.settings.as_object() {
             CatalogExtensionConfig {
                 library_path: settings.get("storage_path")
                     .and_then(|v| v.as_str())
@@ -179,7 +179,7 @@ impl HyperMeshExtension for CatalogPlugin {
     }
 
     async fn extend_manager(&self, asset_manager: Arc<blockmatrix::assets::core::AssetManager>) -> ExtensionResult<()> {
-        let mut inner = self.inner.write().await;
+        let inner = self.inner.write().await;
         inner.extend_manager(asset_manager).await
     }
 
@@ -226,6 +226,7 @@ impl HyperMeshExtension for CatalogPlugin {
 /// This function is marked as unsafe because it returns a raw pointer
 /// that must be properly managed by the caller.
 #[no_mangle]
+#[allow(improper_ctypes_definitions)] // Trait object FFI by design for plugin system
 pub unsafe extern "C" fn hypermesh_extension_create() -> *mut dyn HyperMeshExtension {
     let plugin = Box::new(CatalogPlugin::new());
     Box::into_raw(plugin) as *mut dyn HyperMeshExtension

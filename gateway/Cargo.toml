@@ -7,28 +7,28 @@ edition = "2021"
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
-tokio = { version = "1.41", features = ["full"] }
+tokio = { workspace = true }
 h3 = "0.0.8"
 h3-quinn = "0.0.10"
-quinn = "0.11"
-rustls = "0.23"
-rustls-pemfile = "2.0"
+quinn = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 rustls-native-certs = "0.8"
 http = "1.1"
-bytes = "1.8"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-uuid = { version = "1.10", features = ["v4", "serde"] }
-anyhow = "1.0"
-dashmap = "6.1"
-arc-swap = "1.7"
-futures = "0.3"
+bytes = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+futures = { workspace = true }
 pin-project = "1.1"
 thiserror = "2.0"
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
+async-trait = { workspace = true }
+chrono = { workspace = true }
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }

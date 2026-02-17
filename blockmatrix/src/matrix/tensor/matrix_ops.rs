@@ -8,7 +8,6 @@
 //! system operations within the Block-MATRIX topology.
 
 use super::vector::{TensorError, Vector3D};
-use std::f64::consts::PI;
 
 /// 3x3 matrix for rotation and transformation in Block-MATRIX space
 ///

@@ -127,6 +127,7 @@ pub struct StorageStats {
 }
 
 /// Persistence transaction handle
+#[allow(dead_code)] // Fields used during transaction lifecycle
 pub struct PersistenceTransaction {
     /// Transaction ID
     id: String,
@@ -147,7 +148,7 @@ impl PersistenceTransaction {
     /// Commit transaction
     pub async fn commit(mut self) -> PersistenceResult<()> {
         // Execute all operations
-        for op in &self.operations {
+        for _op in &self.operations {
             // Would execute operation here
         }
         self.committed = true;
@@ -163,7 +164,7 @@ impl PersistenceTransaction {
         }
 
         // Rollback operations
-        for rollback in self.rollback.iter().rev() {
+        for _rollback in self.rollback.iter().rev() {
             // Would rollback here
         }
 
@@ -173,7 +174,7 @@ impl PersistenceTransaction {
 
 /// Persistence operation types
 #[derive(Debug, Clone)]
-enum PersistenceOperation {
+pub enum PersistenceOperation {
     SaveMatrixState(MatrixState),
     SaveBlock(Block),
     CreateSnapshot,
@@ -182,6 +183,7 @@ enum PersistenceOperation {
 
 /// Rollback data
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used during transaction rollback
 struct RollbackData {
     /// Component affected
     component: String,
@@ -466,9 +468,9 @@ impl PersistenceManager {
         // Clone the Arc references we need for the background task
         let snapshot_manager = Arc::clone(&self.snapshot_manager);
         let topology_backup = Arc::clone(&self.topology_backup);
-        let stats_update = Arc::clone(&self.stats);
-        let storage_dir_clone = self.get_storage_dir();
-        let node_id_clone = self.node_id.clone();
+        let _stats_update = Arc::clone(&self.stats);
+        let _storage_dir_clone = self.get_storage_dir();
+        let _node_id_clone = self.node_id.clone();
         let max_backups = self.config.max_backups;
         let interval_secs = self.config.background_interval_secs;
 

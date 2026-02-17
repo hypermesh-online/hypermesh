@@ -18,7 +18,7 @@ use crate::consensus::ConsensusProof;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// DNS resolution tier
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

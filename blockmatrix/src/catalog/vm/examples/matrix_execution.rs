@@ -21,7 +21,7 @@ use crate::catalog::vm::{
 };
 use crate::catalog::vm::execution::ExecutionContext;
 use crate::assets::core::{
-    AssetId, AssetType, NetworkScope, AssetCategory,
+    AssetId, NetworkScope, AssetCategory,
     BaseSystemType, AssetData,
 };
 use crate::assets::matrix_blockchain::{
@@ -205,7 +205,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
     }
     
     println!("\n💰 Asset Allocations:");
-    for (allocation_key, allocation_summary) in &result.asset_allocations {
+    for (_allocation_key, allocation_summary) in &result.asset_allocations {
         println!("  {} from {}: {} units", 
                 allocation_summary.asset_type,
                 allocation_summary.entity_domain,

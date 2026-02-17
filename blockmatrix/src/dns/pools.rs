@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{info, debug};
 
 /// DNS pool type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

@@ -59,6 +59,7 @@ impl Default for MatrixConstraints {
 
 /// Access pattern analysis for intelligent placement
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // Fields used in access pattern analysis
 struct AccessPattern {
     /// Positions that frequently request this bucket
     requester_positions: HashMap<MatrixCoordinate, usize>,
@@ -113,6 +114,7 @@ impl AccessPattern {
 }
 
 /// Bucket to matrix position mapper
+#[allow(dead_code)] // Fields used during bucket mapping
 pub struct BucketMapper {
     /// Matrix foundation for tensor operations
     foundation: Arc<MatrixFoundation>,

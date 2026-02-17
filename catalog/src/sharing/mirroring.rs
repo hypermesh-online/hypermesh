@@ -14,8 +14,7 @@ use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
 use std::cmp::Ordering;
 
-use crate::{AssetId, AssetPackage, AssetMetadata};
-use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator};
+use crate::{AssetId, AssetMetadata};
 use crate::registry::CatalogRegistry;
 use super::topology::NodeLocation;
 
@@ -165,6 +164,7 @@ impl PartialEq for MirrorCandidate {
 impl Eq for MirrorCandidate {}
 
 /// Mirror manager for package replication
+#[allow(dead_code)] // Mirror manager fields for replication operations
 pub struct MirrorManager {
     max_storage: u64,
     replication_factor: u32,
@@ -351,7 +351,7 @@ impl MirrorManager {
         let popularity = self.popularity_metrics.read().await;
         let mut candidates = Vec::new();
 
-        let cutoff_time = SystemTime::now() - time_window;
+        let _cutoff_time = SystemTime::now() - time_window;
 
         for (asset_id, metrics) in popularity.iter() {
             // Check recent access count
@@ -539,7 +539,7 @@ impl MirrorManager {
     async fn replicate_to_node(
         &self,
         asset_id: &AssetId,
-        metadata: &AssetMetadata,
+        _metadata: &AssetMetadata,
         node_id: &str,
     ) -> Result<()> {
         // Would implement actual replication protocol
@@ -557,8 +557,8 @@ impl MirrorManager {
 
     async fn replicate_to_specific_node(
         &self,
-        asset_id: &AssetId,
-        node_id: &str,
+        _asset_id: &AssetId,
+        _node_id: &str,
     ) -> Result<()> {
         // Would get metadata and call replicate_to_node
         Ok(())
@@ -618,7 +618,7 @@ impl MirrorManager {
         let mut nodes = self.mirror_nodes.write().await;
         let now = SystemTime::now();
 
-        for (node_id, node) in nodes.iter_mut() {
+        for (_node_id, node) in nodes.iter_mut() {
             // Would perform actual health check
             node.last_health_check = now;
 
@@ -704,7 +704,7 @@ impl MirrorManager {
         Ok(Vec::new())
     }
 
-    async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetId>> {
+    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetId>> {
         // Would query package registry for priority
         Ok(Vec::new())
     }

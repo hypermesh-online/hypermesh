@@ -5,9 +5,8 @@
 //! STOQ Transport Operations - Send/Receive and Connection Management
 
 use anyhow::Result;
-use bytes::{Bytes, BytesMut, BufMut};
+use bytes::{Bytes, BufMut};
 use std::collections::VecDeque;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 

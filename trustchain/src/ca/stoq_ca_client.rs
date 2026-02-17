@@ -59,6 +59,7 @@ pub struct CaStoqConfig {
 
 /// Cached certificate entry
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct CachedCertificate {
     certificate_der: Bytes,
     chain: Option<Vec<Bytes>>,

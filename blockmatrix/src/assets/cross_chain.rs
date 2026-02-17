@@ -14,7 +14,7 @@ use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
 
-use crate::assets::core::asset_id::{AssetId, AssetType};
+use crate::assets::core::asset_id::AssetId;
 use super::matrix_blockchain::{
     MatrixBlockchainManager, EntityType, ValidationResult, ZKStatement, ProofRequirement
 };
@@ -308,6 +308,7 @@ pub struct ZKProofResult {
 }
 
 /// Cross-chain validation manager
+#[allow(dead_code)] // Fields used during cross-chain validation
 pub struct CrossChainValidationManager {
     /// Matrix blockchain manager
     matrix_manager: MatrixBlockchainManager,
@@ -465,7 +466,7 @@ impl CrossChainValidationManager {
     async fn validate_vehicle_purchase_workflow(
         &mut self,
         vehicle_asset_id: AssetId,
-        entities: Vec<String>,
+        _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         // Create validation chain for vehicle purchase
         let validation_chain = vec![
@@ -605,7 +606,7 @@ impl CrossChainValidationManager {
     /// Validate individual network step
     async fn validate_network_step(
         &self,
-        validator: &CrossNetworkValidator,
+        _validator: &CrossNetworkValidator,
         step: &NetworkValidationStep,
     ) -> Result<NetworkValidationResult, CrossChainValidationError> {
         // This would interface with the actual entity blockchain

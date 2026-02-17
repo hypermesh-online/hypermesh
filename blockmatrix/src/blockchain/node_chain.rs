@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc};
 use tracing::{info, warn, error, debug};
 
 use crate::matrix::coordinate::MatrixCoordinate;

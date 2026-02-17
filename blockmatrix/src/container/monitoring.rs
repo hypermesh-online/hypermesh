@@ -59,6 +59,7 @@ pub struct DefaultContainerMonitor {
 
 /// Monitoring session
 #[derive(Debug)]
+#[allow(dead_code)] // Fields used during container monitoring
 struct MonitoringSession {
     container_id: ContainerId,
     started_at: Instant,

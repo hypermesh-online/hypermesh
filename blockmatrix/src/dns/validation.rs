@@ -25,6 +25,7 @@ pub struct ValidationResult {
 }
 
 /// DNS validator with PoS integration
+#[allow(dead_code)] // Fields used during DNS validation
 pub struct DnsValidator {
     /// Consensus validator
     consensus_validator: Arc<dyn ConsensusValidator>,

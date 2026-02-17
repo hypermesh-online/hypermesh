@@ -14,10 +14,11 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, debug};
 
 /// Network-specific isolation configuration
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used during network isolation
 struct NetworkIsolationConfig {
     /// Network identifier
     network_id: NetworkId,

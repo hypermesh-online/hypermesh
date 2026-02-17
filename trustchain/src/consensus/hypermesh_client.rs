@@ -467,6 +467,7 @@ impl HyperMeshConsensusClient {
 }
 
 /// Trait for consensus validation service
+#[allow(async_fn_in_trait)]
 pub trait ConsensusValidationService {
     /// Validate certificate request with consensus
     async fn validate_certificate_request(

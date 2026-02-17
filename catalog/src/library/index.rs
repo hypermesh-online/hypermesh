@@ -8,7 +8,7 @@
 
 use super::types::*;
 use super::SearchQuery;
-use anyhow::{Result, Context};
+use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet, BTreeMap};

@@ -6,7 +6,7 @@
 //!
 //! Provides semantic versioning support and dependency resolution for asset packages.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -52,6 +52,7 @@ pub struct VersionManager {
 }
 
 /// Dependency resolver for asset packages
+#[allow(dead_code)] // Resolver fields for dependency operations
 pub struct DependencyResolver {
     /// Version manager
     version_manager: VersionManager,
@@ -367,7 +368,6 @@ impl DependencyResolver {
         let start_time = std::time::Instant::now();
         
         let mut resolved = Vec::new();
-        let mut conflicts = Vec::new();
         let mut missing = Vec::new();
         let mut visited = HashSet::new();
         
@@ -381,7 +381,7 @@ impl DependencyResolver {
         }
         
         // Check for conflicts
-        conflicts = self.detect_conflicts(&resolved);
+        let conflicts = self.detect_conflicts(&resolved);
         
         let resolution_time = start_time.elapsed().as_millis() as u64;
         let success = conflicts.is_empty() && missing.is_empty();
@@ -409,7 +409,7 @@ impl DependencyResolver {
         visited.insert(dependency.name.clone());
         
         // Parse version constraint
-        let constraint = VersionConstraint::parse(&dependency.version)?;
+        let _constraint = VersionConstraint::parse(&dependency.version)?;
         
         // For now, create a dummy resolved version since we don't have access to the version manager
         let version = SemanticVersion::parse("1.0.0")?;
@@ -436,6 +436,7 @@ impl DependencyResolver {
     }
     
     /// Get transitive dependencies (placeholder implementation)
+    #[allow(dead_code)] // Pending transitive dependency resolution
     async fn get_transitive_dependencies(
         &self,
         _package_name: &str,

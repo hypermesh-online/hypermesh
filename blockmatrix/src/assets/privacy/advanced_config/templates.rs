@@ -187,7 +187,7 @@ impl PrivacyTemplate {
     /// Apply template to user configuration
     pub fn apply_to_config(&self, config: &mut UserPrivacyConfig) -> AssetResult<()> {
         // Apply template settings to user configuration
-        for (key, value) in &self.config.settings {
+        for (_key, _value) in &self.config.settings {
             // Implementation would depend on specific configuration structure
             // This is a placeholder for the actual implementation
         }
@@ -237,7 +237,7 @@ impl TemplateVariable {
 impl VariableConstraints {
     pub fn validate(&self) -> AssetResult<()> {
         // Validate constraint consistency
-        if let (Some(min), Some(max)) = (&self.min_value, &self.max_value) {
+        if let (Some(_min), Some(_max)) = (&self.min_value, &self.max_value) {
             // Would need type-specific validation logic here
         }
         
@@ -258,7 +258,7 @@ impl TemplateConstraint {
         Ok(())
     }
     
-    pub fn validate_against_config(&self, config: &UserPrivacyConfig) -> AssetResult<()> {
+    pub fn validate_against_config(&self, _config: &UserPrivacyConfig) -> AssetResult<()> {
         // Implementation would evaluate the constraint expression against the configuration
         // This is a placeholder for the actual implementation
         Ok(())
@@ -267,14 +267,14 @@ impl TemplateConstraint {
 
 impl PrivacyPreset {
     /// Apply preset to user configuration
-    pub fn apply_to_config(&self, config: &mut UserPrivacyConfig) -> AssetResult<()> {
+    pub fn apply_to_config(&self, _config: &mut UserPrivacyConfig) -> AssetResult<()> {
         // Apply preset settings to user configuration
-        for (key, value) in &self.config.quick_settings {
+        for (_key, _value) in &self.config.quick_settings {
             // Implementation would depend on specific configuration structure
             // This is a placeholder for the actual implementation
         }
-        
-        for (key, value) in &self.config.advanced_settings {
+
+        for (_key, _value) in &self.config.advanced_settings {
             // Implementation would depend on specific configuration structure
             // This is a placeholder for the actual implementation
         }

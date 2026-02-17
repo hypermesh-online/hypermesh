@@ -184,6 +184,7 @@ impl CgroupResourceManager {
     }
     
     /// Calculate CPU usage percentage
+    #[allow(dead_code)] // Will be used for resource monitoring
     fn calculate_cpu_usage(&self, previous: Option<&ResourceUsage>, current: &ResourceUsage) -> f64 {
         if let Some(prev) = previous {
             let time_diff = current.timestamp.duration_since(prev.timestamp)

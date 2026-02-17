@@ -116,6 +116,7 @@ pub struct StorageUsageStats {
 
 /// Storage operations for statistics
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Variants for future storage operation tracking
 pub enum StorageOperation {
     Allocate,
     Deallocate,

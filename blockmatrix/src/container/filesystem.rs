@@ -68,7 +68,7 @@ impl DefaultContainerFilesystem {
 
 #[async_trait]
 impl ContainerFilesystem for DefaultContainerFilesystem {
-    async fn create_container_filesystem(&self, id: &ContainerId, spec: &ContainerSpec) -> Result<PathBuf> {
+    async fn create_container_filesystem(&self, id: &ContainerId, _spec: &ContainerSpec) -> Result<PathBuf> {
         let container_path = self.container_path(id);
         let rootfs_path = container_path.join("rootfs");
         let work_path = container_path.join("work");
@@ -139,7 +139,7 @@ impl ContainerFilesystem for DefaultContainerFilesystem {
             let target_path = rootfs_path.join(path.strip_prefix("/").unwrap_or(path));
             
             match modification {
-                FileModification::Created { content, permissions } => {
+                FileModification::Created { content, permissions: _permissions } => {
                     if let Some(parent) = target_path.parent() {
                         std::fs::create_dir_all(parent)
                             .map_err(|e| ContainerError::filesystem(

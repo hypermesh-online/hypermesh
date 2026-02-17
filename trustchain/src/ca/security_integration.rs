@@ -192,7 +192,7 @@ impl SecurityIntegratedCA {
         
         // Add to security monitoring dashboard
         if self.config.log_all_operations {
-            let live_operation = LiveCertificateOperation {
+            let _live_operation = LiveCertificateOperation {
                 operation_id: operation_id.clone(),
                 operation_type: "issue_certificate".to_string(),
                 common_name: request.common_name.clone(),
@@ -209,7 +209,7 @@ impl SecurityIntegratedCA {
         }
 
         // CRITICAL: Perform mandatory security validation with consensus
-        let security_result = if self.config.mandatory_security_validation {
+        let _security_result = if self.config.mandatory_security_validation {
             info!("MANDATORY security validation for operation: {}", operation_id);
             
             let result = self.security_monitor.validate_certificate_operation(
@@ -249,7 +249,7 @@ impl SecurityIntegratedCA {
         // PHASE 2: MANDATORY CONSENSUS VALIDATION
         operation.state = SecureOperationState::ConsensusValidation;
         
-        let consensus_result = if self.config.mandatory_consensus {
+        let _consensus_result = if self.config.mandatory_consensus {
             info!("MANDATORY consensus validation for operation: {}", operation_id);
             
             // Use the CA's internal consensus validator
@@ -370,7 +370,7 @@ impl SecurityIntegratedCA {
     async fn issue_certificate_with_falcon(
         &self, 
         request: &CertificateRequest, 
-        operation_id: &str
+        _operation_id: &str
     ) -> TrustChainResult<IssuedCertificate> {
         info!("🔐 Issuing post-quantum certificate with FALCON-1024 for: {}", request.common_name);
         

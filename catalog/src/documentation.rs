@@ -155,7 +155,7 @@ impl Default for DocumentationConfig {
 impl DocumentationGenerator {
     /// Create a new documentation generator
     pub fn new(config: DocumentationConfig) -> Result<Self> {
-        let mut handlebars = Handlebars::new();
+        let handlebars = Handlebars::new();
         
         let mut generator = Self {
             handlebars,

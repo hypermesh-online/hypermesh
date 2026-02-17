@@ -132,6 +132,7 @@ pub enum RecommendationReason {
 }
 
 /// Federated index cache
+#[allow(dead_code)] // Cache fields for index management
 #[derive(Debug, Clone)]
 struct IndexCache {
     /// Cached index entries
@@ -143,6 +144,7 @@ struct IndexCache {
 }
 
 /// Discovery service for asset search and indexing
+#[allow(dead_code)] // Discovery fields for search operations
 pub struct DiscoveryService {
     cache_ttl: Duration,
     local_index: Arc<RwLock<HashMap<AssetId, AssetIndex>>>,
@@ -153,6 +155,7 @@ pub struct DiscoveryService {
 }
 
 /// Index statistics
+#[allow(dead_code)] // Stats fields populated during search operations
 #[derive(Debug, Clone, Default)]
 struct IndexStats {
     /// Total indexed packages
@@ -322,7 +325,7 @@ impl DiscoveryService {
     }
 
     /// Get package from local index
-    pub async fn get_local_package(&self, asset_id: &AssetId) -> Result<Option<AssetPackage>> {
+    pub async fn get_local_package(&self, _asset_id: &AssetId) -> Result<Option<AssetPackage>> {
         // Would retrieve from local storage
         // This is a placeholder implementation
         Ok(None)

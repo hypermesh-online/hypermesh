@@ -7,7 +7,7 @@
 //! Dependency resolution and validation for assets.
 //! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
@@ -94,7 +94,7 @@ impl DependencyResolver {
     }
 
     /// Get dependencies for an asset
-    async fn get_dependencies(&self, asset_id: &str) -> Result<Vec<Dependency>> {
+    async fn get_dependencies(&self, _asset_id: &str) -> Result<Vec<Dependency>> {
         // This would fetch from registry in real implementation
         // For now, return empty list
         Ok(Vec::new())

@@ -1100,6 +1100,7 @@ impl CertificateManager {
 
     /// Backward compatibility: new_self_signed for tests
     #[deprecated(since = "0.1.0", note = "use CertificateManager::new with LocalhostTesting mode")]
+    #[allow(deprecated)]
     pub async fn new_self_signed() -> Result<Self> {
         Self::generate_self_signed().await
     }

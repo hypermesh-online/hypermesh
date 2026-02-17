@@ -10,9 +10,9 @@
 use super::types::*;
 use super::asset_library::AssetLibrary;
 use super::resolver::DependencyResolver;
-use super::{LibraryConfig, LibraryInterface, ValidationResult, DependencyResolution};
+use super::{LibraryInterface, DependencyResolution};
 
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, bail};
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
@@ -37,6 +37,7 @@ pub struct OperationResult {
 }
 
 /// Package manager for lifecycle operations
+#[allow(dead_code)] // Manager fields for package lifecycle
 pub struct AssetPackageManager {
     /// Core library
     library: Arc<AssetLibrary>,
@@ -53,6 +54,7 @@ pub struct AssetPackageManager {
 }
 
 /// Installed package information
+#[allow(dead_code)] // Installation tracking fields
 #[derive(Debug, Clone)]
 struct InstalledPackage {
     /// Package ID
@@ -70,6 +72,7 @@ struct InstalledPackage {
 }
 
 /// Installation source
+#[allow(dead_code)] // Install source variants
 #[derive(Debug, Clone)]
 enum InstallSource {
     /// From library

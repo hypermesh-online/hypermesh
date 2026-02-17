@@ -9,12 +9,12 @@
 use anyhow::{Result, Context, anyhow};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use sha2::{Sha256, Sha512, Digest};
 use pqcrypto_falcon::falcon1024;
-use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage};
+use pqcrypto_traits::sign::SignedMessage;
 
-use super::trustchain::{TrustChainIntegration, Certificate, CertificateValidation};
+use super::trustchain::TrustChainIntegration;
 use super::{PublisherIdentity, PublisherType, CertificateValidity};
 use crate::assets::{AssetPackage, AssetPackageId};
 
@@ -465,14 +465,14 @@ impl SignatureVerifier {
     }
 
     /// Verify FALCON-1024 signature
-    fn verify_falcon_signature(&self, hash: &[u8], signature: &[u8],
-                              certificate: &[u8]) -> Result<bool> {
+    fn verify_falcon_signature(&self, _hash: &[u8], signature: &[u8],
+                              _certificate: &[u8]) -> Result<bool> {
         // Extract public key from certificate
         // TODO: Parse X.509 certificate to extract FALCON public key
         // For now, we'll need to reconstruct the public key from certificate
 
         // Verify signature with FALCON-1024
-        let signed_msg = falcon1024::SignedMessage::from_bytes(signature)
+        let _signed_msg = falcon1024::SignedMessage::from_bytes(signature)
             .map_err(|_| anyhow!("Invalid FALCON signature format"))?;
 
         // Open (verify) the signed message

@@ -7,10 +7,9 @@
 //! Handles serialization of matrix coordinates, neighbor lists, and distance caches
 //! in multiple formats with compression and versioning support.
 
-use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use super::{PersistenceError, PersistenceResult};

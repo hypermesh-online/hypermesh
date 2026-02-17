@@ -162,10 +162,10 @@ fn group_nodes_by_octant(nodes: &[NodeInfo]) -> [Vec<&NodeInfo>; 8] {
 
 /// Place shards in their assigned octants
 fn place_shards_in_octants(
-    shards: &[Shard],
+    _shards: &[Shard],
     octant_assignments: &[u8],
     octant_nodes: &[Vec<&NodeInfo>; 8],
-    all_eligible_nodes: &[NodeInfo],
+    _all_eligible_nodes: &[NodeInfo],
 ) -> AssetResult<Vec<ShardPlacement>> {
     let origin = MatrixCoordinate::origin();
     let mut placements = Vec::new();

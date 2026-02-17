@@ -200,7 +200,7 @@ struct RevocationEntry {
 
 /// Reasons for certificate revocation
 #[derive(Clone, Debug, Serialize, Deserialize)]
-enum RevocationReason {
+pub enum RevocationReason {
     KeyCompromise,
     CACompromise,
     AffiliationChanged,
@@ -231,6 +231,7 @@ struct TrustChainConfig {
     enable_online_revocation_check: bool,
     
     /// Revocation check timeout
+    #[allow(dead_code)] // Config field for future revocation checking
     revocation_check_timeout: Duration,
 }
 
@@ -250,6 +251,7 @@ impl Default for TrustChainConfig {
 
 /// Validation configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields for future certificate validation
 struct ValidationConfig {
     /// Strict validation mode
     strict_mode: bool,
@@ -455,7 +457,7 @@ impl TrustChainIntegration {
     }
     
     /// Get cached validation result
-    async fn get_cached_validation(&self, certificate_fingerprint: &str) -> AssetResult<Option<ValidationResult>> {
+    async fn get_cached_validation(&self, _certificate_fingerprint: &str) -> AssetResult<Option<ValidationResult>> {
         // TODO: Implement actual cache lookup
         // For now, return None to force validation
         Ok(None)
@@ -465,7 +467,7 @@ impl TrustChainIntegration {
     async fn cache_validation_result(
         &self,
         certificate_fingerprint: &str,
-        validation_result: &ValidationResult,
+        _validation_result: &ValidationResult,
     ) -> AssetResult<()> {
         // TODO: Implement actual cache storage
         tracing::debug!("Cached validation result for: {}", certificate_fingerprint);
@@ -516,7 +518,7 @@ impl TrustChainIntegration {
         }
         
         // If not cached, perform validation to get trust level
-        let mock_node_info = ProxyNodeInfo {
+        let _mock_node_info = ProxyNodeInfo {
             node_id: [0u8; 8], // Unknown node ID
             network_address: "unknown".to_string(),
             capabilities: ProxyCapabilities {

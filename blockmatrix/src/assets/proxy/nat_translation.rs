@@ -177,6 +177,7 @@ impl Default for AddressUsageStats {
 }
 
 /// The main NAT translator for memory addressing
+#[allow(dead_code)] // Fields used during NAT translation operations
 pub struct NATTranslator {
     /// Global to local address mappings
     global_to_local: Arc<RwLock<HashMap<GlobalAddress, LocalAddressMapping>>>,
@@ -196,6 +197,7 @@ pub struct NATTranslator {
 
 /// Address allocation management
 #[derive(Debug)]
+#[allow(dead_code)] // Fields for address space management
 struct AddressAllocator {
     /// Next available local address
     next_local_address: usize,
@@ -225,6 +227,7 @@ struct AddressRange {
 
 /// Network configuration for NAT translation
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields for NAT network setup
 struct NetworkConfig {
     /// HyperMesh network prefix
     network_prefix: [u8; 8],
@@ -476,14 +479,14 @@ impl NATTranslator {
         node_bytes[..copy_len].copy_from_slice(&node_id_bytes[..copy_len]);
         
         // Create global address
-        let global_addr = GlobalAddress::new(
+        let _global_addr = GlobalAddress::new(
             self.network_config.network_prefix,
             node_bytes,
             asset_id,
             service_port,
             GlobalAddressType::Memory, // Default to memory
         );
-        
+
         // Convert to ProxyAddress for compatibility
         // Pad 8-byte network prefix to 16 bytes for IPv6-style addressing
         let mut network_prefix_16 = [0u8; 16];
@@ -498,6 +501,7 @@ impl NATTranslator {
     }
     
     /// Create NAT translation mapping with real memory
+    #[allow(unsafe_code)]
     pub async fn create_translation(
         &self,
         global_addr: GlobalAddress,
@@ -694,6 +698,7 @@ impl NATTranslator {
     }
     
     /// Remove translation and unmap memory
+    #[allow(unsafe_code)]
     pub async fn remove_translation(&self, global_addr: &GlobalAddress) -> AssetResult<()> {
         let mapping = {
             let mut global_to_local = self.global_to_local.write().await;

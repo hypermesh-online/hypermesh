@@ -6,13 +6,11 @@
 //!
 //! Configurable trust policies for package installation and verification
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
-use tracing::{info, debug, warn};
-
 use super::{VerificationResult, PolicyResult, PolicyViolation, ViolationType, Severity};
 
 /// Trust level for package verification
@@ -141,6 +139,7 @@ impl Default for RequiredChecks {
 }
 
 /// Policy engine for evaluating trust policies
+#[allow(dead_code)] // Policy engine fields for trust evaluation
 pub struct PolicyEngine {
     /// Active policies by name
     policies: Arc<RwLock<HashMap<String, TrustPolicy>>>,

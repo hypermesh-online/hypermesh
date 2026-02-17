@@ -14,10 +14,10 @@
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
+use tracing::{info, warn};
 use std::collections::HashMap;
 
 use crate::blockchain::block::Block;

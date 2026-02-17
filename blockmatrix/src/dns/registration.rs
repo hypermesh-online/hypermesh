@@ -189,14 +189,14 @@ impl DnsRegistrar {
         &self,
         domain: &Domain,
         record: &DnsRecord,
-        proof: &ConsensusProof,
+        _proof: &ConsensusProof,
     ) -> DnsResult<String> {
         let blockchain_opt = self.blockchain.read().await;
 
         match blockchain_opt.as_ref() {
             Some(blockchain) => {
                 // Create blockchain transaction for DNS registration
-                let mut bc = blockchain.write().await;
+                let bc = blockchain.write().await;
                 let tx_data = format!(
                     "DNS Registration: {} -> {:?}",
                     domain.full, record.data

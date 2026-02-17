@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::net::Ipv6Addr;
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
@@ -51,7 +50,8 @@ pub struct DnsRecord {
 pub struct TrustChainBootstrap {
     /// DNS backend storage
     dns_backend: DnsBackend,
-    /// Bootstrap configuration
+    /// Bootstrap configuration (retained for phase-based bootstrap operations)
+    #[allow(dead_code)]
     config: BootstrapConfig,
     /// Bootstrap state
     state: Arc<RwLock<BootstrapState>>,

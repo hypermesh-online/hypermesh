@@ -82,6 +82,7 @@ impl AssemblyStats {
 
 /// Fetched shard data
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during shard retrieval
 struct FetchedShard {
     /// Shard hash
     hash: Hash,

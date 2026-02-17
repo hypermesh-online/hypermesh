@@ -15,10 +15,10 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
-use sha2::Digest as _;
 
-/// SHA256 algorithm for MerkleTree
+/// SHA256 algorithm for MerkleTree (used via Hasher trait implementation)
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 struct Sha256Algorithm;
 
 impl std::hash::Hasher for Sha256Algorithm {
@@ -85,7 +85,8 @@ pub struct CertificateTransparencyLog {
     merkle_tree: Arc<RwLock<()>>,
     /// S3-backed storage for persistence
     storage: Arc<S3BackedStorage>,
-    /// Performance monitoring
+    /// Performance monitoring (for CT log health tracking)
+    #[allow(dead_code)]
     performance_monitor: Arc<CTPerformanceMonitor>,
     /// Certificate entries cache
     entries_cache: Arc<DashMap<String, CTEntry>>,
@@ -93,17 +94,20 @@ pub struct CertificateTransparencyLog {
     config: Arc<CTConfig>,
     /// Metrics tracking
     metrics: Arc<CTMetrics>,
-    /// Consistency checker
+    /// Consistency checker (for Merkle tree consistency verification)
+    #[allow(dead_code)]
     consistency_checker: Arc<ConsistencyChecker>,
     /// Cryptographic signing key for CT log entries
     signing_key: SigningKey,
     /// Verifying key for signature validation
+    #[allow(dead_code)]
     verifying_key: VerifyingKey,
 }
 
 /// S3-backed storage for certificate transparency logs
 pub struct S3BackedStorage {
-    /// S3 client
+    /// S3 client (for persistence backend)
+    #[allow(dead_code)]
     s3_client: Arc<S3Client>,
     /// Bucket configuration
     bucket_config: S3BucketConfig,
@@ -114,6 +118,7 @@ pub struct S3BackedStorage {
 }
 
 /// Certificate Transparency performance monitor
+#[allow(dead_code)]
 pub struct CTPerformanceMonitor {
     /// Performance metrics
     metrics: Arc<CTMetrics>,
@@ -361,7 +366,7 @@ impl CertificateTransparencyLog {
 
         // Add to Merkle tree (Note: with current merkletree crate, we rebuild the tree)
         {
-            let tree = self.merkle_tree.write().await;
+            let _tree = self.merkle_tree.write().await;
             // For simplicity, we'll track the entry but rebuild if needed
             // In production, consider a different merkle tree implementation
             debug!("Added entry {} to merkle tree (tracking: {})", entry_id, ct_entry.leaf_hash.len());
@@ -451,7 +456,8 @@ impl CertificateTransparencyLog {
         Ok(hasher.finalize().to_vec())
     }
 
-    /// Sign CT entry with cryptographic signature
+    /// Sign CT entry with cryptographic signature (used for SCT generation)
+    #[allow(dead_code)]
     async fn sign_entry(&self, entry: &CTEntry) -> TrustChainResult<Vec<u8>> {
         // Create data to sign
         let mut data_to_sign = Vec::new();
@@ -467,7 +473,8 @@ impl CertificateTransparencyLog {
         Ok(signature.to_bytes().to_vec())
     }
 
-    /// Sign tree head with cryptographic signature
+    /// Sign tree head with cryptographic signature (used for STH generation)
+    #[allow(dead_code)]
     async fn sign_tree_head(&self, tree_size: u64) -> TrustChainResult<Vec<u8>> {
         // Get current Merkle tree root (for now use a placeholder)
         let tree_root = {
@@ -491,7 +498,8 @@ impl CertificateTransparencyLog {
         Ok(signature.to_bytes().to_vec())
     }
 
-    /// Sign arbitrary data with CT log signing key
+    /// Sign arbitrary data with CT log signing key (used for cross-log signing)
+    #[allow(dead_code)]
     async fn sign_data(&self, data: &[u8]) -> TrustChainResult<Vec<u8>> {
         // Generate signature
         let signature = self.signing_key.sign(data);

@@ -30,7 +30,7 @@ use crate::assets::core::{
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
-use crate::os_integration::{create_os_abstraction, OsAbstraction};
+use crate::os_integration::create_os_abstraction;
 
 /// Memory allocation record with NAT-like addressing
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -212,7 +212,7 @@ impl MemoryAssetAdapter {
         &self,
         pool_id: &str,
         size_bytes: u64,
-        numa_node: Option<u32>,
+        _numa_node: Option<u32>,
     ) -> AssetResult<usize> {
         let mut pools = self.memory_pools.write().await;
         let pool = pools.get_mut(pool_id)
@@ -264,6 +264,7 @@ impl MemoryAssetAdapter {
     }
     
     /// Validate memory access permissions
+    #[allow(dead_code)] // Will be used when memory access control is wired
     async fn validate_memory_access(
         &self,
         proxy_addr: &ProxyAddress,
@@ -326,6 +327,7 @@ impl MemoryAssetAdapter {
 
 /// Memory access types for permission validation
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Used by validate_memory_access
 enum MemoryAccessType {
     Read,
     Write,
@@ -358,7 +360,6 @@ impl AssetAdapter for MemoryAssetAdapter {
         }
 
         // Validate all four proofs as required by Proof of State patterns
-        use crate::consensus::Consensus;
         let valid = proof.validate();
 
         if !valid {

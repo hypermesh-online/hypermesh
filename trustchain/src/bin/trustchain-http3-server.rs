@@ -2,17 +2,14 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use anyhow::{Context, Result};
-use http::{Method, Response, StatusCode};
+use anyhow::Result;
+use http::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use trustchain::ca::TrustChainCA;
-use trustchain::consensus::ConsensusValidator;
-use trustchain::dns::DnsResolver;
-use trustchain::http3::{ApiResponse, ErrorResponse, Router, Http3StoqServer};
+use trustchain::http3::{ApiResponse, Router, Http3StoqServer};
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -40,6 +37,7 @@ struct MetricsResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct CertificateIssueRequest {
     subject: String,
     public_key: String,
@@ -55,6 +53,7 @@ struct CertificateResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct CertificateValidateRequest {
     certificate_pem: String,
 }
@@ -69,6 +68,7 @@ struct ValidationResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct DnsResolveRequest {
     domain: String,
     record_type: String,
@@ -83,6 +83,7 @@ struct DnsResolveResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct DnsRegisterRequest {
     domain: String,
     owner: String,
@@ -114,6 +115,7 @@ struct ProofValidationResponse {
 
 // New structures for authentication endpoint
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct AuthCertificateRequest {
     certificate_pem: String,
 }
@@ -216,7 +218,7 @@ async fn main() -> Result<()> {
 
             build_json_response(certificates, uuid::Uuid::new_v4().to_string())
         })
-        .post("/api/v1/trustchain/certificates/issue", |req| async move {
+        .post("/api/v1/trustchain/certificates/issue", |_req| async move {
             // In production, this would parse the request body and issue a real certificate
             let response = CertificateResponse {
                 certificate_id: uuid::Uuid::new_v4().to_string(),
@@ -362,7 +364,7 @@ async fn main() -> Result<()> {
         })
 
         // 10. Authentication endpoint
-        .post("/api/v1/trustchain/auth/certificate", |req| async move {
+        .post("/api/v1/trustchain/auth/certificate", |_req| async move {
             // In production, this would validate the certificate against the TrustChain CA
             // For now, we mock a successful authentication
 

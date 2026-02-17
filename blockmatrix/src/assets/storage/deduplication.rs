@@ -11,7 +11,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use anyhow::Result;
-use crate::assets::pipeline::PipelineError;
 
 use crate::matrix::MatrixCoordinate;
 use crate::assets::pipeline::Shard;
@@ -164,7 +163,7 @@ impl DeduplicationEngine {
             let positions = self.mapper.optimal_positions(&bucket_id, 14).await?;
 
             // Add to bucket
-            let metadata = bucket.add_shard(shard_hash, positions.clone(), shard_size);
+            let _metadata = bucket.add_shard(shard_hash, positions.clone(), shard_size);
 
             // Store actual shard data (in production, this would write to disk/network)
             // For now, we're just tracking metadata

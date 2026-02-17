@@ -10,12 +10,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
-use std::time::SystemTime;
 
 // Import BlockMatrix asset types directly
-use blockmatrix::assets::{AssetId, AssetType, ConsensusProof, PrivacyLevel, AssetAllocation};
-use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
+use blockmatrix::assets::{AssetId, ConsensusProof};
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///

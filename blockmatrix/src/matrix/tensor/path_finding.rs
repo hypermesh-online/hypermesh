@@ -30,6 +30,7 @@ pub enum PathError {
 
 /// Node in the A* search with cost information
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Fields used in A* algorithm
 struct SearchNode {
     coordinate: MatrixCoordinate,
     g_cost: f64, // Cost from start to this node
@@ -362,7 +363,7 @@ where
     F: Fn(&MatrixCoordinate) -> Vec<MatrixCoordinate> + Clone,
 {
     let forward_finder = PathFinder::new();
-    let backward_finder = PathFinder::new();
+    let _backward_finder = PathFinder::new();
 
     // For simplicity, fall back to regular A* for now
     // Full bidirectional implementation would maintain two frontiers

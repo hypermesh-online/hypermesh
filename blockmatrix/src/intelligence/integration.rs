@@ -16,12 +16,11 @@ use tracing::{info, debug, warn, error, instrument};
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
-use crate::assets::pipeline::{Asset, ProcessedAsset, Shard, ShardingConfig, EncryptionConfig};
-use crate::assets::privacy::{PrivacyManager, PrivacyEnforcer};
+use crate::assets::pipeline::{Shard, ShardingConfig, EncryptionConfig};
 use crate::assets::multi_node::{NetworkId, PrivacyTier, MultiNetworkCoordinator};
-use crate::assets::storage::{ContentAddressedStorage, DeduplicationEngine, ContentAddress, DeduplicationResult};
+use crate::assets::storage::{ContentAddressedStorage, ContentAddress, DeduplicationResult};
 use crate::matrix::MatrixCoordinate;
-use stoq::{StoqTransport, NetworkIsolationManager, StoqPrivacyTier};
+use stoq::{StoqTransport, StoqPrivacyTier};
 
 /// Configuration for component integration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -572,7 +571,7 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
     async fn create_network_specific_address(
         &self,
         asset_id: &str,
-        network_config: &NetworkConfig,
+        _network_config: &NetworkConfig,
     ) -> Result<ContentAddress> {
         // Implementation would create network-specific content address
         // This is a placeholder implementation
@@ -606,6 +605,7 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
 }
 
 #[async_trait]
+#[allow(dead_code)] // Extension trait for network-specific storage operations
 trait ContentAddressedStorageExt {
     async fn create_network_specific_address(
         &self,
@@ -618,6 +618,7 @@ trait ContentAddressedStorageExt {
 
 /// Network configuration placeholder
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Configuration struct for network-specific operations
 struct NetworkConfig {
     network_id: NetworkId,
     privacy_tier: PrivacyTier,
@@ -636,9 +637,9 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
 
     async fn register_content(
         &self,
-        network: NetworkId,
-        asset_id: String,
-        address: ContentAddress,
+        _network: NetworkId,
+        _asset_id: String,
+        _address: ContentAddress,
     ) -> Result<()> {
         // Placeholder implementation
         Ok(())
@@ -662,8 +663,8 @@ impl StoqTransportExt for StoqTransport {
     async fn connect_with_routing(
         &self,
         endpoint: &stoq::Endpoint,
-        tier: StoqPrivacyTier,
-        path: Vec<MatrixCoordinate>,
+        _tier: StoqPrivacyTier,
+        _path: Vec<MatrixCoordinate>,
     ) -> Result<stoq::Connection> {
         // Placeholder implementation - would use path for routing hints
         // For now, just use the standard connect method

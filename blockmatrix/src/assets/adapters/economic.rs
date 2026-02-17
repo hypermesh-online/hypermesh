@@ -81,6 +81,7 @@ pub struct EconomicAssetAdapter {
 
 /// Internal state for economic assets
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Fields populated during asset lifecycle
 struct EconomicAssetState {
     /// Asset metadata
     asset_id: AssetId,

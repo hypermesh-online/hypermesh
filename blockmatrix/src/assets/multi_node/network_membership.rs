@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
@@ -194,6 +194,7 @@ pub enum ApprovalProcess {
 }
 
 /// Multi-network coordinator - manages membership across networks
+#[allow(dead_code)] // Fields used during network membership management
 pub struct MultiNetworkMembership {
     /// Node ID
     local_node: NodeId,

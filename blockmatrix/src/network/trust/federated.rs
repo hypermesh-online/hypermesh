@@ -36,6 +36,7 @@ pub struct FederatedNetworkHandler {
 
 /// Federation information and policies
 #[derive(Debug, Default)]
+#[allow(dead_code)] // Fields populated during federation setup
 struct FederationInfo {
     /// Federation name
     name: String,
@@ -96,7 +97,7 @@ impl FederatedNetworkHandler {
     }
 
     /// Discover other federation members
-    async fn discover_members(&self, stoq: &Arc<StoqTransport>) -> Result<()> {
+    async fn discover_members(&self, _stoq: &Arc<StoqTransport>) -> Result<()> {
         debug!("Discovering federation members");
 
         // In production, would query federation gateway for member list

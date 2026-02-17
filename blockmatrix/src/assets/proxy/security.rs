@@ -19,6 +19,7 @@ use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
 use crate::assets::core::{AssetResult, AssetError, ProxyAddress};
 
 /// Quantum-resistant security handler
+#[allow(dead_code)] // Fields used during security operations
 pub struct QuantumSecurity {
     /// FALCON-1024 signer
     falcon_signer: FalconSigner,
@@ -97,6 +98,7 @@ pub enum TokenValidationStatus {
 
 /// Security configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields for security operations
 pub struct SecurityConfig {
     /// Token lifetime duration
     token_lifetime: Duration,
@@ -259,7 +261,7 @@ impl QuantumSecurity {
     }
     
     /// Store active token
-    async fn store_active_token(&self, token_id: String, token: SecurityToken) {
+    async fn store_active_token(&self, token_id: String, _token: SecurityToken) {
         // TODO: In real implementation, this would be thread-safe
         // For now, we'll simulate token storage
         tracing::debug!("Stored security token: {}", token_id);

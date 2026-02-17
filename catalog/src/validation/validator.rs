@@ -7,7 +7,7 @@
 //! Main validator implementation that orchestrates all validation components.
 //! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -248,8 +248,8 @@ impl AssetValidator {
         &self,
         security: &Option<SecurityValidationResult>,
         syntax: &Option<SyntaxValidationResult>,
-        performance: &Option<PerformanceValidationResult>,
-        compliance: &Option<ComplianceValidationResult>,
+        _performance: &Option<PerformanceValidationResult>,
+        _compliance: &Option<ComplianceValidationResult>,
         duration_ms: u64,
     ) -> ValidationSummary {
         let mut total_issues = 0;

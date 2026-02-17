@@ -9,10 +9,10 @@
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use super::PeerInfo;
 
@@ -163,6 +163,7 @@ impl Default for NodeCapacity {
 }
 
 /// Network topology manager
+#[allow(dead_code)] // Topology fields for routing decisions
 pub struct NetworkTopology {
     local_node_id: String,
     nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
@@ -484,8 +485,8 @@ impl NetworkTopology {
             } else {
                 // Fall back to shortest path
                 return self.dijkstra_shortest_path(&current, to).await
-                    .map(|mut sub_path| {
-                        path.append(&mut sub_path[1..].to_vec());
+                    .map(|sub_path| {
+                        path.extend_from_slice(&sub_path[1..]);
                         path
                     });
             }
@@ -499,7 +500,7 @@ impl NetworkTopology {
         let nodes = self.nodes.read().await;
 
         // Find path avoiding overloaded nodes
-        let mut path = self.dijkstra_shortest_path(from, to).await?;
+        let path = self.dijkstra_shortest_path(from, to).await?;
 
         // Check for overloaded nodes
         let mut overloaded = Vec::new();

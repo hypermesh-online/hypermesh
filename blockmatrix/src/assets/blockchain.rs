@@ -7,14 +7,13 @@
 //! This module implements asset-based blockchain operations following Proof of State patterns.
 //! Assets are stored directly in blockchain blocks with ConsensusProof validation.
 
-use std::time::{SystemTime, Duration};
+use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+    ConsensusProof,
     AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
 };
-use trustchain::consensus::{WorkloadType, WorkState};
 
 /// Asset record types for blockchain operations
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -283,7 +282,7 @@ impl AssetBlockchainManager {
     /// Query asset records by asset ID
     pub async fn get_asset_records(
         &self,
-        asset_id: &AssetId,
+        _asset_id: &AssetId,
     ) -> Result<Vec<HyperMeshAssetRecord>, String> {
         // TODO: Query blockchain for asset records
         // This would search the replicated log for all records matching the asset ID
@@ -294,7 +293,7 @@ impl AssetBlockchainManager {
     /// Get current asset status from blockchain
     pub async fn get_asset_status(
         &self,
-        asset_id: &AssetId,
+        _asset_id: &AssetId,
     ) -> Result<Option<HyperMeshAssetRecord>, String> {
         // TODO: Get latest asset record from blockchain
         // This would query the latest committed state for the asset

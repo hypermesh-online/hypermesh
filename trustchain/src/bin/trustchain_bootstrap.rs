@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::net::Ipv6Addr;
 use tracing::{info, warn, error};
 use tracing_subscriber;
-use trustchain::dns::{TrustChainBootstrap, BootstrapPhase};
+use trustchain::dns::TrustChainBootstrap;
 use trustchain::dns::bootstrap::DnsRecord;
 use tokio::signal;
 

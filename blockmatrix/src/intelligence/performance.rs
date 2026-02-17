@@ -11,8 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use std::collections::{HashMap, VecDeque};
 use tokio::sync::RwLock;
-use anyhow::Result;
-use tracing::{debug, instrument};
+use tracing::instrument;
 use serde::{Serialize, Deserialize};
 
 /// Performance monitor for the intelligence layer

@@ -9,9 +9,7 @@
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
-use std::collections::HashMap;
-
-use crate::assets::{AssetPackage, AssetPackageId};
+use crate::assets::AssetPackage;
 
 /// Content address (SHA-256 hash)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

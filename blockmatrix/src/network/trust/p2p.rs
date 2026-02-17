@@ -35,6 +35,7 @@ pub struct P2PNetworkHandler {
 
 /// Trust decision for a peer
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during trust evaluation
 struct TrustDecision {
     /// Peer being decided on
     peer_id: PeerId,

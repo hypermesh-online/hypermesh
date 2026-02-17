@@ -18,7 +18,6 @@ use std::fmt;
 use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use uuid::Uuid;
 
 use crate::matrix::coordinate::MatrixCoordinate;
 

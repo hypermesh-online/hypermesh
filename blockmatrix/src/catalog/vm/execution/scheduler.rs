@@ -23,6 +23,7 @@ use super::context::ExecutionContext;
 use super::super::AssetManagementConfig;
 
 /// Execution scheduler with consensus-aware resource allocation
+#[allow(dead_code)] // Fields used during execution scheduling
 pub struct ExecutionScheduler {
     /// Consensus VM for validation
     consensus_vm: Arc<RwLock<ConsensusVM>>,
@@ -527,7 +528,7 @@ impl ExecutionScheduler {
     /// Determine optimization strategy based on context
     async fn determine_optimization_strategy(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<OptimizationStrategy> {
         // In production: analyze context preferences and system state
         Ok(OptimizationStrategy::Balanced)
@@ -536,7 +537,7 @@ impl ExecutionScheduler {
     /// Create execution constraints based on context
     async fn create_execution_constraints(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<ExecutionConstraints> {
         Ok(ExecutionConstraints {
             max_execution_time: Some(Duration::from_secs(300)), // 5 minutes default
@@ -550,7 +551,7 @@ impl ExecutionScheduler {
     /// Determine execution priority based on context
     async fn determine_execution_priority(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<ExecutionPriority> {
         // In production: analyze context metadata, user preferences, system load
         Ok(ExecutionPriority::Normal)
@@ -560,7 +561,7 @@ impl ExecutionScheduler {
     async fn calculate_priority_score(
         &self,
         priority: &ExecutionPriority,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<f64> {
         let mut score = *priority as u8 as f64 * 100.0;
         
@@ -578,7 +579,7 @@ impl ExecutionScheduler {
     /// Calculate execution deadline
     async fn calculate_deadline(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<Option<SystemTime>> {
         // In production: extract deadline from context or set based on priority
         Ok(Some(SystemTime::now() + Duration::from_secs(3600))) // 1 hour default

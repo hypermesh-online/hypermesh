@@ -507,7 +507,7 @@ impl RemoteProxyManager {
     async fn create_forwarding_rules(
         &self,
         privacy_level: &PrivacyLevel,
-        asset_type: &str,
+        _asset_type: &str,
     ) -> AssetResult<Vec<ForwardingRule>> {
         let mut rules = Vec::new();
         

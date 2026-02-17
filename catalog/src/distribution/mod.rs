@@ -18,10 +18,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use uuid::Uuid;
-
 use crate::assets::{AssetPackage, AssetPackageId};
-use crate::security::{SecurityManager, SecurityConfig, VerificationResult};
+use crate::security::{SecurityManager, SecurityConfig};
 use stoq_transport::StoqTransportLayer;
 use dht::{DhtNetwork, NodeId};
 use content_addressing::{ContentAddress, MerkleTree};
@@ -29,6 +27,7 @@ use package_manager::PackageManager;
 use peer_discovery::PeerDiscovery;
 
 /// P2P Distribution system for Catalog assets
+#[allow(dead_code)] // Distribution system fields for P2P operations
 pub struct P2PDistribution {
     /// Catalog registry for asset discovery
     registry: Arc<crate::registry::CatalogRegistry>,

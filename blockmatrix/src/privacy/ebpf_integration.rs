@@ -7,11 +7,12 @@
 
 use super::tiers::PrivacyTier;
 use super::flexibility_matrix::PrivacyFlexibilityMatrix;
-use super::policies::{PolicyManager as PrivacyPolicyManager, PolicyAction};
+use super::policies::PolicyManager as PrivacyPolicyManager;
 use hypermesh_ebpf::policy_maps::{ValidationPolicy, PolicyManager as EbpfPolicyManager};
 use std::sync::Arc;
 
 /// Privacy-aware eBPF integration
+#[allow(dead_code)] // Fields used during eBPF policy enforcement
 pub struct PrivacyEbpfBridge {
     /// Privacy policy manager
     privacy_manager: Arc<PrivacyPolicyManager>,

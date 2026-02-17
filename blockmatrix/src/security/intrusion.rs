@@ -33,6 +33,7 @@ pub enum ThreatType {
 }
 
 /// Intrusion detection system
+#[allow(dead_code)] // Fields used during intrusion detection
 pub struct IntrusionDetectionSystem {
     threat_indicators: RwLock<Vec<ThreatIndicator>>,
     detection_rules: RwLock<Vec<DetectionRule>>,

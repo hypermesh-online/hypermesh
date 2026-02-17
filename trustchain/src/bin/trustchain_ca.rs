@@ -11,21 +11,19 @@
 use anyhow::{Context, Result};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use std::time::SystemTime;
 use tokio::signal;
-use tracing::{info, error, warn, debug};
+use tracing::{info, error, warn};
 use tracing_subscriber::{FmtSubscriber, EnvFilter};
 
 use trustchain::ca::{
     TrustChainCA, CAConfig, CAMode, CertificateRequest,
-    IssuedCertificate, CertificateStatus,
 };
-use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
+use trustchain::consensus::ConsensusProof;
 use trustchain::http3::{Http3StoqServer, Router};
 
-use http::{Response, StatusCode, Method};
+use http::{Response, StatusCode};
 use serde::{Serialize, Deserialize};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 /// CA service configuration
 #[derive(Debug, Clone)]

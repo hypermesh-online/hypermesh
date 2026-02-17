@@ -16,7 +16,7 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
-use crate::catalog::vm::{ConsensusProofVM, ExecutionContext};
+use crate::catalog::vm::ConsensusProofVM;
 use crate::orchestration::hypermesh_integration::{
     HyperMeshContainerOrchestrator, HyperMeshContainerSpec, PrivacyRequirements, PerformanceRequirements, ContainerMetadata,
 };
@@ -555,6 +555,7 @@ pub enum NotificationChannel {
 }
 
 /// Catalog-HyperMesh deployment bridge
+#[allow(dead_code)] // Fields used during deployment bridging
 pub struct CatalogHyperMeshBridge {
     /// VM runtime for code execution
     vm_runtime: Arc<ConsensusProofVM>,
@@ -766,7 +767,7 @@ impl CatalogHyperMeshBridge {
     async fn deploy_as_vm(
         &self,
         asset: &CatalogAssetType,
-        vm_config: &VMDeploymentConfig,
+        _vm_config: &VMDeploymentConfig,
         consensus_proof: &ConsensusProof,
     ) -> Result<InternalDeploymentResult> {
         match asset {

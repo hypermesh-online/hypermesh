@@ -5,9 +5,6 @@
 use anyhow::Result;
 use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
 
 fn main() -> Result<()> {
     // Initialize logging

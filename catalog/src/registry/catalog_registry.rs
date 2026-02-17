@@ -13,10 +13,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use blockmatrix::assets::{AssetId, AssetType, ConsensusProof, PrivacyLevel};
+use blockmatrix::assets::{AssetId, ConsensusProof, PrivacyLevel};
 use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
-use super::asset_type::{AssetTypeDefinition, ValidationResult};
+use super::asset_type::AssetTypeDefinition;
 
 /// Catalog Registry - provides indexing/discovery for asset types
 ///
@@ -200,7 +200,7 @@ impl CatalogRegistry {
     }
 
     /// Resolve dependencies for a type
-    pub async fn resolve_dependencies(&self, type_name: &str) -> Result<Vec<AssetId>> {
+    pub async fn resolve_dependencies(&self, _type_name: &str) -> Result<Vec<AssetId>> {
         if !self.config.enable_dependency_resolution {
             return Ok(Vec::new());
         }

@@ -345,7 +345,7 @@ impl AlmRoutingEngine {
     async fn traditional_pathfinding(&self,
         source: &ServiceId,
         target: &ServiceId,
-        policies: &[RoutingPolicy],
+        _policies: &[RoutingPolicy],
     ) -> Result<Vec<NodeId>> {
         let topology = self.topology.read().await;
         

@@ -6,12 +6,12 @@
 //!
 //! Tracks and manages publisher reputation based on package quality and community feedback
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
-use tracing::{info, debug, warn};
+use tracing::info;
 
 /// Publisher reputation entry
 #[derive(Debug, Clone, Serialize, Deserialize)]

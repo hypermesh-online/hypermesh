@@ -27,6 +27,7 @@ pub struct CertificateValidation {
 
 /// Cached certificate information
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during certificate caching
 struct CachedCertInfo {
     node_id: String,
     fingerprint: String,
@@ -36,6 +37,7 @@ struct CachedCertInfo {
 }
 
 /// Node authenticator for certificate-based authentication
+#[allow(dead_code)] // Fields used during authentication
 pub struct NodeAuthenticator {
     config: AuthenticationConfig,
     cert_cache: Arc<RwLock<HashMap<String, CachedCertInfo>>>,

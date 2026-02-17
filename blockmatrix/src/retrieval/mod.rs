@@ -28,7 +28,7 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
 use crate::matrix::MatrixCoordinate;
-use crate::assets::storage::{Hash, ContentAddress};
+use crate::assets::storage::Hash;
 
 // Sub-modules
 pub mod shard_map;

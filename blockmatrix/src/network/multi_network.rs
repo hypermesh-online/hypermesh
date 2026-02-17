@@ -15,8 +15,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::{Result, anyhow};
-use tracing::{info, warn, debug};
-use uuid::Uuid;
+use tracing::info;
 
 use super::trust::{
     NetworkHandler, NetworkConnection, NetworkType, NetworkId,
@@ -216,7 +215,7 @@ impl MultiNetworkCoordinator {
                     );
                 }
             }
-            NetworkType::Federated { gateway_url } => {
+            NetworkType::Federated { gateway_url: _gateway_url } => {
                 // Update network_type with gateway from config if needed
                 if config.federation_gateway.is_some() {
                     network_type = NetworkType::Federated {

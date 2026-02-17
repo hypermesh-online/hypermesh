@@ -23,7 +23,6 @@ use anyhow::anyhow;
 
 use hickory_proto::op::ResponseCode;
 use hickory_proto::rr::{Name, RecordType, Record, RData};
-use hickory_proto::serialize::binary::BinDecodable;
 
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 
@@ -280,7 +279,7 @@ impl AuthoritativeDnsServer {
     }
 
     /// Process a DNS query and generate response
-    async fn process_dns_query(&self, query_data: &[u8], _source: SocketAddr) -> TrustChainResult<Vec<u8>> {
+    async fn process_dns_query(&self, _query_data: &[u8], _source: SocketAddr) -> TrustChainResult<Vec<u8>> {
         // Parse the DNS query (simplified implementation)
         // In production, this would use proper DNS parsing library
 

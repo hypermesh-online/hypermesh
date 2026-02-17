@@ -106,7 +106,7 @@ impl InstructionTransmitter {
         plan: &RetrievalPlan,
         format: CompressionFormat,
     ) -> Result<Vec<u8>> {
-        let start = std::time::Instant::now();
+        let _start = std::time::Instant::now();
 
         let bytes = match format {
             CompressionFormat::None => {

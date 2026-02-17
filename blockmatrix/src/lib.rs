@@ -34,6 +34,7 @@ pub struct HyperMeshConfig {
 }
 
 /// HyperMesh system with asset management
+#[allow(dead_code)] // API surface - fields used in future integration
 pub struct HyperMeshSystem {
     /// System configuration
     config: HyperMeshConfig,

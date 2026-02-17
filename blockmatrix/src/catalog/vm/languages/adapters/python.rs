@@ -37,6 +37,7 @@ use super::super::{
 };
 
 /// Python language adapter using PyCall integration
+#[allow(dead_code)] // Fields used during Python adapter operations
 pub struct PythonAdapter {
     /// Base adapter functionality
     base: BaseAdapter,
@@ -277,7 +278,7 @@ class BlockchainStorage:
     async fn execute_julia_pycall(
         &self,
         julia_code: &str,
-        context: Arc<ExecutionContext>,
+        _context: Arc<ExecutionContext>,
     ) -> Result<ExecutionResult> {
         // This would integrate with the actual Julia VM execution
         // For now, return a placeholder result
@@ -517,7 +518,6 @@ class BlockchainStorage:
     /// Analyze Python code for asset requirements
     fn analyze_python_asset_requirements(&self, code: &str) -> Result<AssetRequirements> {
         let mut cpu_requirements = None;
-        let mut memory_requirements = None;
         let mut gpu_requirements = None;
         
         // Analyze for multiprocessing/threading
@@ -543,7 +543,7 @@ class BlockchainStorage:
         let base_memory = 256 * 1024 * 1024; // 256MB base
         let estimated_memory = base_memory * memory_multiplier;
         
-        memory_requirements = Some(MemoryRequirements {
+        let memory_requirements = Some(MemoryRequirements {
             min_ram_bytes: estimated_memory / 2,
             preferred_ram_bytes: estimated_memory,
             access_patterns: vec![MemoryAccessPattern::Random], // Python uses random access

@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 /// DSR-powered container scheduler
+#[allow(dead_code)] // Fields used during scheduling operations
 pub struct DsrScheduler {
     /// DSR scheduling enabled
     dsr_enabled: bool,
@@ -505,7 +506,7 @@ impl DsrScheduler {
         };
         
         // Calculate weighted final score
-        let weights = ResourcePriorityWeights {
+        let _weights = ResourcePriorityWeights {
             cpu_weight: 0.3,
             memory_weight: 0.3,
             storage_weight: 0.1,

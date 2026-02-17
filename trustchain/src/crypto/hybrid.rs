@@ -65,7 +65,8 @@ pub struct HybridEncryption {
 
 /// Hybrid cryptography operations handler
 pub struct HybridCrypto {
-    /// Algorithm identifier
+    /// Algorithm identifier (retained for algorithm negotiation)
+    #[allow(dead_code)]
     algorithm_id: String,
     /// FALCON-1024 handler
     falcon: super::falcon::FalconCrypto,

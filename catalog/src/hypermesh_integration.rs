@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// HyperMesh client for catalog operations
+#[allow(dead_code)] // Client fields for HyperMesh integration
 pub struct HyperMeshClient {
     /// HyperMesh network address
     network_address: String,

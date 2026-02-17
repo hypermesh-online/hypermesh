@@ -13,6 +13,7 @@ use super::types::*;
 use super::traits::{HyperMeshExtension, AssetExtensionHandler};
 
 /// Extension manager for loading and managing extensions
+#[allow(dead_code)] // Fields used during extension management
 pub struct ExtensionManager {
     extensions: Arc<RwLock<HashMap<String, Box<dyn HyperMeshExtension>>>>,
     registry: Arc<RwLock<HashMap<String, ExtensionMetadata>>>,

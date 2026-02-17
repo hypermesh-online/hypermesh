@@ -7,7 +7,7 @@
 //! Converts between geographic coordinates (latitude/longitude) and
 //! Block-MATRIX coordinate system with configurable scale factors.
 
-use crate::matrix::coordinate::{MatrixCoordinate, CoordinateError};
+use crate::matrix::coordinate::MatrixCoordinate;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 

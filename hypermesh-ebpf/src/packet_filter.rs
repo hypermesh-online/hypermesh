@@ -8,7 +8,7 @@
 //! This replaces generic STOQ filtering with HyperMesh-specific logic.
 
 use anyhow::{Result, anyhow};
-use crate::policy_maps::{PolicyManager, ValidationPolicy};
+use crate::policy_maps::PolicyManager;
 use crate::hypermesh_headers::*;
 
 /// Filter action for packets
@@ -168,7 +168,7 @@ impl HyperMeshPacketFilter {
     pub fn validate_asset_hash(
         &self,
         header: &AssetHashHeader,
-        payload: &[u8],
+        _payload: &[u8],
     ) -> bool {
         // Validate shard indices
         if !header.validate_shard_indices() {

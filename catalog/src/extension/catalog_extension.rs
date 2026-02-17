@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use sha2::Digest;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::SystemTime;
 use tokio::sync::RwLock;
 use semver::Version;
 
@@ -26,18 +25,14 @@ use blockmatrix::extensions::{
     ResourceUsageReport, SecurityIssue,
 };
 
-use blockmatrix::assets::core::{AssetManager, AssetType, AssetId, AssetData, NetworkScope, AssetCategory, BaseSystemType};
+use blockmatrix::assets::core::{AssetManager, AssetType, AssetId, AssetData, NetworkScope, AssetCategory};
 use blockmatrix::assets::core::ApplicationDomain;
 
 use crate::{
     Catalog, CatalogConfig,
     library::{AssetLibrary, LibraryConfig},
-    hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig},
-    validation::{AssetValidator, ValidationResult},
-    template::{CatalogTemplateGenerator, TemplateContext, TemplateGenerationResult},
-    documentation::{DocumentationGenerator, GeneratedDocumentation},
-    versioning::{VersionManager, SemanticVersion},
-    sharing::{SharingManager, SharingConfig, SharingStats, SharePermission},
+    hypermesh_bridge::HyperMeshAssetRegistry,
+    sharing::{SharingManager, SharingConfig, SharePermission},
     registry::SearchQuery,
 };
 
@@ -47,6 +42,7 @@ use super::asset_handlers::{
 use super::config::{CatalogExtensionConfig, ExtensionSettings};
 
 /// CatalogExtension - HyperMesh plugin for asset library management
+#[allow(dead_code)] // Fields used during extension lifecycle
 pub struct CatalogExtension {
     /// Extension metadata
     metadata: ExtensionMetadata,
@@ -210,7 +206,7 @@ impl CatalogExtension {
     }
 
     /// Internal helper to track errors
-    async fn track_error(&self, error: &str) {
+    async fn track_error(&self, _error: &str) {
         let mut count = self.error_count.write().await;
         *count += 1;
 
@@ -428,7 +424,7 @@ impl HyperMeshExtension for CatalogExtension {
 
             "catalog.validate" => {
                 // Handle validation request
-                if let Some(catalog) = &self.catalog {
+                if let Some(_catalog) = &self.catalog {
                     // Validation logic here
                     ExtensionResponse {
                         request_id: request.id,
@@ -723,7 +719,7 @@ impl HyperMeshExtension for CatalogExtension {
 #[async_trait]
 impl AssetLibraryExtension for CatalogExtension {
     /// List available asset packages
-    async fn list_packages(&self, filter: PackageFilter) -> ExtensionResult<Vec<AssetPackage>> {
+    async fn list_packages(&self, _filter: PackageFilter) -> ExtensionResult<Vec<AssetPackage>> {
         self.increment_requests().await;
         self.start_operation().await;
 
@@ -764,7 +760,7 @@ impl AssetLibraryExtension for CatalogExtension {
     }
 
     /// Install an asset package
-    async fn install_package(&self, package_id: &str, options: InstallOptions) -> ExtensionResult<InstallResult> {
+    async fn install_package(&self, package_id: &str, _options: InstallOptions) -> ExtensionResult<InstallResult> {
         self.increment_requests().await;
         self.start_operation().await;
 
@@ -859,7 +855,7 @@ impl AssetLibraryExtension for CatalogExtension {
         let library_manager = self.library_manager.read().await;
 
         // Get current package
-        let mut package = library_manager.get_package(package_id).await
+        let package = library_manager.get_package(package_id).await
             .ok_or_else(|| ExtensionError::RuntimeError {
                 message: format!("Package not found: {}", package_id)
             })?;
@@ -892,7 +888,7 @@ impl AssetLibraryExtension for CatalogExtension {
     }
 
     /// Search for packages
-    async fn search_packages(&self, query: &str, options: SearchOptions) -> ExtensionResult<Vec<AssetPackage>> {
+    async fn search_packages(&self, _query: &str, _options: SearchOptions) -> ExtensionResult<Vec<AssetPackage>> {
         self.increment_requests().await;
         self.start_operation().await;
 
@@ -905,7 +901,7 @@ impl AssetLibraryExtension for CatalogExtension {
     }
 
     /// Publish a new package to the library
-    async fn publish_package(&self, package: AssetPackageSpec, proof: blockmatrix::assets::core::ConsensusProof) -> ExtensionResult<PublishResult> {
+    async fn publish_package(&self, package: AssetPackageSpec, _proof: blockmatrix::assets::core::ConsensusProof) -> ExtensionResult<PublishResult> {
         self.increment_requests().await;
         self.start_operation().await;
 
@@ -941,7 +937,7 @@ impl AssetLibraryExtension for CatalogExtension {
                 message: format!("Failed to publish package: {}", e)
             })?;
 
-        let publish_duration = start.elapsed();
+        let _publish_duration = start.elapsed();
 
         let result = PublishResult {
             package_id: lib_package.id.to_string(),

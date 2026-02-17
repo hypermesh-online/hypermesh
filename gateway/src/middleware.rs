@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 use bytes::Bytes;
-use http::{HeaderMap, HeaderValue, Method, Request, Response, StatusCode};
+use http::{HeaderMap, HeaderValue, Request, Response, StatusCode};
 use std::time::Instant;
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -140,7 +140,8 @@ impl RequestIdMiddleware {
         );
     }
 
-    /// Extract request ID from headers or generate new one
+    /// Extract request ID from headers or generate new one (utility for downstream handlers)
+    #[allow(dead_code)]
     pub fn get_or_create_request_id(headers: &HeaderMap) -> Uuid {
         headers
             .get("x-request-id")

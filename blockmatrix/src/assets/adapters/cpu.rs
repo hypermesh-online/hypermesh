@@ -29,7 +29,7 @@ use crate::assets::core::{
     CpuRequirements,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
-use crate::os_integration::{create_os_abstraction, OsAbstraction};
+use crate::os_integration::create_os_abstraction;
 
 /// CPU core allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -129,6 +129,7 @@ pub enum SchedulingAlgorithm {
 }
 
 /// CPU Asset Adapter implementation
+#[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct CpuAssetAdapter {
     /// Active CPU allocations by asset ID
     allocations: Arc<RwLock<HashMap<AssetId, CpuAllocation>>>,
@@ -509,7 +510,6 @@ impl AssetAdapter for CpuAssetAdapter {
         }
 
         // Validate all four proofs with CPU-specific requirements
-        use crate::consensus::Consensus;
         let valid = proof.validate();
 
         if !valid {

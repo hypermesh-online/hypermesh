@@ -38,6 +38,7 @@ use super::encryption::create_kyber_encryption_key;
 use super::distribution::generate_proxy_address;
 
 /// Storage Asset Adapter implementation
+#[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct StorageAssetAdapter {
     /// Active storage allocations by asset ID
     allocations: Arc<RwLock<HashMap<AssetId, StorageAllocation>>>,
@@ -88,7 +89,6 @@ impl AssetAdapter for StorageAssetAdapter {
 
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
         // Validate all four proofs with CRITICAL PoSpace validation for storage
-        use crate::consensus::Consensus;
         let valid = proof.validate();
 
         if !valid {

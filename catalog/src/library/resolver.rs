@@ -13,7 +13,6 @@ use super::{LibraryInterface, DependencyResolution, ResolvedDependency, Dependen
 use anyhow::{Result, Context, bail};
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet, VecDeque};
-use async_trait::async_trait;
 
 // Import Asset Registry
 use crate::registry::CatalogRegistry;
@@ -139,6 +138,7 @@ enum VersionConstraint {
 }
 
 /// Resolution context for tracking state
+#[allow(dead_code)] // Context fields for dependency resolution
 struct ResolutionContext {
     /// Resolved packages
     resolved: HashMap<Arc<str>, ResolvedPackage>,
@@ -157,6 +157,7 @@ struct ResolutionContext {
 }
 
 /// Resolved package information
+#[allow(dead_code)] // Package resolution fields
 struct ResolvedPackage {
     name: Arc<str>,
     version: Arc<str>,
@@ -172,6 +173,7 @@ impl ResolvedPackage {
     }
 
     /// Get package dependencies (compatibility method - returns borrowed slice)
+    #[allow(dead_code)] // Compatibility method for dependency resolution
     pub fn dependencies(&self) -> Vec<PackageDependency> {
         // Convert Arc<str> dependencies to PackageDependency structs
         self.dependencies.iter().map(|name| PackageDependency {
@@ -184,6 +186,7 @@ impl ResolvedPackage {
 }
 
 /// Pending package to resolve
+#[allow(dead_code)] // Package resolution tracking
 struct PendingPackage {
     name: Arc<str>,
     constraint: Arc<str>,
@@ -211,7 +214,7 @@ impl DependencyResolver {
         &self,
         package: &LibraryAssetPackage,
         registry: &CatalogRegistry,
-        max_depth: u32,
+        _max_depth: u32,
     ) -> Result<DependencyResolution> {
         let start = std::time::Instant::now();
 
@@ -322,7 +325,7 @@ impl DependencyResolver {
                 Ok(()) => {
                     // Successfully resolved
                 }
-                Err(e) => {
+                Err(_e) => {
                     context.missing.push(pending.name.to_string());
                 }
             }

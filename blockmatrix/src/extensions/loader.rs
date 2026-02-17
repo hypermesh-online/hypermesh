@@ -9,7 +9,6 @@
 
 #![allow(unsafe_code)]
 
-use anyhow::Context;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -38,6 +37,7 @@ use super::{
 };
 
 /// Type alias for extension constructor function
+#[allow(improper_ctypes_definitions)] // Trait object in FFI is intentional for plugin system
 pub type ExtensionConstructor = unsafe extern "C" fn() -> *mut dyn HyperMeshExtension;
 
 /// Extension loader configuration
@@ -124,6 +124,7 @@ pub struct LoadedExtension {
 }
 
 /// Dynamic extension loader
+#[allow(dead_code)] // Fields used during extension loading
 pub struct ExtensionLoader {
     /// Configuration
     config: LoaderConfig,
@@ -260,16 +261,14 @@ impl ExtensionLoader {
         }
 
         // Load the library
-        let library = unsafe {
-            Library::new(&lib_path).map_err(|e| {
-                ExtensionError::Internal(anyhow::anyhow!(
-                    "Failed to load library {:?}: {}", lib_path, e
-                ))
-            })?
-        };
+        let library = Library::new(&lib_path).map_err(|e| {
+            ExtensionError::Internal(anyhow::anyhow!(
+                "Failed to load library {:?}: {}", lib_path, e
+            ))
+        })?;
 
         // Get the constructor function
-        let constructor: Symbol<ExtensionConstructor> = unsafe {
+        let _constructor: Symbol<ExtensionConstructor> = unsafe {
             library.get(b"hypermesh_extension_create\0").map_err(|e| {
                 ExtensionError::Internal(anyhow::anyhow!(
                     "Failed to find extension constructor: {}", e
@@ -319,8 +318,8 @@ impl ExtensionLoader {
     /// Load WebAssembly module
     async fn load_wasm_module(
         &self,
-        path: &Path,
-        context: LoadContext,
+        _path: &Path,
+        _context: LoadContext,
     ) -> ExtensionResult<LoadedExtension> {
         if !self.config.enable_wasm {
             return Err(ExtensionError::Internal(anyhow::anyhow!(
@@ -559,6 +558,7 @@ pub struct ResourceRequirements {
 }
 
 /// Security verifier for extension signatures
+#[allow(dead_code)] // Fields used during signature verification
 pub struct SecurityVerifier {
     /// TrustChain certificate path
     cert_path: Option<PathBuf>,
@@ -607,6 +607,7 @@ impl SecurityVerifier {
 }
 
 /// Extension sandbox for resource isolation
+#[allow(dead_code)] // Fields used during extension sandboxing
 pub struct ExtensionSandbox {
     /// Extension ID
     extension_id: String,

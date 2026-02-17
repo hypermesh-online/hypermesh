@@ -3,9 +3,9 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 
 use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError, StoqApiServer};
 use stoq::transport::{StoqTransport, TransportConfig};

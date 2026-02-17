@@ -7,7 +7,7 @@
 //! CRITICAL: All permission rules live in blockchain Asset records.
 //! This module queries consensus for node eligibility before distribution.
 
-use crate::assets::core::{AssetError, AssetResult};
+use crate::assets::core::AssetResult;
 use crate::assets::pipeline::sharding::Shard;
 use crate::distribution::NodeInfo;
 use async_trait::async_trait;
@@ -259,8 +259,8 @@ impl ConsensusValidator for crate::consensus::validation::DefaultConsensusValida
     async fn validate_storage_access(
         &self,
         node_id: &str,
-        asset_id: &str,
-        shard_id: &str,
+        _asset_id: &str,
+        _shard_id: &str,
     ) -> AssetResult<StorageAccessValidation> {
         // For now, use basic validation based on test mode
         // In production, this would query blockchain Asset records

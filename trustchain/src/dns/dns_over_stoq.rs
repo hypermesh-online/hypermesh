@@ -242,7 +242,7 @@ impl DnsOverStoq {
         
         let mut tasks = Vec::new();
         
-        for i in 0..num_servers {
+        for _i in 0..num_servers {
             let query_clone = query.clone();
             let stoq_client = self.stoq_client.clone();
             
@@ -282,7 +282,7 @@ impl DnsOverStoq {
     async fn convert_stoq_response(
         &self,
         stoq_response: StoqDnsResponse,
-        original_query: &DnsQuery,
+        _original_query: &DnsQuery,
     ) -> TrustChainResult<DnsResponse> {
         let mut answers = Vec::new();
         let mut authorities = Vec::new();
@@ -626,34 +626,6 @@ mod tests {
         // For now, return an error indicating this needs a running STOQ instance
         // This prevents the test from panicking while allowing other tests to run
         Err("Mock STOQ client not available - requires test STOQ server".into())
-    }
-
-    #[test]
-    fn test_record_type_conversion() {
-        let resolver_config = DnsOverStoqConfig::default();
-        // Create a minimal resolver for testing conversions
-        // This would be expanded in real implementation
-        
-        // Test record type to u16 conversion
-        assert_eq!(1, 1); // A record
-        assert_eq!(28, 28); // AAAA record
-        assert_eq!(5, 5); // CNAME record
-    }
-
-    #[test]
-    fn test_cache_key_generation() {
-        let query = DnsQuery {
-            id: 1234,
-            name: "example.com".to_string(),
-            record_type: RecordType::A,
-            class: DNSClass::IN,
-            client_addr: Ipv6Addr::LOCALHOST,
-            timestamp: SystemTime::now(),
-        };
-
-        // This would be implemented properly with actual resolver instance
-        let expected_key = "example.com:1:IN";
-        // assert_eq!(resolver.generate_cache_key(&query), expected_key);
     }
 
     #[test]

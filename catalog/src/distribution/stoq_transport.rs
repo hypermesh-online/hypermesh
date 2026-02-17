@@ -16,7 +16,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::assets::{AssetPackage, AssetPackageId};
+use crate::assets::AssetPackageId;
 use super::{DistributionConfig, PackageManager};
 use super::dht::NodeId;
 
@@ -26,6 +26,7 @@ use super::dht::NodeId;
 /// pooling, FALCON quantum-resistant crypto, adaptive optimization, and eBPF
 /// acceleration. Each connection yields `quinn::SendStream`/`quinn::RecvStream`
 /// bidirectional streams that implement `AsyncWrite`/`AsyncRead`.
+#[allow(dead_code)] // Transport fields used during P2P operations
 pub struct StoqTransportLayer {
     /// Real STOQ transport (manages quinn endpoint, connection pools, crypto)
     transport: Arc<stoq::StoqTransport>,
@@ -522,12 +523,14 @@ impl ConnectionPool {
     }
 
     /// Get a connection from the pool
+    #[allow(dead_code)] // Pool access method for P2P operations
     async fn get_connection(&self, node_id: &NodeId) -> Option<Arc<stoq::Connection>> {
         let pools = self.pools.read().await;
         pools.get(node_id)?.first().cloned()
     }
 
     /// Remove all connections for a peer
+    #[allow(dead_code)] // Cleanup method for connection management
     async fn remove_peer(&self, node_id: &NodeId) {
         let mut pools = self.pools.write().await;
         pools.remove(node_id);

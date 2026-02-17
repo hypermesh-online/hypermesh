@@ -25,7 +25,7 @@ use crate::assets::core::{
     ConsensusProof, AssetStatus, WorkloadType,
     ResourceRequirements, PrivacyLevel,
 };
-use crate::catalog::vm::{ConsensusProofVM, VMConfig};
+use crate::catalog::vm::ConsensusProofVM;
 
 /// HyperMesh-integrated container orchestrator
 pub struct HyperMeshContainerOrchestrator {
@@ -476,6 +476,7 @@ impl HyperMeshContainerOrchestrator {
     }
     
     /// Map asset priority to internal priority system
+    #[allow(dead_code)] // Will be used for asset priority mapping
     fn map_asset_priority(&self, priority: &AssetPriority) -> crate::assets::core::AssetPriority {
         match priority {
             AssetPriority::Low => crate::assets::core::AssetPriority::Low,
@@ -666,7 +667,7 @@ impl HyperMeshContainerOrchestrator {
 
         // Update container specification
         let container_handle = self.container_runtime.get_handle(&container_id).await?;
-        let updated_spec = self.adapt_container_spec_for_assets(
+        let _updated_spec = self.adapt_container_spec_for_assets(
             &container_handle.spec,
             &new_allocated_assets,
         ).await?;

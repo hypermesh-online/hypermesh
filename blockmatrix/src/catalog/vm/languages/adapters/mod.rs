@@ -47,6 +47,7 @@ use super::{
 };
 
 /// Base adapter functionality shared across all language adapters
+#[allow(dead_code)] // Fields used during adapter operations
 pub struct BaseAdapter {
     /// Language identifier
     language_id: String,
@@ -203,6 +204,7 @@ impl BaseAdapter {
 }
 
 /// Execution environment for language adapter
+#[allow(dead_code)] // Fields populated during execution setup
 pub struct ExecutionEnvironment {
     /// Language identifier
     language_id: String,
@@ -277,7 +279,7 @@ impl ExecutionEnvironment {
     
     /// Allocate CPU cores for execution
     async fn allocate_cpu_cores(
-        config: &AdapterConfig,
+        _config: &AdapterConfig,
         _context: &ExecutionContext,
     ) -> Result<Vec<u32>> {
         // Simplified CPU allocation - would integrate with actual resource manager

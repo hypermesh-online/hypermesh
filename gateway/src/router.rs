@@ -9,7 +9,7 @@ use serde_json::json;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::error;
 
 use crate::config::{GatewayConfig, RetryConfig};
 use crate::middleware::{CircuitBreaker, CorsMiddleware, LoggingMiddleware, RequestIdMiddleware};
@@ -22,7 +22,11 @@ pub struct GatewayRouter {
     blockmatrix_pool: ConnectionPool,
     trustchain_proxy: Http3Proxy,
     blockmatrix_proxy: Http3Proxy,
+    /// TrustChain service address (retained for health check routing)
+    #[allow(dead_code)]
     trustchain_addr: SocketAddr,
+    /// BlockMatrix service address (retained for health check routing)
+    #[allow(dead_code)]
     blockmatrix_addr: SocketAddr,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
@@ -35,6 +39,7 @@ impl GatewayRouter {
         // Create connection pools
         let trustchain_pool = ConnectionPool::new(
             config.trustchain_addr,
+            &config.trustchain_server_name,
             config.pool.max_connections,
             config.pool.idle_timeout,
         )
@@ -42,6 +47,7 @@ impl GatewayRouter {
 
         let blockmatrix_pool = ConnectionPool::new(
             config.blockmatrix_addr,
+            &config.blockmatrix_server_name,
             config.pool.max_connections,
             config.pool.idle_timeout,
         )

@@ -7,11 +7,11 @@
 //! This module implements full validation of all four Proof of State proofs
 //! with detailed error reporting and cryptographic verification.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-use super::proof::{Proof, StakeProof, TimeProof, SpaceProof, WorkProof};
+use super::proof::Proof;
 use super::ConsensusProof;
 
 // Re-export ProofType from canonical shared lib (single source of truth)

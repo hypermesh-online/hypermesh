@@ -13,7 +13,7 @@ use super::index::LibraryIndex;
 use super::{LibraryConfig, LibraryInterface, LibraryMetrics, LibraryStats};
 use super::{SearchQuery, PackageSummary, ValidationResult, DependencyResolution};
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;

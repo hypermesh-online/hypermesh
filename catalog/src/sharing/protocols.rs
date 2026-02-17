@@ -13,10 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
 use std::time::{Duration, SystemTime};
-use bytes::Bytes;
-
 use crate::{AssetId, AssetPackage, AssetMetadata};
-use blockmatrix::assets::core::AssetType;
 use super::PeerInfo;
 
 /// Share permission levels
@@ -86,6 +83,7 @@ pub enum TransferPriority {
 }
 
 /// Active transfer information
+#[allow(dead_code)] // Transfer tracking fields
 #[derive(Debug, Clone)]
 struct ActiveTransfer {
     /// Transfer ID
@@ -172,6 +170,7 @@ pub enum ProtocolMessage {
 }
 
 /// Sharing protocol implementation
+#[allow(dead_code)] // Protocol fields for sharing operations
 pub struct SharingProtocol {
     max_bandwidth: u64,
     fair_use_limit: u64,
@@ -184,6 +183,7 @@ pub struct SharingProtocol {
 }
 
 /// Peer connection state
+#[allow(dead_code)] // Connection tracking fields
 #[derive(Debug, Clone)]
 struct PeerConnection {
     /// Peer ID
@@ -442,11 +442,10 @@ impl SharingProtocol {
     /// Set share permissions for package
     pub async fn set_permission(
         &self,
-        asset_id: &AssetId,
-        permission: SharePermission,
+        _asset_id: &AssetId,
+        _permission: SharePermission,
     ) -> Result<()> {
         // Would store permission mapping
-        // This is a placeholder
         Ok(())
     }
 
@@ -581,7 +580,7 @@ impl SharingProtocol {
         message: ProtocolMessage,
     ) -> Result<Option<ProtocolMessage>> {
         match message {
-            ProtocolMessage::RequestPackage { asset_id, requester } => {
+            ProtocolMessage::RequestPackage { asset_id: _asset_id, requester: _requester } => {
                 // Handle package request
                 // Would fetch package and send response
                 Ok(Some(ProtocolMessage::Error {

@@ -19,8 +19,8 @@ use crate::library::{
     AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
 };
 use crate::registry::{
-    CatalogRegistry, SearchQuery, LegacySearchResults as SearchResults, SearchResult,
-    SortCriteria, TrustPolicy, RegistryConfig, DateRange,
+    SearchQuery, LegacySearchResults as SearchResults,
+    SortCriteria,
     AssetDiscovery, AssetFilters, AssetIndexEntry, AssetSearchResult,
     RecommendationContext
 };
@@ -29,8 +29,6 @@ use anyhow::Result;
 use blockmatrix::assets::core::{
     AssetManager, AssetType, PrivacyLevel,
     AssetAllocationRequest, ConsensusProof, ResourceRequirements,
-    CpuRequirements, MemoryRequirements, StorageRequirements, GpuRequirements,
-    StorageType,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -38,6 +36,7 @@ use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
 
 /// HyperMesh-integrated asset registry that replaces the standalone HTTP registry
+#[allow(dead_code)] // Fields used via direct access in bridge methods
 pub struct HyperMeshAssetRegistry {
     /// Direct reference to HyperMesh AssetManager
     asset_manager: Arc<AssetManager>,
@@ -88,6 +87,7 @@ struct CatalogCache {
 }
 
 /// Catalog-specific metadata for packages
+#[allow(dead_code)] // Catalog metadata fields populated during registration
 #[derive(Debug, Clone)]
 struct CatalogMetadata {
     /// Package tags for categorization
@@ -105,8 +105,9 @@ struct CatalogMetadata {
 }
 
 /// Package statistics tracked by Catalog
+#[allow(dead_code)] // Stats fields populated via update methods
 #[derive(Debug, Clone, Default)]
-struct PackageStatistics {
+pub(crate) struct PackageStatistics {
     /// Download count
     download_count: u64,
     /// Average rating
@@ -118,6 +119,7 @@ struct PackageStatistics {
 }
 
 /// Template information for asset packages
+#[allow(dead_code)] // Template info fields for rendering
 #[derive(Debug, Clone)]
 struct TemplateInfo {
     /// Template type
@@ -527,7 +529,7 @@ impl HyperMeshAssetRegistry {
     }
 
     /// Get package statistics
-    pub async fn get_package_stats(&self, id: &AssetPackageId) -> Result<PackageStatistics> {
+    pub(crate) async fn get_package_stats(&self, id: &AssetPackageId) -> Result<PackageStatistics> {
         let cache = self.catalog_cache.read().await;
         Ok(cache.package_stats.get(id).cloned().unwrap_or_default())
     }
@@ -702,7 +704,7 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
 impl HyperMeshAssetRegistry {
     /// Check if metadata matches search filters
     async fn matches_filters(&self, metadata: &CatalogMetadata, query: &SearchQuery) -> bool {
-        if let Some(asset_type) = &query.asset_type {
+        if let Some(_asset_type) = &query.asset_type {
             // Would need to fetch from library to check type
             // For now, assume match
         }

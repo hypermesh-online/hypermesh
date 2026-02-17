@@ -13,7 +13,7 @@ use std::time::{SystemTime, Duration, Instant};
 use std::collections::HashMap;
 use tracing::{info, warn, error, debug};
 
-use super::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, Proof};
+use super::proof::{SpaceProof, StakeProof, WorkProof, TimeProof};
 use super::{ConsensusProof, ConsensusResult};
 
 /// Real cryptographic signature verification
@@ -151,7 +151,8 @@ impl RealSpaceValidator {
 
 /// Real Proof of Stake validator
 pub struct RealStakeValidator {
-    /// Minimum stake requirements by network tier
+    /// Minimum stake requirements by network tier (used for tier-based validation)
+    #[allow(dead_code)]
     stake_thresholds: HashMap<String, u64>,
     /// Stake verification
     crypto_verifier: CryptoVerifier,
@@ -320,9 +321,11 @@ impl RealWorkValidator {
 pub struct RealTimeValidator {
     /// Maximum allowed time drift
     maximum_time_drift: Duration,
-    /// Time synchronization checker
+    /// Time synchronization checker (for NTP-based drift detection)
+    #[allow(dead_code)]
     last_ntp_sync: Option<Instant>,
-    /// Time verification
+    /// Time verification (for cryptographic timestamp validation)
+    #[allow(dead_code)]
     crypto_verifier: CryptoVerifier,
 }
 

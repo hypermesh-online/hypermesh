@@ -4,7 +4,7 @@
 
 //! DNS Cache with TTL Management
 
-use super::{DnsRecord, DnsRecordType, DnsError, DnsResult};
+use super::{DnsRecord, DnsRecordType, DnsResult};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::Arc;

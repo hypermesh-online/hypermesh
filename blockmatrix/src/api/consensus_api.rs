@@ -104,9 +104,9 @@ pub async fn create_consensus_api_server_with_service(
 }
 
 /// Create and configure the consensus API server (backward compatibility)
-#[instrument(skip(validation_service))]
+#[instrument(skip(_validation_service))]
 pub async fn create_consensus_api_server(
-    validation_service: Arc<dyn ConsensusValidationService>,
+    _validation_service: Arc<dyn ConsensusValidationService>,
     config: ConsensusApiConfig,
 ) -> Result<Arc<StoqApiServer>> {
     // Create a default ValidationService to wrap the dyn trait

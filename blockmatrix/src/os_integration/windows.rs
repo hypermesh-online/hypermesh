@@ -25,6 +25,7 @@ use windows::{
 
 /// CPU sample for delta calculations
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used in CPU usage calculation
 struct CpuSample {
     idle_time: u64,
     kernel_time: u64,
@@ -34,6 +35,7 @@ struct CpuSample {
 
 /// Network interface statistics
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used in network rate calculation
 struct NetworkStats {
     bytes_received: u64,
     bytes_sent: u64,
@@ -52,6 +54,7 @@ impl Default for NetworkStats {
 
 /// Disk I/O statistics
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used in disk rate calculation
 struct DiskStats {
     bytes_read: u64,
     bytes_written: u64,
@@ -69,6 +72,7 @@ impl Default for DiskStats {
 }
 
 /// Windows OS Abstraction with Performance Counter support
+#[allow(dead_code)] // Fields used during resource monitoring
 pub struct WindowsAbstraction {
     /// Previous CPU sample for delta calculation
     previous_cpu_sample: Mutex<Option<CpuSample>>,

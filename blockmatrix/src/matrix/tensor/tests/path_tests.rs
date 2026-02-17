@@ -53,13 +53,6 @@ fn diagonal_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
 }
 
 #[test]
-fn test_pathfinder_creation() {
-    let finder = PathFinder::new();
-    // Should create successfully with default settings
-    assert!(true);
-}
-
-#[test]
 fn test_pathfinder_straight_line() {
     let finder = PathFinder::new();
     let start = MatrixCoordinate::new(0, 0, 0).unwrap();

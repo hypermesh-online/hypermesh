@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use http::{Request, Response};
+use http::{Request, Response, HeaderValue};
 use std::time::Instant;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -49,26 +49,32 @@ impl RequestLogger {
     }
 }
 
+/// Default CORS origin used when no specific origin is configured
+pub const DEFAULT_CORS_ORIGIN: &str = "http://localhost:5173";
+
 pub fn add_cors_headers<B>(response: &mut Response<B>) {
+    add_cors_headers_with_origin(response, DEFAULT_CORS_ORIGIN);
+}
+
+pub fn add_cors_headers_with_origin<B>(response: &mut Response<B>, origin: &str) {
     let headers = response.headers_mut();
-    headers.insert(
-        http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        "http://localhost:5173".parse().unwrap(),
-    );
+    if let Ok(origin_val) = origin.parse() {
+        headers.insert(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, origin_val);
+    }
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_METHODS,
-        "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap(),
+        HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_HEADERS,
-        "Content-Type, Authorization, X-Request-ID".parse().unwrap(),
+        HeaderValue::from_static("Content-Type, Authorization, X-Request-ID"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_MAX_AGE,
-        "3600".parse().unwrap(),
+        HeaderValue::from_static("3600"),
     );
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
-        "true".parse().unwrap(),
+        HeaderValue::from_static("true"),
     );
 }

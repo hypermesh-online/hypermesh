@@ -20,7 +20,7 @@ use x509_parser::parse_x509_certificate;
 
 use crate::consensus::{
     ConsensusProof, ConsensusContext, ConsensusRequirements,
-    HyperMeshConsensusClient, HyperMeshClientConfig, ConsensusValidationService,
+    HyperMeshConsensusClient, HyperMeshClientConfig,
     ConsensusValidationStatus, ConsensusValidationResult, ConsensusClientMetrics,
     FourProofSet
 };
@@ -51,7 +51,8 @@ pub struct TrustChainCA {
     certificate_store: Arc<CertStore>,
     /// Certificate policies
     policy_engine: Arc<PolicyEngine>,
-    /// Consensus validation context
+    /// Consensus validation context (retained for consensus proof operations)
+    #[allow(dead_code)]
     consensus_context: Arc<ConsensusContext>,
     /// HyperMesh consensus client for validation
     hypermesh_client: Arc<HyperMeshConsensusClient>,
@@ -404,7 +405,7 @@ impl TrustChainCA {
         debug!("Validating certificate chain");
 
         // Parse certificate
-        let (_, parsed_cert) = parse_x509_certificate(cert_der)
+        let (_, _parsed_cert) = parse_x509_certificate(cert_der)
             .map_err(|e| anyhow!("Failed to parse certificate: {}", e))?;
 
         // Calculate fingerprint
@@ -523,10 +524,10 @@ impl TrustChainCA {
 
         // Convert to PEM format for API compatibility
         let certificate_pem = cert.pem();
-        let private_key_pem = key_pair.serialize_pem();
+        let _private_key_pem = key_pair.serialize_pem();
 
         // Get root CA for chain
-        let root_ca_der = root_ca.der().to_vec();
+        let _root_ca_der = root_ca.der().to_vec();
         let root_ca_pem = root_ca.pem();
 
         // Build certificate chain (leaf + root)

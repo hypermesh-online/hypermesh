@@ -12,9 +12,8 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError, ProxyNodeInfo};
-use crate::assets::ProxyAddress;
-use super::trust_integration::{TrustChainIntegration, CertificateValidator, TrustChain, ChainValidationStatus};
+use crate::assets::core::{AssetId, AssetResult, AssetError};
+use super::trust_integration::{TrustChainIntegration, CertificateValidator};
 
 /// Trust level for proxy nodes
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -152,6 +151,7 @@ pub enum ProxyNodeStatus {
 }
 
 /// Proxy selector with trust validation
+#[allow(dead_code)] // Fields used during proxy selection
 pub struct ProxySelector {
     /// TrustChain integration
     trust_chain: Arc<TrustChainIntegration>,

@@ -24,7 +24,6 @@ use tokio::sync::RwLock;
 pub use trustchain::consensus::ConsensusProof;
 
 // Re-export for compatibility with existing code
-use crate::consensus::proof::ConsensusProof as _;
 use super::super::super::consensus::ConsensusVM;
 use super::super::super::execution::{ExecutionContext, ExecutionResult};
 use super::{
@@ -39,6 +38,7 @@ use super::super::{
 };
 
 /// Rust language adapter using RustCall integration
+#[allow(dead_code)] // Fields used during Rust adapter operations
 pub struct RustAdapter {
     /// Base adapter functionality
     base: BaseAdapter,
@@ -134,7 +134,7 @@ impl RustAdapter {
     async fn prepare_rust_code(
         &self,
         rust_code: &str,
-        consensus_proof: &ConsensusProof,
+        _consensus_proof: &ConsensusProof,
     ) -> Result<String> {
         let mut prepared_code = String::new();
         
@@ -378,7 +378,7 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
             .as_deref()
             .unwrap_or("rustc");
         
-        let compile_command = format!(
+        let _compile_command = format!(
             "{} {} -o {} --edition {} -O",
             rustc_path,
             source_file,
@@ -474,7 +474,7 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
     async fn execute_julia_rustcall(
         &self,
         julia_code: &str,
-        context: Arc<ExecutionContext>,
+        _context: Arc<ExecutionContext>,
     ) -> Result<ExecutionResult> {
         // This would integrate with the actual Julia VM execution
         // For now, return a placeholder result
@@ -716,7 +716,6 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
     /// Analyze Rust code for asset requirements
     fn analyze_rust_asset_requirements(&self, code: &str) -> Result<AssetRequirements> {
         let mut cpu_requirements = None;
-        let mut memory_requirements = None;
         let mut gpu_requirements = None;
         let mut storage_requirements = None;
         
@@ -747,7 +746,7 @@ fn user_code_execution() -> Result<(), Box<dyn std::error::Error>> {
         let base_memory = 128 * 1024 * 1024; // 128MB base
         let estimated_memory = base_memory * memory_multiplier;
         
-        memory_requirements = Some(MemoryRequirements {
+        let memory_requirements = Some(MemoryRequirements {
             min_ram_bytes: estimated_memory / 2,
             preferred_ram_bytes: estimated_memory,
             access_patterns: vec![MemoryAccessPattern::Sequential], // Rust prefers sequential

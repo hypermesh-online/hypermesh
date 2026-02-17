@@ -75,12 +75,12 @@ pub struct RedistributionResult {
 /// Redistribution result with new placements
 pub async fn handle_pos_revocation<C>(
     asset_id: &str,
-    asset_privacy_level: &str,
+    _asset_privacy_level: &str,
     revoked_node_id: &str,
     current_placements: &[ShardPlacement],
     shards: Vec<Shard>,
     all_nodes: &[NodeInfo],
-    consensus: &C,
+    _consensus: &C,
     strategy: RedistributionStrategy,
 ) -> AssetResult<RedistributionResult>
 where
@@ -274,7 +274,7 @@ fn redistribute_full_rebalance(
 fn redistribute_nearest(
     affected_shards: &[&ShardPlacement],
     current_placements: &[ShardPlacement],
-    shards: Vec<Shard>,
+    _shards: Vec<Shard>,
     eligible_nodes: &[NodeInfo],
 ) -> AssetResult<(Vec<ShardPlacement>, Vec<(String, String, usize)>)> {
     let mut new_placements = current_placements.to_vec();

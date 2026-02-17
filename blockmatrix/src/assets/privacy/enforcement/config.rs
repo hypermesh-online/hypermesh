@@ -9,9 +9,8 @@
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::PrivacyLevel;
 use super::types::{
-    DataCollectionSettings, NotificationThrottling, AutoRecoveryConfig,
+    DataCollectionSettings, NotificationThrottling,
     RecoveryProcedures, PatternAnalysisAlgorithm, RiskLevelThresholds,
     AnomalyCategory, NotificationChannel, EscalationRule, AutoResponseTrigger,
     EnforcementAction, FalsePositiveReduction,

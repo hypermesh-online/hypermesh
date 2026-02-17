@@ -13,9 +13,9 @@
 //! Each network maintains completely isolated trust models with no cross-network data leakage.
 
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde::{Serialize, Deserialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -263,6 +263,7 @@ pub struct ProofOfState {
 
 /// STOQ transport abstraction
 #[derive(Clone)]
+#[allow(dead_code)] // Fields used during STOQ transport operations
 pub struct StoqTransport {
     /// Network type this transport is configured for
     network_type: NetworkType,
@@ -289,7 +290,7 @@ impl StoqTransport {
     }
 
     /// Exchange certificates with peer (for P2P mode)
-    pub async fn exchange_certificate(&self, peer_addr: &str, local_cert: &Certificate) -> Result<Certificate> {
+    pub async fn exchange_certificate(&self, peer_addr: &str, _local_cert: &Certificate) -> Result<Certificate> {
         // Placeholder implementation
         // In production, would use STOQ protocol to exchange certificates
         Ok(Certificate {
@@ -346,7 +347,7 @@ pub fn generate_ephemeral_key() -> EphemeralKey {
 }
 
 /// Request federation membership from gateway
-pub async fn request_federation_membership(gateway_url: &str, stoq: &Arc<StoqTransport>) -> Result<Certificate> {
+pub async fn request_federation_membership(gateway_url: &str, _stoq: &Arc<StoqTransport>) -> Result<Certificate> {
     // Placeholder implementation
     // In production, would connect to federation gateway and request membership
     Ok(Certificate {
@@ -362,7 +363,7 @@ pub async fn request_federation_membership(gateway_url: &str, stoq: &Arc<StoqTra
 }
 
 /// Request blockchain certificate from trust.hypermesh.online
-pub async fn request_blockchain_certificate(stoq: &Arc<StoqTransport>, proof: &ProofOfState) -> Result<Certificate> {
+pub async fn request_blockchain_certificate(_stoq: &Arc<StoqTransport>, _proof: &ProofOfState) -> Result<Certificate> {
     // Placeholder implementation
     // In production, would submit proof to trust.hypermesh.online
     Ok(Certificate {
@@ -378,13 +379,14 @@ pub async fn request_blockchain_certificate(stoq: &Arc<StoqTransport>, proof: &P
 }
 
 /// Register DNS name as blockchain asset
-pub async fn register_dns_asset(dns_name: &str, cert: &Certificate) -> Result<()> {
+pub async fn register_dns_asset(_dns_name: &str, _cert: &Certificate) -> Result<()> {
     // Placeholder implementation
     // In production, would register DNS-as-Asset on blockchain
     Ok(())
 }
 
 // Placeholder for stoq module integration
+#[allow(dead_code)] // Placeholder types for future STOQ integration
 mod stoq {
     pub struct StoqTransport;
     pub struct Connection;

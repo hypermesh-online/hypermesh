@@ -15,7 +15,6 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
 use tokio::time::{interval, Instant};
 use tracing::{debug, info, warn, error};
-use sha2::Digest;
 
 use crate::errors::Result as TrustChainResult;
 

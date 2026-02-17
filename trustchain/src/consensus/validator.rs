@@ -12,7 +12,6 @@ use anyhow::Result;
 use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
 use tracing::{info, warn, error};
-use sha2::Digest;
 use crate::consensus::proof::*;
 
 /// Production consensus validator with Byzantine fault detection
@@ -307,7 +306,7 @@ impl FourProofValidator {
         let validation_time = start_time.elapsed().as_millis();
         
         if all_proofs_valid {
-            let proof_hash = proof.hash()?;
+            let _proof_hash = proof.hash()?;
             self.metrics.successful_validations += 1;
             
             info!("✅ CONSENSUS VALIDATION SUCCESSFUL ({}ms)", validation_time);

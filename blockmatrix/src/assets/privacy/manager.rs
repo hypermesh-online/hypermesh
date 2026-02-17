@@ -129,6 +129,7 @@ impl Default for super::RewardDistributionConfig {
 }
 
 /// Core privacy manager
+#[allow(dead_code)] // Fields used during privacy management operations
 pub struct PrivacyManager {
     /// Manager configuration
     config: PrivacyManagerConfig,
@@ -1005,7 +1006,7 @@ impl PrivacyManager {
     async fn create_resource_config(
         &self,
         user_config: &UserPrivacyConfiguration,
-        privacy_level: &PrivacyLevel,
+        _privacy_level: &PrivacyLevel,
         asset_id: &AssetId,
     ) -> AssetResult<ResourceAllocationConfig> {
         let asset_type = asset_id.asset_type()
@@ -1062,9 +1063,9 @@ impl PrivacyManager {
     
     async fn create_proxy_config(
         &self,
-        proxy_preferences: &ProxyPreferences,
-        privacy_level: &PrivacyLevel,
-        asset_id: &AssetId,
+        _proxy_preferences: &ProxyPreferences,
+        _privacy_level: &PrivacyLevel,
+        _asset_id: &AssetId,
     ) -> AssetResult<ProxyConfiguration> {
         // Create proxy configuration based on preferences and privacy level
         Ok(ProxyConfiguration::default()) // Simplified for now

@@ -176,6 +176,7 @@ impl Compressor {
     ) -> PipelineResult<CompressionStats> {
         let start = std::time::Instant::now();
         let mut total_read = 0usize;
+        #[allow(unused_assignments)]
         let mut total_written = 0usize;
 
         match self.config.algorithm {

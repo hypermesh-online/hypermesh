@@ -233,6 +233,7 @@ impl Default for SecurityConfig {
 }
 
 /// Resource monitor for an extension
+#[allow(dead_code)] // Fields used during resource monitoring
 pub struct ResourceMonitor {
     /// Extension ID
     extension_id: String,

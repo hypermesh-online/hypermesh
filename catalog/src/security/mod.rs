@@ -15,7 +15,6 @@ pub mod policies;
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::collections::HashMap;
 
 pub use trustchain::{TrustChainIntegration, TrustChainConfig};
@@ -23,7 +22,7 @@ pub use signing::{PackageSigner, SignatureVerifier, PackageSignature};
 pub use reputation::{PublisherReputation, ReputationSystem};
 pub use policies::{TrustPolicy, PolicyEngine, TrustLevel};
 
-use crate::assets::{AssetPackage, AssetPackageId};
+use crate::assets::AssetPackage;
 
 /// Security manager for package verification and trust
 pub struct SecurityManager {
@@ -445,7 +444,7 @@ impl SecurityManager {
     }
 
     /// Scan package for vulnerabilities
-    async fn scan_vulnerabilities(&self, package: &AssetPackage) -> Result<Vec<Vulnerability>> {
+    async fn scan_vulnerabilities(&self, _package: &AssetPackage) -> Result<Vec<Vulnerability>> {
         // TODO: Integrate with vulnerability database
         // For now, return empty vec
         Ok(vec![])

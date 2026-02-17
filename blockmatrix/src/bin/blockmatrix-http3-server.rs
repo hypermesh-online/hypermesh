@@ -3,12 +3,11 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use http::{Method, Response, StatusCode};
+use http::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
 use dashmap::DashMap;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -44,6 +43,7 @@ struct MatrixPosition {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)] // Deserialized from request payload
 struct AssetAllocationRequest {
     resource_type: String,
     amount: u64,
@@ -378,7 +378,7 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|_| Response::new(Vec::new()))
         })
         // Allocate asset endpoint
-        .post("/api/v1/blockmatrix/assets/allocate", |req| async move {
+        .post("/api/v1/blockmatrix/assets/allocate", |_req| async move {
             // In production, this would parse the request body and allocate real resources
             let response = AssetAllocationResponse {
                 asset_id: uuid::Uuid::new_v4().to_string(),
@@ -576,7 +576,7 @@ async fn main() -> Result<()> {
 
         // 4. HyperMesh Allocations endpoint
         .get("/api/v1/hypermesh/allocations", move |_req| {
-            let uptime = start_time.elapsed().as_secs();
+            let _uptime = start_time.elapsed().as_secs();
 
             async move {
                 let allocations = vec![
@@ -670,7 +670,7 @@ async fn main() -> Result<()> {
             let connections = connections.clone();
 
             move |_req| {
-                let connections = connections.clone();
+                let _connections = connections.clone();
 
                 async move {
                     // Mock some connections
@@ -835,7 +835,7 @@ async fn main() -> Result<()> {
                 },
             ];
 
-            let last_24h = detections.iter().filter(|d| {
+            let last_24h = detections.iter().filter(|_d| {
                 // In production, parse timestamp and check if within 24h
                 true // Mock all as within 24h for demo
             }).count();

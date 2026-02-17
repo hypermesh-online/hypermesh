@@ -10,12 +10,10 @@ use anyhow::{Result, Context};
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use futures::stream::{self, StreamExt};
 
 use crate::assets::{AssetPackage, AssetPackageId};
-use blockmatrix::assets::AssetId;
-use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator};
 use crate::registry::CatalogRegistry;
 use super::{
     ContentStore, ContentAddress,
@@ -25,6 +23,7 @@ use super::{
 };
 
 /// Package manager for handling package storage and transfers
+#[allow(dead_code)] // Fields used during P2P distribution operations
 pub struct PackageManager {
     /// Catalog registry for asset discovery
     registry: Arc<CatalogRegistry>,

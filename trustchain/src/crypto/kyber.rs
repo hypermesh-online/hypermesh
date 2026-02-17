@@ -22,7 +22,8 @@ use super::{
 
 /// Kyber-1024 cryptographic operations handler
 pub struct KyberCrypto {
-    /// Algorithm identifier
+    /// Algorithm identifier (retained for algorithm negotiation)
+    #[allow(dead_code)]
     algorithm_id: String,
 }
 
@@ -253,7 +254,7 @@ impl KyberCrypto {
         }
         
         // Test encryption/decryption round-trip
-        let test_data = b"Kyber-1024 key pair validation test data";
+        let _test_data = b"Kyber-1024 key pair validation test data";
         
         // Reconstruct keys for testing
         let public_key_native = kyber1024::PublicKey::from_bytes(&keypair.public_key.key_bytes)

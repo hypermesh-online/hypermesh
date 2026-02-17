@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn, error};
+use tracing::info;
 
 use super::{PersistenceError, PersistenceResult};
 
@@ -68,6 +68,7 @@ pub enum SnapshotType {
 }
 
 /// Manages snapshot creation and lifecycle
+#[allow(dead_code)] // Fields used during snapshot operations
 pub struct SnapshotManager {
     /// Storage directory
     storage_dir: PathBuf,
@@ -259,7 +260,7 @@ impl SnapshotManager {
         };
 
         // Find snapshot file
-        let pattern = format!("*{}*.tar.zst", &snapshot_id[..8]);
+        let _pattern = format!("*{}*.tar.zst", &snapshot_id[..8]);
         let mut snapshot_file = None;
 
         for entry in std::fs::read_dir(&self.storage_dir)? {

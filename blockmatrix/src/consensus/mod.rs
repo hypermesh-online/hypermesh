@@ -229,14 +229,17 @@ pub mod stoq_handlers {
     }
 
     // Handler types for API
+    #[allow(dead_code)] // API handler - service used at runtime
     pub struct ValidateCertificateHandler {
         validation_service: Arc<dyn ConsensusValidationService>,
     }
 
+    #[allow(dead_code)] // API handler - service used at runtime
     pub struct ValidateProofsHandler {
         validation_service: Arc<ValidationService>,
     }
 
+    #[allow(dead_code)] // API handler - service used at runtime
     pub struct ValidationStatusHandler {
         validation_service: Arc<dyn ConsensusValidationService>,
     }

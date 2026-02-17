@@ -17,6 +17,7 @@ use tracing::{info, debug, warn, error};
 use sha2::{Sha256, Digest};
 // use merkletree::{MerkleTree, Proof, Hashable}; // Temporarily commented due to API changes
 
+#[allow(hidden_glob_reexports)]
 use crate::config::CTConfig;
 use crate::consensus::{ConsensusProof, ConsensusContext};
 use crate::errors::{CTError, TrustChainError, Result as TrustChainResult};
@@ -50,7 +51,8 @@ pub struct CertificateTransparency {
     storage: Arc<CTStorage>,
     /// Configuration
     config: Arc<CTConfig>,
-    /// Consensus validation context
+    /// Consensus validation context (retained for CT log consensus operations)
+    #[allow(dead_code)]
     consensus_context: Arc<ConsensusContext>,
     /// Background task handles
     task_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,

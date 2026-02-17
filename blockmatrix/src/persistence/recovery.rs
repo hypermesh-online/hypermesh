@@ -8,7 +8,7 @@
 //! capabilities with comprehensive validation.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn, error};
 
@@ -411,7 +411,7 @@ impl RecoveryManager {
 
         // Validate snapshot exists and is valid
         let snapshots = snapshot_manager.list_snapshots().await;
-        let snapshot = snapshots.iter()
+        let _snapshot = snapshots.iter()
             .find(|s| s.id == snapshot_id)
             .ok_or_else(|| PersistenceError::SnapshotError(
                 format!("Snapshot {} not found", snapshot_id)
@@ -419,7 +419,7 @@ impl RecoveryManager {
 
         // Create backup of current state before rollback
         info!("Creating backup before rollback");
-        let backup_id = format!("pre_rollback_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let _backup_id = format!("pre_rollback_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
         // Would create backup here
 
         // Restore from snapshot

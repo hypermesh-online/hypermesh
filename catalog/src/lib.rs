@@ -71,6 +71,7 @@ pub use assets::{
     AssetResources, AssetExecution, AssetDependency
 };
 pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateRuntime};
+#[allow(deprecated)] // Re-export for backward compatibility during migration
 pub use registry::{AssetRegistry, RegistryConfig, AssetDiscovery};
 pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
 pub use documentation::DocumentationGenerator;
@@ -85,6 +86,7 @@ pub const CATALOG_VERSION: &str = "0.1.0";
 /// Main Catalog instance - HyperMesh Asset Package Manager
 pub struct Catalog {
     consensus_context: Arc<ConsensusContext>,
+    #[allow(deprecated)] // During migration to CatalogRegistry
     asset_registry: Arc<registry::AssetRegistry>,
     template_generator: Arc<template::CatalogTemplateGenerator>,
     asset_validator: Arc<validation::AssetValidator>,
@@ -132,6 +134,7 @@ impl Catalog {
         let consensus_context = Arc::new(config.consensus);
 
         // Initialize components
+        #[allow(deprecated)] // During migration to CatalogRegistry
         let asset_registry = Arc::new(registry::AssetRegistry::new(config.registry).await?);
         let template_generator = Arc::new(template::CatalogTemplateGenerator::new(config.template)?);
         let asset_validator = Arc::new(validation::AssetValidator::with_config(config.validation));
@@ -167,6 +170,7 @@ impl Catalog {
     }
     
     /// Get asset registry
+    #[allow(deprecated)] // During migration to CatalogRegistry
     pub fn asset_registry(&self) -> Arc<registry::AssetRegistry> {
         Arc::clone(&self.asset_registry)
     }

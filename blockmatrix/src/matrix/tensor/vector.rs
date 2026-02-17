@@ -9,7 +9,6 @@
 //! and alignment calculations for distributed network routing.
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use std::f64::consts::PI;
 use thiserror::Error;
 
 /// Errors that can occur during tensor operations

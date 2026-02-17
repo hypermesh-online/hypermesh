@@ -31,7 +31,6 @@ pub use catalog_registry::{
 use crate::assets::AssetPackageId;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// DEPRECATED: Use CatalogRegistry instead
 ///

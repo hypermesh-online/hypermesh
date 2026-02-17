@@ -417,7 +417,7 @@ impl NetworkAssetAdapter {
     }
     
     /// Configure Quality of Service
-    async fn configure_qos(&self, asset_id: &AssetId, network_req: &NetworkRequirements) -> QoSConfig {
+    async fn configure_qos(&self, _asset_id: &AssetId, network_req: &NetworkRequirements) -> QoSConfig {
         let priority = if network_req.max_latency_us.unwrap_or(10000) < 1000 {
             200 // High priority for low latency requirements
         } else {
@@ -472,6 +472,7 @@ impl NetworkAssetAdapter {
 
 /// Network operations for statistics
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Variants for future network operation tracking
 enum NetworkOperation {
     Allocate,
     Deallocate,

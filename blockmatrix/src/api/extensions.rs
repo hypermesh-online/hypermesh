@@ -151,11 +151,13 @@ impl ApiHandler for GetExtensionHandler {
 }
 
 /// Load extension handler
+#[allow(dead_code)] // API handler fields used at runtime
 struct LoadExtensionHandler {
     manager: Arc<UnifiedExtensionManager>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Deserialized from request payload
 struct LoadExtensionRequest {
     source: String,
     force: Option<bool>,
@@ -468,6 +470,7 @@ pub mod streaming {
     }
 
     /// Event stream handler for real-time extension events
+    #[allow(dead_code)] // API handler - manager used at runtime
     pub struct ExtensionEventStreamHandler {
         manager: Arc<UnifiedExtensionManager>,
     }
@@ -480,9 +483,9 @@ pub mod streaming {
         /// Create an event stream for a specific extension
         pub async fn create_event_stream(
             &self,
-            extension_id: String
+            _extension_id: String
         ) -> impl Stream<Item = ExtensionEvent> {
-            let (tx, rx) = mpsc::channel(100);
+            let (_tx, rx) = mpsc::channel(100);
 
             // TODO: Hook into extension manager events
             // This would monitor the extension and send events through the channel

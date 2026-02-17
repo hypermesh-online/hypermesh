@@ -47,6 +47,7 @@ impl From<u8> for BootstrapPhase {
 }
 
 /// Bootstrap manager for coordinating multi-component startup
+#[allow(dead_code)] // Fields used during bootstrap lifecycle
 pub struct BootstrapManager {
     /// Current bootstrap phase
     current_phase: Arc<AtomicU8>,
@@ -247,6 +248,7 @@ pub struct Certificate {
 
 /// Bootstrap metrics tracking
 #[derive(Debug)]
+#[allow(dead_code)] // Fields populated during bootstrap lifecycle
 pub struct BootstrapMetrics {
     /// Phase start times
     phase_start_times: DashMap<BootstrapPhase, Instant>,
@@ -628,6 +630,7 @@ impl BootstrapManager {
 
 // Implementation details for discovery providers
 
+#[allow(dead_code)] // Fields used in DNS resolution
 struct TraditionalDNS {
     servers: Vec<String>,
 }
@@ -640,7 +643,7 @@ impl TraditionalDNS {
 
 #[async_trait]
 impl ServiceDiscovery for TraditionalDNS {
-    async fn resolve(&self, service: &str) -> Result<ServiceEndpoint> {
+    async fn resolve(&self, _service: &str) -> Result<ServiceEndpoint> {
         // Traditional DNS resolution implementation
         Ok(ServiceEndpoint {
             address: format!("::1:{}", 8080).parse()?,
@@ -659,6 +662,7 @@ impl ServiceDiscovery for TraditionalDNS {
     }
 }
 
+#[allow(dead_code)] // Fields used in hybrid discovery
 struct HybridDiscovery {
     traditional_dns: Vec<String>,
     trustchain_addr: SocketAddr,
@@ -675,7 +679,7 @@ impl HybridDiscovery {
 
 #[async_trait]
 impl ServiceDiscovery for HybridDiscovery {
-    async fn resolve(&self, service: &str) -> Result<ServiceEndpoint> {
+    async fn resolve(&self, _service: &str) -> Result<ServiceEndpoint> {
         // Try TrustChain first, fall back to traditional
         Ok(ServiceEndpoint {
             address: self.trustchain_addr,
@@ -684,7 +688,7 @@ impl ServiceDiscovery for HybridDiscovery {
         })
     }
 
-    async fn register(&self, registration: ServiceRegistration) -> Result<()> {
+    async fn register(&self, _registration: ServiceRegistration) -> Result<()> {
         // Register with both systems
         Ok(())
     }
@@ -694,6 +698,7 @@ impl ServiceDiscovery for HybridDiscovery {
     }
 }
 
+#[allow(dead_code)] // Fields used during federated discovery
 struct FederatedDiscovery {
     hypermesh_addr: SocketAddr,
     fallback_dns: Option<Vec<String>>,
@@ -710,7 +715,7 @@ impl FederatedDiscovery {
 
 #[async_trait]
 impl ServiceDiscovery for FederatedDiscovery {
-    async fn resolve(&self, service: &str) -> Result<ServiceEndpoint> {
+    async fn resolve(&self, _service: &str) -> Result<ServiceEndpoint> {
         // Use HyperMesh federated discovery
         Ok(ServiceEndpoint {
             address: self.hypermesh_addr,
@@ -719,7 +724,7 @@ impl ServiceDiscovery for FederatedDiscovery {
         })
     }
 
-    async fn register(&self, registration: ServiceRegistration) -> Result<()> {
+    async fn register(&self, _registration: ServiceRegistration) -> Result<()> {
         // Register with HyperMesh federation
         Ok(())
     }
@@ -765,6 +770,7 @@ impl CertificateProvider for SelfSignedProvider {
     }
 }
 
+#[allow(dead_code)] // Fields used during TrustChain certificate provision
 struct TrustChainProvider {
     trustchain_addr: SocketAddr,
 }
@@ -887,6 +893,7 @@ impl ConsensusProvider for NoOpConsensus {
     }
 }
 
+#[allow(dead_code)] // Fields used during consensus operations
 struct OptionalConsensus {
     hypermesh_addr: SocketAddr,
 }
@@ -899,7 +906,7 @@ impl OptionalConsensus {
 
 #[async_trait]
 impl ConsensusProvider for OptionalConsensus {
-    async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool> {
+    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
         // Optional validation
         Ok(true)
     }
@@ -926,6 +933,7 @@ impl ConsensusProvider for OptionalConsensus {
     }
 }
 
+#[allow(dead_code)] // Fields used during consensus operations
 struct RequiredConsensus {
     hypermesh_addr: SocketAddr,
 }
@@ -965,6 +973,7 @@ impl ConsensusProvider for RequiredConsensus {
     }
 }
 
+#[allow(dead_code)] // Fields used during consensus operations
 struct FullConsensus {
     hypermesh_addr: SocketAddr,
 }

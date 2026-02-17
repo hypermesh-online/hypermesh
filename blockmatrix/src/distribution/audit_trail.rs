@@ -7,7 +7,7 @@
 //! Records all shard placement decisions on blockchain for transparency
 //! and verification.
 
-use crate::assets::core::{AssetError, AssetResult};
+use crate::assets::core::AssetResult;
 use crate::distribution::ShardPlacement;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;

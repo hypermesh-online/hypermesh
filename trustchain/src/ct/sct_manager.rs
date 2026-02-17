@@ -19,7 +19,8 @@ use super::{LogEntry, SignedCertificateTimestamp};
 
 /// SCT Manager for generating and validating Signed Certificate Timestamps
 pub struct SCTManager {
-    /// Log identifier
+    /// Log identifier (used in SCT metadata)
+    #[allow(dead_code)]
     log_id: String,
     /// Log ID hash (32 bytes)
     log_id_hash: [u8; 32],
@@ -29,7 +30,8 @@ pub struct SCTManager {
     verifying_key: VerifyingKey,
     /// SCT version
     sct_version: u8,
-    /// Random number generator
+    /// Random number generator (for cryptographic operations)
+    #[allow(dead_code)]
     rng: SystemRandom,
 }
 
@@ -85,7 +87,7 @@ impl SCTManager {
     }
 
     /// Generate SCT for a log entry
-    pub async fn generate_sct(&self, entry: &LogEntry, log_id: &str) -> TrustChainResult<SignedCertificateTimestamp> {
+    pub async fn generate_sct(&self, entry: &LogEntry, _log_id: &str) -> TrustChainResult<SignedCertificateTimestamp> {
         debug!("Generating SCT for entry {}", entry.sequence_number);
 
         // Create SCT request from log entry
@@ -185,7 +187,7 @@ impl SCTManager {
         use ring::signature::Ed25519KeyPair;
         
         // Generate Ed25519 key pair using ring
-        let key_pair = Ed25519KeyPair::generate_pkcs8(rng)
+        let _key_pair = Ed25519KeyPair::generate_pkcs8(rng)
             .map_err(|e| CryptoError::KeyGeneration {
                 algorithm: "Ed25519".to_string(),
                 reason: format!("Key generation failed: {}", e),

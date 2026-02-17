@@ -487,6 +487,7 @@ impl EntityBlockchain {
 }
 
 /// Matrix blockchain manager for managing multiple entity chains
+#[allow(dead_code)] // Fields used during blockchain management
 pub struct MatrixBlockchainManager {
     /// All entity blockchains in the matrix
     entity_chains: HashMap<String, EntityBlockchain>,

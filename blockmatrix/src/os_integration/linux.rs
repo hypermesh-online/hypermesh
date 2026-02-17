@@ -28,6 +28,7 @@ pub struct LinuxAbstraction {
 }
 
 /// State of an active eBPF program
+#[allow(dead_code)] // Fields populated during eBPF program lifecycle
 struct EbpfProgramState {
     program_type: EbpfProgramType,
     attached: bool,
@@ -91,6 +92,7 @@ impl LinuxAbstraction {
     }
 
     /// Check if kernel supports advanced eBPF features
+    #[allow(dead_code)] // Will be used for advanced eBPF feature detection
     fn kernel_supports_btf(&self) -> bool {
         let (major, _, _) = self.kernel_version;
         major >= 5
@@ -381,6 +383,7 @@ impl LinuxAbstraction {
     }
 
     /// Get process count from /proc
+    #[allow(dead_code)] // Will be used for resource monitoring
     fn get_process_count(&self) -> Option<usize> {
         fs::read_dir("/proc")
             .ok()?

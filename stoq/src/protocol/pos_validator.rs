@@ -7,13 +7,11 @@
 //! Provides protocol-layer validation for PoS tokens within STOQ transport.
 //! Integrates with TrustChain for certificate validation and token verification.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use parking_lot::RwLock;
 use dashmap::DashMap;
-use tracing::{debug, warn, info};
-use bytes::Bytes;
+use tracing::{debug, info};
 use serde::{Serialize, Deserialize};
 
 /// Backward compatibility alias for old test API

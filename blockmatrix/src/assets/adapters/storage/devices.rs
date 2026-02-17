@@ -12,10 +12,9 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
 
 use crate::assets::core::{StorageType, AssetId};
-use crate::os_integration::{create_os_abstraction, OsAbstraction, StorageType as OsStorageType};
+use crate::os_integration::{create_os_abstraction, StorageType as OsStorageType};
 
 /// Storage device information
 #[derive(Clone, Debug, Serialize, Deserialize)]

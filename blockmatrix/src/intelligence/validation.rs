@@ -8,14 +8,14 @@
 //! ensuring all components work together correctly and meet performance targets.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Instant, SystemTime};
 use std::collections::HashMap;
-use anyhow::{Result, Context};
-use tracing::{info, debug, warn, error, instrument};
+use anyhow::Result;
+use tracing::{info, debug, instrument};
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
-use crate::assets::pipeline::{Asset, AssetPipeline, ProcessedAsset};
+use crate::assets::pipeline::{Asset, AssetPipeline};
 use crate::assets::privacy::PrivacyManager;
 use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId, PrivacyTier};
 use crate::assets::storage::ContentAddressedStorage;
@@ -169,6 +169,7 @@ pub struct IntegrationValidator {
 
 /// Performance targets for validation
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Configuration struct - fields used for future performance validation thresholds
 struct PerformanceTargets {
     /// Maximum processing time (ms)
     max_processing_time_ms: u64,
@@ -420,8 +421,8 @@ impl IntegrationValidator {
     /// Validate cross-component integration
     async fn validate_cross_component_integration(
         &self,
-        stoq: &StoqTransport,
-        privacy: &PrivacyManager,
+        _stoq: &StoqTransport,
+        _privacy: &PrivacyManager,
         network: &MultiNetworkCoordinator,
         pipeline: &AssetPipeline,
         storage: &ContentAddressedStorage,
@@ -437,7 +438,7 @@ impl IntegrationValidator {
         };
 
         // Step 1: Privacy check
-        let privacy_level = crate::assets::core::PrivacyLevel::PrivateNetwork;
+        let _privacy_level = crate::assets::core::PrivacyLevel::PrivateNetwork;
         // PrivacyManager validation is tested separately, skip detailed access check in cross-component test
         // Focus on data flow integration instead
 
@@ -606,6 +607,7 @@ impl IntegrationValidator {
 // Extension trait implementations for missing methods
 
 #[async_trait]
+#[allow(dead_code)] // Extension trait for privacy validation integration
 trait PrivacyManagerExt {
     async fn check_access(
         &self,
@@ -624,8 +626,8 @@ trait PrivacyManagerExt {
 impl PrivacyManagerExt for PrivacyManager {
     async fn check_access(
         &self,
-        asset_id: &str,
-        level: &crate::assets::core::PrivacyLevel,
+        _asset_id: &str,
+        _level: &crate::assets::core::PrivacyLevel,
     ) -> Result<crate::assets::privacy::AccessControlResult> {
         // Placeholder implementation
         Ok(crate::assets::privacy::AccessControlResult {
@@ -639,8 +641,8 @@ impl PrivacyManagerExt for PrivacyManager {
 
     async fn validate_retrieval(
         &self,
-        asset_id: &str,
-        position: &MatrixCoordinate,
+        _asset_id: &str,
+        _position: &MatrixCoordinate,
     ) -> Result<crate::assets::privacy::AccessControlResult> {
         // Placeholder implementation
         Ok(crate::assets::privacy::AccessControlResult {
@@ -675,10 +677,10 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
 
     async fn register_asset(
         &self,
-        network: NetworkId,
-        asset_id: String,
-        privacy_tier: PrivacyTier,
-        positions: Vec<MatrixCoordinate>,
+        _network: NetworkId,
+        _asset_id: String,
+        _privacy_tier: PrivacyTier,
+        _positions: Vec<MatrixCoordinate>,
     ) -> Result<()> {
         // Placeholder implementation
         Ok(())
@@ -686,6 +688,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
 }
 
 #[async_trait]
+#[allow(dead_code)] // Extension trait for storage integration
 trait ContentAddressedStorageExt {
     async fn get_stats(&self) -> crate::assets::storage::StorageStats;
     async fn store_shard(&self, shard: crate::assets::pipeline::Shard) -> Result<()>;
@@ -699,12 +702,12 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
         crate::assets::storage::StorageStats::default()
     }
 
-    async fn store_shard(&self, shard: crate::assets::pipeline::Shard) -> Result<()> {
+    async fn store_shard(&self, _shard: crate::assets::pipeline::Shard) -> Result<()> {
         // Placeholder implementation
         Ok(())
     }
 
-    async fn retrieve_shards(&self, asset_id: &str) -> Result<Vec<crate::assets::pipeline::Shard>> {
+    async fn retrieve_shards(&self, _asset_id: &str) -> Result<Vec<crate::assets::pipeline::Shard>> {
         // Placeholder implementation
         Ok(vec![])
     }

@@ -598,7 +598,7 @@ impl ServiceMeshController {
     pub async fn get_stats(&self) -> ServiceMeshStats {
         let metrics = self.performance_metrics.read().await;
         let registry = self.service_registry.read().await;
-        let active_decisions = self.active_decisions.read().await;
+        let _active_decisions = self.active_decisions.read().await;
         
         // Calculate routing decisions per second
         let decisions_per_second = if metrics.avg_routing_latency_us > 0.0 {

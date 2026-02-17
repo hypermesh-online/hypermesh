@@ -28,7 +28,7 @@ use crate::assets::core::{
     GpuRequirements,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
-use crate::os_integration::{create_os_abstraction, OsAbstraction};
+use crate::os_integration::create_os_abstraction;
 
 /// GPU allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -380,7 +380,7 @@ impl GpuAssetAdapter {
     fn read_gpu_sensors(pci_address: &Option<String>) -> (Option<f32>, Option<f32>) {
         #[cfg(target_os = "linux")]
         {
-            if let Some(pci_addr) = pci_address {
+            if let Some(_pci_addr) = pci_address {
                 // Try to read from sysfs hwmon
                 // Path format: /sys/class/drm/card*/device/hwmon/hwmon*/temp*_input
                 if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
@@ -541,7 +541,7 @@ impl GpuAssetAdapter {
     }
     
     /// Update usage statistics
-    async fn update_usage_stats(&self, operation: GpuOperation, devices: u32, memory_bytes: u64) {
+    async fn update_usage_stats(&self, operation: GpuOperation, _devices: u32, memory_bytes: u64) {
         let mut stats = self.usage_stats.write().await;
         
         match operation {
@@ -567,6 +567,7 @@ impl GpuAssetAdapter {
 
 /// GPU operations for statistics
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Variants for future GPU operation tracking
 enum GpuOperation {
     Allocate,
     Deallocate,
@@ -597,7 +598,6 @@ impl AssetAdapter for GpuAssetAdapter {
         }
 
         // Fallback to standard validation with GPU-specific requirements
-        use crate::consensus::Consensus;
         let valid = proof.validate();
 
         if !valid {

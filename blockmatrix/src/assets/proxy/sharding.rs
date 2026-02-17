@@ -12,6 +12,9 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
+use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
 
 use crate::assets::core::{AssetId, AssetResult, AssetError};
 
@@ -28,16 +31,23 @@ pub struct ShardedDataAccess {
 }
 
 /// Shard manager for handling encrypted shards
+#[allow(dead_code)] // Fields used during shard operations
 pub struct ShardManager {
     /// Available shards by shard key
     available_shards: Arc<RwLock<HashMap<String, EncryptedShard>>>,
-    
+
     /// Shard locations (node_id -> shard_keys)
     shard_locations: Arc<RwLock<HashMap<String, Vec<String>>>>,
-    
+
     /// Shard reconstruction cache
     reconstruction_cache: Arc<RwLock<HashMap<String, Vec<u8>>>>,
-    
+
+    /// Kyber-1024 public key bytes for encryption
+    kyber_public_key: Vec<u8>,
+
+    /// Kyber-1024 secret key bytes for decryption
+    kyber_secret_key: Vec<u8>,
+
     /// Manager configuration
     config: ShardManagerConfig,
 }
@@ -87,18 +97,18 @@ pub struct EncryptedShard {
 pub struct EncryptionMetadata {
     /// Encryption algorithm used
     pub algorithm: String,
-    
+
     /// Key derivation method
     pub key_derivation: String,
-    
-    /// Initialization vector/nonce
-    pub iv: Vec<u8>,
-    
-    /// Salt for key derivation
-    pub salt: Vec<u8>,
-    
-    /// Additional authenticated data
-    pub aad: Vec<u8>,
+
+    /// Kyber-1024 KEM ciphertext (needed for decapsulation during decrypt)
+    pub kem_ciphertext: Vec<u8>,
+
+    /// AES-GCM nonce (12 bytes)
+    pub nonce: Vec<u8>,
+
+    /// AES-GCM authentication tag (16 bytes)
+    pub auth_tag: Vec<u8>,
 }
 
 /// Active shard access session
@@ -153,7 +163,7 @@ enum SessionStatus {
 
 /// Session progress tracking
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct SessionProgress {
+pub struct SessionProgress {
     /// Total shards needed
     total_shards_needed: u32,
     
@@ -172,6 +182,7 @@ struct SessionProgress {
 
 /// Shard access configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields for shard access control
 struct ShardAccessConfig {
     /// Maximum concurrent shard sessions
     max_concurrent_sessions: u32,
@@ -207,6 +218,7 @@ impl Default for ShardAccessConfig {
 
 /// Shard manager configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields for shard management
 struct ShardManagerConfig {
     /// Redundancy factor (how many copies of each shard)
     redundancy_factor: u32,
@@ -381,19 +393,14 @@ impl ShardedDataAccess {
         Ok(())
     }
     
-    /// Decrypt shard data
+    /// Decrypt shard data using Kyber-1024 KEM + AES-256-GCM via the shard manager
     async fn decrypt_shard_data(&self, shard: &EncryptedShard) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual decryption based on encryption metadata
-        // For now, simulate decryption with XOR
-        
-        let key = self.derive_decryption_key(&shard.encryption_metadata).await?;
-        let mut decrypted_data = shard.encrypted_data.clone();
-        
-        for (i, byte) in decrypted_data.iter_mut().enumerate() {
-            *byte ^= key[i % key.len()];
-        }
-        
-        // Verify checksum
+        let decrypted_data = self.shard_manager.decrypt_shard_data_internal(
+            &shard.encrypted_data,
+            &shard.encryption_metadata,
+        )?;
+
+        // Verify checksum against plaintext
         if self.shard_manager.config.enable_integrity_checking {
             let calculated_checksum = self.calculate_checksum(&decrypted_data);
             if calculated_checksum != shard.checksum {
@@ -402,22 +409,9 @@ impl ShardedDataAccess {
                 });
             }
         }
-        
+
         tracing::debug!("Decrypted shard data ({} bytes)", decrypted_data.len());
         Ok(decrypted_data)
-    }
-    
-    /// Derive decryption key from encryption metadata
-    async fn derive_decryption_key(&self, metadata: &EncryptionMetadata) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual key derivation (PBKDF2, Argon2, etc.)
-        // For now, use a simple derivation
-        
-        let mut hasher = Sha256::new();
-        hasher.update(&metadata.salt);
-        hasher.update(b"hypermesh-shard-key");
-        
-        let key_hash = hasher.finalize();
-        Ok(key_hash.to_vec())
     }
     
     /// Calculate checksum for integrity verification
@@ -487,12 +481,16 @@ impl ShardedDataAccess {
 }
 
 impl ShardManager {
-    /// Create new shard manager
+    /// Create new shard manager with Kyber-1024 keypair
     async fn new() -> AssetResult<Self> {
+        let (pk, sk) = kyber1024::keypair();
+
         Ok(Self {
             available_shards: Arc::new(RwLock::new(HashMap::new())),
             shard_locations: Arc::new(RwLock::new(HashMap::new())),
             reconstruction_cache: Arc::new(RwLock::new(HashMap::new())),
+            kyber_public_key: pk.as_bytes().to_vec(),
+            kyber_secret_key: sk.as_bytes().to_vec(),
             config: ShardManagerConfig::default(),
         })
     }
@@ -536,17 +534,17 @@ impl ShardManager {
             let end = std::cmp::min(start + target_shard_size, data.len());
             let shard_data = &data[start..end];
             
-            // Create encryption metadata
-            let encryption_metadata = EncryptionMetadata {
-                algorithm: "AES-256-GCM".to_string(),
-                key_derivation: "PBKDF2".to_string(),
-                iv: (0..16).map(|_| fastrand::u8(..)).collect(),
-                salt: (0..32).map(|_| fastrand::u8(..)).collect(),
-                aad: Vec::new(),
+            // Create encryption metadata (KEM ciphertext, nonce, tag populated during encrypt)
+            let mut encryption_metadata = EncryptionMetadata {
+                algorithm: "Kyber-1024-KEM+AES-256-GCM".to_string(),
+                key_derivation: "Kyber-1024-KEM".to_string(),
+                kem_ciphertext: Vec::new(),
+                nonce: Vec::new(),
+                auth_tag: Vec::new(),
             };
-            
-            // Encrypt shard data (simulated)
-            let encrypted_data = self.encrypt_shard_data(shard_data, &encryption_metadata).await?;
+
+            // Encrypt shard data with Kyber-1024 KEM + AES-256-GCM
+            let encrypted_data = self.encrypt_shard_data(shard_data, &mut encryption_metadata).await?;
             
             // Calculate checksum
             let checksum = {
@@ -581,28 +579,114 @@ impl ShardManager {
         Ok(shards)
     }
     
-    /// Encrypt shard data
+    /// Encrypt shard data with Kyber-1024 KEM + AES-256-GCM
+    ///
+    /// Returns the AES-GCM ciphertext. The KEM ciphertext, nonce, and auth tag
+    /// are stored in the `EncryptionMetadata` attached to the shard so that
+    /// decryption can recover the shared secret via KEM decapsulation.
     async fn encrypt_shard_data(
         &self,
         data: &[u8],
+        metadata: &mut EncryptionMetadata,
+    ) -> AssetResult<Vec<u8>> {
+        let pk = kyber1024::PublicKey::from_bytes(&self.kyber_public_key)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 public key in shard manager: {}", e),
+            })?;
+
+        // KEM encapsulation produces shared secret + ciphertext
+        let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
+
+        // Derive AES-256 key from shared secret via SHA-256
+        let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
+
+        // AES-256-GCM encrypt
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
+        let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());
+
+        let mut buffer = data.to_vec();
+        let tag = cipher.encrypt_in_place_detached(&nonce, b"", &mut buffer)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("AES-GCM shard encryption failed: {}", e),
+            })?;
+
+        // Store crypto artifacts in metadata for later decryption
+        metadata.kem_ciphertext = kem_ct.as_bytes().to_vec();
+        metadata.nonce = nonce.to_vec();
+        metadata.auth_tag = tag.to_vec();
+
+        tracing::debug!(
+            "Kyber-1024 + AES-GCM encrypted shard ({} bytes -> {} bytes)",
+            data.len(),
+            buffer.len()
+        );
+
+        Ok(buffer)
+    }
+
+    /// Decrypt shard data with Kyber-1024 KEM + AES-256-GCM
+    fn decrypt_shard_data_internal(
+        &self,
+        encrypted_data: &[u8],
         metadata: &EncryptionMetadata,
     ) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual AES-256-GCM encryption
-        // For now, simulate with XOR
-        
-        let key = {
-            let mut hasher = Sha256::new();
-            hasher.update(&metadata.salt);
-            hasher.update(b"hypermesh-shard-key");
-            hasher.finalize().to_vec()
-        };
-        
-        let mut encrypted_data = Vec::new();
-        for (i, &byte) in data.iter().enumerate() {
-            encrypted_data.push(byte ^ key[i % key.len()]);
+        // KEM decapsulation to recover shared secret
+        let sk = kyber1024::SecretKey::from_bytes(&self.kyber_secret_key)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 secret key in shard manager: {}", e),
+            })?;
+
+        let kem_ct = kyber1024::Ciphertext::from_bytes(&metadata.kem_ciphertext)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 KEM ciphertext in shard metadata: {}", e),
+            })?;
+
+        let shared_secret = kyber1024::decapsulate(&kem_ct, &sk);
+        let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
+
+        // Parse nonce and tag from metadata
+        if metadata.nonce.len() != 12 {
+            return Err(AssetError::AdapterError {
+                message: format!(
+                    "Invalid AES-GCM nonce length: expected 12, got {}",
+                    metadata.nonce.len()
+                ),
+            });
         }
-        
-        Ok(encrypted_data)
+        if metadata.auth_tag.len() != 16 {
+            return Err(AssetError::AdapterError {
+                message: format!(
+                    "Invalid AES-GCM auth tag length: expected 16, got {}",
+                    metadata.auth_tag.len()
+                ),
+            });
+        }
+
+        use aes_gcm::{Nonce, Tag};
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
+        let nonce = Nonce::from_slice(&metadata.nonce);
+        let tag = Tag::from_slice(&metadata.auth_tag);
+
+        let mut buffer = encrypted_data.to_vec();
+        cipher.decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("AES-GCM shard decryption failed: {}", e),
+            })?;
+
+        tracing::debug!(
+            "Kyber-1024 + AES-GCM decrypted shard ({} bytes)",
+            buffer.len()
+        );
+
+        Ok(buffer)
+    }
+
+    /// Derive AES-256 key from Kyber shared secret via SHA-256
+    fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"KYBER-1024-SHARD-AES-KEY:");
+        hasher.update(shared_secret);
+        hasher.finalize().into()
     }
 }
 
@@ -614,23 +698,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_sharded_data_access_creation() {
-        let access = ShardedDataAccess::new().await.unwrap();
+        let access = ShardedDataAccess::new().await.expect("test: create access");
         assert_eq!(access.active_sessions.read().await.len(), 0);
     }
 
     #[tokio::test]
     async fn test_shard_manager_creation() {
-        let manager = ShardManager::new().await.unwrap();
+        let manager = ShardManager::new().await.expect("test: create manager");
         assert_eq!(manager.available_shards.read().await.len(), 0);
     }
 
     #[tokio::test]
     async fn test_create_shards() {
-        let manager = ShardManager::new().await.unwrap();
+        let manager = ShardManager::new().await.expect("test: create manager");
         let asset_id = test_asset_id(AssetType::Storage);
         let test_data = b"This is test data that will be sharded and encrypted";
-        
-        let shards = manager.create_shards(&asset_id, test_data).await.unwrap();
+
+        let shards = manager.create_shards(&asset_id, test_data).await.expect("test: create shards");
         
         assert!(!shards.is_empty());
         assert_eq!(shards[0].asset_id, asset_id);
@@ -640,9 +724,9 @@ mod tests {
     
     #[tokio::test]
     async fn test_store_and_get_shard() {
-        let manager = ShardManager::new().await.unwrap();
+        let manager = ShardManager::new().await.expect("test: create manager");
         let asset_id = test_asset_id(AssetType::Storage);
-        
+
         let shard = EncryptedShard {
             shard_id: "test-shard".to_string(),
             shard_key: "test-shard-key".to_string(),
@@ -652,22 +736,93 @@ mod tests {
             encrypted_data: vec![1, 2, 3, 4, 5],
             checksum: [0u8; 32],
             encryption_metadata: EncryptionMetadata {
-                algorithm: "AES-256-GCM".to_string(),
-                key_derivation: "PBKDF2".to_string(),
-                iv: vec![0u8; 16],
-                salt: vec![0u8; 32],
-                aad: Vec::new(),
+                algorithm: "Kyber-1024-KEM+AES-256-GCM".to_string(),
+                key_derivation: "Kyber-1024-KEM".to_string(),
+                kem_ciphertext: Vec::new(),
+                nonce: vec![0u8; 12],
+                auth_tag: vec![0u8; 16],
             },
             size_bytes: 5,
             created_at: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(3600),
             storage_nodes: Vec::new(),
         };
-        
-        manager.store_shard(shard.clone()).await.unwrap();
-        
-        let retrieved_shard = manager.get_shard(&shard.shard_key).await.unwrap();
+
+        manager.store_shard(shard.clone()).await.expect("test: store shard");
+
+        let retrieved_shard = manager.get_shard(&shard.shard_key).await.expect("test: get shard");
         assert_eq!(retrieved_shard.shard_id, shard.shard_id);
         assert_eq!(retrieved_shard.encrypted_data, shard.encrypted_data);
+    }
+
+    #[tokio::test]
+    async fn test_shard_encrypt_decrypt_roundtrip() {
+        let manager = ShardManager::new().await.expect("test: create manager");
+        let plaintext = b"Sensitive shard data for Kyber-1024 + AES-GCM roundtrip test";
+
+        let mut metadata = EncryptionMetadata {
+            algorithm: "Kyber-1024-KEM+AES-256-GCM".to_string(),
+            key_derivation: "Kyber-1024-KEM".to_string(),
+            kem_ciphertext: Vec::new(),
+            nonce: Vec::new(),
+            auth_tag: Vec::new(),
+        };
+
+        let ciphertext = manager.encrypt_shard_data(plaintext, &mut metadata).await.expect("test: encrypt");
+
+        // Ciphertext must differ from plaintext
+        assert_ne!(ciphertext, plaintext.to_vec());
+        // KEM ciphertext, nonce, and tag must be populated
+        assert!(!metadata.kem_ciphertext.is_empty());
+        assert_eq!(metadata.nonce.len(), 12);
+        assert_eq!(metadata.auth_tag.len(), 16);
+
+        let decrypted = manager.decrypt_shard_data_internal(&ciphertext, &metadata).expect("test: decrypt");
+        assert_eq!(decrypted, plaintext.to_vec());
+    }
+
+    #[tokio::test]
+    async fn test_create_shards_roundtrip() {
+        let manager = ShardManager::new().await.expect("test: create manager");
+        let asset_id = test_asset_id(AssetType::Storage);
+        let original_data = b"Data that goes through full shard creation pipeline with real crypto";
+
+        let shards = manager.create_shards(&asset_id, original_data).await.expect("test: create shards");
+        assert!(!shards.is_empty());
+
+        // Decrypt each shard and reassemble
+        let mut reassembled = Vec::new();
+        for shard in &shards {
+            let decrypted = manager
+                .decrypt_shard_data_internal(&shard.encrypted_data, &shard.encryption_metadata)
+                .expect("test: decrypt shard");
+            reassembled.extend_from_slice(&decrypted);
+        }
+
+        assert_eq!(reassembled, original_data.to_vec());
+    }
+
+    #[tokio::test]
+    async fn test_tampered_ciphertext_fails_decryption() {
+        let manager = ShardManager::new().await.expect("test: create manager");
+        let plaintext = b"Data that must not be tampered with";
+
+        let mut metadata = EncryptionMetadata {
+            algorithm: "Kyber-1024-KEM+AES-256-GCM".to_string(),
+            key_derivation: "Kyber-1024-KEM".to_string(),
+            kem_ciphertext: Vec::new(),
+            nonce: Vec::new(),
+            auth_tag: Vec::new(),
+        };
+
+        let mut ciphertext = manager.encrypt_shard_data(plaintext, &mut metadata).await.expect("test: encrypt");
+
+        // Tamper with the ciphertext
+        if let Some(byte) = ciphertext.first_mut() {
+            *byte ^= 0xFF;
+        }
+
+        let result = manager.decrypt_shard_data_internal(&ciphertext, &metadata);
+        assert!(result.is_err(), "Tampered ciphertext should fail AES-GCM authentication");
     }
 }

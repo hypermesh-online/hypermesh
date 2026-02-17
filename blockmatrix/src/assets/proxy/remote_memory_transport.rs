@@ -583,7 +583,7 @@ impl RemoteMemoryTransport {
     async fn process_memory_operation(
         &self,
         operation: MemoryOperationType,
-        target_address: &GlobalAddress,
+        _target_address: &GlobalAddress,
         data: Option<Vec<u8>>,
     ) -> OperationResult {
         // This would perform actual memory operations

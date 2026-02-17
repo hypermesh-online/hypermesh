@@ -88,7 +88,6 @@ pub mod examples;
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::time::Duration;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
@@ -96,8 +95,6 @@ use uuid::Uuid;
 
 use execution::context::{
     ExecutionPermissions, ResourceLimits, SchedulingInfo,
-    BlockchainExecutionContext, P2PExecutionContext,
-    NetworkTopology, RoutingPreferences
 };
 
 // Re-export core types

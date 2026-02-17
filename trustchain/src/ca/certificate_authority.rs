@@ -21,7 +21,7 @@ use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult, F
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
-use super::certificate_store::{CertificateStore, CertificateStoreMetrics};
+use super::certificate_store::CertificateStore;
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.
@@ -89,6 +89,8 @@ pub struct CAMetrics {
 
 /// Certificate rotation manager
 pub struct CertificateRotationManager {
+    /// Scheduled certificate rotation times (for automated rotation)
+    #[allow(dead_code)]
     rotation_schedule: Arc<RwLock<HashMap<String, SystemTime>>>,
     rotation_in_progress: Arc<Mutex<bool>>,
 }
@@ -240,7 +242,7 @@ impl TrustChainCA {
 
     /// Generate certificate using local signing
     async fn generate_certificate_local(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
-        let root_ca = self.root_ca.read().await;
+        let _root_ca = self.root_ca.read().await;
 
         // rcgen 0.13 API: CertificateParams::new() returns Result
         let mut params = CertificateParams::new(vec![request.common_name.clone()])

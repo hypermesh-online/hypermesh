@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
@@ -16,7 +16,6 @@ use sha2::{Sha256, Digest};
 use chrono::{DateTime, Utc};
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
-use blockmatrix::retrieval::{RetrievalPlan, InstructionGenerator, ClientAssembler};
 use crate::registry::CatalogRegistry;
 use super::{PeerInfo, ConflictResolution};
 
@@ -120,6 +119,7 @@ pub struct MerkleNode {
 }
 
 /// Synchronization manager
+#[allow(dead_code)] // Sync manager fields for P2P sync operations
 pub struct SyncManager {
     node_id: String,
     sync_interval: Duration,
@@ -683,7 +683,7 @@ impl SyncManager {
             .collect())
     }
 
-    async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetPackage>> {
+    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
         // Priority filtering removed as AssetMetadata doesn't have priority field
         // Return all packages since we can't filter by priority

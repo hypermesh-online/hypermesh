@@ -261,7 +261,7 @@ impl FalconCrypto {
     }
     
     /// Extract public key from certificate request or existing certificate
-    pub fn extract_public_key_from_certificate(&self, cert_der: &[u8]) -> Result<FalconPublicKey> {
+    pub fn extract_public_key_from_certificate(&self, _cert_der: &[u8]) -> Result<FalconPublicKey> {
         // Parse certificate and extract FALCON-1024 public key
         // This would involve X.509 certificate parsing specific to FALCON-1024 keys
         // For now, return a placeholder implementation

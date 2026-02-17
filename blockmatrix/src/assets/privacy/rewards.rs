@@ -39,6 +39,7 @@ use super::{
 use crate::assets::core::{AssetResult, PrivacyLevel};
 
 /// CAESAR reward calculator and manager
+#[allow(dead_code)] // Fields used during reward calculation
 pub struct CaesarRewardCalculator {
     /// Base reward configuration
     base_config: CaesarRewardConfig,
@@ -745,7 +746,7 @@ impl CaesarRewardCalculator {
     // Helper methods (implementation details)
     async fn calculate_base_reward_rate(
         &self,
-        privacy_level: &PrivacyLevel,
+        _privacy_level: &PrivacyLevel,
         resource_config: &ResourceAllocationConfig,
     ) -> AssetResult<f32> {
         let base = self.base_config.base_reward_rate;

@@ -8,18 +8,15 @@
 //! orchestrating the flow of assets through all Phase 2 components.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use std::collections::HashMap;
 use tokio::sync::{RwLock, Semaphore};
-use anyhow::{Result, Context};
+use anyhow::Result;
 use tracing::{info, debug, warn, error, instrument};
 use serde::{Serialize, Deserialize};
 use futures::stream::{self, StreamExt};
 
-use crate::assets::pipeline::{Asset, ProcessedAsset, Shard, DistributedAsset};
-use crate::assets::multi_node::{NetworkId, PrivacyTier};
-use crate::assets::storage::{ContentAddress, DeduplicationResult};
-use crate::matrix::MatrixCoordinate;
+use crate::assets::pipeline::{Asset, ProcessedAsset};
 
 /// Result type for workflow operations
 pub type WorkflowResult<T> = Result<T, WorkflowError>;
@@ -89,6 +86,7 @@ pub struct AssetWorkflow {
     processing_timeout: Duration,
 
     /// Retrieval timeout
+    #[allow(dead_code)] // Stored for future retrieval timeout enforcement
     retrieval_timeout: Duration,
 }
 

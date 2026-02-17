@@ -24,7 +24,8 @@ use super::{DnsQuery, DnsResponse, DnsRecord, DnsRecordData};
 pub struct TrustChainResolver {
     /// Upstream resolvers (IPv6 only)
     upstream_resolvers: Vec<Ipv6Addr>,
-    /// TrustChain domains
+    /// TrustChain domains (for domain-based routing decisions)
+    #[allow(dead_code)]
     trustchain_domains: Vec<String>,
     /// Resolver statistics
     stats: Arc<RwLock<ResolverStats>>,

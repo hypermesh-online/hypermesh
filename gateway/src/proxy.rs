@@ -2,14 +2,13 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use bytes::{Bytes, Buf};
 use h3::client::SendRequest;
-use http::{HeaderMap, Method, Request, Response, StatusCode, Uri};
+use http::{Request, Response, Uri};
 use std::time::Duration;
 use tracing::{debug, error, warn};
 
-use crate::middleware::RequestIdMiddleware;
 use crate::pool::ConnectionPool;
 
 /// HTTP/3 proxy for forwarding requests to backend servers
@@ -160,7 +159,8 @@ pub fn transform_backend_path(original_path: &str, backend_prefix: &str) -> Stri
     }
 }
 
-/// Helper to build backend URI
+/// Helper to build backend URI (utility for proxy routing)
+#[allow(dead_code)]
 pub fn build_backend_uri(
     original_uri: &Uri,
     backend_host: &str,

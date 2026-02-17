@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 use anyhow::Result;
-use tracing::{info, error, warn};
+use tracing::{info, error};
 use tokio::signal;
 
 use trustchain::{

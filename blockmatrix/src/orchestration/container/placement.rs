@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// CPE-powered placement engine for predictive optimization
+#[allow(dead_code)] // Fields used during placement optimization
 pub struct CpePlacementEngine {
     /// Placement history for learning
     placement_history: Arc<RwLock<Vec<PlacementRecord>>>,
@@ -440,6 +441,7 @@ impl CpePlacementEngine {
     }
     
     /// Prepare context history for CPE prediction
+    #[allow(dead_code)] // Will be used for CPE-enhanced placement
     async fn prepare_context_history(
         &self,
         spec: &ContainerSpec,
@@ -497,6 +499,7 @@ impl CpePlacementEngine {
     }
     
     /// Select optimal node from CPE predictions
+    #[allow(dead_code)] // Will be used for CPE-enhanced placement
     async fn select_node_from_predictions(
         &self,
         predictions: &[f64],
@@ -524,6 +527,7 @@ impl CpePlacementEngine {
     }
     
     /// Generate placement reasoning
+    #[allow(dead_code)] // Will be used for CPE-enhanced placement
     async fn generate_placement_reasoning(
         &self,
         selected_node: &NodeId,

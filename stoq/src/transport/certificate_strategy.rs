@@ -12,8 +12,7 @@
 
 use async_trait::async_trait;
 use anyhow::{Result, anyhow};
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use std::collections::HashMap;
+use rustls::pki_types::PrivateKeyDer;
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
@@ -96,7 +95,8 @@ pub struct P2PCertificateStrategy {
     node_id: String,
     /// Common name for certificates
     common_name: String,
-    /// IPv6 addresses for this node
+    /// IPv6 addresses for this node (stored for future certificate SAN extensions)
+    #[allow(dead_code)]
     ipv6_addresses: Vec<Ipv6Addr>,
 }
 
@@ -335,7 +335,8 @@ pub struct PublicCertificateStrategy {
     blockchain_cert: Arc<RwLock<Option<StoqNodeCertificate>>>,
     /// TrustChain client for LOCAL blockchain operations
     trustchain_client: Arc<TrustChainClient>,
-    /// Node ID for this node
+    /// Node ID for this node (stored for blockchain certificate registration metadata)
+    #[allow(dead_code)]
     node_id: String,
     /// Common name for certificates
     common_name: String,

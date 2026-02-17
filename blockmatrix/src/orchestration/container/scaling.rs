@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Predictive scaler using CPE for proactive scaling
+#[allow(dead_code)] // Fields used during predictive scaling operations
 pub struct PredictiveScaler {
     /// Scaling policies
     scaling_policies: Arc<RwLock<HashMap<ServiceId, ServiceScalingPolicy>>>,
@@ -590,7 +591,7 @@ impl PredictiveScaler {
         };
         
         // Generate temporal context
-        let now = SystemTime::now();
+        let _now = SystemTime::now();
         let temporal_context = TemporalContext {
             hour_of_day: 12, // Would be calculated from actual time
             day_of_week: 3,  // Wednesday
@@ -687,6 +688,7 @@ impl PredictiveScaler {
     }
     
     /// Prepare workload context history for CPE
+    #[allow(dead_code)] // Will be used for CPE-enhanced scaling
     async fn prepare_workload_context_history(&self, context: &WorkloadContext) -> Result<Vec<Vec<f64>>> {
         let mut history = Vec::new();
         
@@ -724,6 +726,7 @@ impl PredictiveScaler {
     }
     
     /// Interpret CPE predictions into predicted metrics
+    #[allow(dead_code)] // Will be used for CPE-enhanced scaling
     async fn interpret_predictions(&self, predictions: &[f64]) -> PredictedMetrics {
         PredictedMetrics {
             cpu_utilization: predictions.get(0).cloned().unwrap_or(0.5).max(0.0).min(1.0),

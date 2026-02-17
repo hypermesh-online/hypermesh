@@ -7,7 +7,7 @@
 //! This module provides validation services for matrix positions during
 //! network operations, neighbor discovery, and topology management.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use tokio::sync::RwLock;
@@ -15,10 +15,10 @@ use tracing::{info, warn, debug, error};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::blockchain_integration::{
-    MatrixPositionValidator, MatrixPositionRegistration, ValidationStatus
+    MatrixPositionValidator, ValidationStatus
 };
 use crate::blockchain::node_chain::NodeBlockchain;
-use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
+use trustchain::consensus::ConsensusProof;
 
 /// Network position validator for matrix topology
 pub struct NetworkPositionValidator {
@@ -42,6 +42,7 @@ use std::collections::HashMap;
 
 /// Cached validation entry
 #[derive(Clone)]
+#[allow(dead_code)] // Fields used during validation caching
 struct CachedValidation {
     coordinate: MatrixCoordinate,
     node_id: String,

@@ -59,6 +59,7 @@ pub struct CtStoqConfig {
 
 /// Cached CT entry
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct CachedCtEntry {
     entry: StoqCtEntry,
     cached_at: SystemTime,

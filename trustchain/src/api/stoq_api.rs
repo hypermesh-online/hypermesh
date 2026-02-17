@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
-use tracing::{info, debug, warn, instrument};
+use tracing::{info, debug, instrument};
 use x509_parser::prelude::FromDer;
 
 use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
@@ -392,6 +392,8 @@ impl ApiHandler for TrustChainHealthHandler {
 /// TrustChain STOQ API Server
 pub struct TrustChainStoqApi {
     server: Arc<StoqApiServer>,
+    /// Configuration (retained for runtime access)
+    #[allow(dead_code)]
     config: TrustChainStoqConfig,
 }
 

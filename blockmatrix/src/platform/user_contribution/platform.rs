@@ -20,6 +20,7 @@ use super::rewards::{RewardEngine, PlatformMetrics};
 use super::pricing::PaymentFrequency;
 
 /// User contribution platform for hardware sharing
+#[allow(dead_code)] // Fields used during contribution management
 pub struct UserContributionPlatform {
     asset_manager: Arc<AssetManager>,
     user_profiles: Arc<RwLock<HashMap<UserId, UserProfile>>>,

@@ -11,16 +11,14 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use anyhow::Result;
-
 use blockmatrix::extensions::{
     AssetExtensionHandler, ExtensionResult, ExtensionError,
     AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
     AssetOperation, OperationResult, DeploymentResult, ExecutionResult,
-    TransferResult, SharingResult, ResourceUsageReport,
+    ResourceUsageReport,
 };
 
-use blockmatrix::assets::core::{AssetId, AssetType, AssetData, NetworkScope, AssetCategory, BaseSystemType, ApplicationDomain};
+use blockmatrix::assets::core::{AssetId, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain};
 use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
 use sha2::Digest;
 
@@ -31,6 +29,7 @@ pub struct VirtualMachineHandler {
 }
 
 /// VM instance information
+#[allow(dead_code)] // VM tracking fields populated during lifecycle
 #[derive(Debug, Clone)]
 struct VMInstance {
     pub id: AssetId,
@@ -40,6 +39,7 @@ struct VMInstance {
     pub resources: VMResources,
 }
 
+#[allow(dead_code)] // VM lifecycle states
 #[derive(Debug, Clone)]
 enum VMStatus {
     Created,
@@ -49,6 +49,7 @@ enum VMStatus {
     Error(String),
 }
 
+#[allow(dead_code)] // VM resource tracking
 #[derive(Debug, Clone)]
 struct VMResources {
     pub cpu_cores: f32,
@@ -253,7 +254,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
                 Ok(OperationResult::Executed(result))
             },
 
-            AssetOperation::Deploy(deploy_spec) => {
+            AssetOperation::Deploy(_deploy_spec) => {
                 // Deploy VM to environment
                 let mut instances = self.instances.write().await;
 
@@ -287,6 +288,7 @@ pub struct LibraryHandler {
     packages: Arc<RwLock<HashMap<AssetId, LibraryPackage>>>,
 }
 
+#[allow(dead_code)] // Package tracking fields
 #[derive(Debug, Clone)]
 struct LibraryPackage {
     pub id: AssetId,
@@ -480,6 +482,7 @@ pub struct DatasetHandler {
     datasets: Arc<RwLock<HashMap<AssetId, Dataset>>>,
 }
 
+#[allow(dead_code)] // Dataset tracking fields
 #[derive(Debug, Clone)]
 struct Dataset {
     pub id: AssetId,
@@ -651,6 +654,7 @@ pub struct TemplateHandler {
     templates: Arc<RwLock<HashMap<AssetId, Template>>>,
 }
 
+#[allow(dead_code)] // Template tracking fields
 #[derive(Debug, Clone)]
 struct Template {
     pub id: AssetId,

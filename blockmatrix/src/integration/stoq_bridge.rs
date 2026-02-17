@@ -123,6 +123,7 @@ impl Default for StoqBridgeConfig {
 }
 
 /// Unified STOQ Bridge for all components
+#[allow(dead_code)] // Fields used during STOQ bridge operations
 pub struct UnifiedStoqBridge {
     /// STOQ API server for receiving requests
     server: Arc<StoqApiServer>,

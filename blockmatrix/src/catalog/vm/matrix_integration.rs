@@ -24,7 +24,6 @@ use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityType,
     ValidationRequest, PublicValidationResponse, PrivacyPolicyConfig
 };
-use crate::assets::blockchain::AssetPrivacyLevel;
 use crate::assets::core::AssetId as CoreAssetId;
 use super::{
     ConsensusProofVM, VMConfig, ExecutionResult, ExecutionContext,
@@ -220,6 +219,7 @@ pub struct EntityVMConfig {
 
 /// Cached cross-chain validation result
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during validation caching
 struct CachedValidation {
     validation_request: CrossEntityValidation,
     validation_response: PublicValidationResponse,
@@ -228,6 +228,7 @@ struct CachedValidation {
 }
 
 /// Entity asset allocation coordinator
+#[allow(dead_code)] // Fields used during asset coordination
 pub struct EntityAssetCoordinator {
     /// Available assets per entity
     entity_assets: Arc<std::sync::Mutex<HashMap<String, EntityAssetPool>>>,
@@ -249,6 +250,7 @@ struct EntityAssetPool {
 
 /// Active asset allocation tracking
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during allocation tracking
 struct ActiveAllocation {
     allocation_id: Uuid,
     entity_domain: String,
@@ -347,7 +349,7 @@ impl MatrixAwareVM {
     ) -> Result<()> {
         if let Some(target_entity) = &context.target_entity {
             // Get entity blockchain for validation
-            if let Some(entity_config) = self.entity_configs.get(target_entity) {
+            if let Some(_entity_config) = self.entity_configs.get(target_entity) {
                 // Validate that consensus proof meets entity-specific requirements
                 let consensus_proof = &context.base_context.consensus_proof;
                 
@@ -393,7 +395,7 @@ impl MatrixAwareVM {
             }
 
             // Perform validation through matrix manager
-            let validation_request = ValidationRequest {
+            let _validation_request = ValidationRequest {
                 asset_id: validation.asset_id.clone(),
                 requested_fields: validation.validation_fields.clone(),
                 validation_type: self.convert_validation_type(&validation.validation_type),
@@ -456,7 +458,7 @@ impl MatrixAwareVM {
             self.check_sync_requirements(workflow, step_index, &intermediate_data).await?;
             
             // Create entity-specific execution context
-            let entity_context = self.create_entity_execution_context(
+            let _entity_context = self.create_entity_execution_context(
                 context,
                 entity_domain,
                 asset_allocations,
@@ -497,7 +499,7 @@ impl MatrixAwareVM {
         asset_allocations: &HashMap<String, EntityAssetAllocation>,
     ) -> Result<ExecutionResult> {
         // Create enhanced execution context with entity assets
-        let enhanced_context = ExecutionContext {
+        let _enhanced_context = ExecutionContext {
             asset_allocations: self.convert_entity_allocations_to_vm_allocations(asset_allocations)?,
             ..context.base_context.clone()
         };
@@ -608,7 +610,7 @@ impl MatrixAwareVM {
     
     fn create_entity_identifier(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<crate::assets::matrix_blockchain::EntityIdentifier> {
         Ok(crate::assets::matrix_blockchain::EntityIdentifier {
             network_domain: "vm.hypermesh.online".to_string(),
@@ -619,9 +621,9 @@ impl MatrixAwareVM {
     
     async fn check_sync_requirements(
         &self,
-        workflow: &MultiEntityWorkflow,
-        step_index: usize,
-        intermediate_data: &HashMap<String, serde_json::Value>,
+        _workflow: &MultiEntityWorkflow,
+        _step_index: usize,
+        _intermediate_data: &HashMap<String, serde_json::Value>,
     ) -> Result<()> {
         // Implementation would check synchronization requirements
         // between workflow steps
@@ -631,9 +633,9 @@ impl MatrixAwareVM {
     fn create_entity_execution_context(
         &self,
         base_context: &MatrixExecutionContext,
-        entity_domain: &str,
-        asset_allocations: &HashMap<String, EntityAssetAllocation>,
-        intermediate_data: &HashMap<String, serde_json::Value>,
+        _entity_domain: &str,
+        _asset_allocations: &HashMap<String, EntityAssetAllocation>,
+        _intermediate_data: &HashMap<String, serde_json::Value>,
     ) -> Result<ExecutionContext> {
         // Create entity-specific execution context
         Ok(base_context.base_context.clone())
@@ -642,7 +644,7 @@ impl MatrixAwareVM {
     async fn aggregate_workflow_results(
         &self,
         workflow_results: Vec<(String, ExecutionResult)>,
-        workflow: &MultiEntityWorkflow,
+        _workflow: &MultiEntityWorkflow,
     ) -> Result<ExecutionResult> {
         // Aggregate results from multiple entities according to workflow policy
         if let Some((_, first_result)) = workflow_results.first() {

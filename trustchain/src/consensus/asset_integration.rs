@@ -7,7 +7,7 @@
 //! This module provides integration between TrustChain's Proof of State validation
 //! and BlockMatrix's AssetId system with proof requirements.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::{ConsensusProof, ProofValidation};

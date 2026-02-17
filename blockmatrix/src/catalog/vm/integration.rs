@@ -27,6 +27,7 @@ impl Default for VMIntegrationConfig {
     }
 }
 
+#[allow(dead_code)] // Fields used during VM integration management
 pub struct VMIntegrationManager {
     config: VMIntegrationConfig,
     active_vms: HashMap<String, VMInstance>,

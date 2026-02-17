@@ -112,7 +112,8 @@ impl Default for ConnectionParameters {
 struct HysteresisState {
     /// Number of consecutive measurements in same direction
     consecutive_count: u32,
-    /// Previous tier for comparison
+    /// Previous tier for comparison (used in hysteresis decision logic)
+    #[allow(dead_code)]
     previous_tier: Option<NetworkTier>,
     /// Timestamp of last tier change
     last_tier_change: Instant,

@@ -20,6 +20,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// CPE-enhanced service discovery system
+#[allow(dead_code)] // Fields used during service discovery
 pub struct CpeServiceDiscovery {
     /// Whether CPE enhancement is enabled
     cpe_enabled: bool,
@@ -35,6 +36,7 @@ pub struct CpeServiceDiscovery {
 
 /// Service registry with health tracking
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used during service registry operations
 pub struct ServiceRegistry {
     /// Services and their endpoints
     services: HashMap<ServiceId, ServiceEntry>,
@@ -315,7 +317,7 @@ impl CpeServiceDiscovery {
             self.update_cache_stats(true).await;
             
             // Use IFR for ultra-fast cache lookup
-            if let Ok(ifr_result) = self.ifr_enhanced_lookup(&cache_key).await {
+            if let Ok(_ifr_result) = self.ifr_enhanced_lookup(&cache_key).await {
                 self.update_ifr_stats().await;
                 return Ok(cached_result.endpoints);
             }
@@ -383,6 +385,7 @@ impl CpeServiceDiscovery {
     }
     
     /// Build context history for CPE prediction
+    #[allow(dead_code)] // Will be used for CPE-enhanced discovery
     async fn build_context_history(&self, service_id: &ServiceId, endpoints: &[ServiceEndpoint]) -> Vec<Vec<f64>> {
         let mut context_history = Vec::new();
         
@@ -420,6 +423,7 @@ impl CpeServiceDiscovery {
     }
     
     /// Apply CPE predictions to endpoint ranking
+    #[allow(dead_code)] // Will be used for CPE-enhanced discovery
     async fn apply_cpe_predictions(&self, mut endpoints: Vec<ServiceEndpoint>, predictions: &[f64], confidence: f64) -> Vec<ServiceEndpoint> {
         if predictions.is_empty() || endpoints.is_empty() {
             return endpoints;
@@ -441,6 +445,7 @@ impl CpeServiceDiscovery {
     }
     
     /// Get service predictions from cache or generate new ones
+    #[allow(dead_code)] // Will be used for CPE-enhanced discovery
     async fn get_service_predictions(&self, service_id: &ServiceId) -> Result<Option<ServicePrediction>> {
         let cache = self.prediction_cache.read().await;
         if let Some(prediction) = cache.get(service_id) {
@@ -455,6 +460,7 @@ impl CpeServiceDiscovery {
     }
     
     /// Generate service prediction based on current metrics
+    #[allow(dead_code)] // Will be used for CPE-enhanced discovery
     async fn generate_service_prediction(&self, service_id: &ServiceId) -> Result<Option<ServicePrediction>> {
         // Get historical data for the service
         let registry = self.registry.read().await;

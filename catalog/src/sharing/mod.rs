@@ -27,8 +27,6 @@ pub use protocols::{SharingProtocol, SharePermission, BandwidthAllocation};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
 use crate::{AssetId, AssetPackage, AssetMetadata};
-use crate::assets::AssetPackageId;
-use uuid::Uuid;
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -517,7 +515,7 @@ impl SharingManager {
     async fn should_mirror_package(
         &self,
         asset_id: &AssetId,
-        metadata: &AssetMetadata,
+        _metadata: &AssetMetadata,
     ) -> Result<bool> {
         // Check if we already have it
         if self.discovery_service.has_package(asset_id).await? {

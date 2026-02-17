@@ -782,8 +782,6 @@ impl LibraryAssetPackage {
 
     /// Create LibraryAssetPackage from AssetTypeDefinition (new registry architecture)
     pub fn from_asset_type_definition(type_def: &AssetTypeDefinition) -> Self {
-        use chrono::Utc;
-
         Self {
             id: Arc::from(type_def.asset_id.to_string().as_str()),
             name: type_def.type_name.clone(),

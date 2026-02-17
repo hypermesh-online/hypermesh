@@ -8,11 +8,8 @@
 //! geographic proximity and zone boundaries.
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::neighbors::find_neighbors;
-use crate::matrix::geospatial::hierarchy::GeographicZone;
-use crate::matrix::geospatial::clustering::Cluster;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 /// Load balancing strategy
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

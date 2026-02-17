@@ -12,12 +12,10 @@ use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use parking_lot::RwLock;
 use dashmap::DashMap;
-use tracing::{debug, info, warn, error};
-use bytes::Bytes;
+use tracing::{debug, info, warn};
 
-use super::pos_validator::{PosToken, PosTokenValidator, ValidationResult};
+use super::pos_validator::{PosToken, PosTokenValidator};
 use crate::transport::certificate_strategy::NetworkType;
-use crate::extensions::PacketToken;
 
 /// Privacy tier for protocol-level enforcement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

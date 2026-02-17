@@ -14,7 +14,7 @@
 use crate::matrix::{MatrixCoordinate, CoordinateError};
 use crate::blockchain::{NodeBlockchain, ChainStateManager, BlockPropagator, PropagationStrategy, Block};
 use crate::persistence::{PersistenceManager, PersistenceConfig, RecoveryManager};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -267,7 +267,7 @@ impl MatrixFoundation {
     /// Add a block to a node's blockchain
     pub async fn add_block(&self, node_id: &str, data: Vec<u8>) -> Phase1Result<Block> {
         let node = self.get_node(node_id).await?;
-        let mut blockchain = node.blockchain.write().await;
+        let blockchain = node.blockchain.write().await;
 
         blockchain.add_block_with_data(data).await
             .map_err(|e| Phase1Error::Blockchain(e))

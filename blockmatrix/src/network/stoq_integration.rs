@@ -10,14 +10,14 @@
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::net::{SocketAddr, Ipv6Addr};
+use std::net::SocketAddr;
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::bootstrap::PrivacyMode;
-use stoq::{StoqTransport, Connection, Endpoint, Stream, TransportConfig};
+use stoq::{StoqTransport, Connection, Endpoint};
 
 /// Service discovery tag for matrix nodes
 const MATRIX_SERVICE_TAG: &str = "blockmatrix.node";
@@ -139,7 +139,7 @@ impl MatrixStoqIntegration {
 
     /// Register with STOQ service discovery
     async fn register_service_discovery(
-        transport: &Arc<StoqTransport>,
+        _transport: &Arc<StoqTransport>,
         coordinate: &MatrixCoordinate,
         node_id: &str,
     ) -> Result<()> {

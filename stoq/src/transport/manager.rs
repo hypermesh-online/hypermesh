@@ -6,7 +6,6 @@
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use bytes::{Bytes, BytesMut, BufMut};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use quinn::{self, TransportConfig as QuinnTransportConfig, VarInt};
@@ -20,10 +19,10 @@ use tracing::{info, debug, warn};
 use super::certificates::CertificateManager;
 use super::certificate_strategy::NetworkType;
 use super::config::{TransportConfig, NetworkTier, CongestionControl};
-use super::connection::{Connection, Endpoint, MemoryPool, FrameBatch};
+use super::connection::{Connection, Endpoint, MemoryPool};
 use super::metrics::TransportMetrics;
 use super::stats::{ConnectionPoolStats, PerformanceStats};
-use super::falcon::{FalconTransport, FalconVariant};
+use super::falcon::FalconTransport;
 use super::adaptive::{AdaptiveConnection, AdaptationManager};
 
 use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};

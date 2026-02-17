@@ -7,14 +7,13 @@
 //! Coordinates all pipeline stages: Compression → Encryption → Sharding → Distribution
 
 use crate::assets::pipeline::{
-    Asset, PipelineError, PipelineResult,
+    Asset, PipelineResult,
     Compressor, CompressionConfig, CompressionStats,
     Encryptor, EncryptionConfig, EncryptionStats, EncryptedData, ShardKey,
     Sharder, ShardingConfig, Shard, ShardingStats,
     MatrixDistributor, DistributionConfig, DistributedAsset, DistributionStats,
 };
 use serde::{Serialize, Deserialize};
-use std::sync::Arc;
 
 /// Complete pipeline configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

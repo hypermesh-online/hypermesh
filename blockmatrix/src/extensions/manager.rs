@@ -550,9 +550,9 @@ impl UnifiedExtensionManager {
     /// Get extension as asset library
     pub async fn get_asset_library(
         &self,
-        extension_id: &str,
+        _extension_id: &str,
     ) -> Option<Arc<Box<dyn AssetLibraryExtension>>> {
-        let extensions = self.extensions.read().await;
+        let _extensions = self.extensions.read().await;
 
         // This would require dynamic casting which Rust doesn't support directly
         // In practice, we'd need a different approach or store library extensions separately
@@ -721,7 +721,7 @@ impl UnifiedExtensionManager {
         }
 
         // Get current extension metadata
-        let metadata = {
+        let _metadata = {
             let registry = self.registry.read().await;
             registry
                 .get(extension_id)

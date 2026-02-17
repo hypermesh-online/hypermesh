@@ -123,6 +123,7 @@ pub struct StoqClientMetrics {
 
 /// Certificate validation result
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct CertificateValidationResult {
     is_valid: bool,
     validated_at: SystemTime,

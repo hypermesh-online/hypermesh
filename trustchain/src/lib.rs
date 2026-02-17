@@ -51,7 +51,8 @@ pub struct TrustChain {
     stoq_client: Arc<TrustChainStoqClient>,
     /// Security monitoring system
     security_monitor: Arc<SecurityMonitor>,
-    /// Configuration
+    /// Configuration (retained for runtime configuration access)
+    #[allow(dead_code)]
     config: Arc<TrustChainConfig>,
 }
 

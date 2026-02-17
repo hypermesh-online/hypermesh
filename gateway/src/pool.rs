@@ -19,6 +19,8 @@ use tracing::{debug, error, info, warn};
 pub struct ConnectionPool {
     endpoint: Endpoint,
     backend_addr: SocketAddr,
+    /// SNI server name used for TLS handshakes
+    server_name: String,
     connections: Arc<DashMap<usize, PooledConnection>>,
     next_id: Arc<AtomicUsize>,
     max_connections: usize,
@@ -39,6 +41,8 @@ pub struct PoolStats {
 struct PooledConnection {
     connection: Arc<ArcSwap<Option<SendRequest<h3_quinn::OpenStreams, Bytes>>>>,
     last_used: Arc<ArcSwap<Instant>>,
+    /// Connection creation time (for connection age tracking)
+    #[allow(dead_code)]
     created_at: Instant,
     request_count: Arc<AtomicU64>,
     healthy: Arc<ArcSwap<bool>>,
@@ -48,6 +52,7 @@ impl ConnectionPool {
     /// Create a new connection pool for a backend server
     pub async fn new(
         backend_addr: SocketAddr,
+        server_name: impl Into<String>,
         max_connections: usize,
         idle_timeout: Duration,
     ) -> Result<Self> {
@@ -74,6 +79,7 @@ impl ConnectionPool {
         let pool = Self {
             endpoint,
             backend_addr,
+            server_name: server_name.into(),
             connections: Arc::new(DashMap::new()),
             next_id: Arc::new(AtomicUsize::new(0)),
             max_connections,
@@ -146,7 +152,7 @@ impl ConnectionPool {
         // Create new QUIC connection
         let quic_conn = self
             .endpoint
-            .connect(self.backend_addr, "localhost")?
+            .connect(self.backend_addr, &self.server_name)?
             .await?;
 
         // Create HTTP/3 connection
@@ -201,7 +207,8 @@ impl ConnectionPool {
         }
     }
 
-    /// Mark a connection as unhealthy
+    /// Mark a connection as unhealthy (for circuit breaker integration)
+    #[allow(dead_code)]
     pub fn mark_unhealthy(&self, _conn: &SendRequest<h3_quinn::OpenStreams, Bytes>) {
         // In a real implementation, we'd track which specific connection failed
         // For now, we'll just increment the failed counter
@@ -236,6 +243,7 @@ impl ConnectionPool {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PoolStatus {
     pub total_connections: u64,
     pub active_connections: usize,

@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use tokio::fs;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use tracing::{info, error, warn, debug};
+use tracing::{info, debug};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use super::block::Block;

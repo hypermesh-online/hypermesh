@@ -287,8 +287,8 @@ impl DnsResolver {
         info!("Starting TrustChain DNS resolver");
 
         // Start STOQ DNS server (proper architectural separation)
-        let stoq_client_clone = Arc::clone(&self.stoq_client);
-        let resolver_clone = self.clone_for_task();
+        let _stoq_client_clone = Arc::clone(&self.stoq_client);
+        let _resolver_clone = self.clone_for_task();
         
         let handle = tokio::spawn(async move {
             loop {
@@ -490,6 +490,8 @@ impl DnsResolver {
         }
     }
 
+    /// Convert DNS record to trust-dns Record format (used for DNS response construction)
+    #[allow(dead_code)]
     fn dns_record_to_trust_dns(&self, record: &DnsRecord) -> AnyhowResult<Record> {
         let name = Name::from_utf8(&record.name)?;
         let rdata = match &record.data {

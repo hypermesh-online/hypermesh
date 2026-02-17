@@ -193,7 +193,7 @@ impl STOQTransport {
         debug!("Connecting to DNS server over STOQ: {}", server_addr);
 
         // Check if we have a cached connection
-        let server_key = server_addr.to_string();
+        let _server_key = server_addr.to_string();
         if let Some(connection_info) = self.server_connections.get(&server_addr) {
             if self.config.enable_connection_pooling {
                 debug!("Reusing existing DNS connection: {}", server_addr);
@@ -234,7 +234,7 @@ impl STOQTransport {
     /// Send DNS query over STOQ transport
     pub async fn send_dns_query(
         &self,
-        connection: &Arc<DNSConnection>,
+        _connection: &Arc<DNSConnection>,
         query_data: &[u8],
     ) -> TrustChainResult<Vec<u8>> {
         let start_time = std::time::Instant::now();
@@ -393,7 +393,8 @@ impl STOQTransport {
 pub struct DNSConnection {
     /// Service endpoint for DNS
     endpoint: ServiceEndpoint,
-    /// STOQ client for transport
+    /// STOQ client for transport (retained for connection reuse)
+    #[allow(dead_code)]
     stoq_client: Arc<TrustChainStoqClient>,
     /// Connection established time
     established_at: SystemTime,

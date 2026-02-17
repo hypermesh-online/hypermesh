@@ -73,7 +73,7 @@ impl CapabilitySystem {
         Ok(false)
     }
     
-    fn capability_matches(&self, cap: &Capability, resource: &Resource, operation: &Operation) -> bool {
+    fn capability_matches(&self, cap: &Capability, _resource: &Resource, operation: &Operation) -> bool {
         // Simplified matching logic
         match operation {
             Operation::Read => cap.permissions.read,

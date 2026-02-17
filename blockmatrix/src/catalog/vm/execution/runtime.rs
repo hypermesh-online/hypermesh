@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration, Instant};
 use std::process::{Command, Stdio};
-use std::io::Write;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tokio::sync::{RwLock, Mutex};
@@ -26,6 +25,7 @@ use super::scheduler::{ExecutionScheduler, ExecutionPlan};
 use super::{RuntimeExecutionResult, MemoryUsagePattern, StorageOperation};
 
 /// Production-ready consensus runtime with native VM execution
+#[allow(dead_code)] // Fields used during runtime execution
 pub struct ConsensusRuntime {
     /// Consensus VM integration
     consensus_vm: Arc<RwLock<ConsensusVM>>,
@@ -519,6 +519,7 @@ impl Clone for RuntimeMetrics {
 }
 
 /// Julia language runtime implementation
+#[allow(dead_code)] // Fields used during Julia execution
 pub struct JuliaLanguageRuntime {
     asset_manager: Arc<AssetManager>,
     sandbox_config: SandboxConfig,
@@ -549,8 +550,8 @@ impl LanguageRuntime for JuliaLanguageRuntime {
     async fn execute(
         &self,
         code: &str,
-        context: &ExecutionContext,
-        asset_allocations: &HashMap<AssetId, AssetHandle>,
+        _context: &ExecutionContext,
+        _asset_allocations: &HashMap<AssetId, AssetHandle>,
     ) -> Result<LanguageExecutionResult> {
         let start_time = Instant::now();
         
@@ -651,6 +652,7 @@ impl LanguageRuntime for JuliaLanguageRuntime {
 }
 
 /// Python language runtime implementation
+#[allow(dead_code)] // Fields used during Python execution
 pub struct PythonLanguageRuntime {
     asset_manager: Arc<AssetManager>,
     sandbox_config: SandboxConfig,
@@ -681,8 +683,8 @@ impl LanguageRuntime for PythonLanguageRuntime {
     async fn execute(
         &self,
         code: &str,
-        context: &ExecutionContext,
-        asset_allocations: &HashMap<AssetId, AssetHandle>,
+        _context: &ExecutionContext,
+        _asset_allocations: &HashMap<AssetId, AssetHandle>,
     ) -> Result<LanguageExecutionResult> {
         let start_time = Instant::now();
         
@@ -758,6 +760,7 @@ impl LanguageRuntime for PythonLanguageRuntime {
 }
 
 /// Rust language runtime implementation (compiled execution)
+#[allow(dead_code)] // Fields used during Rust compilation/execution
 pub struct RustLanguageRuntime {
     asset_manager: Arc<AssetManager>,
     sandbox_config: SandboxConfig,
@@ -787,8 +790,8 @@ impl LanguageRuntime for RustLanguageRuntime {
     async fn execute(
         &self,
         code: &str,
-        context: &ExecutionContext,
-        asset_allocations: &HashMap<AssetId, AssetHandle>,
+        _context: &ExecutionContext,
+        _asset_allocations: &HashMap<AssetId, AssetHandle>,
     ) -> Result<LanguageExecutionResult> {
         let start_time = Instant::now();
         

@@ -2,13 +2,12 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bytes::{Buf, Bytes};
-use h3::{quic, server::Connection};
 use h3_quinn::quinn;
-use http::{Request, Response, StatusCode};
+use http::{Request, Response};
 use quinn::Endpoint;
-use rcgen::{generate_simple_self_signed, CertifiedKey};
+use rcgen::generate_simple_self_signed;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::net::SocketAddr;
 use std::sync::Arc;

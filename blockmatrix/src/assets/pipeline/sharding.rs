@@ -11,7 +11,6 @@
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 
 /// Sharding configuration

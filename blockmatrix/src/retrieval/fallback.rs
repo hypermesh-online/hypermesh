@@ -6,7 +6,6 @@
 //!
 //! Handles missing shards and intelligent replica selection.
 
-use anyhow::Result;
 use std::collections::HashSet;
 
 use crate::matrix::MatrixCoordinate;

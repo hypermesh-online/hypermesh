@@ -132,6 +132,7 @@ pub enum ForwardingMode {
 
 /// Forwarding configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Config fields used when forwarding is active
 pub struct ForwardingConfig {
     /// Maximum concurrent connections per proxy
     max_connections_per_proxy: u32,
@@ -233,7 +234,7 @@ impl ProxyForwarder {
         };
         
         // Find matching rule
-        let matching_rule = rules.iter()
+        let _matching_rule = rules.iter()
             .find(|rule| self.rule_matches(rule, &request_type))
             .ok_or_else(|| AssetError::AdapterError {
                 message: format!("No matching forwarding rule for request type: {:?}", request_type)

@@ -19,6 +19,12 @@ pub struct GatewayConfig {
     /// BlockMatrix backend address
     pub blockmatrix_addr: SocketAddr,
 
+    /// TLS server name for TrustChain backend (SNI)
+    pub trustchain_server_name: String,
+
+    /// TLS server name for BlockMatrix backend (SNI)
+    pub blockmatrix_server_name: String,
+
     /// Certificate configuration
     pub cert_path: PathBuf,
     pub key_path: PathBuf,
@@ -90,6 +96,8 @@ impl Default for GatewayConfig {
             listen_addr: "[::]:8443".parse().unwrap(),
             trustchain_addr: "[::1]:50053".parse().unwrap(),
             blockmatrix_addr: "[::1]:8446".parse().unwrap(),
+            trustchain_server_name: "trustchain".to_string(),
+            blockmatrix_server_name: "blockmatrix".to_string(),
             cert_path: PathBuf::from("/home/persist/repos/projects/web3/certs/server.crt"),
             key_path: PathBuf::from("/home/persist/repos/projects/web3/certs/server.key"),
             pool: ConnectionPoolConfig::default(),
@@ -159,6 +167,14 @@ impl GatewayConfig {
 
         if let Ok(addr) = std::env::var("BLOCKMATRIX_ADDR") {
             config.blockmatrix_addr = addr.parse()?;
+        }
+
+        if let Ok(name) = std::env::var("TRUSTCHAIN_SERVER_NAME") {
+            config.trustchain_server_name = name;
+        }
+
+        if let Ok(name) = std::env::var("BLOCKMATRIX_SERVER_NAME") {
+            config.blockmatrix_server_name = name;
         }
 
         if let Ok(path) = std::env::var("CERT_PATH") {

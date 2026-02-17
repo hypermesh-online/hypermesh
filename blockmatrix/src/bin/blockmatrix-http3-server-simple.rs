@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use http::{Method, Response, StatusCode};
+use http::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use tracing::{info, Level};

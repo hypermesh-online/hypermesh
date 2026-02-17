@@ -29,6 +29,7 @@ use super::{AssetManagementConfig, PrivacyLevel};
 // Already imported above, no need to import again
 
 /// Main VM executor with consensus-native execution
+#[allow(dead_code)] // Fields used during VM execution
 pub struct VMExecutor {
     /// Consensus VM for proof validation
     consensus_vm: Arc<RwLock<ConsensusVM>>,

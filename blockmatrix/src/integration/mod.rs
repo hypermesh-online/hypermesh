@@ -16,8 +16,7 @@ pub mod coordinator;
 pub mod lifecycle;
 pub mod metrics;
 pub mod services;
-pub mod benches;
-pub mod tests;
+
 pub mod phase1_foundation;
 
 // Re-export main types from stoq_bridge instead

@@ -17,13 +17,12 @@ pub mod validation;
 
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
-use std::net::{SocketAddr, Ipv6Addr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn, debug, error};
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use serde::{Serialize, Deserialize};
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::bootstrap::PrivacyMode;
 use crate::network::stoq_integration::{MatrixStoqIntegration, MatrixNodeInfo};

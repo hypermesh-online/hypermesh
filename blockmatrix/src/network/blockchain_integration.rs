@@ -16,13 +16,12 @@
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{info, warn, debug};
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::blockchain::node_chain::NodeBlockchain;
-use crate::blockchain::block::Block;
 use trustchain::consensus::{
     ConsensusProof, ConsensusRequirements,
     StakeProof, TimeProof, SpaceProof, WorkProof
@@ -515,7 +514,7 @@ impl MatrixPositionValidator {
     /// Verify neighbor positions using TrustChain certificates
     pub async fn verify_neighbor_positions(
         &self,
-        center: &MatrixCoordinate,
+        _center: &MatrixCoordinate,
         neighbors: Vec<MatrixCoordinate>,
     ) -> Result<Vec<(MatrixCoordinate, bool)>> {
         let mut results = Vec::new();

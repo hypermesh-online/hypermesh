@@ -168,6 +168,7 @@ pub struct ThreatAssessment {
 }
 
 /// eBPF security manager
+#[allow(dead_code)] // Fields used during eBPF security operations
 pub struct EBPFSecurityManager {
     /// Loaded eBPF programs
     programs: Arc<RwLock<HashMap<String, EBPFProgram>>>,

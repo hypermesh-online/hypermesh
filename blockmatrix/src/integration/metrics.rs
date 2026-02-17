@@ -54,6 +54,7 @@ struct MetricsInner {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields populated during component lifecycle
 struct ComponentMetrics {
     status: String,
     start_time: Instant,

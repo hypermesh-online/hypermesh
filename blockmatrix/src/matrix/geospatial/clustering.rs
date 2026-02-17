@@ -8,7 +8,7 @@
 //! organizing nodes into geographic groups.
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::geospatial::hierarchy::{GeographicZone, GeographicLevel, GeographicBounds};
+use crate::matrix::geospatial::hierarchy::GeographicZone;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -154,7 +154,7 @@ impl GeographicClustering {
         // Initialize k clusters with random centroids
         let mut centroids = self.initialize_kmeans_centroids(nodes, k);
 
-        for iteration in 0..max_iterations {
+        for _iteration in 0..max_iterations {
             // Create empty clusters
             let mut new_clusters: Vec<Cluster> = (0..k)
                 .map(|i| Cluster::new(format!("kmeans_{}", i)))

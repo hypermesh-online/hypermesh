@@ -6,12 +6,12 @@
 //!
 //! Provides certificate validation and CA integration for package signing
 
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 
 // Import TrustChain types (will be available when integrated)
 // use trustchain::{TrustChainCA, CertificateRequest, IssuedCertificate};
@@ -48,6 +48,7 @@ struct CertificateCache {
 }
 
 /// Cached certificate entry
+#[allow(dead_code)] // Certificate cache fields
 #[derive(Clone)]
 struct CachedCertificate {
     /// Certificate data
@@ -112,6 +113,7 @@ pub struct CertificateValidation {
 }
 
 /// CA root certificate
+#[allow(dead_code)] // CA cert fields
 #[derive(Debug, Clone)]
 struct CACertificate {
     /// Root certificate
@@ -237,8 +239,9 @@ impl TrustChainIntegration {
         // Validate with TrustChain
         debug!("Validating certificate {} with TrustChain", fingerprint);
 
-        let request = ValidateCertificateRequest {
-            certificate: base64::encode(cert_bytes),
+        use base64::Engine;
+        let _request = ValidateCertificateRequest {
+            certificate: base64::engine::general_purpose::STANDARD.encode(cert_bytes),
             chain: vec![], // TODO: Include chain if available
             check_revocation: true,
             require_pqc: self.config.enable_pqc,
@@ -331,6 +334,7 @@ impl TrustChainIntegration {
         //     return Err(anyhow!("Revocation check failed: {}", response.status()));
         // }
 
+        #[allow(dead_code)] // Deserialization target for revocation response
         #[derive(Deserialize)]
         struct RevocationStatus {
             revoked: bool,

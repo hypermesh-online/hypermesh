@@ -10,7 +10,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{info, debug};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_neighbors, find_k_nearest};
@@ -160,7 +160,7 @@ impl BlockPropagator {
         let mut targets = Vec::new();
         for relay in relay_points {
             // Use routing to get path vector
-            let path = calculate_routing_path(&self.node_coordinate, &relay, 3.0);
+            let _path = calculate_routing_path(&self.node_coordinate, &relay, 3.0);
 
             // Find nodes close to the path (within distance 2)
             for node in network_nodes {

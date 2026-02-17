@@ -43,6 +43,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Container orchestration engine with MFN integration
+#[allow(dead_code)] // Fields used during container orchestration
 pub struct ContainerOrchestrator {
     /// Configuration
     config: ContainerConfig,

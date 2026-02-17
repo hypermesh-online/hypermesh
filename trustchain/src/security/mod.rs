@@ -22,8 +22,10 @@ pub mod monitoring;
 pub mod byzantine;
 pub mod alerts;
 
+#[allow(ambiguous_glob_reexports)]
 pub use monitoring::*;
 pub use byzantine::*;
+#[allow(ambiguous_glob_reexports)]
 pub use alerts::*;
 
 /// Security monitoring system with consensus integration

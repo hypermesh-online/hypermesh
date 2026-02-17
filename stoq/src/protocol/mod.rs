@@ -86,6 +86,8 @@ pub mod transport_params {
 struct ShardStorage {
     shards: Vec<PacketShard>,
     total_expected: u32,
+    /// Shard identifier for reassembly ordering
+    #[allow(dead_code)]
     shard_id: u32,
     last_update: std::time::Instant,
 }

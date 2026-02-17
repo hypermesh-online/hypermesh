@@ -137,7 +137,7 @@ impl GenesisAuthManager {
         let nonce = rand::thread_rng().gen::<[u8; 12]>();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| anyhow!("System time error: {}", e))?
             .as_secs();
 
         self.credentials = Some(GenesisCredentials {
@@ -202,7 +202,7 @@ impl GenesisAuthManager {
         // Clone encrypted data before dropping the mutable borrow
         let encrypted_totp_secret = creds.encrypted_totp_secret.clone();
         let encrypted_private_key = creds.encrypted_private_key.clone();
-        drop(creds); // Drop mutable borrow
+        // Mutable borrow of creds ends here (NLL)
 
         // Derive key to decrypt TOTP secret
         let password_key = self.derive_password_key(passphrase)?;
@@ -211,7 +211,8 @@ impl GenesisAuthManager {
 
         // Verify TOTP code
         if !self.verify_totp(&totp_secret_base32, totp_code)? {
-            let mut creds = self.credentials.as_mut().unwrap();
+            let creds = self.credentials.as_mut()
+                .ok_or_else(|| anyhow!("No credentials configured"))?;
             creds.failed_attempts += 1;
             warn!("Invalid TOTP code for user: {} (attempt {})", creds.user_id, creds.failed_attempts);
             return Err(anyhow!("Authentication failed: invalid TOTP code"));
@@ -224,12 +225,13 @@ impl GenesisAuthManager {
         let private_key = self.decrypt_data(&encrypted_private_key, &auth_key)?;
 
         // Reset failed attempts and update last auth
-        let mut creds = self.credentials.as_mut().unwrap();
+        let creds = self.credentials.as_mut()
+            .ok_or_else(|| anyhow!("No credentials configured"))?;
         creds.failed_attempts = 0;
         creds.last_auth = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .map_err(|e| anyhow!("System time error: {}", e))?
                 .as_secs()
         );
         let user_id = creds.user_id.clone();
@@ -271,9 +273,9 @@ impl GenesisAuthManager {
         // Clone data before verifying (to avoid borrow conflict)
         let user_id = creds.user_id.clone();
         let has_code = creds.recovery_code_hashes.contains(&code_hash);
-        drop(creds);
+        // Mutable borrow of creds ends here (NLL)
 
-        // Now verify after dropping mutable borrow
+        // Verify recovery code
         if !has_code {
             return Err(anyhow!("Recovery failed: invalid recovery code"));
         }
@@ -294,7 +296,8 @@ impl GenesisAuthManager {
         // This implementation updates only the TOTP secret (safe approach).
 
         // Update credentials
-        let mut creds = self.credentials.as_mut().unwrap();
+        let creds = self.credentials.as_mut()
+            .ok_or_else(|| anyhow!("No credentials configured"))?;
         creds.encrypted_totp_secret = encrypted_totp_secret;
         creds.failed_attempts = 0;
 
@@ -332,9 +335,9 @@ impl GenesisAuthManager {
                 // Generate 8-character alphanumeric codes
                 let code: String = (0..8)
                     .map(|_| {
-                        let chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude ambiguous chars
+                        let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude ambiguous chars
                         let idx = rand::thread_rng().gen_range(0..chars.len());
-                        chars.chars().nth(idx).unwrap()
+                        chars[idx] as char
                     })
                     .collect();
                 code
@@ -352,7 +355,8 @@ impl GenesisAuthManager {
 
     /// Derive key from passphrase using Argon2id
     fn derive_password_key(&self, passphrase: &str) -> Result<[u8; 32]> {
-        let salt = SaltString::encode_b64(b"genesis_auth_salt_fixed_for_derivation").unwrap();
+        let salt = SaltString::encode_b64(b"genesis_auth_salt_fixed_for_derivation")
+            .map_err(|e| anyhow!("Salt encoding failed: {}", e))?;
         let argon2 = Argon2::default();
         let hash = argon2
             .hash_password(passphrase.as_bytes(), &salt)
@@ -368,7 +372,8 @@ impl GenesisAuthManager {
     /// Derive authentication key from passphrase + TOTP secret
     fn derive_auth_key(&self, passphrase: &str, totp_secret: &str) -> Result<[u8; 32]> {
         let combined = format!("{}{}", passphrase, totp_secret);
-        let salt = SaltString::encode_b64(b"auth_key_salt_fixed_for_derivation").unwrap();
+        let salt = SaltString::encode_b64(b"auth_key_salt_fixed_for_derivation")
+            .map_err(|e| anyhow!("Salt encoding failed: {}", e))?;
         let argon2 = Argon2::default();
         let hash = argon2
             .hash_password(combined.as_bytes(), &salt)
@@ -420,7 +425,7 @@ impl GenesisAuthManager {
         // Get current time
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| anyhow!("System time error: {}", e))?
             .as_secs();
 
         // Calculate time step

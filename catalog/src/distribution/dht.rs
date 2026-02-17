@@ -93,6 +93,7 @@ impl Distance {
 }
 
 /// DHT Network implementation using Kademlia algorithm
+#[allow(dead_code)] // DHT fields for Kademlia operations
 pub struct DhtNetwork {
     /// Our node ID
     local_id: NodeId,
@@ -235,6 +236,7 @@ enum ValueData {
 type QueryId = [u8; 16];
 
 /// Pending query information
+#[allow(dead_code)] // Query tracking fields for DHT operations
 struct PendingQuery {
     /// Query type
     query_type: QueryType,
@@ -253,6 +255,7 @@ struct PendingQuery {
 }
 
 /// Query types
+#[allow(dead_code)] // DHT query type variants
 enum QueryType {
     FindNode,
     FindValue,
@@ -363,15 +366,15 @@ impl DhtNetwork {
     }
 
     /// Refresh routing table by looking up random nodes
-    async fn refresh_routing_table(routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
+    async fn refresh_routing_table(_routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
         // Generate random node ID and look it up
-        let random_id = NodeId::random();
+        let _random_id = NodeId::random();
         // TODO: Implement node lookup
         Ok(())
     }
 
     /// Republish stored values
-    async fn republish_values(value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
+    async fn republish_values(_value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
         // TODO: Implement value republishing
         Ok(())
     }
@@ -568,21 +571,21 @@ impl DhtNetwork {
     /// Store a value on a specific node
     async fn store_value_on_node(
         &self,
-        node: &NodeInfo,
-        key: ValueKey,
-        value: StoredValue,
+        _node: &NodeInfo,
+        _key: ValueKey,
+        _value: StoredValue,
     ) -> Result<()> {
-        // TODO: Implement store request
+        // Pending: store request implementation
         Ok(())
     }
 
     /// Query a value from a specific node
     async fn query_value_from_node(
         &self,
-        node: &NodeInfo,
-        key: &ValueKey,
+        _node: &NodeInfo,
+        _key: &ValueKey,
     ) -> Result<Vec<StoredValue>> {
-        // TODO: Implement value query
+        // Pending: value query implementation
         Ok(Vec::new())
     }
 }
@@ -687,6 +690,7 @@ impl ValueStore {
 }
 
 // Helper function for AssetPackageId
+#[allow(dead_code)] // Utility for DHT key operations
 fn asset_package_id_as_bytes(id: &AssetPackageId) -> &[u8] {
     id.as_bytes()
 }

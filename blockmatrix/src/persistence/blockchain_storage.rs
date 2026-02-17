@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn, error};
+use tracing::info;
 
 use crate::blockchain::block::Block;
 use crate::blockchain::node_chain::ChainStats;
@@ -74,6 +74,7 @@ pub enum BlockQuery {
 }
 
 /// Manages blockchain storage for a single node
+#[allow(dead_code)] // Fields used during blockchain persistence
 pub struct BlockchainStorage {
     /// Storage directory
     storage_dir: PathBuf,

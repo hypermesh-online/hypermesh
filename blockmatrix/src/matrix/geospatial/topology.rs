@@ -9,8 +9,7 @@
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::geospatial::converter::{GpsCoordinate, GpsConverter};
-use crate::matrix::geospatial::hierarchy::{GeographicZone, GeographicLevel};
-use crate::blockchain::node_chain::NodeBlockchain;
+use crate::matrix::geospatial::hierarchy::GeographicZone;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

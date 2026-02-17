@@ -302,6 +302,7 @@ pub enum RuntimeType {
 }
 
 /// Container Asset Adapter implementation
+#[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct ContainerAssetAdapter {
     /// Active container allocations by asset ID
     allocations: Arc<RwLock<HashMap<AssetId, ContainerAllocation>>>,
@@ -488,7 +489,7 @@ impl ContainerAssetAdapter {
     }
     
     /// Get container runtime statistics
-    async fn get_container_stats(&self, container_id: &str) -> ContainerRuntimeStats {
+    async fn get_container_stats(&self, _container_id: &str) -> ContainerRuntimeStats {
         // TODO: Implement actual stats collection from runtime
         ContainerRuntimeStats {
             cpu_usage_percent: 5.0,
@@ -532,6 +533,7 @@ impl ContainerAssetAdapter {
 
 /// Container operations for statistics
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // Variants for future container operation tracking
 enum ContainerOperation {
     Create,
     Destroy,

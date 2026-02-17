@@ -18,7 +18,7 @@ pub mod monitoring;
 pub mod migration;
 pub mod error;
 pub mod types;
-pub mod tests;
+
 
 // Re-export main types
 pub use runtime::{

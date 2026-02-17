@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::assets::core::AssetResult;
 
 /// Violation tracker for managing violations
+#[allow(dead_code)] // Fields used during violation tracking
 pub struct ViolationTracker {
     /// Recent violations
     recent_violations: Vec<PrivacyViolation>,

@@ -8,7 +8,6 @@
 //! Send retrieval instructions (shard maps), not the actual files.
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::matrix::MatrixCoordinate;
@@ -155,7 +154,7 @@ impl ContentAddress {
         shard_hashes: Vec<Hash>,
         shard_map: ShardMap,
     ) -> Self {
-        let reconstruction_order: Vec<usize> = (0..shard_hashes.len()).collect();
+        let _reconstruction_order: Vec<usize> = (0..shard_hashes.len()).collect();
 
         let retrieval_instructions = RetrievalInstructions::new(shard_map);
 

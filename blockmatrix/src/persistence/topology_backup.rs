@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use crate::matrix::geospatial::topology::{TopologyNode, TopologyEdge};
 use crate::matrix::geospatial::hierarchy::GeographicZone;
@@ -132,7 +132,7 @@ impl TopologyBackupData {
     /// Get size estimate
     pub fn size_estimate(&self) -> usize {
         let nodes_size: usize = self.nodes.iter()
-            .map(|(k, v)| k.len() + 100) // Rough estimate per node
+            .map(|(k, _v)| k.len() + 100) // Rough estimate per node
             .sum();
         let edges_size = self.edges.len() * 50;
         let zones_size = self.zones.len() * 200;
@@ -143,6 +143,7 @@ impl TopologyBackupData {
 }
 
 /// Handles topology backup and restore operations
+#[allow(dead_code)] // Fields used during backup operations
 pub struct TopologyBackup {
     /// Storage directory
     storage_dir: PathBuf,
@@ -228,7 +229,7 @@ impl TopologyBackup {
         }
 
         // Find changed edges
-        let current_edges: HashSet<_> = topology.edges()
+        let _current_edges: HashSet<_> = topology.edges()
             .map(|e| (e.source.clone(), e.target.clone()))
             .collect();
         let previous_edges: HashSet<_> = previous_backup.edges.iter()

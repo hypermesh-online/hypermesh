@@ -37,6 +37,7 @@ pub use types::{
 
 
 /// Security manager for HyperMesh
+#[allow(dead_code)] // Config field used during security operations
 pub struct SecurityManager {
     config: SecurityConfig,
 }

@@ -12,9 +12,10 @@ use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::Utc;
-use handlebars::{Handlebars, Helper, Context as HbContext, RenderContext, Output, HelperResult, Renderable};
+use handlebars::{Handlebars, Helper, Context as HbContext, RenderContext, Output, HelperResult};
 
 /// Template generator for creating asset packages
+#[allow(dead_code)] // Template fields for generation operations
 pub struct CatalogTemplateGenerator {
     /// Handlebars template engine
     handlebars: Handlebars<'static>,

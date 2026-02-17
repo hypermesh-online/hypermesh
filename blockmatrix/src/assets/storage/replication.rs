@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 use anyhow::Result;
 use std::collections::HashMap;
 
-use crate::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
+use crate::integration::phase1_foundation::MatrixFoundation;
 use crate::matrix::MatrixCoordinate;
 
 /// Replication configuration
@@ -109,7 +109,7 @@ impl PopularityMetrics {
     }
 
     /// Update metrics with new access
-    pub fn record_access(&mut self, accessor: &MatrixCoordinate) {
+    pub fn record_access(&mut self, _accessor: &MatrixCoordinate) {
         let now = chrono::Utc::now().timestamp();
 
         if self.first_access == 0 {
@@ -146,6 +146,7 @@ impl PopularityMetrics {
 }
 
 /// Replication strategy manager
+#[allow(dead_code)] // Fields used during replication operations
 pub struct ReplicationStrategy {
     /// Matrix foundation for geospatial operations
     foundation: Arc<MatrixFoundation>,

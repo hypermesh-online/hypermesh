@@ -16,7 +16,7 @@ use std::str::FromStr;
 
 use super::{
     stoq_transport::StoqTransportLayer,
-    dht::{DhtNetwork, NodeId, NodeInfo},
+    dht::{DhtNetwork, NodeId},
 };
 
 /// Peer discovery service
@@ -132,6 +132,7 @@ pub enum DiscoverySource {
 }
 
 /// mDNS discovery for local network
+#[allow(dead_code)] // mDNS config fields for local network discovery
 struct MdnsDiscovery {
     /// Service name
     service_name: String,
@@ -293,9 +294,8 @@ impl PeerDiscovery {
     /// Discover peers via DHT
     async fn discover_from_dht(&self) -> Result<()> {
         // Query DHT for random nodes to discover new peers
-        let random_id = NodeId::random();
+        let _random_id = NodeId::random();
         // Note: This would use the actual DHT lookup method
-        // For now, we'll skip the actual implementation
         Ok(())
     }
 
@@ -493,6 +493,7 @@ impl MdnsDiscovery {
 }
 
 // Helper for parsing IPv6 addresses
+#[allow(dead_code)] // Utility for IPv6 parsing in discovery
 fn parse_ipv6_addr(s: &str) -> Result<Ipv6Addr> {
     s.parse().context("Invalid IPv6 address")
 }

@@ -27,7 +27,7 @@ use std::time::{Duration, Instant, SystemTime};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use anyhow::{Result, Context as AnyhowContext};
-use tracing::{info, debug, warn, error, instrument};
+use tracing::{info, debug, warn, instrument};
 use serde::{Serialize, Deserialize};
 
 // Sub-modules for integration layer
@@ -97,21 +97,19 @@ pub use performance::{
 };
 
 // Import Phase 1 Foundation
-use crate::integration::phase1_foundation::{MatrixFoundation, MatrixNode};
-use crate::matrix::{MatrixCoordinate, tensor::Vector3D};
+use crate::integration::phase1_foundation::MatrixFoundation;
+use crate::matrix::MatrixCoordinate;
 
 // Import Sprint 2.1: STOQ Protocol Intelligence
 use stoq::{
-    StoqTransport, Connection, Endpoint, StoqApiClient,
-    StoqProtocolExtension, PacketToken, PacketShard,
+    StoqTransport, Connection, Endpoint,
     NetworkIsolationManager, StoqPrivacyTier
 };
 
 // Import Sprint 2.2: Privacy Tiers
 use crate::assets::privacy::{
-    PrivacyManager, PrivacyAllocationType, CaesarRewardConfig,
-    CaesarRewardCalculator, PrivacyEnforcer, AccessControlResult,
-    ResourceAllocationConfig, PayoutFrequency
+    PrivacyManager,
+    CaesarRewardCalculator,
 };
 use crate::assets::core::{
     PrivacyLevel, AssetId, NetworkScope, AssetCategory,
@@ -120,8 +118,8 @@ use crate::assets::core::{
 
 // Import Sprint 2.3: Multi-Network Participation
 use crate::assets::multi_node::{
-    MultiNetworkCoordinator, NetworkId, NetworkMembership,
-    PrivacyTier, CrossNetworkValidator, IsolationReport
+    MultiNetworkCoordinator, NetworkId,
+    PrivacyTier, CrossNetworkValidator,
 };
 
 // Import Sprint 2.4: Asset Pipeline
@@ -134,8 +132,8 @@ use crate::assets::pipeline::orchestrator::PipelineStages;
 
 // Import Sprint 2.5: Content-Addressed Storage
 use crate::assets::storage::{
-    ContentAddressedStorage, ContentAddress, RetrievalInstructions,
-    DeduplicationResult, StorageStats, Hash
+    ContentAddressedStorage, ContentAddress,
+    DeduplicationResult,
 };
 
 /// Asset handle returned after processing
@@ -220,6 +218,7 @@ pub struct IntelligenceLayer {
     stoq_transport: Arc<StoqTransport>,
 
     /// Network isolation manager
+    #[allow(dead_code)] // Used for future network isolation enforcement
     network_isolation: Arc<NetworkIsolationManager>,
 
     // Sprint 2.2: Privacy Tiers
@@ -234,6 +233,7 @@ pub struct IntelligenceLayer {
     network_coordinator: Arc<MultiNetworkCoordinator>,
 
     /// Cross-network validator
+    #[allow(dead_code)] // Used for future cross-network asset validation
     cross_validator: Arc<CrossNetworkValidator>,
 
     // Sprint 2.4: Asset Pipeline
@@ -246,9 +246,11 @@ pub struct IntelligenceLayer {
 
     // Integration Components
     /// Component integration manager
+    #[allow(dead_code)] // Used for future component health monitoring
     component_integration: Arc<ComponentIntegration>,
 
     /// Performance monitor
+    #[allow(dead_code)] // Used for future performance tracking dashboard
     performance_monitor: Arc<PerformanceMonitor>,
 
     /// Integration validator
@@ -428,7 +430,7 @@ impl IntelligenceLayer {
         );
 
         // Step 1: Map privacy tier to privacy level
-        let privacy_level = self.map_privacy_tier_to_level(&privacy_tier);
+        let _privacy_level = self.map_privacy_tier_to_level(&privacy_tier);
 
         // Note: Privacy validation happens at the application layer, not in the
         // integration layer. The integration layer orchestrates components and
@@ -622,7 +624,7 @@ impl IntelligenceLayer {
         // Step 2: Find nearest matrix positions with shards
         // MatrixFoundation has find_k_nearest_nodes() method
         let shard_count = instructions.shard_map.len();
-        let nearest_positions = self.matrix_foundation
+        let _nearest_positions = self.matrix_foundation
             .find_k_nearest_nodes(&requester_position, shard_count)
             .await;
 
@@ -633,7 +635,7 @@ impl IntelligenceLayer {
             if let Some(first_pos) = positions.first() {
                 // StoqTransport doesn't have connect_with_tier, use connect()
                 // Use localhost as a placeholder for matrix coordinates
-                let endpoint = stoq::Endpoint {
+                let _endpoint = stoq::Endpoint {
                     address: std::net::Ipv6Addr::LOCALHOST,
                     port: 9292,
                     server_name: Some(format!("matrix://[{}:{}:{}]", first_pos.x, first_pos.y, first_pos.z)),
@@ -641,7 +643,7 @@ impl IntelligenceLayer {
 
                 // Note: StoqTransport.connect() doesn't exist in our stub, simplify for now
                 // In production, this would use the actual STOQ connection
-                let shard_id = hex::encode(shard_hash);
+                let _shard_id = hex::encode(shard_hash);
                 let shard_data = vec![0u8; 1024]; // Placeholder
 
                 retrieved_shards.push(shard_data);
@@ -723,6 +725,7 @@ impl IntelligenceLayer {
     }
 
     /// Map privacy tier to STOQ privacy tier
+    #[allow(dead_code)] // Used for future STOQ protocol integration
     fn map_privacy_tier_to_stoq(&self, tier: &PrivacyTier) -> StoqPrivacyTier {
         match tier {
             PrivacyTier::Anonymous => StoqPrivacyTier::Anonymous,
@@ -770,7 +773,7 @@ impl IntelligenceLayer {
     async fn calculate_optimal_positions(
         &self,
         processed: &ProcessedAsset,
-        privacy_tier: PrivacyTier,
+        _privacy_tier: PrivacyTier,
         network_count: usize,
     ) -> Result<Vec<MatrixCoordinate>> {
         // MatrixFoundation doesn't have calculate_shard_positions
@@ -790,11 +793,12 @@ impl IntelligenceLayer {
     }
 
     /// Retrieve shard via STOQ protocol
+    #[allow(dead_code)] // Used for future STOQ shard retrieval
     async fn retrieve_shard_via_stoq(
         &self,
-        connection: Connection,
-        shard_id: String,
-        privacy_tier: &PrivacyTier,
+        _connection: Connection,
+        _shard_id: String,
+        _privacy_tier: &PrivacyTier,
     ) -> Result<Vec<u8>> {
         // Simplified shard retrieval - in production this would use actual STOQ protocol
         // For now, return placeholder data
@@ -857,6 +861,7 @@ impl IntelligenceLayer {
 }
 
 // Extension trait for PrivacyTier to get replication factor
+#[allow(dead_code)] // Used for future shard replication strategy
 trait PrivacyTierExt {
     fn replication_factor(&self) -> usize;
 }
@@ -873,6 +878,7 @@ impl PrivacyTierExt for PrivacyTier {
 }
 
 // Extension trait for MatrixCoordinate to create endpoint
+#[allow(dead_code)] // Used for future matrix-to-network endpoint mapping
 trait MatrixCoordinateExt {
     fn to_endpoint(&self) -> Endpoint;
 }

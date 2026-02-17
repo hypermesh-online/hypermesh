@@ -401,7 +401,7 @@ impl ContainerRuntime {
     pub async fn delete(&self, id: &ContainerId) -> Result<()> {
         // Remove from container registry
         let mut containers = self.containers.write().await;
-        let handle = containers.remove(id)
+        let _handle = containers.remove(id)
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
         drop(containers);
 

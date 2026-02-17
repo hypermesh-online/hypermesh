@@ -22,7 +22,6 @@
 //! - Storage Savings: 10x reduction for viral content
 //! - Matrix Placement: Shards within 5 hops of requester
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
@@ -44,13 +43,13 @@ pub use content_address::{ContentAddress, RetrievalInstructions, ShardMap, Conte
 pub use replication::{ReplicationStrategy, ReplicationConfig, PopularityMetrics};
 
 use crate::integration::phase1_foundation::MatrixFoundation;
-use crate::matrix::MatrixCoordinate;
-use crate::assets::pipeline::{Shard, ShardingStats};
+use crate::assets::pipeline::Shard;
 
 /// Hash type (SHA-256)
 pub type Hash = [u8; 32];
 
 /// Content-addressed storage system
+#[allow(dead_code)] // Fields used during storage operations
 pub struct ContentAddressedStorage {
     /// Deduplication engine
     deduplication: Arc<RwLock<DeduplicationEngine>>,

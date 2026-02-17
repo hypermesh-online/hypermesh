@@ -11,7 +11,7 @@ use anyhow::{Result, Context};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, VecDeque};
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use serde::{Serialize, Deserialize};
 
 /// Cache statistics
@@ -154,6 +154,7 @@ impl LRUCache {
         self.current_size = 0;
     }
 
+    #[allow(dead_code)] // Cache size accessor
     fn len(&self) -> usize {
         self.entries.len()
     }
@@ -322,7 +323,7 @@ impl PackageCache {
     pub async fn initialize(&self) -> Result<()> {
         // Initialize L3 cache if path is provided
         if let Some(path) = &self.l3_cache_path {
-            let disk_cache = DiskCache::new(path.clone(), 1000).await?; // 1GB default
+            let _disk_cache = DiskCache::new(path.clone(), 1000).await?; // 1GB default
             // Note: In actual implementation, would store this properly
         }
         Ok(())
@@ -351,7 +352,7 @@ impl PackageCache {
 
                 // Promote to L1
                 let mut l1 = self.l1_cache.write().await;
-                if let Some(evicted) = l1.insert(Arc::clone(key), Arc::clone(&package)) {
+                if let Some(_evicted) = l1.insert(Arc::clone(key), Arc::clone(&package)) {
                     // Move evicted to L2 (it's already there, just update)
                     drop(l1);
                 }

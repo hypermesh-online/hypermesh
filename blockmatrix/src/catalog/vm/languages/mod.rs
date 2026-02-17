@@ -51,6 +51,7 @@ const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
 ];
 
 /// Multi-language support coordinator
+#[allow(dead_code)] // Fields used during multi-language execution
 pub struct MultiLanguageSupport {
     /// Consensus VM for proof validation
     consensus_vm: Arc<RwLock<ConsensusVM>>,
@@ -469,7 +470,7 @@ impl MultiLanguageSupport {
     
     /// Create language adapter based on type
     async fn create_language_adapter(
-        lang_id: &str,
+        _lang_id: &str,
         adapter_type: &str,
         consensus_vm: Arc<RwLock<ConsensusVM>>,
         consensus_bridge: Arc<ConsensusBridge>,

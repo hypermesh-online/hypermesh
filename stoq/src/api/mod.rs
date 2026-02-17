@@ -283,7 +283,7 @@ impl StoqApiClient {
     }
 
     /// Set TrustChain DNS client for service discovery
-    pub fn set_trustchain_dns(&mut self, client: Arc<dyn service_discovery::TrustChainDnsClient>) {
+    pub fn set_trustchain_dns(&mut self, _client: Arc<dyn service_discovery::TrustChainDnsClient>) {
         // This would require making service_discovery mutable or using interior mutability
         // For now, we'll log that TrustChain DNS integration is pending
         info!("TrustChain DNS client configuration pending - requires mutable service discovery");

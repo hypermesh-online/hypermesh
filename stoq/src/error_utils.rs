@@ -8,7 +8,6 @@
 //! well-structured errors with proper context throughout the STOQ stack.
 
 use crate::errors::*;
-use std::net::SocketAddr;
 
 /// Transport error builder for structured error construction
 pub struct TransportErrorBuilder {

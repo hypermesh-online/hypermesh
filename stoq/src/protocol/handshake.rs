@@ -204,8 +204,6 @@ impl StoqHandshakeExtension {
 
     /// Validate PoS token during handshake
     pub fn validate_pos_token(&self, token: &PosToken) -> Result<ValidationResult> {
-        let start = std::time::Instant::now();
-
         // Perform validation
         let result = self.pos_validator.validate_token(token)?;
 
@@ -237,7 +235,7 @@ impl StoqHandshakeExtension {
     /// Add PoS token validation to handshake flow
     pub fn process_handshake_with_pos(
         &self,
-        handshake_data: &[u8],
+        _handshake_data: &[u8],
         pos_token: Option<&PosToken>,
     ) -> Result<bool> {
         // First, do traditional handshake validation
@@ -324,7 +322,8 @@ impl StoqHandshakeExtension {
 
 /// STOQ-enhanced QUIC crypto session
 pub struct StoqCryptoSession {
-    /// Base crypto session
+    /// Base crypto session (retained for future QUIC crypto trait integration)
+    #[allow(dead_code)]
     inner: Box<dyn Session>,
 
     /// STOQ handshake extension

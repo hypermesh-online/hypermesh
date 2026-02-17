@@ -313,8 +313,8 @@ impl ConsensusVMPrimitive {
         &self,
         vm: &mut ConsensusVM,
     ) -> Result<ConsensusExecutionResult> {
-        let start_time = SystemTime::now();
-        
+        let _start_time = SystemTime::now();
+
         match self {
             ConsensusVMPrimitive::Load { asset_id, space_proof } => {
                 // Create minimal consensus proof with space validation

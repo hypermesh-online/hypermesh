@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! DNS-over-QUIC Implementation (DEPRECATED)
-//! 
+//!
 //! This module provides legacy DNS-over-QUIC support while migrating to STOQ transport.
 //! All new implementations should use dns_over_stoq.rs instead.
 
@@ -15,9 +15,12 @@ use crate::errors::{DnsError, Result as TrustChainResult};
 /// DEPRECATED: DNS-over-QUIC client (use STOQ transport instead)
 #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]
 pub struct DnsOverQuicClient {
+    /// Server identifier (retained for API compatibility)
+    #[allow(dead_code)]
     server_id: String,
 }
 
+#[allow(deprecated)]
 impl DnsOverQuicClient {
     /// Create new DNS-over-QUIC client
     #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]
@@ -42,6 +45,7 @@ pub struct DnsOverQuicServer {
     bind_addr: SocketAddrV6,
 }
 
+#[allow(deprecated)]
 impl DnsOverQuicServer {
     /// Create new DNS-over-QUIC server
     #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]

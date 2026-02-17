@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use tracing::{info, warn, error, debug};
+use tracing::debug;
 
 // Import network types from parent module
 use super::trust::{NetworkId, NetworkType};
@@ -162,6 +162,7 @@ impl std::fmt::Display for ViolationType {
 
 /// Connection pool for isolated network connections
 #[derive(Debug)]
+#[allow(dead_code)] // Fields used during connection pooling
 pub struct ConnectionPool {
     /// Network this pool belongs to
     pub network_id: NetworkId,

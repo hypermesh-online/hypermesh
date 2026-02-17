@@ -385,7 +385,7 @@ impl ProxyRouter {
     async fn select_best_route(
         &self,
         routes: &[ProxyRoute],
-        request: &RouteRequest,
+        _request: &RouteRequest,
     ) -> AssetResult<ProxyRoute> {
         let metrics = self.route_metrics.read().await;
         let registry = self.node_registry.read().await;

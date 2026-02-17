@@ -4,7 +4,7 @@
 
 use http::{Request, Response, header::HeaderValue};
 use std::time::Instant;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 pub struct RequestLogger;
@@ -49,14 +49,19 @@ impl RequestLogger {
     }
 }
 
+/// Default CORS origin used when no specific origin is configured
+pub const DEFAULT_CORS_ORIGIN: &str = "http://localhost:5173";
+
 pub fn add_cors_headers<B>(response: &mut Response<B>) {
+    add_cors_headers_with_origin(response, DEFAULT_CORS_ORIGIN);
+}
+
+pub fn add_cors_headers_with_origin<B>(response: &mut Response<B>, origin: &str) {
     let headers = response.headers_mut();
 
-    // Safe: All header values are valid static strings that cannot fail
-    headers.insert(
-        http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        HeaderValue::from_static("http://localhost:5173"),
-    );
+    if let Ok(origin_val) = origin.parse() {
+        headers.insert(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, origin_val);
+    }
     headers.insert(
         http::header::ACCESS_CONTROL_ALLOW_METHODS,
         HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),

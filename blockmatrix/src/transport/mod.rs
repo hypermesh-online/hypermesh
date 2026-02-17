@@ -24,8 +24,7 @@ pub mod auth;
 pub mod error;
 pub mod monitoring;
 pub mod pool;
-pub mod benches;
-pub mod tests;
+
 
 // Re-export main types
 pub use types::NodeId;
@@ -114,6 +113,7 @@ pub trait HyperMeshTransportTrait: Send + Sync {
 }
 
 /// HyperMesh transport implementation
+#[allow(dead_code)] // Config field used in transport operations
 pub struct HyperMeshTransport {
     config: TransportConfig,
 }

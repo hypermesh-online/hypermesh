@@ -17,6 +17,7 @@ use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, Acce
 use super::{ProofValidator, ProofRequirement, VMConsensusContext};
 
 /// Validator for Proof of Space - WHERE operations occur
+#[allow(dead_code)] // Fields used during space proof validation
 pub struct SpaceProofValidator {
     /// Minimum space commitment required (bytes)
     min_space_commitment: u64,
@@ -236,6 +237,7 @@ impl ProofValidator<StakeProof> for StakeProofValidator {
 }
 
 /// Validator for Proof of Work - WHAT/HOW computational work was done
+#[allow(dead_code)] // Fields used during work proof validation
 pub struct WorkProofValidator {
     /// Minimum difficulty required
     min_difficulty: u32,
@@ -279,6 +281,7 @@ impl WorkProofValidator {
     }
     
     /// Count leading zero bits in hash
+    #[allow(dead_code)] // Will be used for difficulty validation
     fn count_leading_zeros(&self, hash: &[u8; 32]) -> usize {
         let mut zeros = 0;
         for byte in hash {
@@ -293,6 +296,7 @@ impl WorkProofValidator {
     }
     
     /// Validate resource type is supported
+    #[allow(dead_code)] // Will be used for resource type validation
     async fn validate_resource_type(&self, resource_type: &str) -> Result<bool> {
         Ok(self.valid_resource_types.contains(&resource_type.to_string()))
     }

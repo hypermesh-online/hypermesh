@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 use bytes::{Buf, Bytes};
 use h3::server::Connection as H3Connection;
 use h3_quinn::quinn;
-use http::{Request, Response, StatusCode};
-use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use http::{Request, Response};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
@@ -113,7 +113,7 @@ async fn handle_connection(
     loop {
         // Accept incoming request
         match h3_conn.accept().await {
-            Ok(Some(mut resolver)) => {
+            Ok(Some(resolver)) => {
                 let router = router.clone();
 
                 // Spawn task to handle request

@@ -9,7 +9,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::collections::HashMap;
 
 // Use local Catalog AssetPackage
 use crate::assets::AssetPackage;
@@ -121,7 +120,7 @@ impl StaticSecurityScanner {
     }
 
     /// Check for known vulnerabilities in BlockMatrix Asset
-    fn check_vulnerabilities(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
+    fn check_vulnerabilities(&self, _asset: &AssetPackage) -> Vec<Vulnerability> {
         let mut vulnerabilities = Vec::new();
 
         // Check dependencies for known vulnerabilities from BlockMatrix Asset metadata

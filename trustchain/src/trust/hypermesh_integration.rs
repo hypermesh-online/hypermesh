@@ -35,6 +35,7 @@ pub struct HyperMeshTrustValidator {
 }
 
 /// HyperMesh asset client for trust validation
+#[allow(dead_code)]
 pub struct HyperMeshAssetClient {
     /// Connection to HyperMesh network
     network_client: Arc<HyperMeshNetworkClient>,
@@ -45,6 +46,7 @@ pub struct HyperMeshAssetClient {
 }
 
 /// Byzantine fault detector for malicious nodes
+#[allow(dead_code)]
 pub struct ByzantineDetector {
     /// Known node behaviors
     node_behaviors: Arc<DashMap<NodeId, NodeBehavior>>,
@@ -59,6 +61,7 @@ pub struct ByzantineDetector {
 }
 
 /// Remote proxy manager for NAT-like asset addressing
+#[allow(dead_code)]
 pub struct RemoteProxyManager {
     /// Active proxy connections
     proxy_connections: Arc<DashMap<ProxyId, ProxyConnection>>,
@@ -71,6 +74,7 @@ pub struct RemoteProxyManager {
 }
 
 /// Trust scoring engine for assets and nodes
+#[allow(dead_code)]
 pub struct TrustScoringEngine {
     /// Historical trust data
     trust_history: Arc<DashMap<EntityId, TrustHistory>>,
@@ -347,10 +351,10 @@ struct TrustHistory;
 struct ScoringAlgorithms;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct ProxyPerformanceMetrics;
+pub struct ProxyPerformanceMetrics;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct SecurityContext;
+pub struct SecurityContext;
 
 impl HyperMeshTrustValidator {
     /// Create new HyperMesh trust validator
@@ -518,6 +522,7 @@ struct ByzantineBehaviorAnalysis {
 }
 
 /// Proxy candidate for selection
+#[allow(dead_code)]
 struct ProxyCandidate {
     node_id: NodeId,
     trust_score: TrustScore,

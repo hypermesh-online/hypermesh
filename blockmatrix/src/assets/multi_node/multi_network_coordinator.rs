@@ -19,8 +19,6 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use async_trait::async_trait;
-
 use crate::assets::core::{AssetId, AssetResult, AssetError, ConsensusProof};
 use super::NodeId;
 
@@ -120,6 +118,7 @@ impl StoqIsolationManager {
 }
 
 /// Network asset router - matrix-based routing for assets
+#[allow(dead_code)] // Fields used during asset routing
 pub struct NetworkAssetRouter {
     /// Network ID
     network_id: NetworkId,
