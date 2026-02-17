@@ -70,10 +70,12 @@ export const crateStatuses: CrateStatus[] = [
         "Live multi-chain bridge (BTC/ETH/SOL)",
         "Fiat payment processing",
         "Reward distribution system",
-        "Gold peg stabilization mechanism"
+        "Gold peg stabilization mechanism",
+        "Actual stake storage implementation",
+        "Balance lookup service (actual implementation)"
       ]
     },
-    "completion": 50
+    "completion": 44
   },
   {
     "id": "catalog",
