@@ -47,6 +47,9 @@ name = "phase1_bench"
 harness = false
 
 [dependencies]
+# Shared types (single source of truth)
+hypermesh-lib = { workspace = true }
+
 # Core dependencies
 tokio = { workspace = true }
 tokio-util = { workspace = true }
@@ -66,7 +69,7 @@ lazy_static = { workspace = true }
 
 # TrustChain - Consensus and certificate system
 # NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
-trustchain = { path = "../trustchain" }
+trustchain = { path = "../trustchain", features = ["localhost-testing"] }
 
 # Blockchain dependencies already included below
 
@@ -88,6 +91,9 @@ blake3 = { workspace = true }
 hex = { workspace = true }
 ed25519-dalek = { workspace = true }
 aes-gcm = { workspace = true }
+pqcrypto-falcon = { workspace = true }
+pqcrypto-kyber = { workspace = true }
+pqcrypto-traits = { workspace = true }
 argon2 = "0.5"
 chacha20poly1305 = "0.10"
 hmac = "0.12"
@@ -189,3 +195,4 @@ ctor = "0.2"  # Test initialization functions
 default = ["consensus", "assets"]
 consensus = []
 assets = []
+multi-node = []

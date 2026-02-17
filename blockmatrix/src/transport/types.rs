@@ -9,6 +9,8 @@ use std::fmt;
 use std::net::Ipv6Addr;
 
 /// Canonical node identifier for HyperMesh network
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(pub String), this has {name, id, address, pub_key} fields)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct NodeId {
     /// Human-readable node name

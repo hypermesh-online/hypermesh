@@ -96,6 +96,8 @@ pub enum AssetType {
     Library,
 }
 
+// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
+// (lib uses AssetId(String), this uses {uuid, asset_type, network_id})
 /// Asset identification in HyperMesh
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AssetId {
@@ -104,6 +106,8 @@ pub struct AssetId {
     pub network_id: String,
 }
 
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(String), this uses {public_key, network_address, node_type})
 /// Node identification in HyperMesh
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NodeId {

@@ -30,6 +30,8 @@ pub struct StorageAccessValidation {
 }
 
 /// Proof types in Four-Proof consensus
+// TODO: Migrate to hypermesh_lib::ProofType once variant names are unified
+// (lib uses Space/Stake/Work/Time, this uses PoSpace/PoStake/PoWork/PoTime)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProofType {
     /// Proof of Space (WHERE)

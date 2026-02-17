@@ -115,6 +115,8 @@ pub use matrix_integration::{
 };
 
 /// Asset identifier for VM operations
+// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
+// (lib uses AssetId(pub String), this uses type alias to Uuid)
 pub type AssetId = Uuid;
 
 /// VM configuration with consensus requirements

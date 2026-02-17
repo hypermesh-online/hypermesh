@@ -78,14 +78,60 @@ pub enum BlockchainScope {
 /// Proof of State proof types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
-    /// WHERE - storage location and physical/network location
-    PoSpace,
-    /// WHO - ownership, access rights, economic stake
-    PoStake,
-    /// WHAT/HOW - computational resources and processing
-    PoWork,
-    /// WHEN - temporal ordering and timestamp validation
-    PoTime,
+    /// WHERE - storage location and physical/network location (PoSpace)
+    Space,
+    /// WHO - ownership, access rights, economic stake (PoStake)
+    Stake,
+    /// WHAT/HOW - computational resources and processing (PoWork)
+    Work,
+    /// WHEN - temporal ordering and timestamp validation (PoTime)
+    Time,
+}
+
+impl fmt::Display for ProofType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProofType::Space => write!(f, "ProofOfSpace"),
+            ProofType::Stake => write!(f, "ProofOfStake"),
+            ProofType::Work => write!(f, "ProofOfWork"),
+            ProofType::Time => write!(f, "ProofOfTime"),
+        }
+    }
+}
+
+impl fmt::Display for NetworkPrivacyTier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NetworkPrivacyTier::Anonymous => write!(f, "Anonymous"),
+            NetworkPrivacyTier::P2P => write!(f, "P2P"),
+            NetworkPrivacyTier::Federated => write!(f, "Federated"),
+            NetworkPrivacyTier::Public => write!(f, "Public"),
+        }
+    }
+}
+
+impl fmt::Display for BlockchainScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BlockchainScope::Device => write!(f, "Device"),
+            BlockchainScope::User => write!(f, "User"),
+            BlockchainScope::Group => write!(f, "Group"),
+            BlockchainScope::Organization => write!(f, "Organization"),
+            BlockchainScope::Federation => write!(f, "Federation"),
+            BlockchainScope::Public => write!(f, "Public"),
+        }
+    }
+}
+
+impl fmt::Display for PipelineStage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PipelineStage::Compress => write!(f, "Compress"),
+            PipelineStage::Encrypt => write!(f, "Encrypt"),
+            PipelineStage::Shard => write!(f, "Shard"),
+            PipelineStage::Distribute => write!(f, "Distribute"),
+        }
+    }
 }
 
 /// Matrix coordinate in Block-MATRIX topology

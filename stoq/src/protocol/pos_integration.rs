@@ -71,6 +71,8 @@ impl PrivacyTier {
 }
 
 /// Matrix position for shard addressing
+// TODO: Migrate to hypermesh_lib::MatrixPosition once field compatibility is resolved
+// (lib uses f64 coordinates, this uses i64 coordinates and has methods)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MatrixPosition {
     pub x: i64,

@@ -10,25 +10,12 @@ use crate::consensus::ConsensusConfig;
 use crate::container::config::ContainerConfig as ContainerRuntimeConfig;
 use crate::security::config::SecurityConfig;
 use crate::orchestration::HyperMeshIntegrationConfig as OrchestrationConfig;
-// Temporarily comment out STOQ
-// use stoq::StoqConfig;
-
-/// Temporary placeholder for StoqConfig
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoqConfig {
-    pub enabled: bool,
-}
-
-impl Default for StoqConfig {
-    fn default() -> Self {
-        Self { enabled: false }
-    }
-}
+pub use stoq::StoqConfig;
 
 /// Main HyperMesh platform configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HyperMeshConfig {
-    /// STOQ protocol configuration (placeholder)
+    /// STOQ protocol configuration
     pub stoq: StoqConfig,
     /// Transport layer configuration
     pub transport: TransportConfig,

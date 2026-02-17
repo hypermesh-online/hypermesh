@@ -10,6 +10,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 /// NodeId represents a unique identifier for a node in the network
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(pub String), this uses type alias to [u8; 32])
 pub type NodeId = [u8; 32];
 
 /// NetworkId represents a unique identifier for a federated network

@@ -14,6 +14,9 @@ use std::time::{Duration, SystemTime};
 use super::proof::{Proof, StakeProof, TimeProof, SpaceProof, WorkProof};
 use super::ConsensusProof;
 
+// Re-export ProofType from canonical shared lib (single source of truth)
+pub use hypermesh_lib::ProofType;
+
 /// Detailed validation result for all four proofs
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ProofValidation {
@@ -41,15 +44,6 @@ pub struct ValidationError {
     pub proof_type: ProofType,
     pub error_message: String,
     pub error_code: ErrorCode,
-}
-
-/// Proof type enumeration
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ProofType {
-    Space,
-    Stake,
-    Work,
-    Time,
 }
 
 /// Error codes for validation failures

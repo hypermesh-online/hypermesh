@@ -81,6 +81,74 @@ impl Default for STOQTransportConfig {
     }
 }
 
+/// Parse the DNS question section to extract the domain name and query type.
+///
+/// DNS question section starts at byte offset 12 (after the 12-byte header).
+/// Domain names are encoded as a sequence of length-prefixed labels, terminated
+/// by a zero-length label. The query type follows as a 2-byte big-endian value.
+fn parse_dns_question_section(query_data: &[u8]) -> TrustChainResult<(String, u16)> {
+    let mut offset = 12; // Skip DNS header
+    let mut labels: Vec<String> = Vec::new();
+
+    loop {
+        if offset >= query_data.len() {
+            return Err(TrustChainError::DNSError {
+                operation: "parse_dns_question".to_string(),
+                reason: "Query data truncated while parsing domain name".to_string(),
+            });
+        }
+
+        let label_len = query_data[offset] as usize;
+        offset += 1;
+
+        if label_len == 0 {
+            break;
+        }
+
+        if label_len > 63 {
+            return Err(TrustChainError::DNSError {
+                operation: "parse_dns_question".to_string(),
+                reason: format!("Invalid DNS label length: {} (max 63)", label_len),
+            });
+        }
+
+        if offset + label_len > query_data.len() {
+            return Err(TrustChainError::DNSError {
+                operation: "parse_dns_question".to_string(),
+                reason: "Query data truncated within label".to_string(),
+            });
+        }
+
+        let label = std::str::from_utf8(&query_data[offset..offset + label_len])
+            .map_err(|_| TrustChainError::DNSError {
+                operation: "parse_dns_question".to_string(),
+                reason: "DNS label contains invalid UTF-8".to_string(),
+            })?;
+
+        labels.push(label.to_string());
+        offset += label_len;
+    }
+
+    if offset + 2 > query_data.len() {
+        return Err(TrustChainError::DNSError {
+            operation: "parse_dns_question".to_string(),
+            reason: "Query data truncated: missing query type".to_string(),
+        });
+    }
+
+    let query_type = u16::from_be_bytes([query_data[offset], query_data[offset + 1]]);
+    let domain = labels.join(".");
+
+    if domain.is_empty() {
+        return Err(TrustChainError::DNSError {
+            operation: "parse_dns_question".to_string(),
+            reason: "Parsed domain name is empty".to_string(),
+        });
+    }
+
+    Ok((domain, query_type))
+}
+
 impl STOQTransport {
     /// Create new STOQ transport for DNS (architectural compliance)
     pub async fn new(config: &super::DnsConfig) -> TrustChainResult<Self> {
@@ -204,14 +272,16 @@ impl STOQTransport {
         }
 
         let query_id = u16::from_be_bytes([query_data[0], query_data[1]]);
-        
-        // For now, create a basic STOQ query
-        // In production, this would fully parse the DNS packet
+        let flags = u16::from_be_bytes([query_data[2], query_data[3]]);
+
+        // Parse domain name from DNS question section (starts at byte 12)
+        let (domain, query_type) = parse_dns_question_section(query_data)?;
+
         Ok(crate::stoq_client::StoqDnsQuery {
             query_id,
-            domain: "example.com".to_string(), // TODO: Parse actual domain
-            query_type: 1, // A record - TODO: Parse actual type
-            flags: 0x0100, // Standard recursion desired
+            domain,
+            query_type,
+            flags,
             client_ip: self.config.bind_address,
         })
     }

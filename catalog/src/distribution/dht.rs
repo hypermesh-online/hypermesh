@@ -18,6 +18,8 @@ use crate::assets::AssetPackageId;
 use super::stoq_transport::{StoqTransportLayer, RequestType, ResponseData, PackageAnnouncement};
 
 /// Node ID in the DHT network (256-bit)
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(pub String), this uses NodeId { id: [u8; 32] } with DHT methods)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId {
     id: [u8; 32],

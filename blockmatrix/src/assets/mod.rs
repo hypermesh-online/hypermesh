@@ -36,6 +36,7 @@ pub use privacy::{
     PrivacyManager, ResourceAllocation,
 };
 
+#[cfg(feature = "multi-node")]
 pub use multi_node::{
     MultiNodeCoordinator, NodeInfo, NodeCapabilities,
     ConsensusManager, ConsensusDecision, NetworkTopology,

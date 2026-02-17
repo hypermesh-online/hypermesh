@@ -11,6 +11,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use tracing::{info, debug, warn, instrument};
+use x509_parser::prelude::FromDer;
 
 use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
 use stoq::StoqApiServer;
@@ -168,6 +169,37 @@ impl ApiHandler for ValidateCertificateHandler {
     }
 }
 
+/// Extract the Common Name (CN) from a PEM-encoded Certificate Signing Request.
+///
+/// Parses the PEM to DER, then extracts the subject CN from the CSR's
+/// distinguished name fields. Returns an error if the CSR cannot be parsed
+/// or does not contain a CN.
+fn extract_common_name_from_csr(csr_pem: &str) -> std::result::Result<String, String> {
+    // Decode PEM to DER bytes
+    let pem_data = pem::parse(csr_pem)
+        .map_err(|e| format!("Invalid PEM encoding: {}", e))?;
+
+    let der_bytes = pem_data.contents();
+
+    // Parse the CSR DER to extract the subject distinguished name
+    let (_, csr) = x509_parser::certification_request::X509CertificationRequest::from_der(der_bytes)
+        .map_err(|e| format!("Failed to parse CSR DER: {}", e))?;
+
+    // Extract CN from the subject
+    for rdn in csr.certification_request_info.subject.iter() {
+        for attr in rdn.iter() {
+            // OID 2.5.4.3 is the Common Name
+            if attr.attr_type().to_id_string() == "2.5.4.3" {
+                let cn = attr.as_str()
+                    .map_err(|e| format!("CN value is not valid UTF-8: {}", e))?;
+                return Ok(cn.to_string());
+            }
+        }
+    }
+
+    Err("CSR does not contain a Common Name (CN) in the subject".to_string())
+}
+
 /// Certificate issuance handler
 pub struct IssueCertificateHandler {
     ca: Arc<TrustChainCA>,
@@ -188,21 +220,28 @@ impl ApiHandler for IssueCertificateHandler {
         let issue_request: IssueCertificateRequest = serde_json::from_slice(&request.payload)
             .map_err(|e| ApiError::InvalidRequest(format!("Invalid issuance request: {}", e)))?;
 
-        // Build CertificateRequest for CA
-        // TODO: Parse CSR to extract subject info, for now using placeholder values
+        // Build CertificateRequest for CA by parsing the CSR
         use crate::ca::CertificateRequest;
         use crate::consensus::ConsensusProof;
 
-        // SECURITY: This uses a test consensus proof. In production, the proof must be
-        // extracted from the request or validated via the consensus network. This handler
-        // must not be exposed to untrusted callers until real proof validation is added.
-        warn!("Certificate issuance using test consensus proof - not safe for production");
+        // Parse common_name from the CSR PEM
+        let common_name = extract_common_name_from_csr(&issue_request.csr_pem)
+            .map_err(|e| ApiError::InvalidRequest(format!(
+                "Failed to extract common_name from CSR: {}. A valid CSR with subject CN is required.", e
+            )))?;
+
+        // Generate a real consensus proof from the local node
+        let consensus_proof = ConsensusProof::generate_from_network("api_node").await
+            .map_err(|e| ApiError::HandlerError(format!(
+                "Failed to generate consensus proof: {}. A valid consensus proof is required for certificate issuance.", e
+            )))?;
+
         let cert_request = CertificateRequest {
-            common_name: "placeholder.trustchain.local".to_string(), // TODO: Extract from CSR
+            common_name,
             san_entries: vec![],
             node_id: "api_node".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::new_for_testing(),
+            consensus_proof,
             timestamp: std::time::SystemTime::now(),
         };
 

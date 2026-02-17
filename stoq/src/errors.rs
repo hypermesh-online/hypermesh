@@ -146,14 +146,8 @@ pub enum ProtocolError {
     },
 }
 
-/// Proof type for protocol errors
-#[derive(Debug, Clone, Copy)]
-pub enum ProofType {
-    Space,
-    Stake,
-    Work,
-    Time,
-}
+// Re-export ProofType from canonical shared lib (single source of truth)
+pub use hypermesh_lib::ProofType;
 
 /// Network layer errors
 #[derive(Debug)]
@@ -288,17 +282,6 @@ impl fmt::Display for ProtocolError {
                 write!(f, "Shard {} reassembly failed: {}", shard_id, reason),
             ProtocolError::TokenReplayDetected { token_hash } =>
                 write!(f, "Token replay attack detected: {:?}", token_hash),
-        }
-    }
-}
-
-impl fmt::Display for ProofType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ProofType::Space => write!(f, "ProofOfSpace"),
-            ProofType::Stake => write!(f, "ProofOfStake"),
-            ProofType::Work => write!(f, "ProofOfWork"),
-            ProofType::Time => write!(f, "ProofOfTime"),
         }
     }
 }

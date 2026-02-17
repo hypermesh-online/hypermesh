@@ -12,6 +12,9 @@ keywords = ["ca", "certificate", "transparency", "dns", "consensus"]
 workspace = true
 
 [dependencies]
+# Shared types (single source of truth)
+hypermesh-lib = { workspace = true }
+
 # Core async runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }
@@ -115,7 +118,7 @@ tempfile = { workspace = true }
 tokio-test = { workspace = true }
 
 [features]
-default = ["ca", "ct", "dns", "consensus"]
+default = ["ca", "ct", "dns", "consensus", "localhost-testing"]
 
 # Core features
 ca = []           # Certificate Authority

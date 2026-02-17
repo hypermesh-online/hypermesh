@@ -10,6 +10,11 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use pqcrypto_falcon::falcon1024;
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::sign::{PublicKey as SignPublicKey, SecretKey as SignSecretKey, DetachedSignature};
+use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
+use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
 
 use crate::assets::core::{AssetResult, AssetError, ProxyAddress};
 
@@ -30,26 +35,20 @@ pub struct QuantumSecurity {
 
 /// FALCON-1024 digital signature system
 pub struct FalconSigner {
-    /// Private key for signing (simulated)
-    private_key: [u8; 32],
-    
-    /// Public key for verification (simulated)
-    public_key: [u8; 64],
-    
-    /// Signature cache
-    signature_cache: HashMap<Vec<u8>, Vec<u8>>,
+    /// FALCON-1024 secret key bytes
+    secret_key_bytes: Vec<u8>,
+
+    /// FALCON-1024 public key bytes
+    public_key_bytes: Vec<u8>,
 }
 
-/// Kyber post-quantum encryption system
+/// Kyber-1024 post-quantum encryption system (KEM + AES-GCM)
 pub struct KyberEncryption {
-    /// Private key for decryption (simulated)
-    private_key: [u8; 32],
-    
-    /// Public key for encryption (simulated)
-    public_key: [u8; 64],
-    
-    /// Encryption cache
-    encryption_cache: HashMap<Vec<u8>, Vec<u8>>,
+    /// Kyber-1024 secret key bytes
+    secret_key_bytes: Vec<u8>,
+
+    /// Kyber-1024 public key bytes
+    public_key_bytes: Vec<u8>,
 }
 
 /// Security token for quantum-resistant authentication
@@ -165,25 +164,31 @@ impl QuantumSecurity {
         let token_clone = token.clone();
         self.store_active_token(token_id, token).await;
 
-        // Return combined signature + encrypted payload
-        let mut access_tokens = Vec::new();
+        // Return combined: [4-byte sig_len][signature][encrypted_payload]
+        let sig_len = token_clone.signature.len() as u32;
+        let mut access_tokens = Vec::with_capacity(4 + token_clone.signature.len() + token_clone.encrypted_payload.len());
+        access_tokens.extend_from_slice(&sig_len.to_be_bytes());
         access_tokens.extend_from_slice(&token_clone.signature);
         access_tokens.extend_from_slice(&token_clone.encrypted_payload);
-        
+
         tracing::debug!("Generated quantum security tokens for proxy address: {}", proxy_addr);
         Ok(access_tokens)
     }
     
     /// Validate quantum-resistant access tokens
     pub async fn validate_access_tokens(&self, tokens: &[u8]) -> AssetResult<bool> {
-        if tokens.len() < 64 { // Minimum size for signature + minimal payload
+        // Format: [4-byte sig_len][signature][encrypted_payload]
+        if tokens.len() < 4 {
             return Ok(false);
         }
-        
-        // Split tokens into signature and encrypted payload
-        // FALCON-1024 signatures are variable length, but we'll assume first 64 bytes for simulation
-        let signature = &tokens[..64];
-        let encrypted_payload = &tokens[64..];
+
+        let sig_len = u32::from_be_bytes([tokens[0], tokens[1], tokens[2], tokens[3]]) as usize;
+        if tokens.len() < 4 + sig_len {
+            return Ok(false);
+        }
+
+        let signature = &tokens[4..4 + sig_len];
+        let encrypted_payload = &tokens[4 + sig_len..];
         
         // Decrypt payload
         let payload = match self.kyber_encryption.decrypt(encrypted_payload).await {
@@ -306,138 +311,172 @@ impl QuantumSecurity {
 }
 
 impl FalconSigner {
-    /// Create new FALCON-1024 signer
+    /// Create new FALCON-1024 signer with a real keypair
     fn new() -> AssetResult<Self> {
-        // TODO: Generate actual FALCON-1024 key pair
-        // For now, simulate with random keys
-        let mut private_key = [0u8; 32];
-        let mut public_key = [0u8; 64];
-        
-        for i in 0..32 {
-            private_key[i] = fastrand::u8(..);
-        }
-        
-        for i in 0..64 {
-            public_key[i] = fastrand::u8(..);
-        }
-        
+        let (pk, sk) = falcon1024::keypair();
+
         Ok(Self {
-            private_key,
-            public_key,
-            signature_cache: HashMap::new(),
+            public_key_bytes: pk.as_bytes().to_vec(),
+            secret_key_bytes: sk.as_bytes().to_vec(),
         })
     }
-    
+
     /// Sign data with FALCON-1024
     pub async fn sign(&self, data: &[u8]) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual FALCON-1024 signing
-        // For now, simulate with HMAC-SHA256
-        
-        let mut hasher = Sha256::new();
-        hasher.update(&self.private_key);
-        hasher.update(data);
-        
-        let signature_hash = hasher.finalize();
-        let mut signature = Vec::new();
-        signature.extend_from_slice(&signature_hash);
-        
-        // Add some padding to simulate FALCON-1024 signature size
-        signature.resize(64, 0);
-        
-        tracing::debug!("Created FALCON-1024 signature ({} bytes)", signature.len());
-        Ok(signature)
+        let sk = falcon1024::SecretKey::from_bytes(&self.secret_key_bytes)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid FALCON-1024 secret key: {}", e),
+            })?;
+
+        let sig = falcon1024::detached_sign(data, &sk);
+        let sig_bytes = sig.as_bytes().to_vec();
+
+        tracing::debug!("Created FALCON-1024 signature ({} bytes)", sig_bytes.len());
+        Ok(sig_bytes)
     }
-    
+
     /// Verify FALCON-1024 signature
     pub async fn verify(&self, data: &[u8], signature: &[u8]) -> AssetResult<bool> {
-        // TODO: Implement actual FALCON-1024 verification
-        // For now, simulate by re-creating signature and comparing
-        
-        let expected_signature = self.sign(data).await?;
-        let valid = signature.len() >= 32 && expected_signature.len() >= 32 && 
-                   signature[..32] == expected_signature[..32];
-        
+        let pk = falcon1024::PublicKey::from_bytes(&self.public_key_bytes)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid FALCON-1024 public key: {}", e),
+            })?;
+
+        let sig = match falcon1024::DetachedSignature::from_bytes(signature) {
+            Ok(s) => s,
+            Err(_) => {
+                tracing::debug!("FALCON-1024 signature verification: invalid signature format");
+                return Ok(false);
+            }
+        };
+
+        let valid = falcon1024::verify_detached_signature(&sig, data, &pk).is_ok();
         tracing::debug!("FALCON-1024 signature verification result: {}", valid);
         Ok(valid)
     }
-    
-    /// Get public key for verification
-    pub fn get_public_key(&self) -> &[u8; 64] {
-        &self.public_key
+
+    /// Get public key bytes for verification
+    pub fn get_public_key(&self) -> &[u8] {
+        &self.public_key_bytes
     }
 }
 
 impl KyberEncryption {
-    /// Create new Kyber encryption handler
+    /// Create new Kyber-1024 encryption handler with a real keypair
     fn new() -> AssetResult<Self> {
-        // TODO: Generate actual Kyber key pair
-        // For now, simulate with random keys
-        let mut private_key = [0u8; 32];
-        let mut public_key = [0u8; 64];
-        
-        for i in 0..32 {
-            private_key[i] = fastrand::u8(..);
-        }
-        
-        for i in 0..64 {
-            public_key[i] = fastrand::u8(..);
-        }
-        
+        let (pk, sk) = kyber1024::keypair();
+
         Ok(Self {
-            private_key,
-            public_key,
-            encryption_cache: HashMap::new(),
+            public_key_bytes: pk.as_bytes().to_vec(),
+            secret_key_bytes: sk.as_bytes().to_vec(),
         })
     }
-    
-    /// Encrypt data with Kyber
+
+    /// Encrypt data with Kyber-1024 KEM + AES-GCM
+    ///
+    /// Output format: [4-byte KEM ciphertext length][KEM ciphertext][12-byte nonce][16-byte tag][AES ciphertext]
     pub async fn encrypt(&self, data: &[u8]) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual Kyber encryption
-        // For now, simulate with XOR cipher
-        
-        let mut encrypted = Vec::new();
-        let key_stream = self.generate_key_stream(data.len())?;
-        
-        for (i, &byte) in data.iter().enumerate() {
-            encrypted.push(byte ^ key_stream[i % key_stream.len()]);
-        }
-        
-        tracing::debug!("Kyber encrypted {} bytes", data.len());
-        Ok(encrypted)
+        let pk = kyber1024::PublicKey::from_bytes(&self.public_key_bytes)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 public key: {}", e),
+            })?;
+
+        // KEM encapsulation produces a shared secret and ciphertext
+        let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
+
+        // Derive AES-256 key from shared secret
+        let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
+
+        // AES-GCM encrypt the data
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
+        let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());
+
+        let mut buffer = data.to_vec();
+        let tag = cipher.encrypt_in_place_detached(&nonce, b"", &mut buffer)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("AES-GCM encryption failed: {}", e),
+            })?;
+
+        // Build output: [kem_ct_len (4 bytes)][kem_ct][nonce (12)][tag (16)][aes_ct]
+        let kem_ct_bytes = kem_ct.as_bytes();
+        let mut output = Vec::with_capacity(4 + kem_ct_bytes.len() + 12 + 16 + buffer.len());
+        output.extend_from_slice(&(kem_ct_bytes.len() as u32).to_be_bytes());
+        output.extend_from_slice(kem_ct_bytes);
+        output.extend_from_slice(&nonce);
+        output.extend_from_slice(&tag);
+        output.extend_from_slice(&buffer);
+
+        tracing::debug!("Kyber-1024 encrypted {} bytes -> {} bytes", data.len(), output.len());
+        Ok(output)
     }
-    
-    /// Decrypt data with Kyber
+
+    /// Decrypt data with Kyber-1024 KEM + AES-GCM
     pub async fn decrypt(&self, encrypted_data: &[u8]) -> AssetResult<Vec<u8>> {
-        // TODO: Implement actual Kyber decryption
-        // For now, simulate with XOR cipher (symmetric for testing)
-        
-        let mut decrypted = Vec::new();
-        let key_stream = self.generate_key_stream(encrypted_data.len())?;
-        
-        for (i, &byte) in encrypted_data.iter().enumerate() {
-            decrypted.push(byte ^ key_stream[i % key_stream.len()]);
+        // Parse header
+        if encrypted_data.len() < 4 {
+            return Err(AssetError::AdapterError {
+                message: "Kyber ciphertext too short for length header".to_string(),
+            });
         }
-        
-        tracing::debug!("Kyber decrypted {} bytes", encrypted_data.len());
-        Ok(decrypted)
-    }
-    
-    /// Generate key stream for encryption/decryption simulation
-    fn generate_key_stream(&self, length: usize) -> AssetResult<Vec<u8>> {
-        let mut key_stream = Vec::new();
-        
-        for i in 0..length {
-            let key_byte = self.private_key[i % self.private_key.len()] ^ 
-                          self.public_key[i % self.public_key.len()];
-            key_stream.push(key_byte);
+
+        let kem_ct_len = u32::from_be_bytes([
+            encrypted_data[0], encrypted_data[1],
+            encrypted_data[2], encrypted_data[3],
+        ]) as usize;
+
+        let min_len = 4 + kem_ct_len + 12 + 16; // header + kem_ct + nonce + tag
+        if encrypted_data.len() < min_len {
+            return Err(AssetError::AdapterError {
+                message: "Kyber ciphertext too short".to_string(),
+            });
         }
-        
-        Ok(key_stream)
+
+        let kem_ct_bytes = &encrypted_data[4..4 + kem_ct_len];
+        let nonce_bytes = &encrypted_data[4 + kem_ct_len..4 + kem_ct_len + 12];
+        let tag_bytes = &encrypted_data[4 + kem_ct_len + 12..4 + kem_ct_len + 28];
+        let aes_ct = &encrypted_data[4 + kem_ct_len + 28..];
+
+        // KEM decapsulation
+        let sk = kyber1024::SecretKey::from_bytes(&self.secret_key_bytes)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 secret key: {}", e),
+            })?;
+
+        let kem_ct = kyber1024::Ciphertext::from_bytes(kem_ct_bytes)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 ciphertext: {}", e),
+            })?;
+
+        let shared_secret = kyber1024::decapsulate(&kem_ct, &sk);
+        let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
+
+        // AES-GCM decrypt
+        use aes_gcm::{Nonce, Tag};
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
+        let nonce = Nonce::from_slice(nonce_bytes);
+        let tag = Tag::from_slice(tag_bytes);
+
+        let mut buffer = aes_ct.to_vec();
+        cipher.decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
+            .map_err(|e| AssetError::AdapterError {
+                message: format!("AES-GCM decryption failed: {}", e),
+            })?;
+
+        tracing::debug!("Kyber-1024 decrypted {} bytes", buffer.len());
+        Ok(buffer)
     }
-    
-    /// Get public key for encryption
-    pub fn get_public_key(&self) -> &[u8; 64] {
-        &self.public_key
+
+    /// Derive AES-256 key from Kyber shared secret
+    fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"KYBER-1024-AES-KEY:");
+        hasher.update(shared_secret);
+        hasher.finalize().into()
+    }
+
+    /// Get public key bytes for encryption
+    pub fn get_public_key(&self) -> &[u8] {
+        &self.public_key_bytes
     }
 }
 

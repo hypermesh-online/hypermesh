@@ -132,6 +132,8 @@ pub struct NetworkAssetRouter {
 }
 
 /// Matrix position for asset routing
+// TODO: Migrate to hypermesh_lib::MatrixPosition once field compatibility is resolved
+// (lib uses f64 coordinates, this uses i64 coordinates)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MatrixPosition {
     /// X coordinate

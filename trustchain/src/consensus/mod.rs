@@ -87,8 +87,8 @@ impl ConsensusProof {
         Self::new_for_testing()
     }
 
-    /// Create a testing proof (non-test builds, for API placeholder usage only)
-    /// TODO: Replace all calls to this method with generate_from_network()
+    /// Create a testing proof - only available in test builds or with localhost-testing feature
+    #[cfg(any(test, feature = "localhost-testing"))]
     pub fn new_for_testing() -> Self {
         use std::time::Duration;
 

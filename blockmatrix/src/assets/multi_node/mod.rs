@@ -16,32 +16,50 @@
 //! with Byzantine fault tolerance, consensus-based allocation, and automatic
 //! migration capabilities.
 
+#[cfg(feature = "multi-node")]
 use std::collections::{HashMap, HashSet};
-use std::net::Ipv6Addr;
+#[cfg(feature = "multi-node")]
 use std::time::{Duration, SystemTime};
+#[cfg(feature = "multi-node")]
 use serde::{Serialize, Deserialize};
+#[cfg(feature = "multi-node")]
 use async_trait::async_trait;
 
+#[cfg(feature = "multi-node")]
 use crate::assets::core::{
     AssetId, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyLevel,
 };
 
+#[cfg(feature = "multi-node")]
 pub mod coordinator;
+#[cfg(feature = "multi-node")]
 pub mod consensus;
+#[cfg(feature = "multi-node")]
 pub mod migration;
+#[cfg(feature = "multi-node")]
 pub mod discovery;
+#[cfg(feature = "multi-node")]
 pub mod load_balancer;
+#[cfg(feature = "multi-node")]
 pub mod fault_tolerance;
+#[cfg(feature = "multi-node")]
 pub mod resource_sharing;
 pub mod network_membership;
 pub mod multi_network_coordinator;
 
+#[cfg(feature = "multi-node")]
 pub use coordinator::{MultiNodeCoordinator, NodeInfo, NodeCapabilities};
+#[cfg(feature = "multi-node")]
 pub use consensus::{ConsensusManager, ConsensusDecision, VotingRound};
+#[cfg(feature = "multi-node")]
 pub use migration::{AssetMigrator, MigrationPlan, MigrationStatus};
+#[cfg(feature = "multi-node")]
 pub use discovery::{NodeDiscovery, DiscoveryProtocol, ServiceAnnouncement};
+#[cfg(feature = "multi-node")]
 pub use load_balancer::{LoadBalancer, BalancingStrategy, ResourceMetrics};
+#[cfg(feature = "multi-node")]
 pub use fault_tolerance::{ByzantineDetector, FaultRecovery, NodeHealthMonitor};
+#[cfg(feature = "multi-node")]
 pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
 
 // Multi-Network Participation (Revolutionary Concept #4)
@@ -59,6 +77,7 @@ pub use multi_network_coordinator::{
 // Use canonical NodeId from transport layer
 pub use crate::transport::NodeId;
 
+#[cfg(feature = "multi-node")]
 /// Multi-node network topology
 #[derive(Clone, Debug)]
 pub struct NetworkTopology {
@@ -74,6 +93,7 @@ pub struct NetworkTopology {
     pub last_updated: SystemTime,
 }
 
+#[cfg(feature = "multi-node")]
 /// Network partition information
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkPartition {
@@ -87,6 +107,7 @@ pub struct NetworkPartition {
     pub healed: bool,
 }
 
+#[cfg(feature = "multi-node")]
 /// Distributed asset state
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DistributedAssetState {
@@ -106,6 +127,7 @@ pub struct DistributedAssetState {
     pub last_sync: SystemTime,
 }
 
+#[cfg(feature = "multi-node")]
 /// Asset allocation decision
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AllocationDecision {
@@ -123,6 +145,7 @@ pub struct AllocationDecision {
     pub signatures: Vec<Vec<u8>>,
 }
 
+#[cfg(feature = "multi-node")]
 /// Cross-node resource sharing request
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceSharingRequest {
@@ -142,6 +165,7 @@ pub struct ResourceSharingRequest {
     pub expires_at: SystemTime,
 }
 
+#[cfg(feature = "multi-node")]
 /// Resource amount specification
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ResourceAmount {
@@ -157,6 +181,7 @@ pub enum ResourceAmount {
     BandwidthMbps(u64),
 }
 
+#[cfg(feature = "multi-node")]
 /// Resource sharing offer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceSharingOffer {
@@ -176,6 +201,7 @@ pub struct ResourceSharingOffer {
     pub sla: ServiceLevelAgreement,
 }
 
+#[cfg(feature = "multi-node")]
 /// Service level agreement for resource sharing
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ServiceLevelAgreement {
@@ -191,6 +217,7 @@ pub struct ServiceLevelAgreement {
     pub penalty_rate: f64,
 }
 
+#[cfg(feature = "multi-node")]
 /// Data locality requirements
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DataLocalityRequirement {
@@ -206,6 +233,7 @@ pub enum DataLocalityRequirement {
     Geographic { latitude: f64, longitude: f64, radius_km: f64 },
 }
 
+#[cfg(feature = "multi-node")]
 /// Multi-node event for coordination
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MultiNodeEvent {
@@ -229,6 +257,7 @@ pub enum MultiNodeEvent {
     ByzantineDetected { node: NodeId, evidence: Vec<u8> },
 }
 
+#[cfg(feature = "multi-node")]
 /// Multi-node coordinator trait
 #[async_trait]
 pub trait MultiNodeCoordinatorTrait: Send + Sync {
@@ -269,6 +298,7 @@ pub trait MultiNodeCoordinatorTrait: Send + Sync {
     async fn handle_event(&self, event: MultiNodeEvent) -> AssetResult<()>;
 }
 
+#[cfg(feature = "multi-node")]
 /// Performance metrics for multi-node operations
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MultiNodeMetrics {
@@ -302,9 +332,10 @@ pub struct MultiNodeMetrics {
     pub data_transferred_bytes: u64,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "multi-node"))]
 mod tests {
     use super::*;
+    use std::net::Ipv6Addr;
 
     #[test]
     fn test_node_id_creation() {

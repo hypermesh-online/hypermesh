@@ -10,6 +10,9 @@ license = "MIT OR Apache-2.0"
 workspace = true
 
 [dependencies]
+# Shared types (single source of truth)
+hypermesh-lib = { workspace = true }
+
 # STOQ types only (no runtime dependencies)
 stoq = { path = "../stoq", default-features = false, features = [] }
 

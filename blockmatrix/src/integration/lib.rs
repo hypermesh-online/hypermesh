@@ -37,8 +37,7 @@ use crate::consensus::{ConsensusManager, ConsensusConfig};
 use hypermesh_container::{ContainerRuntime, ContainerRuntimeConfig};
 use hypermesh_security::{HyperMeshSecurity, SecurityConfig};
 use hypermesh_orchestration::{OrchestrationEngine, OrchestrationConfig};
-// Temporarily comment out STOQ until compilation issues are resolved
-// use stoq::{Stoq, StoqConfig};
+// STOQ is imported via config module (config.rs re-exports stoq::StoqConfig)
 
 mod config;
 mod coordinator;

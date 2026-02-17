@@ -153,6 +153,8 @@ pub struct JoinRequirements {
 }
 
 /// Proof types required for network
+// TODO: Migrate to hypermesh_lib::ProofType once extra Identity variant is handled
+// (lib has Space/Stake/Work/Time, this has Space/Stake/Work/Time/Identity)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
     /// Proof of Space

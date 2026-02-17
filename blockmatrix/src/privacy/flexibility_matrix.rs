@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Asset identifier type
+// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
+// (lib uses AssetId(pub String), this uses type alias to [u8; 32])
 pub type AssetId = [u8; 32];
 
 /// Privacy Flexibility Matrix - Core of the flexible privacy system

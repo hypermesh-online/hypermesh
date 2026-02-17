@@ -9,6 +9,9 @@ repository = "https://github.com/hypermesh-online/catalog"
 keywords = ["assets", "hypermesh", "package-manager", "trustchain", "distributed"]
 
 [dependencies]
+# Shared types (single source of truth)
+hypermesh-lib = { workspace = true }
+
 # HyperMesh integration for consensus and asset management
 blockmatrix = { path = "../blockmatrix" }
 

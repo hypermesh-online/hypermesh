@@ -21,6 +21,8 @@ use anyhow::Result;
 use std::sync::Arc;
 
 /// Common types
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(pub String) newtype, this uses type alias to String)
 pub type NodeId = String;
 pub type ServiceId = String;
 

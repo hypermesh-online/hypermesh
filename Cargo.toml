@@ -289,7 +289,3 @@ debug = true
 
 [workspace.lints.rust]
 missing_docs = "allow"
-# Allow unused code during early development - these are stubs for future implementation
-dead_code = "allow"
-unused_variables = "allow"
-unused_imports = "allow"

@@ -44,6 +44,8 @@ pub struct RegistryId(pub [u8; 32]);
 pub struct FederationId(pub [u8; 32]);
 
 /// Node identifier (node's unique blockchain ID)
+// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
+// (lib uses NodeId(pub String), this uses NodeId(pub [u8; 32]))
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeId(pub [u8; 32]);
 
@@ -178,6 +180,8 @@ impl fmt::Display for AssetType {
 }
 
 /// Universal asset identifier with content-based hashing and network scoping
+// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
+// (lib uses AssetId(pub String), this has {content_hash, network_scope, category, creation_timestamp})
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AssetId {
     /// Content-based hash (derived from asset data, not UUID)
