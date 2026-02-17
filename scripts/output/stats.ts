@@ -12,19 +12,19 @@ export const crateStats: CrateStats[] = [
   {
     "id": "block-matrix",
     "files": 326,
-    "linesOfCode": 131231,
+    "linesOfCode": 131310,
     "testCount": 627
   },
   {
     "id": "caesar",
     "files": 14,
-    "linesOfCode": 5749,
+    "linesOfCode": 5752,
     "testCount": 4
   },
   {
     "id": "catalog",
     "files": 48,
-    "linesOfCode": 26226,
+    "linesOfCode": 26206,
     "testCount": 41
   },
   {
@@ -42,26 +42,26 @@ export const crateStats: CrateStats[] = [
   {
     "id": "hypermesh-lib",
     "files": 4,
-    "linesOfCode": 189,
+    "linesOfCode": 235,
     "testCount": 0
   },
   {
     "id": "stoq",
     "files": 35,
-    "linesOfCode": 14184,
+    "linesOfCode": 14169,
     "testCount": 65
   },
   {
     "id": "trustchain",
     "files": 73,
-    "linesOfCode": 31037,
+    "linesOfCode": 31144,
     "testCount": 65
   }
 ];
 
 export const totalStats = {
   "totalFiles": 514,
-  "totalLines": 211930,
+  "totalLines": 212130,
   "totalTests": 821,
   "crateCount": 8
 };
