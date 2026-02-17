@@ -6,19 +6,19 @@ Complete documentation for the Web3 decentralized compute and storage ecosystem.
 ## Quick Links
 
 ### Core Components
-- **[Architecture Overview](./ARCHITECTURE.md)** - System design and component interactions
-- **[HyperMesh](./HYPERMESH.md)** - Distributed asset management system
-- **[STOQ Protocol](./STOQ.md)** - Pure QUIC transport with quantum-resistant security
-- **[TrustChain](./TRUSTCHAIN.md)** - Certificate authority and DNS
-- **[Caesar Economics](./CAESAR.md)** - Token incentives and governance
-- **[UI Dashboard](./UI.md)** - Web interface and management console
+- **[Architecture Overview](./architecture/ARCHITECTURE.md)** - System design and component interactions
+- **[HyperMesh](./components/HYPERMESH.md)** - Distributed asset management system
+- **[STOQ Protocol](./components/STOQ.md)** - Pure QUIC transport with quantum-resistant security
+- **[TrustChain](./components/TRUSTCHAIN.md)** - Certificate authority and DNS
+- **[Caesar Economics](./components/CAESAR.md)** - Token incentives and governance
+- **[UI Dashboard](./components/UI.md)** - Web interface and management console
 
 ### Status & Planning
-- **[Testing Report](./TESTING_REPORT.md)** - Comprehensive validation results
-- **[Security Audit](./SECURITY.md)** - Security architecture and findings
-- **[Roadmap](./ROADMAP.md)** - Development timeline and priorities
-- **[Deployment Guide](./DEPLOYMENT.md)** - Production deployment instructions
-- **[Development Setup](./DEVELOPMENT.md)** - Local development environment
+- **[Testing Report](./reports/TEST_FIX_SUMMARY.md)** - Comprehensive validation results
+- **[Security Audit](./architecture/SECURITY.md)** - Security architecture and findings
+- **[Roadmap](./architecture/PDL_ROADMAP.md)** - Development timeline and priorities
+- **[Deployment Guide](./guides/DEPLOYMENT.md)** - Production deployment instructions
+- **[Development Setup](./guides/DEVELOPMENT.md)** - Local development environment
 
 ### Technical Documentation
 - **[Implementation Summary](./implementation/IMPLEMENTATION_SUMMARY.md)** - Consolidated technical details
