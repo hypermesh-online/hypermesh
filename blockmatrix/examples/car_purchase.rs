@@ -10,7 +10,7 @@
 use blockmatrix::assets::multi_node::{
     MultiNetworkCoordinator, MultiNetworkConfig, TrustChainClient,
     NetworkId, NetworkDiscovery, PrivacyTier, MembershipStatus,
-    NetworkMembership, EngagementEventType, MatrixPosition,
+    NetworkMembership, EngagementEventType, IntegerMatrixPosition,
 };
 use blockmatrix::assets::multi_node::network_membership::{
     JoinRequirements, ApprovalProcess, NetworkCredentials,
@@ -261,13 +261,13 @@ async fn main() {
     // Step 2: Buyer finds a car on the dealer's public network and initiates purchase
     println!("\n  2. Buyer initiates purchase on Dealer's public network...");
     let car_for_sale_asset = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(dealer_network, car_for_sale_asset.clone(), MatrixPosition { x: 1, y: 1, z: 1 }).await.unwrap();
+    dealer_coordinator.add_asset_to_network(dealer_network, car_for_sale_asset.clone(), IntegerMatrixPosition { x: 1, y: 1, z: 1 }).await.unwrap();
     println!("     - Dealer lists Car for Sale Asset: {:?}", car_for_sale_asset);
 
     // 3. Buyer creates a 'Purchase Intent' asset on their private chain
     println!("\n  3. Buyer creates 'Purchase Intent' on their private chain...");
     let purchase_intent = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, purchase_intent.clone(), MatrixPosition { x: 1, y: 2, z: 1 }).await.unwrap();
+    buyer_coordinator.add_asset_to_network(buyer_private_network, purchase_intent.clone(), IntegerMatrixPosition { x: 1, y: 2, z: 1 }).await.unwrap();
     println!("     - Purchase Intent Asset: {:?}", purchase_intent);
 
     // 4. Dealer validates the 'Purchase Intent'
@@ -286,7 +286,7 @@ async fn main() {
     // 5. Dealer creates 'Sales Agreement' on its federated network, sharing with Bank
     println!("\n  5. Dealer creates 'Sales Agreement' and shares with Bank...");
     let sales_agreement = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(dealer_network, sales_agreement.clone(), MatrixPosition { x: 2, y: 2, z: 2 }).await.unwrap();
+    dealer_coordinator.add_asset_to_network(dealer_network, sales_agreement.clone(), IntegerMatrixPosition { x: 2, y: 2, z: 2 }).await.unwrap();
     println!("     - Sales Agreement Asset: {:?}", sales_agreement);
 
     // 6. Bank validates 'Sales Agreement'
@@ -305,7 +305,7 @@ async fn main() {
     // 7. Bank provides 'Proof of Financing'
     println!("\n  7. Bank provides 'Proof of Financing'...");
     let proof_of_financing = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(bank_network, proof_of_financing.clone(), MatrixPosition { x: 3, y: 3, z: 3 }).await.unwrap();
+    bank_coordinator.add_asset_to_network(bank_network, proof_of_financing.clone(), IntegerMatrixPosition { x: 3, y: 3, z: 3 }).await.unwrap();
     println!("     - Proof of Financing Asset: {:?}", proof_of_financing);
 
     // 8. Dealer validates 'Proof of Financing' and transfers title
@@ -322,7 +322,7 @@ async fn main() {
     println!("     - Dealer validated Proof of Financing.");
 
     let car_title = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(buyer_private_network, car_title.clone(), MatrixPosition { x: 1, y: 3, z: 1 }).await.unwrap();
+    dealer_coordinator.add_asset_to_network(buyer_private_network, car_title.clone(), IntegerMatrixPosition { x: 1, y: 3, z: 1 }).await.unwrap();
     println!("     - Dealer transferred Car Title to Buyer's private chain: {:?}", car_title);
 
     // 9. Buyer gets insurance
@@ -340,7 +340,7 @@ async fn main() {
 
     // Buyer pays for insurance
     let insurance_payment = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, insurance_payment.clone(), MatrixPosition { x: 1, y: 4, z: 1 }).await.unwrap();
+    buyer_coordinator.add_asset_to_network(buyer_private_network, insurance_payment.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 1 }).await.unwrap();
     println!("     - Buyer creates 'Payment for Insurance' asset: {:?}", insurance_payment);
 
     // Bank validates payment
@@ -356,7 +356,7 @@ async fn main() {
     println!("     - Bank validated insurance payment.");
 
     let insurance_payment_confirmation = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(buyer_private_network, insurance_payment_confirmation.clone(), MatrixPosition { x: 1, y: 4, z: 2 }).await.unwrap();
+    bank_coordinator.add_asset_to_network(buyer_private_network, insurance_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 2 }).await.unwrap();
     println!("     - Bank issues 'Payment Confirmation' asset: {:?}", insurance_payment_confirmation);
     
     // Insurance company validates payment confirmation
@@ -371,7 +371,7 @@ async fn main() {
     println!("     - Insurance company validated payment confirmation.");
 
     let proof_of_insurance = AssetId::new(AssetType::Storage);
-    insurance_coordinator.add_asset_to_network(buyer_private_network, proof_of_insurance.clone(), MatrixPosition { x: 1, y: 4, z: 3 }).await.unwrap();
+    insurance_coordinator.add_asset_to_network(buyer_private_network, proof_of_insurance.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 3 }).await.unwrap();
     println!("     - Insurance company issued Proof of Insurance to Buyer's private chain: {:?}", proof_of_insurance);
 
     // 10. Buyer registers car with DMV
@@ -399,7 +399,7 @@ async fn main() {
 
     // Buyer pays for registration
     let dmv_payment = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, dmv_payment.clone(), MatrixPosition { x: 1, y: 5, z: 1 }).await.unwrap();
+    buyer_coordinator.add_asset_to_network(buyer_private_network, dmv_payment.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 1 }).await.unwrap();
     println!("     - Buyer creates 'Payment for Registration' asset: {:?}", dmv_payment);
 
     // Bank validates payment
@@ -414,7 +414,7 @@ async fn main() {
     println!("     - Bank validated registration payment.");
 
     let dmv_payment_confirmation = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(buyer_private_network, dmv_payment_confirmation.clone(), MatrixPosition { x: 1, y: 5, z: 2 }).await.unwrap();
+    bank_coordinator.add_asset_to_network(buyer_private_network, dmv_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 2 }).await.unwrap();
     println!("     - Bank issues 'Payment Confirmation' asset: {:?}", dmv_payment_confirmation);
 
     // DMV validates payment confirmation
@@ -429,7 +429,7 @@ async fn main() {
     println!("     - DMV validated payment confirmation.");
 
     let registered_title = AssetId::new(AssetType::Storage);
-    dmv_coordinator.add_asset_to_network(buyer_private_network, registered_title.clone(), MatrixPosition { x: 1, y: 5, z: 3 }).await.unwrap();
+    dmv_coordinator.add_asset_to_network(buyer_private_network, registered_title.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 3 }).await.unwrap();
     println!("     - DMV issued Registered Title to Buyer's private chain: {:?}", registered_title);
 
 
