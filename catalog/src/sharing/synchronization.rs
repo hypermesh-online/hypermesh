@@ -748,7 +748,7 @@ mod tests {
         use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
 
         let registry = Arc::new(CatalogRegistry::new(
-            blockmatrix::assets::PrivacyLevel::FullPublic,
+            blockmatrix::assets::PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));
@@ -766,7 +766,7 @@ mod tests {
         use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
 
         let registry = Arc::new(CatalogRegistry::new(
-            blockmatrix::assets::PrivacyLevel::FullPublic,
+            blockmatrix::assets::PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

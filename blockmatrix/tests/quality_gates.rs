@@ -29,8 +29,6 @@ use blockmatrix::network::{
     isolation::{DefaultIsolationManager, IsolationManager, Packet, PacketId, zero_hash},
 };
 use blockmatrix::assets::core::{AssetId, AssetCategory, BaseSystemType, NetworkScope, AssetData};
-use blockmatrix::bootstrap::PrivacyMode;
-
 use std::sync::Arc;
 use std::collections::HashMap;
 use anyhow::Result;

@@ -88,18 +88,15 @@ pub struct SessionToken {
     pub permissions: HashSet<String>,
 }
 
-/// Privacy tier for network (maps to blockmatrix/src/privacy/tiers.rs)
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum PrivacyTier {
-    /// Anonymous - Zero identity tracking
-    Anonymous,
-    /// Private P2P - Trusted peer circles
-    PrivateP2P,
-    /// Federated - Cross-network partner trust
-    Federated,
-    /// Public - Full transparency with PoS validation
-    Public,
-}
+/// Backward-compatible alias: network_membership code that references
+/// `PrivacyTier` keeps compiling against the canonical `PrivacyMode`.
+///
+/// Variant mapping (old enum -> PrivacyMode constant):
+///   Anonymous  -> PrivacyMode::ANONYMOUS
+///   PrivateP2P -> PrivacyMode::PRIVATE
+///   Federated  -> PrivacyMode::PRIVATE
+///   Public     -> PrivacyMode::PUBLIC
+pub type PrivacyTier = hypermesh_lib::PrivacyMode;
 
 /// Network role
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -414,7 +411,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Public,
+                    privacy_tier: PrivacyTier::PUBLIC,
                     member_count: 1000,
                     is_public: true,
                 },
@@ -456,7 +453,7 @@ mod tests {
         let network_id = networks[0].network_id;
 
         // Join network
-        membership.join_network(network_id, PrivacyTier::Public).await.unwrap();
+        membership.join_network(network_id, PrivacyTier::PUBLIC).await.unwrap();
 
         // Leave network
         membership.leave_network(network_id).await.unwrap();
@@ -477,7 +474,7 @@ mod tests {
         // Discover and join network
         let networks = membership.discover_networks().await.unwrap();
         let network_id = networks[0].network_id;
-        membership.join_network(network_id, PrivacyTier::Public).await.unwrap();
+        membership.join_network(network_id, PrivacyTier::PUBLIC).await.unwrap();
 
         // Add asset to network
         use crate::assets::core::AssetType;

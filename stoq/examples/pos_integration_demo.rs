@@ -5,10 +5,11 @@
 //! STOQ + Proof of State Integration Demo
 //!
 //! Demonstrates protocol-level PoS validation, asset hash verification,
-//! privacy tier enforcement, and matrix-aware shard addressing.
+//! privacy mode enforcement, and matrix-aware shard addressing.
 
 use anyhow::Result;
 use std::time::{Duration, SystemTime};
+use hypermesh_lib::PrivacyMode;
 use stoq::transport::{StoqTransport, TransportConfig};
 use stoq::transport::certificate_strategy::NetworkType;
 use stoq::protocol::{
@@ -58,8 +59,8 @@ async fn main() -> Result<()> {
     info!("\n--- Demo 6: Matrix-Aware Shard Distribution ---");
     demo_shard_distribution(&transport).await?;
 
-    // Demo 7: Privacy Tier Enforcement
-    info!("\n--- Demo 7: Privacy Tier Enforcement ---");
+    // Demo 7: Privacy Mode Enforcement
+    info!("\n--- Demo 7: Privacy Mode Enforcement ---");
     demo_privacy_enforcement(&transport).await?;
 
     // Display final statistics
@@ -67,8 +68,7 @@ async fn main() -> Result<()> {
     let stats = transport.get_pos_integration_stats();
     info!("Total connections: {}", stats.total_connections);
     info!("  Anonymous: {}", stats.anonymous_connections);
-    info!("  P2P: {}", stats.p2p_connections);
-    info!("  Federated: {}", stats.federated_connections);
+    info!("  Private: {}", stats.private_connections);
     info!("  Public: {}", stats.public_connections);
     info!("Cached assets: {}", stats.cached_assets);
     info!("Registered shards: {}", stats.registered_shards);
@@ -90,7 +90,7 @@ async fn demo_anonymous_network(transport: &StoqTransport) -> Result<()> {
     ).await?;
 
     if result {
-        info!("✓ Anonymous connection established (no validation required)");
+        info!("Anonymous connection established (no validation required)");
         info!("  - No persistent identity");
         info!("  - No logging");
         info!("  - Ephemeral sessions only");
@@ -109,10 +109,10 @@ async fn demo_p2p_network(transport: &StoqTransport) -> Result<()> {
     ).await?;
 
     if result {
-        info!("✓ P2P connection established (peer-based validation)");
+        info!("P2P connection established (peer-based validation)");
         info!("  - Direct peer trust exchange");
         info!("  - Self-signed certificates");
-        info!("  - Minimal logging");
+        info!("  - Maps to Private privacy mode");
     }
 
     Ok(())
@@ -130,10 +130,10 @@ async fn demo_federated_network(transport: &StoqTransport) -> Result<()> {
     ).await?;
 
     if result {
-        info!("✓ Federated connection established (gateway-based validation)");
+        info!("Federated connection established (gateway-based validation)");
         info!("  - Federation gateway as trust anchor");
         info!("  - Network-scoped logging");
-        info!("  - Controlled membership");
+        info!("  - Maps to Private privacy mode");
     }
 
     Ok(())
@@ -146,15 +146,15 @@ async fn demo_public_network(transport: &StoqTransport) -> Result<()> {
     let pos_token = create_demo_pos_token();
 
     info!("Created PoS token with 4 proofs:");
-    info!("  ✓ Proof of Space (WHERE): Matrix position ({}, {}, {})",
+    info!("  Proof of Space (WHERE): Matrix position ({}, {}, {})",
         pos_token.proof_of_space.matrix_position.0,
         pos_token.proof_of_space.matrix_position.1,
         pos_token.proof_of_space.matrix_position.2);
-    info!("  ✓ Proof of Stake (WHO): {} tokens staked",
+    info!("  Proof of Stake (WHO): {} tokens staked",
         pos_token.proof_of_stake.stake_amount);
-    info!("  ✓ Proof of Work (WHAT): Difficulty {}",
+    info!("  Proof of Work (WHAT): Difficulty {}",
         pos_token.proof_of_work.difficulty);
-    info!("  ✓ Proof of Time (WHEN): Sequence {}",
+    info!("  Proof of Time (WHEN): Sequence {}",
         pos_token.proof_of_time.sequence);
 
     let result = transport.validate_connection_with_pos(
@@ -164,7 +164,7 @@ async fn demo_public_network(transport: &StoqTransport) -> Result<()> {
     ).await?;
 
     if result {
-        info!("✓ Public connection established (full PoS validation)");
+        info!("Public connection established (full PoS validation)");
         info!("  - Global CA with blockchain registration");
         info!("  - Full transparency and logging");
         info!("  - Maximum CAESAR rewards");
@@ -207,7 +207,7 @@ async fn demo_asset_verification(transport: &StoqTransport) -> Result<()> {
     )?;
 
     if is_valid {
-        info!("✓ Asset hash verified at protocol level");
+        info!("Asset hash verified at protocol level");
         info!("  - Prevents corrupted data from reaching application");
         info!("  - Tamper detection built into transport");
     }
@@ -235,7 +235,7 @@ async fn demo_shard_distribution(transport: &StoqTransport) -> Result<()> {
         max_distance,
     );
 
-    info!("✓ Generated {} shard positions using golden ratio sphere packing",
+    info!("Generated {} shard positions using golden ratio sphere packing",
         positions.len());
 
     // Register shard addresses
@@ -256,7 +256,7 @@ async fn demo_shard_distribution(transport: &StoqTransport) -> Result<()> {
     let shard_ids: Vec<u32> = (0..5).collect();
     let addresses = transport.get_shard_addresses(&shard_ids);
 
-    info!("✓ Retrieved {} shard addresses for instruction-based retrieval",
+    info!("Retrieved {} shard addresses for instruction-based retrieval",
         addresses.len());
     info!("  - Receiver uses addresses to query matrix positions");
     info!("  - Bandwidth efficiency (send addresses not data)");
@@ -266,37 +266,28 @@ async fn demo_shard_distribution(transport: &StoqTransport) -> Result<()> {
 }
 
 async fn demo_privacy_enforcement(transport: &StoqTransport) -> Result<()> {
-    info!("Demonstrating privacy tier enforcement...");
+    info!("Demonstrating privacy mode enforcement...");
 
-    let pos_integration = transport.pos_integration();
+    let _pos_integration = transport.pos_integration();
 
-    // Show privacy tier characteristics
-    use stoq::protocol::PrivacyTier;
-
-    info!("Privacy Tier Comparison:");
+    info!("Privacy Mode Comparison:");
 
     info!("\n  Anonymous:");
-    info!("    - Requires PoS validation: {}", PrivacyTier::Anonymous.requires_pos_validation());
-    info!("    - Allows logging: {}", PrivacyTier::Anonymous.allows_logging());
-    info!("    - Connection timeout: {:?}", PrivacyTier::Anonymous.connection_timeout());
+    info!("    - Requires identity: {}", PrivacyMode::ANONYMOUS.requires_identity());
+    info!("    - Allows logging: {}", PrivacyMode::ANONYMOUS.allows_logging());
+    info!("    - Connection timeout: {}s", PrivacyMode::ANONYMOUS.connection_timeout_secs());
 
-    info!("\n  P2P:");
-    info!("    - Requires PoS validation: {}", PrivacyTier::P2P.requires_pos_validation());
-    info!("    - Allows logging: {}", PrivacyTier::P2P.allows_logging());
-    info!("    - Connection timeout: {:?}", PrivacyTier::P2P.connection_timeout());
-
-    info!("\n  Federated:");
-    info!("    - Requires PoS validation: {}", PrivacyTier::Federated.requires_pos_validation());
-    info!("    - Allows logging: {}", PrivacyTier::Federated.allows_logging());
-    info!("    - Connection timeout: {:?}", PrivacyTier::Federated.connection_timeout());
+    info!("\n  Private (covers P2P and Federated networks):");
+    info!("    - Requires identity: {}", PrivacyMode::PRIVATE.requires_identity());
+    info!("    - Allows logging: {}", PrivacyMode::PRIVATE.allows_logging());
+    info!("    - Connection timeout: {}s", PrivacyMode::PRIVATE.connection_timeout_secs());
 
     info!("\n  Public:");
-    info!("    - Requires PoS validation: {}", PrivacyTier::Public.requires_pos_validation());
-    info!("    - Allows logging: {}", PrivacyTier::Public.allows_logging());
-    info!("    - Connection timeout: {:?}", PrivacyTier::Public.connection_timeout());
-    info!("    - Requires full 4-proof validation: {}", PrivacyTier::Public.requires_full_proofs());
+    info!("    - Requires identity: {}", PrivacyMode::PUBLIC.requires_identity());
+    info!("    - Allows logging: {}", PrivacyMode::PUBLIC.allows_logging());
+    info!("    - Connection timeout: {}s", PrivacyMode::PUBLIC.connection_timeout_secs());
 
-    info!("\n✓ Privacy tier enforcement ensures protocol behavior matches network type");
+    info!("\nPrivacy mode enforcement ensures protocol behavior matches network type");
 
     Ok(())
 }

@@ -75,7 +75,7 @@ pub struct AuditLoggingConfig {
 impl Default for PrivacyManagerConfig {
     fn default() -> Self {
         Self {
-            default_privacy_level: PrivacyLevel::Private,
+            default_privacy_level: PrivacyLevel::PRIVATE,
             default_resource_allocation: ResourceAllocationConfig::default(),
             global_consensus_requirements: ConsensusRequirementConfig::default(),
             base_reward_config: CaesarRewardConfig::default(),

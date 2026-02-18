@@ -79,7 +79,7 @@ impl CaesarRewardCalculator {
         let base_reward = base_rate * hours;
 
         // Apply privacy multiplier
-        let privacy_multiplier = privacy_level.caesar_reward_multiplier();
+        let privacy_multiplier = crate::assets::core::privacy::caesar_reward_multiplier(privacy_level);
         let privacy_adjusted_reward = base_reward * privacy_multiplier;
 
         // Apply utilization multipliers
@@ -141,7 +141,7 @@ impl CaesarRewardCalculator {
     }
 
     async fn calculate_privacy_multiplier(&self, privacy_level: &PrivacyLevel) -> AssetResult<f32> {
-        Ok(privacy_level.caesar_reward_multiplier())
+        Ok(crate::assets::core::privacy::caesar_reward_multiplier(privacy_level))
     }
 
     async fn calculate_utilization_multiplier(

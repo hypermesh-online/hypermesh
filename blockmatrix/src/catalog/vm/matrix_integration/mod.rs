@@ -31,8 +31,9 @@ mod tests {
     use super::super::{ConsensusRequirements, VMConfig, ConsensusProofVM};
     use super::super::consensus::ConsensusVM;
     use crate::assets::matrix_blockchain::{
-        MatrixBlockchainManager, EntityType, PrivacyPolicyConfig, AssetPrivacyLevel,
+        MatrixBlockchainManager, EntityType, PrivacyPolicyConfig,
     };
+    use hypermesh_lib::PrivacyMode;
     use std::sync::Arc;
     use std::collections::HashMap;
     use std::time::Duration;
@@ -68,7 +69,7 @@ mod tests {
             asset_id,
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
-            privacy_level: PrivacyLevel::P2P,
+            privacy_level: PrivacyLevel::PRIVATE,
         };
 
         assert_eq!(validation.entity_domain, "honda.hypermesh.online");
@@ -108,8 +109,8 @@ mod tests {
                 }
             ],
             workflow_privacy: WorkflowPrivacyPolicy {
-                intermediate_privacy: PrivacyLevel::P2P,
-                final_privacy: PrivacyLevel::PublicNetwork,
+                intermediate_privacy: PrivacyLevel::PRIVATE,
+                final_privacy: PrivacyLevel::PUBLIC,
                 intermediate_access: vec!["dealer.hypermesh.online".to_string()],
                 data_sharing_rules: HashMap::new(),
             },
@@ -131,7 +132,7 @@ mod tests {
                 public_fields: vec![],
                 federated_fields: HashMap::new(),
                 zk_proof_fields: vec![],
-                default_privacy_level: AssetPrivacyLevel::Private,
+                default_privacy_level: PrivacyMode::PRIVATE,
             },
             trusted_partners: vec![],
             max_external_allocation: {

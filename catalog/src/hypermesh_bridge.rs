@@ -68,7 +68,7 @@ impl Default for BridgeConfig {
         Self {
             enable_consensus: true,
             minimum_stake: 1000,
-            default_privacy: PrivacyLevel::Private,
+            default_privacy: PrivacyLevel::PRIVATE,
             enable_zero_copy: true,
             catalog_cache_size: 10000,
         }

@@ -680,7 +680,7 @@ mod tests {
         use blockmatrix::assets::PrivacyLevel;
 
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

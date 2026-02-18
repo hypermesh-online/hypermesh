@@ -569,16 +569,10 @@ impl ProxyRouter {
     
     /// Check if privacy levels are compatible
     fn privacy_levels_compatible(&self, route_privacy: &PrivacyLevel, request_privacy: &PrivacyLevel) -> bool {
-        use PrivacyLevel::*;
-        
-        match (route_privacy, request_privacy) {
-            (Private, Private) => true,
-            (PrivateNetwork, Private | PrivateNetwork) => true,
-            (P2P, Private | PrivateNetwork | P2P) => true,
-            (PublicNetwork, Private | PrivateNetwork | P2P | PublicNetwork) => true,
-            (FullPublic, _) => true,
-            _ => false,
-        }
+        // A route can serve a request if the route's privacy is at least as open.
+        // Openness order: PRIVATE < ANONYMOUS < PUBLIC
+        use crate::assets::core::privacy::privacy_priority;
+        privacy_priority(route_privacy) >= privacy_priority(request_privacy)
     }
     
     /// Recalculate all routes (called when network topology changes)
@@ -671,18 +665,20 @@ mod tests {
     #[tokio::test]
     async fn test_route_privacy_compatibility() {
         let router = create_test_router().await;
-        
-        // FullPublic should be compatible with everything
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::FullPublic, &PrivacyLevel::Private));
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::FullPublic, &PrivacyLevel::FullPublic));
-        
-        // Private should only be compatible with Private
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::Private, &PrivacyLevel::Private));
-        assert!(!router.privacy_levels_compatible(&PrivacyLevel::Private, &PrivacyLevel::P2P));
-        
-        // P2P should be compatible with Private, PrivateNetwork, P2P
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::P2P, &PrivacyLevel::Private));
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::P2P, &PrivacyLevel::P2P));
-        assert!(!router.privacy_levels_compatible(&PrivacyLevel::P2P, &PrivacyLevel::PublicNetwork));
+
+        // PUBLIC route can serve any request
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PRIVATE));
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::ANONYMOUS));
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PUBLIC));
+
+        // PRIVATE route can only serve PRIVATE requests
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PRIVATE));
+        assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::ANONYMOUS));
+        assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PUBLIC));
+
+        // ANONYMOUS route can serve PRIVATE and ANONYMOUS, but not PUBLIC
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::PRIVATE));
+        assert!(router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::ANONYMOUS));
+        assert!(!router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::PUBLIC));
     }
 }

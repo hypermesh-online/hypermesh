@@ -358,11 +358,11 @@ mod tests {
     #[test]
     fn test_privacy_levels() {
         // Verify privacy allocation types
-        let _private = PrivacyLevel::Private;
-        let _private_network = PrivacyLevel::PrivateNetwork;
-        let _p2p = PrivacyLevel::P2P;
-        let _public_network = PrivacyLevel::PublicNetwork;
-        let _full_public = PrivacyLevel::FullPublic;
+        let _private = PrivacyLevel::PRIVATE;
+        let _private_network = PrivacyLevel::PRIVATE;
+        let _p2p = PrivacyLevel::PRIVATE;
+        let _public_network = PrivacyLevel::PUBLIC;
+        let _full_public = PrivacyLevel::PUBLIC;
 
         println!("✅ All privacy levels defined");
     }

@@ -1,4 +1,4 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (c) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
@@ -14,6 +14,7 @@ use blockmatrix::privacy::{
     PolicyAction, ActionType, ValidationType,
     PrivacyEbpfBridge, TransitionResult,
     NodeId, NetworkId, TrustLevel,
+    validation_requirements_for,
 };
 use std::collections::HashSet;
 use std::time::Duration;
@@ -21,31 +22,25 @@ use std::thread;
 
 #[test]
 fn test_e2e_node_lifecycle_with_tier_transitions() {
-    // Simulate a node's complete lifecycle through all tiers
+    // Simulate a node's complete lifecycle through all modes
     let mut system = PrivacySystem::new();
 
     // Stage 1: Start as Anonymous
-    system.switch_tier(PrivacyTier::Anonymous).unwrap();
-    assert_eq!(system.caesar_multiplier(), 0.1); // Minimal rewards
+    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    assert_eq!(system.caesar_multiplier(), 0.0); // No rewards
 
-    // Stage 2: Build trust, move to Private P2P
+    // Stage 2: Build trust, move to Private
     thread::sleep(Duration::from_millis(10)); // Simulate time passing
-    system.switch_tier(PrivacyTier::PrivateP2P).unwrap();
-    assert_eq!(system.caesar_multiplier(), 0.4); // Increased rewards
+    system.switch_tier(PrivacyTier::PRIVATE).unwrap();
+    assert_eq!(system.caesar_multiplier(), 0.5); // Medium rewards
 
-    // Stage 3: Join federation
+    // Stage 3: Go fully public for maximum rewards
     thread::sleep(Duration::from_millis(10));
-    system.switch_tier(PrivacyTier::Federated).unwrap();
-    assert_eq!(system.caesar_multiplier(), 0.7); // Higher rewards
-
-    // Stage 4: Go fully public for maximum rewards
-    thread::sleep(Duration::from_millis(10));
-    system.switch_tier(PrivacyTier::Public).unwrap();
+    system.switch_tier(PrivacyTier::PUBLIC).unwrap();
     assert_eq!(system.caesar_multiplier(), 1.0); // Maximum rewards
 
-    // Verify transition history
-    let switcher = TierSwitcher::new(PrivacyTier::Anonymous);
-    assert_eq!(system.current_tier(), PrivacyTier::Public);
+    // Verify final state
+    assert_eq!(system.current_tier(), PrivacyTier::PUBLIC);
 }
 
 #[test]
@@ -58,24 +53,24 @@ fn test_e2e_mixed_privacy_network() {
     // Create 3 anonymous nodes
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::Anonymous).unwrap();
+        node.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
         anonymous_nodes.push(node);
     }
 
     // Create 3 public nodes
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::Public).unwrap();
+        node.switch_tier(PrivacyTier::PUBLIC).unwrap();
         public_nodes.push(node);
     }
 
     // Create 3 hybrid nodes (anonymous network, public assets)
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::Anonymous).unwrap();
+        node.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
         let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyTier::Anonymous,
-            PrivacyTier::Public
+            PrivacyTier::ANONYMOUS,
+            PrivacyTier::PUBLIC
         );
         node.update_flexibility_matrix(matrix).unwrap();
         hybrid_nodes.push(node);
@@ -92,8 +87,8 @@ fn test_e2e_policy_enforcement_workflow() {
     let bridge = PrivacyEbpfBridge::new().unwrap();
 
     // Workflow 1: Anonymous user trying to access restricted resource
-    system.switch_tier(PrivacyTier::Anonymous).unwrap();
-    bridge.update_ebpf_for_tier(PrivacyTier::Anonymous, 1000);
+    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    bridge.update_ebpf_for_tier(PrivacyTier::ANONYMOUS, 1000);
 
     let restricted_action = PolicyAction {
         action_type: ActionType::AccessResource,
@@ -108,8 +103,8 @@ fn test_e2e_policy_enforcement_workflow() {
     assert!(system.enforce_policy(restricted_action).is_err());
 
     // Workflow 2: Public node with full validation
-    system.switch_tier(PrivacyTier::Public).unwrap();
-    bridge.update_ebpf_for_tier(PrivacyTier::Public, 1001);
+    system.switch_tier(PrivacyTier::PUBLIC).unwrap();
+    bridge.update_ebpf_for_tier(PrivacyTier::PUBLIC, 1001);
 
     let mut validations = HashSet::new();
     validations.insert(ValidationType::FullIdentity);
@@ -132,29 +127,29 @@ fn test_e2e_policy_enforcement_workflow() {
 }
 
 #[test]
-fn test_e2e_federation_setup() {
-    // Simulate setting up a federated network
+fn test_e2e_private_group_setup() {
+    // Simulate setting up a private group network
     let mut coordinator = PrivacySystem::new();
-    coordinator.switch_tier(PrivacyTier::Federated).unwrap();
+    // Default is already PRIVATE, but switch explicitly for clarity
+    coordinator.switch_tier(PrivacyTier::PRIVATE).unwrap();
 
     let mut members = Vec::new();
-    for i in 0..5 {
+    for _i in 0..5 {
         let mut member = PrivacySystem::new();
-        member.switch_tier(PrivacyTier::Federated).unwrap();
+        member.switch_tier(PrivacyTier::PRIVATE).unwrap();
         members.push(member);
     }
 
-    // All federation members should have same tier
+    // All private group members should have same mode
     for member in &members {
-        assert_eq!(member.current_tier(), PrivacyTier::Federated);
-        assert_eq!(member.caesar_multiplier(), 0.7);
+        assert_eq!(member.current_tier(), PrivacyTier::PRIVATE);
+        assert_eq!(member.caesar_multiplier(), 0.5);
     }
 
-    // Verify federation validation requirements
-    let req = PrivacyTier::Federated.validation_requirements();
-    assert!(req.federation_validation);
-    assert!(req.proof_of_space);
-    assert!(req.proof_of_time);
+    // Verify private validation requirements
+    let req = validation_requirements_for(&PrivacyTier::PRIVATE);
+    assert!(req.peer_validation);
+    assert!(!req.proof_of_stake); // PRIVATE uses peer validation, not full PoS
 }
 
 #[test]
@@ -164,13 +159,13 @@ fn test_e2e_privacy_tier_daily_limits() {
     let mut system = PrivacySystem::with_config(config);
 
     // First switch - OK
-    assert!(system.switch_tier(PrivacyTier::Anonymous).is_ok());
+    assert!(system.switch_tier(PrivacyTier::ANONYMOUS).is_ok());
 
     // Second switch - OK
-    assert!(system.switch_tier(PrivacyTier::Public).is_ok());
+    assert!(system.switch_tier(PrivacyTier::PUBLIC).is_ok());
 
     // Third switch - Should fail (daily limit)
-    assert!(system.switch_tier(PrivacyTier::Federated).is_err());
+    assert!(system.switch_tier(PrivacyTier::PRIVATE).is_err());
 }
 
 #[test]
@@ -178,18 +173,18 @@ fn test_e2e_asset_privacy_independence() {
     let mut system = PrivacySystem::new();
 
     // Set network to anonymous but assets to public
-    system.switch_tier(PrivacyTier::Anonymous).unwrap();
+    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
     let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::Anonymous,
-        PrivacyTier::Public
+        PrivacyTier::ANONYMOUS,
+        PrivacyTier::PUBLIC
     );
     system.update_flexibility_matrix(matrix.clone()).unwrap();
 
-    // Network should be private
-    assert_eq!(system.current_tier(), PrivacyTier::Anonymous);
+    // Network should be anonymous
+    assert_eq!(system.current_tier(), PrivacyTier::ANONYMOUS);
 
     // But assets should be public (check via matrix)
-    assert_eq!(matrix.asset_tier, PrivacyTier::Public);
+    assert_eq!(matrix.asset_tier, PrivacyTier::PUBLIC);
     assert!(matrix.is_anonymous_public());
 
     // Should get bonus CAESAR rewards for this configuration
@@ -198,20 +193,20 @@ fn test_e2e_asset_privacy_independence() {
 
 #[test]
 fn test_e2e_transition_with_active_connections() {
-    let mut switcher = TierSwitcher::new(PrivacyTier::PrivateP2P);
+    let mut switcher = TierSwitcher::new(PrivacyTier::PRIVATE);
 
-    // Simulate active P2P connections
+    // Simulate active private connections
     if let Some(tier) = &mut switcher.private_tier {
         for i in 0..5 {
             tier.add_peer([i; 32]).unwrap();
         }
     }
 
-    // Transition to Federated while maintaining connections
-    match switcher.switch_tier(PrivacyTier::Federated) {
+    // Transition to Public while maintaining connections
+    match switcher.switch_tier(PrivacyTier::PUBLIC) {
         Ok(TransitionResult::Success(record)) => {
-            assert_eq!(record.from, PrivacyTier::PrivateP2P);
-            assert_eq!(record.to, PrivacyTier::Federated);
+            assert_eq!(record.from, PrivacyTier::PRIVATE);
+            assert_eq!(record.to, PrivacyTier::PUBLIC);
             assert!(record.success);
         }
         _ => panic!("Transition should succeed"),
@@ -225,12 +220,11 @@ fn test_e2e_transition_with_active_connections() {
 fn test_e2e_ebpf_policy_sync() {
     let bridge = PrivacyEbpfBridge::new().unwrap();
 
-    // Set policies for multiple connections with different tiers
+    // Set policies for multiple connections with different modes
     let connections = vec![
-        (100, PrivacyTier::Anonymous),
-        (101, PrivacyTier::PrivateP2P),
-        (102, PrivacyTier::Federated),
-        (103, PrivacyTier::Public),
+        (100, PrivacyTier::ANONYMOUS),
+        (101, PrivacyTier::PRIVATE),
+        (103, PrivacyTier::PUBLIC),
     ];
 
     for (conn_id, tier) in &connections {
@@ -238,10 +232,9 @@ fn test_e2e_ebpf_policy_sync() {
     }
 
     // Verify each connection has correct policy
-    assert_eq!(bridge.get_ebpf_policy(100).privacy_tier, 0);
-    assert_eq!(bridge.get_ebpf_policy(101).privacy_tier, 1);
-    assert_eq!(bridge.get_ebpf_policy(102).privacy_tier, 2);
-    assert_eq!(bridge.get_ebpf_policy(103).privacy_tier, 3);
+    assert_eq!(bridge.get_ebpf_policy(100).privacy_tier, 0); // ANONYMOUS
+    assert_eq!(bridge.get_ebpf_policy(101).privacy_tier, 2); // PRIVATE
+    assert_eq!(bridge.get_ebpf_policy(103).privacy_tier, 3); // PUBLIC
 
     // Sync to kernel (would be actual eBPF maps in production)
     assert!(bridge.sync_to_kernel().is_ok());
@@ -273,7 +266,7 @@ fn test_e2e_privacy_preset_deployment() {
         match name {
             "MaxPrivacy" => {
                 assert_eq!(privacy_score, 1.0);
-                assert_eq!(caesar_mult, 0.1);
+                assert_eq!(caesar_mult, 0.0); // ANONYMOUS has 0.0 caesar multiplier
             }
             "MaxRewards" => {
                 assert_eq!(privacy_score, 0.0);
@@ -290,12 +283,11 @@ fn test_e2e_privacy_preset_deployment() {
 
 #[test]
 fn test_e2e_multi_tier_resource_sharing() {
-    // Simulate resource sharing across different privacy tiers
+    // Simulate resource sharing across different privacy modes
     let mut nodes = Vec::new();
 
-    // Create nodes in each tier
-    for tier in &[PrivacyTier::Anonymous, PrivacyTier::PrivateP2P,
-                  PrivacyTier::Federated, PrivacyTier::Public] {
+    // Create nodes in each mode
+    for tier in &[PrivacyTier::ANONYMOUS, PrivacyTier::PRIVATE, PrivacyTier::PUBLIC] {
         let mut node = PrivacySystem::new();
         node.switch_tier(*tier).unwrap();
         nodes.push((*tier, node));
@@ -305,23 +297,18 @@ fn test_e2e_multi_tier_resource_sharing() {
     for (tier, node) in &nodes {
         let mut validations = HashSet::new();
 
-        // Add validations based on tier
-        match tier {
-            PrivacyTier::Anonymous => {
-                // No validations needed
-            }
-            PrivacyTier::PrivateP2P => {
-                validations.insert(ValidationType::PeerIdentity);
-                validations.insert(ValidationType::PeerTrust);
-            }
-            PrivacyTier::Federated => {
-                validations.insert(ValidationType::NetworkIdentity);
-                validations.insert(ValidationType::FederationMembership);
-            }
-            PrivacyTier::Public => {
-                validations.insert(ValidationType::FullIdentity);
-                validations.insert(ValidationType::ProofOfSpace);
-            }
+        // Add validations based on mode
+        if *tier == PrivacyTier::ANONYMOUS {
+            // No validations needed
+        } else if *tier == PrivacyTier::PRIVATE {
+            validations.insert(ValidationType::PeerIdentity);
+            validations.insert(ValidationType::PeerTrust);
+            validations.insert(ValidationType::NetworkIdentity);
+            validations.insert(ValidationType::FederationMembership);
+        } else {
+            // PUBLIC
+            validations.insert(ValidationType::FullIdentity);
+            validations.insert(ValidationType::ProofOfSpace);
         }
 
         let share_action = PolicyAction {
@@ -334,12 +321,12 @@ fn test_e2e_multi_tier_resource_sharing() {
             high_value: false,
         };
 
-        // Anonymous tier doesn't allow resource sharing
-        if *tier == PrivacyTier::Anonymous {
+        // Anonymous mode doesn't allow resource sharing
+        if *tier == PrivacyTier::ANONYMOUS {
             continue; // Skip anonymous as it has limited permissions
         }
 
-        // Other tiers should allow with proper validation
+        // Other modes should allow with proper validation
         let result = node.enforce_policy(share_action);
         assert!(result.is_ok(), "Resource sharing failed for {:?}", tier);
     }
@@ -349,12 +336,11 @@ fn test_e2e_multi_tier_resource_sharing() {
 fn test_e2e_privacy_score_impact() {
     let mut systems = Vec::new();
 
-    // Create systems with different privacy scores
+    // Create systems with different privacy scores (3 modes, not 4)
     let configs = vec![
-        (PrivacyTier::Anonymous, PrivacyTier::Anonymous),   // Score: 1.0
-        (PrivacyTier::PrivateP2P, PrivacyTier::PrivateP2P), // Score: 0.7
-        (PrivacyTier::Federated, PrivacyTier::Federated),   // Score: 0.4
-        (PrivacyTier::Public, PrivacyTier::Public),         // Score: 0.0
+        (PrivacyTier::ANONYMOUS, PrivacyTier::ANONYMOUS),   // Score: 1.0
+        (PrivacyTier::PRIVATE, PrivacyTier::PRIVATE),       // Score: 0.7
+        (PrivacyTier::PUBLIC, PrivacyTier::PUBLIC),          // Score: 0.0
     ];
 
     for (network_tier, asset_tier) in configs {

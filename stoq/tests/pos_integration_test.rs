@@ -9,8 +9,9 @@
 
 use anyhow::Result;
 use std::time::{Duration, SystemTime};
+use hypermesh_lib::PrivacyMode;
 use stoq::protocol::{
-    StoqPosIntegration, PrivacyTier, MatrixPosition, PosToken,
+    StoqPosIntegration, MatrixPosition, PosToken,
     ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
 };
 use stoq::transport::certificate_strategy::NetworkType;
@@ -60,7 +61,7 @@ async fn test_anonymous_network_validation() -> Result<()> {
 
     let stats = integration.get_connection_stats("conn_anon_1");
     assert!(stats.is_some());
-    assert_eq!(stats.unwrap().privacy_tier, PrivacyTier::Anonymous);
+    assert_eq!(stats.unwrap().privacy_tier, PrivacyMode::ANONYMOUS);
 
     Ok(())
 }
@@ -80,7 +81,8 @@ async fn test_p2p_network_validation() -> Result<()> {
 
     let stats = integration.get_connection_stats("conn_p2p_1");
     assert!(stats.is_some());
-    assert_eq!(stats.unwrap().privacy_tier, PrivacyTier::P2P);
+    // P2P maps to PRIVATE in the new PrivacyMode model
+    assert_eq!(stats.unwrap().privacy_tier, PrivacyMode::PRIVATE);
 
     Ok(())
 }
@@ -102,7 +104,8 @@ async fn test_federated_network_validation() -> Result<()> {
 
     let stats = integration.get_connection_stats("conn_fed_1");
     assert!(stats.is_some());
-    assert_eq!(stats.unwrap().privacy_tier, PrivacyTier::Federated);
+    // Federated maps to PRIVATE in the new PrivacyMode model
+    assert_eq!(stats.unwrap().privacy_tier, PrivacyMode::PRIVATE);
 
     Ok(())
 }
@@ -124,7 +127,7 @@ async fn test_public_network_with_pos_validation() -> Result<()> {
     let stats = integration.get_connection_stats("conn_pub_1");
     assert!(stats.is_some());
     let stats = stats.unwrap();
-    assert_eq!(stats.privacy_tier, PrivacyTier::Public);
+    assert_eq!(stats.privacy_tier, PrivacyMode::PUBLIC);
     assert!(stats.has_pos_token, "Should have PoS token");
 
     Ok(())
@@ -311,14 +314,12 @@ async fn test_privacy_tier_enforcement_anonymous() -> Result<()> {
 
 #[tokio::test]
 async fn test_privacy_tier_enforcement_public() -> Result<()> {
-    let integration = StoqPosIntegration::new(Duration::from_secs(300));
-
-    // Create public connection without PoS token (invalid state for testing)
-    // We'll manually register to test enforcement
-    use stoq::protocol::pos_integration::PrivacyTier;
+    let _integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // This tests the enforcement logic - in practice, connection wouldn't be established
-    // without PoS token
+    // without PoS token. The test validates that PrivacyMode is accessible.
+    let mode = PrivacyMode::PUBLIC;
+    assert!(mode.requires_identity());
 
     Ok(())
 }
@@ -356,11 +357,11 @@ async fn test_all_network_types_integration() -> Result<()> {
     ).await?;
 
     // Verify all connections are tracked
+    // P2P and Federated both map to PRIVATE, so private_connections = 2
     let stats = integration.get_stats();
     assert_eq!(stats.total_connections, 4);
     assert_eq!(stats.anonymous_connections, 1);
-    assert_eq!(stats.p2p_connections, 1);
-    assert_eq!(stats.federated_connections, 1);
+    assert_eq!(stats.private_connections, 2);
     assert_eq!(stats.public_connections, 1);
 
     Ok(())
@@ -392,12 +393,12 @@ async fn test_connection_statistics() -> Result<()> {
     // Get connection stats
     let c1_stats = integration.get_connection_stats("c1");
     assert!(c1_stats.is_some());
-    assert_eq!(c1_stats.unwrap().privacy_tier, PrivacyTier::Anonymous);
+    assert_eq!(c1_stats.unwrap().privacy_tier, PrivacyMode::ANONYMOUS);
 
     let c3_stats = integration.get_connection_stats("c3");
     assert!(c3_stats.is_some());
     let c3_stats = c3_stats.unwrap();
-    assert_eq!(c3_stats.privacy_tier, PrivacyTier::Public);
+    assert_eq!(c3_stats.privacy_tier, PrivacyMode::PUBLIC);
     assert!(c3_stats.has_pos_token);
 
     // Get overall stats
@@ -429,40 +430,37 @@ async fn test_matrix_position_distance() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_privacy_tier_timeouts() -> Result<()> {
-    use stoq::protocol::pos_integration::PrivacyTier;
+async fn test_privacy_mode_timeouts() -> Result<()> {
+    // PrivacyMode uses connection_timeout_secs() returning u64
+    let anon_timeout = Duration::from_secs(PrivacyMode::ANONYMOUS.connection_timeout_secs());
+    let private_timeout = Duration::from_secs(PrivacyMode::PRIVATE.connection_timeout_secs());
+    let pub_timeout = Duration::from_secs(PrivacyMode::PUBLIC.connection_timeout_secs());
 
-    let anon_timeout = PrivacyTier::Anonymous.connection_timeout();
-    let p2p_timeout = PrivacyTier::P2P.connection_timeout();
-    let fed_timeout = PrivacyTier::Federated.connection_timeout();
-    let pub_timeout = PrivacyTier::Public.connection_timeout();
+    // Anonymous(30s) < Private(90s) < Public(300s)
+    assert!(anon_timeout < private_timeout);
+    assert!(private_timeout < pub_timeout);
 
-    // Higher privacy tiers should have longer timeouts
-    assert!(anon_timeout < p2p_timeout);
-    assert!(p2p_timeout < fed_timeout);
-    assert!(fed_timeout < pub_timeout);
+    // Verify exact values
+    assert_eq!(PrivacyMode::ANONYMOUS.connection_timeout_secs(), 30);
+    assert_eq!(PrivacyMode::PRIVATE.connection_timeout_secs(), 90);
+    assert_eq!(PrivacyMode::PUBLIC.connection_timeout_secs(), 300);
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_privacy_tier_validation_requirements() -> Result<()> {
-    use stoq::protocol::pos_integration::PrivacyTier;
+async fn test_privacy_mode_validation_requirements() -> Result<()> {
+    // ANONYMOUS: no identity, no logging
+    assert!(!PrivacyMode::ANONYMOUS.requires_identity());
+    assert!(!PrivacyMode::ANONYMOUS.allows_logging());
 
-    // Only Public requires PoS validation
-    assert!(!PrivacyTier::Anonymous.requires_pos_validation());
-    assert!(!PrivacyTier::P2P.requires_pos_validation());
-    assert!(!PrivacyTier::Federated.requires_pos_validation());
-    assert!(PrivacyTier::Public.requires_pos_validation());
+    // PRIVATE: requires identity, allows logging
+    assert!(PrivacyMode::PRIVATE.requires_identity());
+    assert!(PrivacyMode::PRIVATE.allows_logging());
 
-    // Only Public requires full 4-proof validation
-    assert!(PrivacyTier::Public.requires_full_proofs());
-
-    // Anonymous doesn't allow logging
-    assert!(!PrivacyTier::Anonymous.allows_logging());
-    assert!(PrivacyTier::P2P.allows_logging());
-    assert!(PrivacyTier::Federated.allows_logging());
-    assert!(PrivacyTier::Public.allows_logging());
+    // PUBLIC: requires identity, allows logging
+    assert!(PrivacyMode::PUBLIC.requires_identity());
+    assert!(PrivacyMode::PUBLIC.allows_logging());
 
     Ok(())
 }

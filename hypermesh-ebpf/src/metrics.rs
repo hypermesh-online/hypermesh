@@ -120,15 +120,14 @@ impl MatrixRoutingMetrics {
     }
 }
 
-/// Privacy tier enforcement metrics
+/// Privacy mode enforcement metrics
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PrivacyTierMetrics {
-    /// Connections by privacy tier
+    /// Connections by privacy mode
     pub anonymous_connections: u64,
     pub private_connections: u64,
-    pub federated_connections: u64,
     pub public_connections: u64,
-    /// Privacy tier violations (access denied)
+    /// Privacy mode violations (access denied)
     pub tier_violations: u64,
     /// Total privacy checks
     pub total_checks: u64,
@@ -139,7 +138,6 @@ impl PrivacyTierMetrics {
     pub fn total_connections(&self) -> u64 {
         self.anonymous_connections
             + self.private_connections
-            + self.federated_connections
             + self.public_connections
     }
 
@@ -171,7 +169,6 @@ pub struct HyperMeshMetricsCollector {
 
     privacy_anonymous: Arc<AtomicU64>,
     privacy_private: Arc<AtomicU64>,
-    privacy_federated: Arc<AtomicU64>,
     privacy_public: Arc<AtomicU64>,
     privacy_violations: Arc<AtomicU64>,
 
@@ -199,7 +196,6 @@ impl HyperMeshMetricsCollector {
 
             privacy_anonymous: Arc::new(AtomicU64::new(0)),
             privacy_private: Arc::new(AtomicU64::new(0)),
-            privacy_federated: Arc::new(AtomicU64::new(0)),
             privacy_public: Arc::new(AtomicU64::new(0)),
             privacy_violations: Arc::new(AtomicU64::new(0)),
 
@@ -249,12 +245,11 @@ impl HyperMeshMetricsCollector {
         }
     }
 
-    /// Record privacy tier connection
-    pub fn record_privacy_connection(&self, tier: u8) {
-        match tier {
+    /// Record privacy mode connection (u8 from eBPF map: 0=Anonymous, 1|2=Private, 3=Public)
+    pub fn record_privacy_connection(&self, mode: u8) {
+        match mode {
             0 => self.privacy_anonymous.fetch_add(1, Ordering::Relaxed),
-            1 => self.privacy_private.fetch_add(1, Ordering::Relaxed),
-            2 => self.privacy_federated.fetch_add(1, Ordering::Relaxed),
+            1 | 2 => self.privacy_private.fetch_add(1, Ordering::Relaxed),
             3 => self.privacy_public.fetch_add(1, Ordering::Relaxed),
             _ => 0,
         };
@@ -289,7 +284,6 @@ impl HyperMeshMetricsCollector {
         // Update privacy metrics
         metrics.privacy_metrics.anonymous_connections = self.privacy_anonymous.load(Ordering::Relaxed);
         metrics.privacy_metrics.private_connections = self.privacy_private.load(Ordering::Relaxed);
-        metrics.privacy_metrics.federated_connections = self.privacy_federated.load(Ordering::Relaxed);
         metrics.privacy_metrics.public_connections = self.privacy_public.load(Ordering::Relaxed);
         metrics.privacy_metrics.tier_violations = self.privacy_violations.load(Ordering::Relaxed);
 
@@ -314,7 +308,6 @@ impl HyperMeshMetricsCollector {
 
         self.privacy_anonymous.store(0, Ordering::Relaxed);
         self.privacy_private.store(0, Ordering::Relaxed);
-        self.privacy_federated.store(0, Ordering::Relaxed);
         self.privacy_public.store(0, Ordering::Relaxed);
         self.privacy_violations.store(0, Ordering::Relaxed);
 
@@ -355,11 +348,10 @@ impl std::fmt::Display for HyperMeshMetrics {
             self.routing_metrics.path_failures)?;
         writeln!(f, "    Success Rate: {:.2}%", self.routing_metrics.success_rate())?;
 
-        writeln!(f, "  Privacy Tiers:")?;
-        writeln!(f, "    Anonymous: {}, Private: {}, Federated: {}, Public: {}",
+        writeln!(f, "  Privacy Modes:")?;
+        writeln!(f, "    Anonymous: {}, Private: {}, Public: {}",
             self.privacy_metrics.anonymous_connections,
             self.privacy_metrics.private_connections,
-            self.privacy_metrics.federated_connections,
             self.privacy_metrics.public_connections)?;
         writeln!(f, "    Violations: {}", self.privacy_metrics.tier_violations)?;
 

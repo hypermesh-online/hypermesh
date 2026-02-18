@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::time::Duration;
+use hypermesh_lib::PrivacyMode;
 use hypermesh_assets::{
     cross_chain::{
         CrossNetworkValidator, CrossChainValidationManager, BusinessWorkflowType,
@@ -25,7 +26,6 @@ use hypermesh_assets::{
         GeographicDimension, OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
     },
     core::asset_id::{AssetId, AssetType},
-    blockchain::AssetPrivacyLevel,
 };
 
 #[tokio::main]
@@ -164,7 +164,7 @@ async fn register_entities(
                 ("dealer.hypermesh.online".to_string(), vec!["wholesale_price".to_string()]),
             ]),
             zk_proof_fields: vec!["manufacturing_cost".to_string()],
-            default_privacy_level: AssetPrivacyLevel::PrivateNetwork,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec![
             "dealer.hypermesh.online".to_string(),
@@ -209,7 +209,7 @@ async fn register_entities(
                 ("bank.hypermesh.online".to_string(), vec!["invoice_price".to_string()]),
             ]),
             zk_proof_fields: vec!["profit_margin".to_string(), "dealer_cost".to_string()],
-            default_privacy_level: AssetPrivacyLevel::PublicNetwork,
+            default_privacy_level: PrivacyMode::PUBLIC,
         },
         trusted_partners: vec![
             "honda.hypermesh.online".to_string(),
@@ -259,7 +259,7 @@ async fn register_entities(
                 "loan_amount".to_string(),
                 "interest_rate".to_string()
             ],
-            default_privacy_level: AssetPrivacyLevel::Private,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec![
             "dealer.hypermesh.online".to_string(),
@@ -305,7 +305,7 @@ async fn register_entities(
                 ("dmv.hypermesh.online".to_string(), vec!["policy_number".to_string()]),
             ]),
             zk_proof_fields: vec!["premium_amount".to_string(), "risk_score".to_string()],
-            default_privacy_level: AssetPrivacyLevel::PrivateNetwork,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec![
             "honda.hypermesh.online".to_string(),
@@ -353,7 +353,7 @@ async fn register_entities(
                 ("bank.hypermesh.online".to_string(), vec!["lien_status".to_string()]),
             ]),
             zk_proof_fields: vec![],
-            default_privacy_level: AssetPrivacyLevel::PublicNetwork,
+            default_privacy_level: PrivacyMode::PUBLIC,
         },
         trusted_partners: vec![
             "insurance.hypermesh.online".to_string(),

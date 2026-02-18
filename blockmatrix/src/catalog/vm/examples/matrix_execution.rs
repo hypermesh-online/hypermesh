@@ -28,8 +28,8 @@ use crate::assets::matrix_blockchain::{
     MatrixBlockchainManager, EntityConfig,
     EntityType, BlockchainMatrixCoordinate, GeographicDimension,
     OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
-    AssetPrivacyLevel
 };
+use hypermesh_lib::PrivacyMode;
 use crate::consensus::ConsensusProof;
 
 /// Example: Vehicle Purchase Cross-Entity Workflow
@@ -100,8 +100,8 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
             },
         ],
         workflow_privacy: WorkflowPrivacyPolicy {
-            intermediate_privacy: PrivacyLevel::P2P,
-            final_privacy: PrivacyLevel::PrivateNetwork,
+            intermediate_privacy: PrivacyLevel::PRIVATE,
+            final_privacy: PrivacyLevel::PRIVATE,
             intermediate_access: vec![
                 "dealer.hypermesh.online".to_string(),
                 "bank.hypermesh.online".to_string(),
@@ -134,7 +134,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
                     field: "warranty_status".to_string(),
                     constraint: ValidationConstraint::Equal("active".to_string()),
                 },
-                privacy_level: PrivacyLevel::P2P,
+                privacy_level: PrivacyLevel::PRIVATE,
             },
             // Validate registration with DMV
             CrossEntityValidation {
@@ -149,7 +149,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
                     field: "title_status".to_string(),
                     constraint: ValidationConstraint::Equal("clear".to_string()),
                 },
-                privacy_level: PrivacyLevel::PublicNetwork,
+                privacy_level: PrivacyLevel::PUBLIC,
             },
         ],
         entity_privacy_policies: HashMap::new(),
@@ -259,7 +259,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
                     statement: "coverage_validation".to_string(),
                     proof_type: "zk_snark".to_string(),
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
             },
         ],
         entity_privacy_policies: {
@@ -273,7 +273,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
                         alloc
                     },
                     allowed_operations: vec!["read_anonymized".to_string()],
-                    resource_privacy_level: PrivacyLevel::Private,
+                    resource_privacy_level: PrivacyLevel::PRIVATE,
                     max_duration_seconds: 300, // 5 minutes max
                 });
             policies
@@ -331,8 +331,8 @@ pub async fn iot_device_coordination_example() -> Result<()> {
             },
         ],
         workflow_privacy: WorkflowPrivacyPolicy {
-            intermediate_privacy: PrivacyLevel::P2P,
-            final_privacy: PrivacyLevel::PublicNetwork,
+            intermediate_privacy: PrivacyLevel::PRIVATE,
+            final_privacy: PrivacyLevel::PUBLIC,
             intermediate_access: vec!["edge-processor.hypermesh.online".to_string()],
             data_sharing_rules: HashMap::new(),
         },
@@ -381,7 +381,7 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
             public_fields: vec!["vin".to_string(), "model".to_string()],
             federated_fields: HashMap::new(),
             zk_proof_fields: vec!["manufacturing_cost".to_string()],
-            default_privacy_level: AssetPrivacyLevel::Private,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec!["dealer.hypermesh.online".to_string()],
     };
@@ -395,7 +395,7 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
             public_fields: vec!["registration_status".to_string(), "inspection_status".to_string()],
             federated_fields: HashMap::new(),
             zk_proof_fields: vec![],
-            default_privacy_level: AssetPrivacyLevel::FullPublic,
+            default_privacy_level: PrivacyMode::PUBLIC,
         },
         trusted_partners: vec!["dealer.hypermesh.online".to_string()],
     };
@@ -413,7 +413,7 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
                 federated
             },
             zk_proof_fields: vec!["profit_margin".to_string()],
-            default_privacy_level: AssetPrivacyLevel::Private,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec!["honda.hypermesh.online".to_string(), "bank.hypermesh.online".to_string()],
     };
@@ -431,7 +431,7 @@ fn setup_vehicle_ecosystem_entities(manager: &mut MatrixBlockchainManager) -> Re
                 federated
             },
             zk_proof_fields: vec!["credit_score".to_string(), "loan_amount".to_string()],
-            default_privacy_level: AssetPrivacyLevel::Private,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec!["dealer.hypermesh.online".to_string()],
     };
@@ -488,7 +488,7 @@ async fn setup_entity_vm_configs(mut matrix_vm: MatrixAwareVM) -> Result<MatrixA
                 public_fields: vec!["basic_info".to_string()],
                 federated_fields: HashMap::new(),
                 zk_proof_fields: vec![],
-                default_privacy_level: AssetPrivacyLevel::Private,
+                default_privacy_level: PrivacyMode::PRIVATE,
             },
             trusted_partners: vec![],
             max_external_allocation: {

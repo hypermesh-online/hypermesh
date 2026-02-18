@@ -173,9 +173,9 @@ mod tests {
         };
 
         let privacy_config = PrivacyConfig {
-            level: PrivacyLevel::P2P,
+            level: PrivacyLevel::PRIVATE,
             allowed_networks: vec![],
-            allowed_peers: vec!["peer1".to_string(), "peer2".to_string()],
+            allowed_peers: vec![],
             max_concurrent_access: 5,
             require_consensus: false,
         };
@@ -189,8 +189,7 @@ mod tests {
 
         assert!(mapping.privacy_config.is_some());
         let attached_privacy = mapping.privacy_config.expect("test");
-        assert_eq!(attached_privacy.level, PrivacyLevel::P2P);
-        assert_eq!(attached_privacy.allowed_peers.len(), 2);
+        assert_eq!(attached_privacy.level, PrivacyLevel::PRIVATE);
         assert_eq!(attached_privacy.max_concurrent_access, 5);
 
         translator.remove_translation(&global_addr).await.expect("test");
@@ -218,10 +217,11 @@ mod tests {
             prefetch: false,
         };
 
+        // PRIVATE level should not have allowed networks or peers
         let invalid_privacy = PrivacyConfig {
-            level: PrivacyLevel::P2P,
-            allowed_networks: vec![],
-            allowed_peers: vec![], // Should fail - P2P needs peers
+            level: PrivacyLevel::PRIVATE,
+            allowed_networks: vec!["some-net".to_string()],
+            allowed_peers: vec![],
             max_concurrent_access: 1,
             require_consensus: false,
         };
@@ -234,6 +234,6 @@ mod tests {
         ).await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("P2P privacy level requires allowed peers"));
+        assert!(result.unwrap_err().to_string().contains("Private level should not have allowed networks or peers"));
     }
 }

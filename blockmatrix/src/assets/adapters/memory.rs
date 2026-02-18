@@ -165,7 +165,7 @@ impl MemoryAssetAdapter {
             available_size: total_memory,
             memory_type: "DDR4".to_string(), // Default assumption
             numa_node: None,
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             allocations: Vec::new(),
         });
         
@@ -482,7 +482,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                 read: true,
                 write: true,
                 execute: false, // No execute by default
-                share: matches!(request.privacy_level, PrivacyLevel::FullPublic | PrivacyLevel::PublicNetwork),
+                share: request.privacy_level == PrivacyLevel::PUBLIC,
             },
             expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour default
             access_signature: Vec::new(), // Will be filled by create_access_signature
@@ -529,7 +529,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 proxy_address: Some(proxy_address.clone()),
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -639,7 +639,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         if let Some(proxy_addr) = &allocation.proxy_address {
             let mut mappings = self.proxy_mappings.write().await;
             if let Some(mapping) = mappings.get_mut(proxy_addr) {
-                mapping.permissions.share = matches!(privacy, PrivacyLevel::FullPublic | PrivacyLevel::PublicNetwork);
+                mapping.permissions.share = privacy == PrivacyLevel::PUBLIC;
             }
         }
         
@@ -734,11 +734,11 @@ impl AssetAdapter for MemoryAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Memory,
             supported_privacy_levels: vec![
-                PrivacyLevel::Private,
-                PrivacyLevel::PrivateNetwork,
-                PrivacyLevel::P2P,
-                PrivacyLevel::PublicNetwork,
-                PrivacyLevel::FullPublic,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PUBLIC,
+                PrivacyLevel::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,
@@ -777,7 +777,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             // Use default test proofs that pass validation (proper hash generation)
             consensus_proof: ConsensusProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),

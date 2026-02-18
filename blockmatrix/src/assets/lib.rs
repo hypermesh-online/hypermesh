@@ -74,7 +74,7 @@
 //!
 //! let request = AssetAllocationRequest {
 //!     asset_type: AssetType::Cpu,
-//!     privacy_level: PrivacyLevel::P2P,
+//!     privacy_level: PrivacyLevel::PRIVATE,
 //!     consensus_proof,
 //!     certificate_fingerprint: "cert-fingerprint".to_string(),
 //!     // ... other fields
@@ -93,7 +93,7 @@
 //!
 //! // Configure user privacy preferences
 //! let privacy_config = UserPrivacyConfig {
-//!     default_privacy_level: PrivacyLevel::P2P,
+//!     default_privacy_level: PrivacyLevel::PRIVATE,
 //!     // Private: No sharing, no rewards
 //!     // PrivateNetwork: Trusted groups only  
 //!     // P2P: Verified peers
@@ -316,15 +316,15 @@ mod integration_tests {
     #[test]
     fn test_privacy_level_hierarchy() {
         // Test privacy level access control hierarchy
-        assert!(!PrivacyLevel::Private.allows_access_from(&PrivacyLevel::FullPublic));
-        assert!(PrivacyLevel::FullPublic.allows_access_from(&PrivacyLevel::Private));
-        assert!(PrivacyLevel::PublicNetwork.allows_access_from(&PrivacyLevel::P2P));
+        assert!(!PrivacyLevel::PRIVATE.allows_access_from(&PrivacyLevel::PUBLIC));
+        assert!(PrivacyLevel::PUBLIC.allows_access_from(&PrivacyLevel::PRIVATE));
+        assert!(PrivacyLevel::PUBLIC.allows_access_from(&PrivacyLevel::PRIVATE));
         
         // Test CAESAR reward multipliers
-        assert_eq!(PrivacyLevel::Private.caesar_reward_multiplier(), 0.0);
-        assert_eq!(PrivacyLevel::FullPublic.caesar_reward_multiplier(), 1.0);
-        assert!(PrivacyLevel::P2P.caesar_reward_multiplier() > 0.0);
-        assert!(PrivacyLevel::P2P.caesar_reward_multiplier() < 1.0);
+        assert_eq!(PrivacyLevel::PRIVATE.caesar_reward_multiplier(), 0.0);
+        assert_eq!(PrivacyLevel::PUBLIC.caesar_reward_multiplier(), 1.0);
+        assert!(PrivacyLevel::PRIVATE.caesar_reward_multiplier() > 0.0);
+        assert!(PrivacyLevel::PRIVATE.caesar_reward_multiplier() < 1.0);
     }
     
     #[test]

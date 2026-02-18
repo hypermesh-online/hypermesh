@@ -263,7 +263,7 @@ impl MatrixAwareVM {
                 target_entity: request.entity_domain.clone(),
                 asset_id: None,
                 timestamp: std::time::SystemTime::now(),
-                privacy_level: PrivacyLevel::P2P,
+                privacy_level: PrivacyLevel::PRIVATE,
             });
         }
 

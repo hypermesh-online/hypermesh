@@ -681,7 +681,7 @@ impl UnifiedExtensionManager {
             settings: serde_json::Value::Null,
             resource_limits: self.config.global_limits.clone(),
             granted_capabilities,
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             debug_mode: false,
         })
     }

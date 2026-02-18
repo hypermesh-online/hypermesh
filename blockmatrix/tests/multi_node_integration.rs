@@ -255,7 +255,7 @@ async fn test_resource_sharing() {
             penalty_rate: 0.1,
         },
         expires_at: SystemTime::now() + Duration::from_secs(3600),
-        privacy_requirements: PrivacyLevel::PublicNetwork,
+        privacy_requirements: PrivacyLevel::PUBLIC,
     };
 
     sharing.submit_offer(offer).await.unwrap();
@@ -276,7 +276,7 @@ async fn test_resource_sharing() {
             penalty_rate: 0.05,
         },
         expires_at: SystemTime::now() + Duration::from_secs(1800),
-        privacy_requirements: PrivacyLevel::PublicNetwork,
+        privacy_requirements: PrivacyLevel::PUBLIC,
     };
 
     sharing.submit_request(request).await.unwrap();

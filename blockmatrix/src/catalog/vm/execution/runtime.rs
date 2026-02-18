@@ -385,7 +385,7 @@ impl ConsensusRuntime {
                     container: None,
                     economic: None,
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 consensus_proof: self.create_allocation_consensus_proof().await?,
                 certificate_fingerprint: String::new(),
                 duration_limit: Some(Duration::from_secs(3600)), // 1 hour default

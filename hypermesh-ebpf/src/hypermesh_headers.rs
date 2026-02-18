@@ -8,6 +8,7 @@
 //! STOQ treats these as opaque byte blobs; HyperMesh interprets their semantics.
 
 use serde::{Serialize, Deserialize};
+use hypermesh_lib::{PrivacyMode, AccessScope};
 
 /// Extension type constants (HyperMesh namespace: 0x1000-0x1FFF)
 pub const EXT_PROOF_OF_STATE: u16 = 0x1000;
@@ -273,42 +274,23 @@ impl MatrixRoutingHeader {
     }
 }
 
-/// Privacy Tier for access control
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PrivacyTier {
-    /// No public access, internal network only
-    Anonymous = 0,
-    /// Specific networks/groups only
-    Private = 1,
-    /// Federated trust networks
-    Federated = 2,
-    /// Full public access
-    Public = 3,
-}
-
-impl PrivacyTier {
-    pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(PrivacyTier::Anonymous),
-            1 => Some(PrivacyTier::Private),
-            2 => Some(PrivacyTier::Federated),
-            3 => Some(PrivacyTier::Public),
-            _ => None,
-        }
-    }
-
-    pub fn to_u8(self) -> u8 {
-        self as u8
+/// Convert a u8 (from eBPF map or wire format) back to PrivacyMode
+pub fn privacy_mode_from_u8(value: u8) -> Option<PrivacyMode> {
+    match value {
+        0 => Some(PrivacyMode::ANONYMOUS),
+        1 => Some(PrivacyMode { scope: AccessScope::Bounded, tracked: false }),
+        2 => Some(PrivacyMode::PRIVATE),
+        3 => Some(PrivacyMode::PUBLIC),
+        _ => None,
     }
 }
 
-/// Privacy Tier extension header
+/// Privacy mode extension header
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PrivacyTierHeader {
-    /// Privacy tier level
-    pub tier: PrivacyTier,
+    /// Privacy mode
+    pub tier: PrivacyMode,
     /// Reserved for future use
     _reserved: [u8; 7],
 }
@@ -316,7 +298,7 @@ pub struct PrivacyTierHeader {
 impl PrivacyTierHeader {
     pub const SIZE: usize = 8;
 
-    pub fn new(tier: PrivacyTier) -> Self {
+    pub fn new(tier: PrivacyMode) -> Self {
         Self {
             tier,
             _reserved: [0u8; 7],
@@ -325,7 +307,7 @@ impl PrivacyTierHeader {
 
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        bytes[0] = self.tier.to_u8();
+        bytes[0] = self.tier.to_ebpf_u8();
         bytes
     }
 
@@ -335,7 +317,7 @@ impl PrivacyTierHeader {
         }
 
         Some(Self {
-            tier: PrivacyTier::from_u8(bytes[0])?,
+            tier: privacy_mode_from_u8(bytes[0])?,
             _reserved: [0u8; 7],
         })
     }
@@ -411,11 +393,11 @@ mod tests {
     }
 
     #[test]
-    fn test_privacy_tier_conversion() {
-        assert_eq!(PrivacyTier::from_u8(0), Some(PrivacyTier::Anonymous));
-        assert_eq!(PrivacyTier::from_u8(3), Some(PrivacyTier::Public));
-        assert_eq!(PrivacyTier::from_u8(99), None);
+    fn test_privacy_mode_conversion() {
+        assert_eq!(privacy_mode_from_u8(0), Some(PrivacyMode::ANONYMOUS));
+        assert_eq!(privacy_mode_from_u8(3), Some(PrivacyMode::PUBLIC));
+        assert_eq!(privacy_mode_from_u8(99), None);
 
-        assert_eq!(PrivacyTier::Private.to_u8(), 1);
+        assert_eq!(PrivacyMode::PRIVATE.to_ebpf_u8(), 2);
     }
 }

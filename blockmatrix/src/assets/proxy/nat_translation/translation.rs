@@ -201,30 +201,16 @@ impl NATTranslator {
             });
         }
 
-        match privacy.level {
-            PrivacyLevel::Private => {
-                if !privacy.allowed_networks.is_empty() || !privacy.allowed_peers.is_empty() {
-                    return Err(AssetError::AdapterError {
-                        message: "Private level should not have allowed networks or peers".to_string()
-                    });
-                }
-            },
-            PrivacyLevel::PrivateNetwork | PrivacyLevel::PublicNetwork => {
-                if privacy.allowed_networks.is_empty() {
-                    return Err(AssetError::AdapterError {
-                        message: "Network privacy level requires allowed networks".to_string()
-                    });
-                }
-            },
-            PrivacyLevel::P2P => {
-                if privacy.allowed_peers.is_empty() {
-                    return Err(AssetError::AdapterError {
-                        message: "P2P privacy level requires allowed peers".to_string()
-                    });
-                }
-            },
-            PrivacyLevel::FullPublic => {},
+        if privacy.level == PrivacyLevel::PRIVATE {
+            if !privacy.allowed_networks.is_empty() || !privacy.allowed_peers.is_empty() {
+                return Err(AssetError::AdapterError {
+                    message: "Private level should not have allowed networks or peers".to_string()
+                });
+            }
+        } else if privacy.level == PrivacyLevel::ANONYMOUS {
+            // Anonymous level: no special restrictions
         }
+        // PUBLIC: no restrictions
 
         Ok(())
     }

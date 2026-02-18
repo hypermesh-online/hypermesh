@@ -525,7 +525,7 @@ mod tests {
 
         // Create mock registry
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

@@ -61,8 +61,8 @@ pub struct PrivacySettings {
     /// Default allocation type
     pub default_allocation_type: PrivacyAllocationType,
     
-    /// Privacy mode preferences
-    pub privacy_mode: PrivacyMode,
+    /// Privacy preference (user's desired privacy/functionality balance)
+    pub privacy_preference: PrivacyPreference,
     
     /// Data minimization settings
     pub data_minimization: DataMinimizationSettings,
@@ -74,9 +74,9 @@ pub struct PrivacySettings {
     pub dashboard_preferences: DashboardPreferences,
 }
 
-/// Privacy mode options
+/// Privacy preference options (user's desired privacy/functionality balance)
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum PrivacyMode {
+pub enum PrivacyPreference {
     /// Maximum privacy protection
     MaximumPrivacy,
     /// Balance privacy and functionality
@@ -182,9 +182,9 @@ impl Default for UserPrivacyConfig {
 impl Default for PrivacySettings {
     fn default() -> Self {
         Self {
-            default_privacy_level: PrivacyLevel::Private,
+            default_privacy_level: PrivacyLevel::PRIVATE,
             default_allocation_type: PrivacyAllocationType::Private,
-            privacy_mode: PrivacyMode::Balanced,
+            privacy_preference: PrivacyPreference::Balanced,
             data_minimization: DataMinimizationSettings::default(),
             consent_management: ConsentManagementSettings::default(),
             dashboard_preferences: DashboardPreferences::default(),
@@ -192,8 +192,8 @@ impl Default for PrivacySettings {
     }
 }
 
-impl Default for PrivacyMode {
+impl Default for PrivacyPreference {
     fn default() -> Self {
-        PrivacyMode::Balanced
+        PrivacyPreference::Balanced
     }
 }

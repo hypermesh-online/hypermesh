@@ -27,7 +27,7 @@ export const crateStatuses: CrateStatus[] = [
         "Every-node blockchain (independent chains)",
         "Geospatial module (GPS conversion, clustering)",
         "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
-        "Privacy allocation (5 levels, 4 tiers)",
+        "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
         "Matrix persistence (WAL, snapshots, recovery)",
         "Proof of State four-proof validation"
       ],
@@ -167,7 +167,7 @@ export const crateStatuses: CrateStatus[] = [
     "features": {
       "working": [
         "NodeId and AssetId newtypes",
-        "NetworkPrivacyTier enum (4 tiers)",
+        "PrivacyMode struct (2-axis: AccessScope + tracked)",
         "BlockchainScope enum (6 scopes)",
         "ProofType enum (PoSpace/PoStake/PoWork/PoTime)",
         "MatrixPosition coordinate type",

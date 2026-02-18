@@ -5,7 +5,8 @@
 // Per-tier validation policies for the privacy system
 // Defines and enforces rules for each privacy tier
 
-use super::tiers::{NodeId, PrivacyTier};
+use super::tiers::NodeId;
+use hypermesh_lib::PrivacyMode;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -46,7 +47,7 @@ pub enum ConditionType {
 #[derive(Debug, Clone)]
 pub struct PolicyViolation {
     pub violation_type: ViolationType,
-    pub tier: PrivacyTier,
+    pub tier: PrivacyMode,
     pub message: String,
     pub severity: Severity,
 }
@@ -73,8 +74,8 @@ pub enum Severity {
 
 /// Master policy manager for all tiers
 pub struct PolicyManager {
-    /// Tier-specific policies
-    tier_policies: HashMap<PrivacyTier, TierPolicy>,
+    /// Mode-specific policies
+    tier_policies: HashMap<PrivacyMode, TierPolicy>,
     /// Global rate limits
     rate_limits: RateLimits,
     /// Enforcement statistics
@@ -89,17 +90,16 @@ impl PolicyManager {
             enforcement_stats: EnforcementStats::default(),
         };
 
-        // Initialize policies for each tier
-        manager.tier_policies.insert(PrivacyTier::Anonymous, TierPolicy::anonymous());
-        manager.tier_policies.insert(PrivacyTier::PrivateP2P, TierPolicy::private_p2p());
-        manager.tier_policies.insert(PrivacyTier::Federated, TierPolicy::federated());
-        manager.tier_policies.insert(PrivacyTier::Public, TierPolicy::public());
+        // Initialize policies for each mode
+        manager.tier_policies.insert(PrivacyMode::ANONYMOUS, TierPolicy::anonymous());
+        manager.tier_policies.insert(PrivacyMode::PRIVATE, TierPolicy::private_p2p());
+        manager.tier_policies.insert(PrivacyMode::PUBLIC, TierPolicy::public());
 
         manager
     }
 
     /// Enforce policy for a specific action
-    pub fn enforce(&mut self, tier: PrivacyTier, action: PolicyAction) -> PolicyResult {
+    pub fn enforce(&mut self, tier: PrivacyMode, action: PolicyAction) -> PolicyResult {
         self.enforcement_stats.total_checks += 1;
 
         let policy = self.tier_policies.get(&tier)
@@ -136,8 +136,8 @@ impl PolicyManager {
         Ok(decision)
     }
 
-    /// Update policy for a specific tier
-    pub fn update_policy(&mut self, tier: PrivacyTier, policy: TierPolicy) {
+    /// Update policy for a specific mode
+    pub fn update_policy(&mut self, tier: PrivacyMode, policy: TierPolicy) {
         self.tier_policies.insert(tier, policy);
     }
 
@@ -161,8 +161,8 @@ impl Default for PolicyManager {
 /// Tier-specific policy configuration
 #[derive(Debug, Clone)]
 pub struct TierPolicy {
-    /// Privacy tier this policy applies to
-    pub tier: PrivacyTier,
+    /// Privacy mode this policy applies to
+    pub tier: PrivacyMode,
     /// Allowed actions
     pub allowed_actions: HashSet<ActionType>,
     /// Required validations
@@ -174,10 +174,10 @@ pub struct TierPolicy {
 }
 
 impl TierPolicy {
-    /// Create policy for anonymous tier
+    /// Create policy for anonymous mode
     pub fn anonymous() -> Self {
         Self {
-            tier: PrivacyTier::Anonymous,
+            tier: PrivacyMode::ANONYMOUS,
             allowed_actions: vec![
                 ActionType::Connect,
                 ActionType::Disconnect,
@@ -198,10 +198,10 @@ impl TierPolicy {
         }
     }
 
-    /// Create policy for private P2P tier
+    /// Create policy for private P2P mode
     pub fn private_p2p() -> Self {
         Self {
-            tier: PrivacyTier::PrivateP2P,
+            tier: PrivacyMode::PRIVATE,
             allowed_actions: vec![
                 ActionType::Connect,
                 ActionType::Disconnect,
@@ -227,35 +227,10 @@ impl TierPolicy {
         }
     }
 
-    /// Create policy for federated tier
-    pub fn federated() -> Self {
-        Self {
-            tier: PrivacyTier::Federated,
-            allowed_actions: ActionType::all(),
-            required_validations: vec![
-                ValidationType::NetworkIdentity,
-                ValidationType::FederationMembership,
-                ValidationType::ProofOfSpace,
-                ValidationType::ProofOfTime,
-            ],
-            access_rules: AccessRules {
-                allow_identity_query: true,
-                allow_location_query: true,
-                allow_metric_collection: true,
-                allow_resource_discovery: true,
-            },
-            retention_policy: RetentionPolicy {
-                connection_logs: true,
-                transaction_history: true,
-                retention_hours: 168, // 1 week
-            },
-        }
-    }
-
-    /// Create policy for public tier
+    /// Create policy for public mode
     pub fn public() -> Self {
         Self {
-            tier: PrivacyTier::Public,
+            tier: PrivacyMode::PUBLIC,
             allowed_actions: ActionType::all(),
             required_validations: vec![
                 ValidationType::FullIdentity,
@@ -285,7 +260,7 @@ impl TierPolicy {
             return Err(PolicyViolation {
                 violation_type: ViolationType::UnauthorizedAccess,
                 tier: self.tier,
-                message: format!("Action {:?} not allowed in {:?} tier", action.action_type, self.tier),
+                message: format!("Action {:?} not allowed in {} mode", action.action_type, self.tier),
                 severity: Severity::High,
             });
         }
@@ -343,30 +318,19 @@ impl TierPolicy {
     fn get_required_conditions(&self, action: &PolicyAction) -> Vec<PolicyCondition> {
         let mut conditions = Vec::new();
 
-        // Add tier-specific conditions
-        match self.tier {
-            PrivacyTier::PrivateP2P if action.action_type == ActionType::ShareResource => {
-                conditions.push(PolicyCondition {
-                    condition_type: ConditionType::RequirePeerApproval,
-                    description: "Requires approval from trusted peers".to_string(),
-                    timeout_ms: Some(5000),
-                });
-            }
-            PrivacyTier::Federated if action.high_value => {
-                conditions.push(PolicyCondition {
-                    condition_type: ConditionType::RequireFederationConsensus,
-                    description: "High-value action requires federation consensus".to_string(),
-                    timeout_ms: Some(10000),
-                });
-            }
-            PrivacyTier::Public if action.action_type == ActionType::ValidateBlock => {
-                conditions.push(PolicyCondition {
-                    condition_type: ConditionType::RequireProofOfState,
-                    description: "Block validation requires full proof of state".to_string(),
-                    timeout_ms: None,
-                });
-            }
-            _ => {}
+        // Add mode-specific conditions
+        if self.tier == PrivacyMode::PRIVATE && action.action_type == ActionType::ShareResource {
+            conditions.push(PolicyCondition {
+                condition_type: ConditionType::RequirePeerApproval,
+                description: "Requires approval from trusted peers".to_string(),
+                timeout_ms: Some(5000),
+            });
+        } else if self.tier == PrivacyMode::PUBLIC && action.action_type == ActionType::ValidateBlock {
+            conditions.push(PolicyCondition {
+                condition_type: ConditionType::RequireProofOfState,
+                description: "Block validation requires full proof of state".to_string(),
+                timeout_ms: None,
+            });
         }
 
         conditions
@@ -450,14 +414,14 @@ pub struct RetentionPolicy {
 /// Rate limiting configuration
 #[derive(Debug, Clone)]
 pub struct RateLimits {
-    /// Limits per tier
-    tier_limits: HashMap<PrivacyTier, RateLimit>,
+    /// Limits per mode
+    tier_limits: HashMap<PrivacyMode, RateLimit>,
     /// Action counts for rate limiting
-    action_counts: HashMap<(PrivacyTier, ActionType), u64>,
+    action_counts: HashMap<(PrivacyMode, ActionType), u64>,
 }
 
 impl RateLimits {
-    pub fn check_rate(&mut self, tier: PrivacyTier, action: &PolicyAction) -> bool {
+    pub fn check_rate(&mut self, tier: PrivacyMode, action: &PolicyAction) -> bool {
         let key = (tier, action.action_type);
         let count = self.action_counts.entry(key).or_insert(0);
 
@@ -479,11 +443,10 @@ impl Default for RateLimits {
     fn default() -> Self {
         let mut limits = HashMap::new();
 
-        // Configure tier-specific rate limits
-        limits.insert(PrivacyTier::Anonymous, RateLimit::restrictive());
-        limits.insert(PrivacyTier::PrivateP2P, RateLimit::moderate());
-        limits.insert(PrivacyTier::Federated, RateLimit::permissive());
-        limits.insert(PrivacyTier::Public, RateLimit::unlimited());
+        // Configure mode-specific rate limits
+        limits.insert(PrivacyMode::ANONYMOUS, RateLimit::restrictive());
+        limits.insert(PrivacyMode::PRIVATE, RateLimit::moderate());
+        limits.insert(PrivacyMode::PUBLIC, RateLimit::unlimited());
 
         Self {
             tier_limits: limits,
@@ -542,7 +505,7 @@ pub struct EnforcementStats {
 
 impl std::fmt::Display for PolicyViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{:?}] {} tier: {} (Severity: {:?})",
+        write!(f, "[{:?}] {} mode: {} (Severity: {:?})",
                self.violation_type, self.tier, self.message, self.severity)
     }
 }
@@ -556,7 +519,7 @@ mod tests {
     #[test]
     fn test_policy_manager_creation() {
         let manager = PolicyManager::new();
-        assert_eq!(manager.tier_policies.len(), 4);
+        assert_eq!(manager.tier_policies.len(), 3);
     }
 
     #[test]
@@ -590,7 +553,7 @@ mod tests {
             high_value: false,
         };
 
-        let result = manager.enforce(PrivacyTier::Anonymous, action);
+        let result = manager.enforce(PrivacyMode::ANONYMOUS, action);
         assert!(matches!(result, Ok(PolicyDecision::Allow)));
     }
 
@@ -607,7 +570,7 @@ mod tests {
             high_value: false,
         };
 
-        let result = manager.enforce(PrivacyTier::Anonymous, action);
+        let result = manager.enforce(PrivacyMode::ANONYMOUS, action);
         assert!(result.is_err());
     }
 
@@ -662,9 +625,9 @@ mod tests {
             high_value: false,
         };
 
-        // Anonymous tier has very restrictive limits
-        assert!(rate_limits.check_rate(PrivacyTier::Anonymous, &action));
-        assert!(!rate_limits.check_rate(PrivacyTier::Anonymous, &action)); // Second attempt fails
+        // Anonymous mode has very restrictive limits
+        assert!(rate_limits.check_rate(PrivacyMode::ANONYMOUS, &action));
+        assert!(!rate_limits.check_rate(PrivacyMode::ANONYMOUS, &action)); // Second attempt fails
     }
 
     #[test]
@@ -680,9 +643,9 @@ mod tests {
             high_value: false,
         };
 
-        manager.enforce(PrivacyTier::Anonymous, action.clone()).unwrap();
+        manager.enforce(PrivacyMode::ANONYMOUS, action.clone()).unwrap();
         // Second call should fail due to rate limit, but we need to handle the error
-        let _ = manager.enforce(PrivacyTier::Anonymous, action);
+        let _ = manager.enforce(PrivacyMode::ANONYMOUS, action);
 
         let stats = manager.stats();
         assert_eq!(stats.total_checks, 2);

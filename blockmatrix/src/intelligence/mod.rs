@@ -716,23 +716,23 @@ impl IntelligenceLayer {
 
     /// Map privacy tier to privacy level
     fn map_privacy_tier_to_level(&self, tier: &PrivacyTier) -> PrivacyLevel {
-        match tier {
-            PrivacyTier::Anonymous => PrivacyLevel::Private,
-            PrivacyTier::PrivateP2P => PrivacyLevel::P2P,
-            PrivacyTier::Federated => PrivacyLevel::PublicNetwork,
-            PrivacyTier::Public => PrivacyLevel::FullPublic,
+        if *tier == PrivacyTier::PUBLIC {
+            PrivacyLevel::PUBLIC
+        } else if *tier == PrivacyTier::PRIVATE {
+            PrivacyLevel::PUBLIC
+        } else {
+            // ANONYMOUS
+            PrivacyLevel::PRIVATE
         }
     }
 
-    /// Map privacy tier to STOQ privacy tier
+    /// Map privacy tier to STOQ privacy tier (StoqPrivacyTier = PrivacyMode)
+    ///
+    /// Since PrivacyTier is now an alias for PrivacyMode (same as StoqPrivacyTier),
+    /// this is an identity mapping. Kept for API stability.
     #[allow(dead_code)] // Used for future STOQ protocol integration
     fn map_privacy_tier_to_stoq(&self, tier: &PrivacyTier) -> StoqPrivacyTier {
-        match tier {
-            PrivacyTier::Anonymous => StoqPrivacyTier::Anonymous,
-            PrivacyTier::PrivateP2P => StoqPrivacyTier::PrivateP2P,
-            PrivacyTier::Federated => StoqPrivacyTier::Federated,
-            PrivacyTier::Public => StoqPrivacyTier::Public,
-        }
+        *tier
     }
 
     /// Configure pipeline based on privacy tier
@@ -741,31 +741,21 @@ impl IntelligenceLayer {
         config: &mut crate::assets::pipeline::PipelineConfig,
         tier: &PrivacyTier,
     ) {
-        match tier {
-            PrivacyTier::Public => {
-                // Maximum security for public tier
-                config.encryption.quantum_resistant = true;
-                config.compression.level = 6;
-                config.sharding.parity_shards = 4;
-            }
-            PrivacyTier::Federated => {
-                // Balanced security and performance
-                config.encryption.quantum_resistant = true;
-                config.compression.level = 4;
-                config.sharding.parity_shards = 3;
-            }
-            PrivacyTier::PrivateP2P => {
-                // Performance optimized for trusted peers
-                config.encryption.quantum_resistant = false;
-                config.compression.level = 3;
-                config.sharding.parity_shards = 2;
-            }
-            PrivacyTier::Anonymous => {
-                // Minimal tracking, balanced security
-                config.encryption.quantum_resistant = false;
-                config.compression.level = 2;
-                config.sharding.parity_shards = 2;
-            }
+        if *tier == PrivacyTier::PUBLIC {
+            // Maximum security for public tier
+            config.encryption.quantum_resistant = true;
+            config.compression.level = 6;
+            config.sharding.parity_shards = 4;
+        } else if *tier == PrivacyTier::PRIVATE {
+            // Federated-level config (more secure of the collapsed pair)
+            config.encryption.quantum_resistant = true;
+            config.compression.level = 4;
+            config.sharding.parity_shards = 3;
+        } else {
+            // ANONYMOUS: minimal tracking, balanced security
+            config.encryption.quantum_resistant = false;
+            config.compression.level = 2;
+            config.sharding.parity_shards = 2;
         }
     }
 
@@ -868,11 +858,12 @@ trait PrivacyTierExt {
 
 impl PrivacyTierExt for PrivacyTier {
     fn replication_factor(&self) -> usize {
-        match self {
-            PrivacyTier::Public => 5,      // High replication for public access
-            PrivacyTier::Federated => 3,   // Medium replication
-            PrivacyTier::PrivateP2P => 2, // Low replication for trusted peers
-            PrivacyTier::Anonymous => 1,   // Minimal replication
+        if *self == PrivacyTier::PUBLIC {
+            5  // High replication for public access
+        } else if *self == PrivacyTier::PRIVATE {
+            3  // Federated-level replication (higher value of collapsed pair)
+        } else {
+            1  // ANONYMOUS: minimal replication
         }
     }
 }

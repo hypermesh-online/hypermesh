@@ -511,60 +511,46 @@ impl RemoteProxyManager {
     ) -> AssetResult<Vec<ForwardingRule>> {
         let mut rules = Vec::new();
         
-        match privacy_level {
-            PrivacyLevel::Private => {
-                // Only direct memory access for private assets
-                rules.push(ForwardingRule {
-                    source_pattern: "local".to_string(),
-                    destination: "direct".to_string(),
-                    mode: super::forwarding::ForwardingMode::DirectMemory,
-                    rule_type: ForwardingRuleType::DirectMemory,
-                    priority: 100,
-                    auth_required: true,
-                });
-            },
-            PrivacyLevel::PrivateNetwork => {
-                // Limited network access
-                rules.push(ForwardingRule {
-                    source_pattern: "private_network".to_string(),
-                    destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::TcpTunnel,
-                    rule_type: ForwardingRuleType::Tcp,
-                    priority: 80,
-                    auth_required: true,
-                });
-            },
-            PrivacyLevel::P2P | PrivacyLevel::PublicNetwork | PrivacyLevel::FullPublic => {
-                // Full proxy capabilities
+        if *privacy_level == PrivacyLevel::PRIVATE {
+            // Only direct memory access for private assets
+            rules.push(ForwardingRule {
+                source_pattern: "local".to_string(),
+                destination: "direct".to_string(),
+                mode: super::forwarding::ForwardingMode::DirectMemory,
+                rule_type: ForwardingRuleType::DirectMemory,
+                priority: 100,
+                auth_required: true,
+            });
+        } else {
+            // Full proxy capabilities for PUBLIC and ANONYMOUS
+            rules.push(ForwardingRule {
+                source_pattern: "*".to_string(),
+                destination: "forwarded".to_string(),
+                mode: super::forwarding::ForwardingMode::HttpProxy,
+                rule_type: ForwardingRuleType::Http,
+                priority: 60,
+                auth_required: false,
+            });
+
+            rules.push(ForwardingRule {
+                source_pattern: "*".to_string(),
+                destination: "forwarded".to_string(),
+                mode: super::forwarding::ForwardingMode::Socks5Proxy,
+                rule_type: ForwardingRuleType::Socks5,
+                priority: 70,
+                auth_required: false,
+            });
+
+            if *privacy_level == PrivacyLevel::PUBLIC {
                 rules.push(ForwardingRule {
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::HttpProxy,
-                    rule_type: ForwardingRuleType::Http,
-                    priority: 60,
+                    mode: super::forwarding::ForwardingMode::VpnTunnel,
+                    rule_type: ForwardingRuleType::Vpn,
+                    priority: 90,
                     auth_required: false,
                 });
-
-                rules.push(ForwardingRule {
-                    source_pattern: "*".to_string(),
-                    destination: "forwarded".to_string(),
-                    mode: super::forwarding::ForwardingMode::Socks5Proxy,
-                    rule_type: ForwardingRuleType::Socks5,
-                    priority: 70,
-                    auth_required: false,
-                });
-
-                if matches!(privacy_level, PrivacyLevel::FullPublic) {
-                    rules.push(ForwardingRule {
-                        source_pattern: "*".to_string(),
-                        destination: "forwarded".to_string(),
-                        mode: super::forwarding::ForwardingMode::VpnTunnel,
-                        rule_type: ForwardingRuleType::Vpn,
-                        priority: 90,
-                        auth_required: false,
-                    });
-                }
-            },
+            }
         }
         
         Ok(rules)
@@ -572,48 +558,36 @@ impl RemoteProxyManager {
     
     /// Create access permissions based on privacy level
     async fn create_access_permissions(&self, privacy_level: &PrivacyLevel) -> AssetResult<AccessPermissions> {
-        Ok(match privacy_level {
-            PrivacyLevel::Private => AccessPermissions {
+        let perms = if *privacy_level == PrivacyLevel::PRIVATE {
+            AccessPermissions {
                 http_proxy: false,
                 socks5_proxy: false,
                 tcp_forwarding: false,
                 vpn_tunnel: false,
                 memory_access: true,
                 sharded_access: false,
-            },
-            PrivacyLevel::PrivateNetwork => AccessPermissions {
-                http_proxy: false,
-                socks5_proxy: false,
-                tcp_forwarding: true,
-                vpn_tunnel: false,
-                memory_access: true,
-                sharded_access: true,
-            },
-            PrivacyLevel::P2P => AccessPermissions {
+            }
+        } else if *privacy_level == PrivacyLevel::ANONYMOUS {
+            AccessPermissions {
                 http_proxy: true,
                 socks5_proxy: true,
                 tcp_forwarding: true,
                 vpn_tunnel: false,
                 memory_access: true,
                 sharded_access: true,
-            },
-            PrivacyLevel::PublicNetwork => AccessPermissions {
+            }
+        } else {
+            // PUBLIC: full access
+            AccessPermissions {
                 http_proxy: true,
                 socks5_proxy: true,
                 tcp_forwarding: true,
                 vpn_tunnel: true,
                 memory_access: true,
                 sharded_access: true,
-            },
-            PrivacyLevel::FullPublic => AccessPermissions {
-                http_proxy: true,
-                socks5_proxy: true,
-                tcp_forwarding: true,
-                vpn_tunnel: true,
-                memory_access: true,
-                sharded_access: true,
-            },
-        })
+            }
+        };
+        Ok(perms)
     }
     
     /// Check privacy level access for request type

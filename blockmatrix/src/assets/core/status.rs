@@ -442,12 +442,12 @@ mod tests {
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert-fingerprint".to_string(),
-            PrivacyLevel::Private,
+            PrivacyLevel::PRIVATE,
         );
         
         assert_eq!(status.asset_id, asset_id);
         assert_eq!(status.state, AssetState::Available);
-        assert_eq!(status.privacy_level, PrivacyLevel::Private);
+        assert_eq!(status.privacy_level, PrivacyLevel::PRIVATE);
         assert_eq!(status.health_status.health_score, 1.0);
     }
     
@@ -471,7 +471,7 @@ mod tests {
         let mut status = AssetStatus::new(
             asset_id,
             "test-cert".to_string(),
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
         );
         
         // Add critical alert

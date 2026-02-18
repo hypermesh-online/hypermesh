@@ -241,16 +241,16 @@ impl PrivacyManager {
         privacy_level: &PrivacyLevel,
         privacy_history: &PrivacyHistory,
     ) -> AssetResult<PrivacyAllocationType> {
-        match privacy_level {
-            PrivacyLevel::Private => Ok(PrivacyAllocationType::Private),
-            PrivacyLevel::FullPublic => {
-                if privacy_history.violations.is_empty() {
-                    Ok(PrivacyAllocationType::Verified)
-                } else {
-                    Ok(PrivacyAllocationType::Public)
-                }
-            },
-            _ => Ok(PrivacyAllocationType::Public),
+        if *privacy_level == PrivacyLevel::PRIVATE {
+            Ok(PrivacyAllocationType::Private)
+        } else if *privacy_level == PrivacyLevel::PUBLIC {
+            if privacy_history.violations.is_empty() {
+                Ok(PrivacyAllocationType::Verified)
+            } else {
+                Ok(PrivacyAllocationType::Public)
+            }
+        } else {
+            Ok(PrivacyAllocationType::Public)
         }
     }
 
@@ -288,21 +288,17 @@ impl PrivacyManager {
     ) -> AssetResult<ConsensusRequirementConfig> {
         let mut merged = user_requirements.clone();
 
-        match privacy_level {
-            PrivacyLevel::Private => {
-                merged.require_proof_of_work = false;
-                merged.minimum_stake = 0;
-            },
-            PrivacyLevel::FullPublic => {
-                merged.require_proof_of_space = true;
-                merged.require_proof_of_stake = true;
-                merged.require_proof_of_work = true;
-                merged.require_proof_of_time = true;
-                merged.minimum_stake = merged.minimum_stake.max(1000);
-            },
-            _ => {
-                merged.minimum_stake = merged.minimum_stake.max(100);
-            }
+        if *privacy_level == PrivacyLevel::PRIVATE {
+            merged.require_proof_of_work = false;
+            merged.minimum_stake = 0;
+        } else if *privacy_level == PrivacyLevel::PUBLIC {
+            merged.require_proof_of_space = true;
+            merged.require_proof_of_stake = true;
+            merged.require_proof_of_work = true;
+            merged.require_proof_of_time = true;
+            merged.minimum_stake = merged.minimum_stake.max(1000);
+        } else {
+            merged.minimum_stake = merged.minimum_stake.max(100);
         }
 
         Ok(merged)
@@ -353,7 +349,7 @@ impl ResourcePrivacyConfig {
     fn default_for_type(resource_type: &str) -> Self {
         Self {
             resource_type: resource_type.to_string(),
-            privacy_level: PrivacyLevel::P2P,
+            privacy_level: PrivacyLevel::PRIVATE,
             allocation_percentage: 0.5, // 50% default allocation
             max_concurrent_access: 5,
             duration_limits: super::super::DurationLimits::default(),

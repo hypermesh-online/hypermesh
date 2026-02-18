@@ -71,10 +71,10 @@ enum PrivacyModeArg {
 impl From<PrivacyModeArg> for PrivacyMode {
     fn from(arg: PrivacyModeArg) -> Self {
         match arg {
-            PrivacyModeArg::Private => PrivacyMode::Private,
-            PrivacyModeArg::Anonymous => PrivacyMode::Anonymous,
-            PrivacyModeArg::P2P => PrivacyMode::P2P,
-            PrivacyModeArg::Public => PrivacyMode::Public,
+            PrivacyModeArg::Private => PrivacyMode::PRIVATE,
+            PrivacyModeArg::Anonymous => PrivacyMode::ANONYMOUS,
+            PrivacyModeArg::P2P => PrivacyMode::PRIVATE, // P2P collapses into PRIVATE
+            PrivacyModeArg::Public => PrivacyMode::PUBLIC,
         }
     }
 }
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
 
             // Initialize STOQ transport if not in Private mode
             let privacy_mode = bootstrap.privacy_mode().await;
-            if privacy_mode != PrivacyMode::Private {
+            if privacy_mode != PrivacyMode::PRIVATE {
                 info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
                 // Create STOQ config

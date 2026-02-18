@@ -18,7 +18,7 @@
 
 // Re-export core types for convenience
 pub use super::core::{
-    UserPrivacyConfig, PrivacySettings, PrivacyMode, DataMinimizationSettings,
+    UserPrivacyConfig, PrivacySettings, PrivacyPreference, DataMinimizationSettings,
     RetentionPreferences, ResourcePrivacySettings, PrivacyConstraints,
     PrivacyValidationRules, PrivacyTemplate, PrivacyPreset, AdvancedPrivacyOptions,
     ConsentManagementSettings, DashboardPreferences, SharingMinimizationSettings,
@@ -80,9 +80,9 @@ impl PrivacyConfigManager {
             user_id,
             config_version: "1.0".to_string(),
             privacy_settings: PrivacySettings {
-                default_privacy_level: crate::assets::core::PrivacyLevel::Private,
+                default_privacy_level: crate::assets::core::PrivacyLevel::PRIVATE,
                 default_allocation_type: PrivacyAllocationType::Private,
-                privacy_mode: PrivacyMode::Balanced,
+                privacy_preference: PrivacyPreference::Balanced,
                 data_minimization: DataMinimizationSettings {
                     enabled: true,
                     retention_preferences: RetentionPreferences {

@@ -12,7 +12,8 @@ use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::AssetId;
-pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel};
+use hypermesh_lib::PrivacyMode;
+pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType};
 use crate::consensus::ConsensusProof;
 
 /// Blockchain-specific matrix coordinate with geographic/organizational dimensions.
@@ -199,7 +200,7 @@ pub struct PrivacyPolicyConfig {
     /// Fields that require zero-knowledge proofs
     pub zk_proof_fields: Vec<String>,
     /// Default privacy level for new assets
-    pub default_privacy_level: AssetPrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
 }
 
 /// Cross-chain validation request
@@ -626,7 +627,7 @@ mod tests {
                 public_fields: vec!["asset_type".to_string(), "vin".to_string()],
                 federated_fields: HashMap::new(),
                 zk_proof_fields: vec!["manufacturing_cost".to_string()],
-                default_privacy_level: AssetPrivacyLevel::Private,
+                default_privacy_level: PrivacyMode::PRIVATE,
             },
             trusted_partners: vec!["dealer.hypermesh.online".to_string()],
         };
@@ -670,7 +671,7 @@ mod tests {
                 public_fields: vec!["registration_status".to_string()],
                 federated_fields: HashMap::new(),
                 zk_proof_fields: vec![],
-                default_privacy_level: AssetPrivacyLevel::Public,
+                default_privacy_level: PrivacyMode::PUBLIC,
             },
             trusted_partners: vec![],
         };

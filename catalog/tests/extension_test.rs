@@ -44,7 +44,7 @@ fn create_test_extension_config() -> ExtensionConfig {
             ExtensionCapability::NetworkAccess,
             ExtensionCapability::VMExecution,
         ]),
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         debug_mode: true,
     }
 }
@@ -238,7 +238,7 @@ async fn test_vm_handler_operations() {
             ("language".to_string(), serde_json::json!("lua")),
             ("version".to_string(), serde_json::json!("5.4.0")),
         ]),
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         allocation: None,
         consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
         parent_id: None,
@@ -325,7 +325,7 @@ async fn test_dataset_handler_operations() {
             ("size_bytes".to_string(), serde_json::json!(1024 * 1024)),
             ("record_count".to_string(), serde_json::json!(10000)),
         ]),
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         allocation: None,
         consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
         parent_id: None,

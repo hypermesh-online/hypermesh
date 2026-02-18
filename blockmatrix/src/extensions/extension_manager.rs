@@ -66,7 +66,7 @@ impl ExtensionManager {
             settings: serde_json::Value::Null,
             resource_limits: self.config.global_limits.clone(),
             granted_capabilities: metadata.required_capabilities.intersection(&self.config.allowed_capabilities).cloned().collect(),
-            privacy_level: crate::assets::core::PrivacyLevel::Private,
+            privacy_level: crate::assets::core::PrivacyLevel::PRIVATE,
             debug_mode: false,
         };
 

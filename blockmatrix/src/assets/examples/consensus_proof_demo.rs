@@ -8,9 +8,10 @@
 //! 4-proof consensus system (PoSp+PoSt+PoWk+PoTm) and stored in blockchain blocks.
 
 use hypermesh_assets::blockchain::{
-    HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel, HyperMeshBlockData,
+    HyperMeshAssetRecord, AssetRecordType, HyperMeshBlockData,
     AssetBlockchainManager,
 };
+use hypermesh_lib::PrivacyMode;
 use hypermesh_assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
@@ -105,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "demo-authority".to_string(),
         b"Demo asset creation with consensus validation".to_vec(),
         vec![consensus_proof],
-        AssetPrivacyLevel::PublicNetwork,
+        PrivacyMode::PUBLIC,
     );
     info!("Created HyperMeshAssetRecord with ConsensusProof");
     
@@ -139,10 +140,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 9. Test privacy validation
     let privacy_tests = vec![
-        (AssetPrivacyLevel::FullPublic, true),
-        (AssetPrivacyLevel::PublicNetwork, true),
-        (AssetPrivacyLevel::P2P, false),
-        (AssetPrivacyLevel::Private, false),
+        (PrivacyMode::PUBLIC, true),
+        (PrivacyMode::PUBLIC, true),
+        (PrivacyMode::PRIVATE, false),
+        (PrivacyMode::PRIVATE, false),
     ];
     
     info!("Testing privacy level validation:");

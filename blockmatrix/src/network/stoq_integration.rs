@@ -517,7 +517,7 @@ mod tests {
             coord,
             "test_node".to_string(),
             transport,
-            PrivacyMode::Private,
+            PrivacyMode::PRIVATE,
         ).await.unwrap();
 
         assert_eq!(integration.local_coordinate, coord);

@@ -5,9 +5,9 @@
 // eBPF Integration for Privacy Tiers
 // Bridges the privacy system with kernel-level enforcement via hypermesh-ebpf
 
-use super::tiers::PrivacyTier;
 use super::flexibility_matrix::PrivacyFlexibilityMatrix;
 use super::policies::PolicyManager as PrivacyPolicyManager;
+use hypermesh_lib::PrivacyMode;
 use hypermesh_ebpf::policy_maps::{ValidationPolicy, PolicyManager as EbpfPolicyManager};
 use std::sync::Arc;
 
@@ -29,9 +29,9 @@ impl PrivacyEbpfBridge {
         })
     }
 
-    /// Update eBPF policies based on privacy tier
-    pub fn update_ebpf_for_tier(&self, tier: PrivacyTier, connection_id: u64) {
-        let ebpf_policy = Self::privacy_tier_to_ebpf_policy(tier);
+    /// Update eBPF policies based on privacy mode
+    pub fn update_ebpf_for_tier(&self, mode: PrivacyMode, connection_id: u64) {
+        let ebpf_policy = Self::privacy_mode_to_ebpf_policy(mode);
         self.ebpf_manager.set_policy(connection_id, ebpf_policy);
     }
 
@@ -47,14 +47,9 @@ impl PrivacyEbpfBridge {
         self.update_ebpf_for_tier(stricter_tier, connection_id);
     }
 
-    /// Convert privacy tier to eBPF validation policy
-    fn privacy_tier_to_ebpf_policy(tier: PrivacyTier) -> ValidationPolicy {
-        match tier {
-            PrivacyTier::Anonymous => ValidationPolicy::for_privacy_tier(0),
-            PrivacyTier::PrivateP2P => ValidationPolicy::for_privacy_tier(1),
-            PrivacyTier::Federated => ValidationPolicy::for_privacy_tier(2),
-            PrivacyTier::Public => ValidationPolicy::for_privacy_tier(3),
-        }
+    /// Convert privacy mode to eBPF validation policy
+    fn privacy_mode_to_ebpf_policy(mode: PrivacyMode) -> ValidationPolicy {
+        ValidationPolicy::for_privacy_tier(mode.to_ebpf_u8())
     }
 
     /// Sync all privacy policies to kernel
@@ -72,9 +67,9 @@ impl PrivacyEbpfBridge {
         self.ebpf_manager.clear_policies();
     }
 
-    /// Set default eBPF policy based on privacy tier
-    pub fn set_default_ebpf_tier(&self, tier: PrivacyTier) {
-        let ebpf_policy = Self::privacy_tier_to_ebpf_policy(tier);
+    /// Set default eBPF policy based on privacy mode
+    pub fn set_default_ebpf_tier(&self, mode: PrivacyMode) {
+        let ebpf_policy = Self::privacy_mode_to_ebpf_policy(mode);
         self.ebpf_manager.set_default_policy(ebpf_policy);
     }
 }
@@ -155,15 +150,15 @@ mod tests {
     fn test_tier_to_ebpf_policy_conversion() {
         let bridge = PrivacyEbpfBridge::new().unwrap();
 
-        // Test Anonymous tier
-        bridge.update_ebpf_for_tier(PrivacyTier::Anonymous, 100);
+        // Test Anonymous mode
+        bridge.update_ebpf_for_tier(PrivacyMode::ANONYMOUS, 100);
         let policy = bridge.get_ebpf_policy(100);
         assert!(!policy.requires_pos);
         assert!(!policy.validate_asset_hash);
         assert_eq!(policy.privacy_tier, 0);
 
-        // Test Public tier
-        bridge.update_ebpf_for_tier(PrivacyTier::Public, 200);
+        // Test Public mode
+        bridge.update_ebpf_for_tier(PrivacyMode::PUBLIC, 200);
         let policy = bridge.get_ebpf_policy(200);
         assert!(policy.requires_pos);
         assert!(policy.validate_asset_hash);
@@ -174,14 +169,14 @@ mod tests {
     fn test_flexibility_matrix_ebpf_update() {
         let bridge = PrivacyEbpfBridge::new().unwrap();
         let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyTier::Anonymous,
-            PrivacyTier::Public
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PUBLIC,
         );
 
         bridge.update_ebpf_for_matrix(&matrix, 300);
         let policy = bridge.get_ebpf_policy(300);
 
-        // Should use Anonymous tier (stricter)
+        // Should use Anonymous mode (stricter)
         assert_eq!(policy.privacy_tier, 0);
     }
 
@@ -189,11 +184,11 @@ mod tests {
     fn test_default_ebpf_tier_setting() {
         let bridge = PrivacyEbpfBridge::new().unwrap();
 
-        bridge.set_default_ebpf_tier(PrivacyTier::Federated);
+        bridge.set_default_ebpf_tier(PrivacyMode::PRIVATE);
 
         // Unknown connection should use default
         let policy = bridge.get_ebpf_policy(999);
-        assert_eq!(policy.privacy_tier, 2); // Federated
+        assert_eq!(policy.privacy_tier, 2); // Private maps to ebpf u8 = 2
     }
 
     #[test]
@@ -216,8 +211,8 @@ mod tests {
     fn test_clear_ebpf_policies() {
         let bridge = PrivacyEbpfBridge::new().unwrap();
 
-        bridge.update_ebpf_for_tier(PrivacyTier::Public, 400);
-        bridge.update_ebpf_for_tier(PrivacyTier::Anonymous, 401);
+        bridge.update_ebpf_for_tier(PrivacyMode::PUBLIC, 400);
+        bridge.update_ebpf_for_tier(PrivacyMode::ANONYMOUS, 401);
 
         bridge.clear_ebpf_policies();
 

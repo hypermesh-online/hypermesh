@@ -32,7 +32,7 @@ async fn test_hypermesh_bridge_creation() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false, // Disable for testing
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::Private,
+        default_privacy: PrivacyLevel::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 1000,
     };
@@ -68,7 +68,7 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false,
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::Private,
+        default_privacy: PrivacyLevel::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 1000,
     };
@@ -120,7 +120,7 @@ async fn test_performance_without_network_calls() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false, // Skip for performance test
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::Private,
+        default_privacy: PrivacyLevel::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 10000,
     };

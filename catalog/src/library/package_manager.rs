@@ -119,7 +119,7 @@ impl AssetPackageManager {
 
         // Initialize registry with default configuration
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

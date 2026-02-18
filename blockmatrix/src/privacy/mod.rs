@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 // Privacy module for Block-MATRIX
-// Revolutionary Concept #5: Four privacy tiers with flexibility matrix
+// Uses hypermesh_lib::PrivacyMode as canonical type (re-exported as PrivacyTier)
 
 pub mod tiers;
 pub mod flexibility_matrix;
@@ -12,10 +12,15 @@ pub mod policies;
 pub mod ebpf_integration;
 
 pub use tiers::{
-    AnonymousTier, FederatedTier, NodeId, NetworkId, PrivacyTier,
+    AnonymousTier, FederatedTier, NodeId, NetworkId,
     PrivateP2PTier, PublicTier, TrustLevel, ValidationRequirements,
     PeerValidator, FederationValidator, ProofOfStateValidator,
+    validation_requirements_for,
 };
+
+/// Re-export PrivacyMode under the domain name PrivacyTier for callers that
+/// treat network-privacy tiers and PrivacyMode interchangeably.
+pub use hypermesh_lib::PrivacyMode as PrivacyTier;
 
 pub use flexibility_matrix::{
     PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,
@@ -39,11 +44,14 @@ pub use ebpf_integration::{
     PrivacyEbpfBridge, PrivacyEbpfMetrics, EbpfEventType,
 };
 
+// Re-export PrivacyMode from hypermesh_lib for convenience
+pub use hypermesh_lib::PrivacyMode;
+
 /// Privacy system configuration
 #[derive(Debug, Clone)]
 pub struct PrivacyConfig {
-    /// Default privacy tier for new nodes
-    pub default_tier: PrivacyTier,
+    /// Default privacy mode for new nodes
+    pub default_tier: PrivacyMode,
     /// Whether to allow tier switching
     pub allow_switching: bool,
     /// Maximum number of tier switches per day
@@ -55,7 +63,7 @@ pub struct PrivacyConfig {
 impl Default for PrivacyConfig {
     fn default() -> Self {
         Self {
-            default_tier: PrivacyTier::Federated,
+            default_tier: PrivacyMode::PRIVATE,
             allow_switching: true,
             max_switches_per_day: 3,
             strict_enforcement: true,
@@ -92,13 +100,13 @@ impl PrivacySystem {
         }
     }
 
-    /// Get current privacy tier
-    pub fn current_tier(&self) -> PrivacyTier {
+    /// Get current privacy mode
+    pub fn current_tier(&self) -> PrivacyMode {
         self.tier_switcher.current_tier()
     }
 
-    /// Switch to a new privacy tier
-    pub fn switch_tier(&mut self, new_tier: PrivacyTier) -> Result<TransitionResult, TransitionError> {
+    /// Switch to a new privacy mode
+    pub fn switch_tier(&mut self, new_tier: PrivacyMode) -> Result<TransitionResult, TransitionError> {
         if !self.config.allow_switching {
             return Err(TransitionError::InvalidTransition("Tier switching disabled".into()));
         }
@@ -193,16 +201,16 @@ mod tests {
     #[test]
     fn test_privacy_system_creation() {
         let system = PrivacySystem::new();
-        assert_eq!(system.current_tier(), PrivacyTier::Federated);
+        assert_eq!(system.current_tier(), PrivacyMode::PRIVATE);
         assert!(system.config.allow_switching);
     }
 
     #[test]
     fn test_privacy_system_tier_switching() {
         let mut system = PrivacySystem::new();
-        let result = system.switch_tier(PrivacyTier::Public);
+        let result = system.switch_tier(PrivacyMode::PUBLIC);
         assert!(result.is_ok());
-        assert_eq!(system.current_tier(), PrivacyTier::Public);
+        assert_eq!(system.current_tier(), PrivacyMode::PUBLIC);
     }
 
     #[test]
@@ -212,10 +220,10 @@ mod tests {
         let mut system = PrivacySystem::with_config(config);
 
         // First switch should succeed
-        assert!(system.switch_tier(PrivacyTier::Public).is_ok());
+        assert!(system.switch_tier(PrivacyMode::PUBLIC).is_ok());
 
         // Second switch should fail
-        let result = system.switch_tier(PrivacyTier::Anonymous);
+        let result = system.switch_tier(PrivacyMode::ANONYMOUS);
         assert!(matches!(result, Err(TransitionError::InvalidTransition(_))));
     }
 
@@ -223,8 +231,8 @@ mod tests {
     fn test_flexibility_matrix_update() {
         let mut system = PrivacySystem::new();
         let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyTier::Anonymous,
-            PrivacyTier::Public
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PUBLIC,
         );
 
         assert!(system.update_flexibility_matrix(matrix).is_ok());
@@ -235,10 +243,8 @@ mod tests {
     fn test_policy_enforcement() {
         let mut system = PrivacySystem::new();
         let mut validations = HashSet::new();
-        validations.insert(ValidationType::NetworkIdentity);
-        validations.insert(ValidationType::FederationMembership);
-        validations.insert(ValidationType::ProofOfSpace);
-        validations.insert(ValidationType::ProofOfTime);
+        validations.insert(ValidationType::PeerIdentity);
+        validations.insert(ValidationType::PeerTrust);
 
         let action = PolicyAction {
             action_type: ActionType::ShareResource,
@@ -257,8 +263,8 @@ mod tests {
     #[test]
     fn test_caesar_multiplier() {
         let mut system = PrivacySystem::new();
-        system.switch_tier(PrivacyTier::Public).unwrap();
-        system.flexibility_matrix.asset_tier = PrivacyTier::Public;
+        system.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        system.flexibility_matrix.asset_tier = PrivacyMode::PUBLIC;
 
         assert_eq!(system.caesar_multiplier(), 1.0);
     }
@@ -266,8 +272,8 @@ mod tests {
     #[test]
     fn test_privacy_scores() {
         let mut system = PrivacySystem::new();
-        system.switch_tier(PrivacyTier::Anonymous).unwrap();
-        system.flexibility_matrix.asset_tier = PrivacyTier::Anonymous;
+        system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
+        system.flexibility_matrix.asset_tier = PrivacyMode::ANONYMOUS;
 
         assert_eq!(system.privacy_score(), 1.0);
         assert_eq!(system.openness_score(), 0.0);
@@ -291,7 +297,7 @@ mod tests {
             high_value: true,
         };
 
-        system.switch_tier(PrivacyTier::Anonymous).unwrap();
+        system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
 
         // Should allow in lenient mode
         let result = system.enforce_policy(action);
@@ -304,7 +310,7 @@ mod tests {
         config.allow_switching = false;
         let mut system = PrivacySystem::with_config(config);
 
-        let result = system.switch_tier(PrivacyTier::Public);
+        let result = system.switch_tier(PrivacyMode::PUBLIC);
         assert!(matches!(result, Err(TransitionError::InvalidTransition(_))));
     }
 }

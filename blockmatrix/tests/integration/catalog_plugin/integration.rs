@@ -182,7 +182,7 @@ async fn test_asset_registration() {
             "version": "1.0.0",
             "dependencies": []
         }),
-        PrivacyLevel::Private,
+        PrivacyLevel::PRIVATE,
     ).await;
 
     assert!(library_asset.is_ok());

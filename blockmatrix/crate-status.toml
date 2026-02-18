@@ -11,7 +11,7 @@ items = [
     "Every-node blockchain (independent chains)",
     "Geospatial module (GPS conversion, clustering)",
     "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
-    "Privacy allocation (5 levels, 4 tiers)",
+    "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
     "Matrix persistence (WAL, snapshots, recovery)",
     "Proof of State four-proof validation",
 ]

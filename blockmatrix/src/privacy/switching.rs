@@ -6,8 +6,9 @@
 // Enables transitions between privacy tiers without connection drops
 
 use super::tiers::{
-    AnonymousTier, FederatedTier, NodeId, PrivacyTier, PrivateP2PTier, PublicTier
+    AnonymousTier, FederatedTier, NodeId, PrivateP2PTier, PublicTier,
 };
+use hypermesh_lib::PrivacyMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -66,7 +67,7 @@ pub struct AssetState {
     pub asset_id: [u8; 32],
     pub access_count: u64,
     pub last_accessed: u64,
-    pub current_tier: PrivacyTier,
+    pub current_tier: PrivacyMode,
 }
 
 /// Reputation data for public tier
@@ -79,8 +80,8 @@ pub struct ReputationData {
 
 /// Tier switcher for managing privacy tier transitions
 pub struct TierSwitcher {
-    /// Current privacy tier
-    current_tier: PrivacyTier,
+    /// Current privacy mode
+    current_tier: PrivacyMode,
     /// Migration state
     migration_state: MigrationState,
     /// Transition history
@@ -95,8 +96,8 @@ pub struct TierSwitcher {
 }
 
 impl TierSwitcher {
-    /// Create a new tier switcher starting at the specified tier
-    pub fn new(initial_tier: PrivacyTier) -> Self {
+    /// Create a new tier switcher starting at the specified mode
+    pub fn new(initial_tier: PrivacyMode) -> Self {
         let mut switcher = Self {
             current_tier: initial_tier,
             migration_state: MigrationState {
@@ -118,27 +119,23 @@ impl TierSwitcher {
         switcher
     }
 
-    /// Initialize a specific tier
-    fn initialize_tier(&mut self, tier: PrivacyTier) {
-        match tier {
-            PrivacyTier::Anonymous => {
-                self.anonymous_tier = Some(AnonymousTier::new());
-            }
-            PrivacyTier::PrivateP2P => {
-                self.private_tier = Some(PrivateP2PTier::new(100));
-            }
-            PrivacyTier::Federated => {
-                self.federated_tier = Some(FederatedTier::new(50));
-            }
-            PrivacyTier::Public => {
-                let node_id = [0u8; 32]; // Would be generated in practice
-                self.public_tier = Some(PublicTier::new(node_id));
-            }
+    /// Initialize a specific tier based on privacy mode
+    fn initialize_tier(&mut self, mode: PrivacyMode) {
+        if mode == PrivacyMode::ANONYMOUS {
+            self.anonymous_tier = Some(AnonymousTier::new());
+        } else if mode == PrivacyMode::PRIVATE {
+            self.private_tier = Some(PrivateP2PTier::new(100));
+        } else if mode == PrivacyMode::PUBLIC {
+            let node_id = [0u8; 32]; // Would be generated in practice
+            self.public_tier = Some(PublicTier::new(node_id));
+        } else {
+            // Fallback for custom modes: use private tier
+            self.private_tier = Some(PrivateP2PTier::new(100));
         }
     }
 
-    /// Switch to a new privacy tier
-    pub fn switch_tier(&mut self, to: PrivacyTier) -> Result<TransitionResult, TransitionError> {
+    /// Switch to a new privacy mode
+    pub fn switch_tier(&mut self, to: PrivacyMode) -> Result<TransitionResult, TransitionError> {
         if self.transitioning {
             return Err(TransitionError::TransitionInProgress);
         }
@@ -168,63 +165,55 @@ impl TierSwitcher {
     }
 
     /// Validate if a transition is allowed
-    fn validate_transition(&self, from: PrivacyTier, to: PrivacyTier) -> Result<(), TransitionError> {
-        // Check for restricted transitions
-        match (from, to) {
-            // Anonymous to P2P requires establishing identity
-            (PrivacyTier::Anonymous, PrivacyTier::PrivateP2P) => {
-                if self.migration_state.active_connections.len() > 10 {
-                    return Err(TransitionError::TooManyConnections(
-                        "Cannot establish P2P identity with >10 anonymous connections".into()
-                    ));
-                }
+    fn validate_transition(&self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
+        // Anonymous to Private requires establishing identity
+        if from == PrivacyMode::ANONYMOUS && to == PrivacyMode::PRIVATE {
+            if self.migration_state.active_connections.len() > 10 {
+                return Err(TransitionError::TooManyConnections(
+                    "Cannot establish Private identity with >10 anonymous connections".into()
+                ));
             }
-            // P2P to Anonymous requires dropping peer relationships
-            (PrivacyTier::PrivateP2P, PrivacyTier::Anonymous) => {
-                if !self.migration_state.pending_transactions.is_empty() {
-                    return Err(TransitionError::PendingTransactions(
-                        self.migration_state.pending_transactions.len()
-                    ));
-                }
+        }
+        // Private to Anonymous requires dropping peer relationships
+        if from == PrivacyMode::PRIVATE && to == PrivacyMode::ANONYMOUS {
+            if !self.migration_state.pending_transactions.is_empty() {
+                return Err(TransitionError::PendingTransactions(
+                    self.migration_state.pending_transactions.len()
+                ));
             }
-            _ => {}
         }
 
         Ok(())
     }
 
     /// Prepare the migration state
-    fn prepare_migration(&mut self, from: PrivacyTier, to: PrivacyTier) -> Result<(), TransitionError> {
+    fn prepare_migration(&mut self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
         // Save current connections
         self.migration_state.active_connections.clear();
 
-        // Simulate gathering connection info based on current tier
-        match from {
-            PrivacyTier::Anonymous => {
-                // Anonymous connections don't have peer IDs
-                for i in 0..3 {
+        // Simulate gathering connection info based on current mode
+        if from == PrivacyMode::ANONYMOUS {
+            // Anonymous connections don't have peer IDs
+            for i in 0..3 {
+                self.migration_state.active_connections.push(ConnectionInfo {
+                    peer_id: None,
+                    connection_type: ConnectionType::Anonymous,
+                    established_at: i as u64 * 1000,
+                    last_activity: i as u64 * 1000 + 500,
+                });
+            }
+        } else if from == PrivacyMode::PRIVATE {
+            // Private connections have known peer IDs
+            if let Some(tier) = &self.private_tier {
+                for (i, peer_id) in tier.trusted_peers.iter().enumerate() {
                     self.migration_state.active_connections.push(ConnectionInfo {
-                        peer_id: None,
-                        connection_type: ConnectionType::Anonymous,
+                        peer_id: Some(*peer_id),
+                        connection_type: ConnectionType::Peer,
                         established_at: i as u64 * 1000,
                         last_activity: i as u64 * 1000 + 500,
                     });
                 }
             }
-            PrivacyTier::PrivateP2P => {
-                // P2P connections have known peer IDs
-                if let Some(tier) = &self.private_tier {
-                    for (i, peer_id) in tier.trusted_peers.iter().enumerate() {
-                        self.migration_state.active_connections.push(ConnectionInfo {
-                            peer_id: Some(*peer_id),
-                            connection_type: ConnectionType::Peer,
-                            established_at: i as u64 * 1000,
-                            last_activity: i as u64 * 1000 + 500,
-                        });
-                    }
-                }
-            }
-            _ => {}
         }
 
         // Initialize the target tier if not already present
@@ -236,55 +225,49 @@ impl TierSwitcher {
     }
 
     /// Execute the migration
-    fn execute_migration(&mut self, from: PrivacyTier, to: PrivacyTier) -> Result<(), TransitionError> {
+    fn execute_migration(&mut self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
         // Migrate connections
+        let target_conn_type = if to == PrivacyMode::ANONYMOUS {
+            ConnectionType::Anonymous
+        } else if to == PrivacyMode::PRIVATE {
+            ConnectionType::Peer
+        } else if to == PrivacyMode::PUBLIC {
+            ConnectionType::Public
+        } else {
+            ConnectionType::Federation
+        };
+
         for conn in &mut self.migration_state.active_connections {
-            conn.connection_type = match to {
-                PrivacyTier::Anonymous => ConnectionType::Anonymous,
-                PrivacyTier::PrivateP2P => ConnectionType::Peer,
-                PrivacyTier::Federated => ConnectionType::Federation,
-                PrivacyTier::Public => ConnectionType::Public,
-            };
+            conn.connection_type = target_conn_type;
 
             // Handle identity changes
-            match (from, to) {
-                (PrivacyTier::Anonymous, _) if to != PrivacyTier::Anonymous => {
-                    // Generate identity for previously anonymous connection
-                    let mut new_id = [0u8; 32];
-                    for (i, byte) in new_id.iter_mut().enumerate() {
-                        *byte = (i as u8).wrapping_add(rand::random::<u8>());
-                    }
-                    conn.peer_id = Some(new_id);
+            if from == PrivacyMode::ANONYMOUS && to != PrivacyMode::ANONYMOUS {
+                // Generate identity for previously anonymous connection
+                let mut new_id = [0u8; 32];
+                for (i, byte) in new_id.iter_mut().enumerate() {
+                    *byte = (i as u8).wrapping_add(rand::random::<u8>());
                 }
-                (_, PrivacyTier::Anonymous) => {
-                    // Remove identity for anonymous tier
-                    conn.peer_id = None;
-                }
-                _ => {}
+                conn.peer_id = Some(new_id);
+            } else if to == PrivacyMode::ANONYMOUS {
+                // Remove identity for anonymous mode
+                conn.peer_id = None;
             }
         }
 
-        // Migrate reputation data if moving to/from public tier
-        match to {
-            PrivacyTier::Public => {
-                if self.migration_state.reputation_data.is_none() {
-                    self.migration_state.reputation_data = Some(ReputationData {
-                        reputation_score: 0.5,
-                        validated_count: 0,
-                        last_validation: 0,
-                    });
-                }
-            }
-            _ => {
-                // Optionally preserve reputation for future use
-            }
+        // Migrate reputation data if moving to public mode
+        if to == PrivacyMode::PUBLIC && self.migration_state.reputation_data.is_none() {
+            self.migration_state.reputation_data = Some(ReputationData {
+                reputation_score: 0.5,
+                validated_count: 0,
+                last_validation: 0,
+            });
         }
 
         Ok(())
     }
 
     /// Finalize the transition
-    fn finalize_transition(&mut self, from: PrivacyTier, to: PrivacyTier, duration: Duration) -> TransitionResult {
+    fn finalize_transition(&mut self, from: PrivacyMode, to: PrivacyMode, duration: Duration) -> TransitionResult {
         // Update current tier
         self.current_tier = to;
 
@@ -307,18 +290,22 @@ impl TierSwitcher {
         TransitionResult::Success(record)
     }
 
-    /// Check if a tier is initialized
-    fn is_tier_initialized(&self, tier: PrivacyTier) -> bool {
-        match tier {
-            PrivacyTier::Anonymous => self.anonymous_tier.is_some(),
-            PrivacyTier::PrivateP2P => self.private_tier.is_some(),
-            PrivacyTier::Federated => self.federated_tier.is_some(),
-            PrivacyTier::Public => self.public_tier.is_some(),
+    /// Check if a tier is initialized for the given mode
+    fn is_tier_initialized(&self, mode: PrivacyMode) -> bool {
+        if mode == PrivacyMode::ANONYMOUS {
+            self.anonymous_tier.is_some()
+        } else if mode == PrivacyMode::PRIVATE {
+            self.private_tier.is_some()
+        } else if mode == PrivacyMode::PUBLIC {
+            self.public_tier.is_some()
+        } else {
+            // Custom modes: check if federated or private is initialized
+            self.federated_tier.is_some() || self.private_tier.is_some()
         }
     }
 
-    /// Get the current privacy tier
-    pub fn current_tier(&self) -> PrivacyTier {
+    /// Get the current privacy mode
+    pub fn current_tier(&self) -> PrivacyMode {
         self.current_tier
     }
 
@@ -351,8 +338,8 @@ impl TierSwitcher {
 /// Transition record for history tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitionRecord {
-    pub from: PrivacyTier,
-    pub to: PrivacyTier,
+    pub from: PrivacyMode,
+    pub to: PrivacyMode,
     pub timestamp: u64,
     pub duration_ms: u64,
     pub connections_migrated: usize,
@@ -401,60 +388,60 @@ mod tests {
 
     #[test]
     fn test_tier_switcher_creation() {
-        let switcher = TierSwitcher::new(PrivacyTier::Anonymous);
-        assert_eq!(switcher.current_tier(), PrivacyTier::Anonymous);
-        assert!(switcher.is_tier_initialized(PrivacyTier::Anonymous));
+        let switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
+        assert_eq!(switcher.current_tier(), PrivacyMode::ANONYMOUS);
+        assert!(switcher.is_tier_initialized(PrivacyMode::ANONYMOUS));
     }
 
     #[test]
     fn test_simple_tier_switch() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
-        let result = switcher.switch_tier(PrivacyTier::Public);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
+        let result = switcher.switch_tier(PrivacyMode::PUBLIC);
         assert!(matches!(result, Ok(TransitionResult::Success(_))));
-        assert_eq!(switcher.current_tier(), PrivacyTier::Public);
+        assert_eq!(switcher.current_tier(), PrivacyMode::PUBLIC);
     }
 
     #[test]
     fn test_no_change_transition() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Public);
-        let result = switcher.switch_tier(PrivacyTier::Public);
+        let mut switcher = TierSwitcher::new(PrivacyMode::PUBLIC);
+        let result = switcher.switch_tier(PrivacyMode::PUBLIC);
         assert!(matches!(result, Ok(TransitionResult::NoChange)));
     }
 
     #[test]
     fn test_transition_history() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
-        switcher.switch_tier(PrivacyTier::PrivateP2P).unwrap();
-        switcher.switch_tier(PrivacyTier::Federated).unwrap();
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
+        switcher.switch_tier(PrivacyMode::PRIVATE).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
 
         let history = switcher.transition_history();
         assert_eq!(history.len(), 2);
-        assert_eq!(history[0].from, PrivacyTier::Anonymous);
-        assert_eq!(history[0].to, PrivacyTier::PrivateP2P);
-        assert_eq!(history[1].from, PrivacyTier::PrivateP2P);
-        assert_eq!(history[1].to, PrivacyTier::Federated);
+        assert_eq!(history[0].from, PrivacyMode::ANONYMOUS);
+        assert_eq!(history[0].to, PrivacyMode::PRIVATE);
+        assert_eq!(history[1].from, PrivacyMode::PRIVATE);
+        assert_eq!(history[1].to, PrivacyMode::PUBLIC);
     }
 
     #[test]
     fn test_concurrent_transition_prevention() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
         switcher.transitioning = true;
 
-        let result = switcher.switch_tier(PrivacyTier::Public);
+        let result = switcher.switch_tier(PrivacyMode::PUBLIC);
         assert!(matches!(result, Err(TransitionError::TransitionInProgress)));
     }
 
     #[test]
     fn test_migration_state_preservation() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::PrivateP2P);
+        let mut switcher = TierSwitcher::new(PrivacyMode::PRIVATE);
 
-        // Add some connections to P2P tier
+        // Add some connections to private tier
         if let Some(tier) = &mut switcher.private_tier {
             tier.add_peer([1u8; 32]).unwrap();
             tier.add_peer([2u8; 32]).unwrap();
         }
 
-        switcher.switch_tier(PrivacyTier::Federated).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
 
         // Check that connections were migrated
         assert!(!switcher.migration_state().active_connections.is_empty());
@@ -462,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_abort_transition() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // No transition in progress
         assert!(switcher.abort_transition().is_err());
@@ -475,10 +462,10 @@ mod tests {
 
     #[test]
     fn test_connection_type_migration() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // Switch to Public
-        switcher.switch_tier(PrivacyTier::Public).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
 
         // Check that connections were updated
         for conn in &switcher.migration_state().active_connections {
@@ -488,13 +475,13 @@ mod tests {
 
     #[test]
     fn test_reputation_data_creation() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // Initially no reputation
         assert!(switcher.migration_state().reputation_data.is_none());
 
         // Switch to Public
-        switcher.switch_tier(PrivacyTier::Public).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
 
         // Reputation data should be created
         assert!(switcher.migration_state().reputation_data.is_some());
@@ -505,13 +492,12 @@ mod tests {
 
     #[test]
     fn test_tier_initialization_on_demand() {
-        let switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // Only Anonymous should be initialized
-        assert!(switcher.is_tier_initialized(PrivacyTier::Anonymous));
-        assert!(!switcher.is_tier_initialized(PrivacyTier::PrivateP2P));
-        assert!(!switcher.is_tier_initialized(PrivacyTier::Federated));
-        assert!(!switcher.is_tier_initialized(PrivacyTier::Public));
+        assert!(switcher.is_tier_initialized(PrivacyMode::ANONYMOUS));
+        assert!(!switcher.is_tier_initialized(PrivacyMode::PRIVATE));
+        assert!(!switcher.is_tier_initialized(PrivacyMode::PUBLIC));
     }
 
     #[test]
@@ -532,11 +518,11 @@ mod tests {
 
     #[test]
     fn test_transition_record_tracking() {
-        let mut switcher = TierSwitcher::new(PrivacyTier::Anonymous);
+        let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
-        if let Ok(TransitionResult::Success(record)) = switcher.switch_tier(PrivacyTier::Public) {
-            assert_eq!(record.from, PrivacyTier::Anonymous);
-            assert_eq!(record.to, PrivacyTier::Public);
+        if let Ok(TransitionResult::Success(record)) = switcher.switch_tier(PrivacyMode::PUBLIC) {
+            assert_eq!(record.from, PrivacyMode::ANONYMOUS);
+            assert_eq!(record.to, PrivacyMode::PUBLIC);
             assert!(record.success);
             assert!(record.duration_ms > 0);
         } else {

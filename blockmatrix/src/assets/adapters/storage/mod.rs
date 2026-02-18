@@ -68,7 +68,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             // ConsensusProof::new expects: (stake, time, space, work)
             consensus_proof: ConsensusProof::new(
                 StakeProof {

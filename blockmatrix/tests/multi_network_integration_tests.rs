@@ -51,7 +51,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Public,
+                    privacy_tier: PrivacyTier::PUBLIC,
                     member_count: 1000,
                     is_public: true,
                 },
@@ -68,7 +68,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Federated,
+                    privacy_tier: PrivacyTier::PRIVATE,
                     member_count: 500,
                     is_public: false,
                 },
@@ -85,7 +85,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Federated,
+                    privacy_tier: PrivacyTier::PRIVATE,
                     member_count: 300,
                     is_public: false,
                 },
@@ -102,7 +102,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Public,
+                    privacy_tier: PrivacyTier::PUBLIC,
                     member_count: 200,
                     is_public: true,
                 },
@@ -128,7 +128,7 @@ impl MockTrustChainClient {
                     geo_restrictions: None,
                     approval_process: ApprovalProcess::Automatic,
                 },
-                privacy_tier: PrivacyTier::PrivateP2P,
+                privacy_tier: PrivacyTier::PRIVATE,
                 member_count: 50,
                 is_public: false,
             });
@@ -259,8 +259,8 @@ async fn test_independent_privacy_tiers() {
     let bank_network = networks[0].network_id;
     let dealer_network = networks[1].network_id;
 
-    coordinator.join_network(bank_network, PrivacyTier::Public).await.unwrap();
-    coordinator.join_network(dealer_network, PrivacyTier::Federated).await.unwrap();
+    coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
+    coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
 
     let active = coordinator.active_networks().await;
 
@@ -269,10 +269,10 @@ async fn test_independent_privacy_tiers() {
     let dealer_membership = active.iter().find(|m| m.network_id == dealer_network);
 
     if let Some(bank) = bank_membership {
-        assert_eq!(bank.privacy_tier, PrivacyTier::Public);
+        assert_eq!(bank.privacy_tier, PrivacyTier::PUBLIC);
     }
     if let Some(dealer) = dealer_membership {
-        assert_eq!(dealer.privacy_tier, PrivacyTier::Federated);
+        assert_eq!(dealer.privacy_tier, PrivacyTier::PRIVATE);
     }
 
     println!("✅ Independent privacy tiers working correctly");
@@ -295,8 +295,8 @@ async fn test_packet_isolation_zero_leakage() {
     let networks = client.discover_networks().await.unwrap();
 
     // Join multiple networks
-    coordinator.join_network(networks[0].network_id, PrivacyTier::Public).await.unwrap();
-    coordinator.join_network(networks[1].network_id, PrivacyTier::Federated).await.unwrap();
+    coordinator.join_network(networks[0].network_id, PrivacyTier::PUBLIC).await.unwrap();
+    coordinator.join_network(networks[1].network_id, PrivacyTier::PRIVATE).await.unwrap();
 
     // Verify isolation
     let report = coordinator.verify_isolation().await.unwrap();
@@ -324,8 +324,8 @@ async fn test_cross_network_asset_validation() {
     let dealer_network = networks[1].network_id;
 
     // Join both networks
-    coordinator.join_network(bank_network, PrivacyTier::Public).await.unwrap();
-    coordinator.join_network(dealer_network, PrivacyTier::Federated).await.unwrap();
+    coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
+    coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
 
     // Create car title asset
     let car_title = AssetId::new(AssetType::Storage);
@@ -376,7 +376,7 @@ async fn test_car_purchase_scenario() {
 
     // Step 1: Join bank network
     println!("  1. Joining bank network...");
-    coordinator.join_network(bank_network, PrivacyTier::Public).await.unwrap();
+    coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
 
     // Step 2: Create car asset on blockchain
     println!("  2. Creating car asset on blockchain...");
@@ -400,7 +400,7 @@ async fn test_car_purchase_scenario() {
 
     // Step 4: Join dealer network
     println!("  4. Joining dealer network...");
-    coordinator.join_network(dealer_network, PrivacyTier::Federated).await.unwrap();
+    coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
 
     // Step 5: Dealer validates via federated trust
     println!("  5. Dealer validating via federated trust...");
@@ -416,7 +416,7 @@ async fn test_car_purchase_scenario() {
 
     // Step 6: Join insurance network
     println!("  6. Joining insurance network...");
-    coordinator.join_network(insurance_network, PrivacyTier::Federated).await.unwrap();
+    coordinator.join_network(insurance_network, PrivacyTier::PRIVATE).await.unwrap();
 
     // Step 7: Insurance validates
     println!("  7. Insurance validating...");
@@ -432,7 +432,7 @@ async fn test_car_purchase_scenario() {
 
     // Step 8: Join DMV network
     println!("  8. Joining DMV network...");
-    coordinator.join_network(dmv_network, PrivacyTier::Public).await.unwrap();
+    coordinator.join_network(dmv_network, PrivacyTier::PUBLIC).await.unwrap();
 
     // Step 9: DMV validates for registration
     println!("  9. DMV validating for registration...");
@@ -503,7 +503,7 @@ async fn test_leave_network() {
     let network_id = networks[0].network_id;
 
     // Join network
-    coordinator.join_network(network_id, PrivacyTier::Public).await.unwrap();
+    coordinator.join_network(network_id, PrivacyTier::PUBLIC).await.unwrap();
 
     // Leave network
     coordinator.leave_network(network_id).await.unwrap();

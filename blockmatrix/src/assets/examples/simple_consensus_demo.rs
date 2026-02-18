@@ -7,8 +7,9 @@
 //! This example shows the core ConsensusProof validation without the full consensus system.
 
 use hypermesh_assets::blockchain::{
-    HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel, HyperMeshBlockData,
+    HyperMeshAssetRecord, AssetRecordType, HyperMeshBlockData,
 };
+use hypermesh_lib::PrivacyMode;
 use hypermesh_assets::core::asset_id::{AssetId, AssetType};
 use crate::consensus::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
@@ -95,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "demo-authority".to_string(),
         b"Asset created with consensus validation".to_vec(),
         vec![consensus_proof],
-        AssetPrivacyLevel::PublicNetwork,
+        PrivacyMode::PUBLIC,
     );
     println!("✅ Created HyperMeshAssetRecord with ConsensusProof");
     
@@ -129,10 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 9. Test privacy validation
     println!("\n🔐 Testing Privacy Levels:");
     let privacy_tests = [
-        (AssetPrivacyLevel::FullPublic, true),
-        (AssetPrivacyLevel::PublicNetwork, true), 
-        (AssetPrivacyLevel::P2P, false),
-        (AssetPrivacyLevel::Private, false),
+        (PrivacyMode::PUBLIC, true),
+        (PrivacyMode::PUBLIC, true), 
+        (PrivacyMode::PRIVATE, false),
+        (PrivacyMode::PRIVATE, false),
     ];
     
     for (level, expected) in &privacy_tests {

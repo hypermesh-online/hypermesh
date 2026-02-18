@@ -113,23 +113,18 @@ impl NetworkManager {
     pub async fn start_discovery(&self) -> Result<()> {
         let mode = *self.privacy_mode.read().await;
 
-        match mode {
-            PrivacyMode::Private => {
-                info!("Private mode: No network discovery (localhost only)");
-                Ok(())
-            }
-            PrivacyMode::Anonymous => {
-                info!("Anonymous mode: Starting ephemeral discovery");
-                self.discover_ephemeral_peers().await
-            }
-            PrivacyMode::P2P => {
-                info!("P2P mode: Starting peer discovery");
-                self.discover_peers().await
-            }
-            PrivacyMode::Public => {
-                info!("Public mode: Joining network with full discovery");
-                self.join_network().await
-            }
+        if mode == PrivacyMode::PRIVATE {
+            info!("Private mode: No network discovery (localhost only)");
+            Ok(())
+        } else if mode == PrivacyMode::ANONYMOUS {
+            info!("Anonymous mode: Starting ephemeral discovery");
+            self.discover_ephemeral_peers().await
+        } else if mode == PrivacyMode::PUBLIC {
+            info!("Public mode: Joining network with full discovery");
+            self.join_network().await
+        } else {
+            info!("Custom privacy mode ({:?}): Starting peer discovery", mode);
+            self.discover_peers().await
         }
     }
 
@@ -254,10 +249,9 @@ impl NetworkManager {
             .to_string();
 
         let privacy_mode = match peer_info["privacy_mode"].as_str().unwrap_or("Private") {
-            "Anonymous" => PrivacyMode::Anonymous,
-            "P2P" => PrivacyMode::P2P,
-            "Public" => PrivacyMode::Public,
-            _ => PrivacyMode::Private,
+            "Anonymous" => PrivacyMode::ANONYMOUS,
+            "Public" => PrivacyMode::PUBLIC,
+            _ => PrivacyMode::PRIVATE, // Private, P2P, and unknown all collapse to PRIVATE
         };
 
         Ok(NetworkNode {
@@ -429,7 +423,7 @@ impl NetworkManager {
                                                     coordinate,
                                                     address: connection.endpoint().to_socket_addr(),
                                                     node_id: node_id.clone(),
-                                                    privacy_mode: PrivacyMode::Public, // Default
+                                                    privacy_mode: PrivacyMode::PUBLIC, // Default
                                                     connection: Some(connection),
                                                 };
 
@@ -464,7 +458,7 @@ mod tests {
         let manager = NetworkManager::new(
             coord,
             transport,
-            PrivacyMode::Private,
+            PrivacyMode::PRIVATE,
             vec![],
         ).await.unwrap();
 

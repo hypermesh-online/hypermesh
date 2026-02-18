@@ -242,7 +242,7 @@ impl SharingPreferences {
         resource_settings.insert(AssetType::Cpu, ResourceSharingSettings {
             enabled: true,
             share_percentage: 25.0,
-            privacy_level: PrivacyLevel::P2P,
+            privacy_level: PrivacyLevel::PRIVATE,
             max_concurrent_users: 2,
             max_session_duration: Duration::from_secs(3600),
             min_price_per_unit: 0.10,
@@ -262,7 +262,7 @@ impl SharingPreferences {
         resource_settings.insert(AssetType::Memory, ResourceSharingSettings {
             enabled: false,
             share_percentage: 10.0,
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             max_concurrent_users: 1,
             max_session_duration: Duration::from_secs(1800),
             min_price_per_unit: 0.01,
@@ -282,7 +282,7 @@ impl SharingPreferences {
             resource_settings.insert(AssetType::Gpu, ResourceSharingSettings {
                 enabled: false,
                 share_percentage: 50.0,
-                privacy_level: PrivacyLevel::P2P,
+                privacy_level: PrivacyLevel::PRIVATE,
                 max_concurrent_users: 1,
                 max_session_duration: Duration::from_secs(7200),
                 min_price_per_unit: 1.00,
@@ -302,7 +302,7 @@ impl SharingPreferences {
 
         Self {
             resource_settings,
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             operating_hours: OperatingHours::default_24_7(),
             performance_preferences: PerformancePreferences::conservative(),
             pricing_config: PricingConfiguration::default(),

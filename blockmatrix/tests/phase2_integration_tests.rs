@@ -88,15 +88,14 @@ async fn test_privacy_tier_to_pipeline_integration() {
 
     // Test each privacy tier configures pipeline correctly
     for tier in &[
-        PrivacyTier::Anonymous,
-        PrivacyTier::PrivateP2P,
-        PrivacyTier::Federated,
-        PrivacyTier::Public,
+        PrivacyTier::ANONYMOUS,
+        PrivacyTier::PRIVATE,
+        PrivacyTier::PUBLIC,
     ] {
         let handle = layer
             .process_asset(
                 asset.clone(),
-                tier.clone(),
+                *tier,
                 vec![network_id("test_network")]
             )
             .await
@@ -123,7 +122,7 @@ async fn test_content_storage_to_multinetwork_integration() {
     ];
 
     let handle = layer
-        .process_asset(asset, PrivacyTier::Federated, networks.clone())
+        .process_asset(asset, PrivacyTier::PRIVATE, networks.clone())
         .await
         .expect("Failed to process asset");
 
@@ -159,7 +158,7 @@ async fn test_stoq_to_matrix_foundation_integration() {
     let handle = layer
         .process_asset(
             asset,
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![network_id("test")]
         )
         .await
@@ -200,7 +199,7 @@ async fn test_pipeline_to_storage_integration() {
         let handle = layer
             .process_asset(
                 asset,
-                PrivacyTier::PrivateP2P,
+                PrivacyTier::PRIVATE,
                 vec![network_id("test")]
             )
             .await
@@ -268,13 +267,13 @@ async fn test_e2e_asset_upload_public_tier() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![network_id("public_network")]
         )
         .await
         .expect("Failed to process asset");
 
-    assert_eq!(handle.privacy_tier, PrivacyTier::Public);
+    assert_eq!(handle.privacy_tier, PrivacyTier::PUBLIC);
 
     // Retrieve the asset
     let retrieved = layer
@@ -301,13 +300,13 @@ async fn test_e2e_asset_upload_private_tier() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::PrivateP2P,
+            PrivacyTier::PRIVATE,
             vec![network_id("private_network")]
         )
         .await
         .expect("Failed to process asset");
 
-    assert_eq!(handle.privacy_tier, PrivacyTier::PrivateP2P);
+    assert_eq!(handle.privacy_tier, PrivacyTier::PRIVATE);
 
     // Verify pipeline was configured for private tier
     // Encryption should have been applied (duration_ms is always >= 0 for u64, just verify it exists)
@@ -327,13 +326,13 @@ async fn test_e2e_asset_upload_federated_tier() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![network_id("federated_network")]
         )
         .await
         .expect("Failed to process asset");
 
-    assert_eq!(handle.privacy_tier, PrivacyTier::Federated);
+    assert_eq!(handle.privacy_tier, PrivacyTier::PRIVATE);
 
     // Federated tier should have balanced configuration
     // Compression ratio < 1.0 means good compression (compressed_size/original_size)
@@ -354,13 +353,13 @@ async fn test_e2e_asset_upload_anonymous_tier() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Anonymous,
+            PrivacyTier::ANONYMOUS,
             vec![network_id("anonymous_network")]
         )
         .await
         .expect("Failed to process asset");
 
-    assert_eq!(handle.privacy_tier, PrivacyTier::Anonymous);
+    assert_eq!(handle.privacy_tier, PrivacyTier::ANONYMOUS);
 
     // Anonymous tier should have minimal tracking
     assert!(handle.pipeline_stats.total_duration_ms < 1000); // Fast processing
@@ -383,7 +382,7 @@ async fn test_e2e_multi_network_asset_sharing() {
 
     // Upload once, share across 3 networks
     let handle = layer
-        .process_asset(asset.clone(), PrivacyTier::Federated, networks.clone())
+        .process_asset(asset.clone(), PrivacyTier::PRIVATE, networks.clone())
         .await
         .expect("Failed to process asset");
 
@@ -427,7 +426,7 @@ async fn test_e2e_deduplicated_retrieval() {
         let handle = layer
             .process_asset(
                 asset,
-                PrivacyTier::Public,
+                PrivacyTier::PUBLIC,
                 vec![network_id(&format!("user_{}_network", i))]
             )
             .await
@@ -462,7 +461,7 @@ async fn test_e2e_cross_network_retrieval() {
     let handle_a = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![network_id("network_a")]
         )
         .await
@@ -472,7 +471,7 @@ async fn test_e2e_cross_network_retrieval() {
     let handle_b = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![network_id("network_b")]
         )
         .await
@@ -508,7 +507,7 @@ async fn test_e2e_matrix_aware_retrieval() {
     let handle = layer
         .process_asset(
             asset,
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![network_id("matrix_network")]
         )
         .await
@@ -547,7 +546,7 @@ async fn test_performance_10mb_asset_processing() {
     let handle = layer
         .process_asset(
             asset,
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![network_id("perf_test")]
         )
         .await
@@ -578,7 +577,7 @@ async fn test_performance_100mb_asset_processing() {
     let handle = layer
         .process_asset(
             asset,
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![network_id("perf_test")]
         )
         .await
@@ -620,7 +619,7 @@ async fn test_performance_concurrent_uploads() {
             layer_clone
                 .process_asset(
                     asset,
-                    PrivacyTier::PrivateP2P,
+                    PrivacyTier::PRIVATE,
                     vec![network_id(&format!("network_{}", i))]
                 )
                 .await
@@ -673,7 +672,7 @@ async fn test_performance_deduplication_rate() {
         let handle = layer
             .process_asset(
                 asset,
-                PrivacyTier::Public,
+                PrivacyTier::PUBLIC,
                 vec![network_id("dedup_network")]
             )
             .await
@@ -714,7 +713,7 @@ async fn test_failure_partial_shard_loss() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![network_id("test")]
         )
         .await
@@ -752,7 +751,7 @@ async fn test_failure_network_timeout() {
         Duration::from_millis(100), // 100ms overall timeout
         layer.process_asset(
             asset,
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![network_id("test")]
         )
     ).await;
@@ -788,7 +787,7 @@ async fn test_failure_invalid_privacy_tier() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Anonymous,
+            PrivacyTier::ANONYMOUS,
             vec![network_id("test")]
         )
         .await
@@ -797,7 +796,7 @@ async fn test_failure_invalid_privacy_tier() {
     // Try to retrieve with incompatible privacy requirements
     // This would require implementing privacy validation logic
     // For now, just verify the handle has the correct tier
-    assert_eq!(handle.privacy_tier, PrivacyTier::Anonymous);
+    assert_eq!(handle.privacy_tier, PrivacyTier::ANONYMOUS);
 }
 
 // Integration validation test
@@ -822,7 +821,7 @@ async fn test_complete_phase2_integration() {
     let handle = layer
         .process_asset(
             asset.clone(),
-            PrivacyTier::Public,
+            PrivacyTier::PUBLIC,
             vec![
                 network_id("net1"),
                 network_id("net2"),

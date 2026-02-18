@@ -128,10 +128,10 @@ pub fn create_asset_status(
 #[allow(dead_code)] // Public API for adapter implementations
 pub fn get_supported_privacy_levels() -> Vec<PrivacyLevel> {
     vec![
-        PrivacyLevel::Private,
-        PrivacyLevel::PrivateNetwork,
-        PrivacyLevel::P2P,
-        PrivacyLevel::PublicNetwork,
-        PrivacyLevel::FullPublic,
+        PrivacyLevel::PRIVATE,
+        PrivacyLevel::PRIVATE,
+        PrivacyLevel::PRIVATE,
+        PrivacyLevel::PUBLIC,
+        PrivacyLevel::PUBLIC,
     ]
 }

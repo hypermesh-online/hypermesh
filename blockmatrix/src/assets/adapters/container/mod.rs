@@ -49,7 +49,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             consensus_proof: ConsensusProof::new(
                 StakeProof {
                     stake_holder: "test-holder".to_string(),

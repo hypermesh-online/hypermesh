@@ -267,7 +267,7 @@ pub fn initialize_default_pool(
         total_capacity,
         available_capacity: total_capacity,
         storage_type: StorageType::Ssd, // Default assumption
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         devices: device_ids,
         allocations: Vec::new(),
         health_status: PoolHealthStatus::Healthy,

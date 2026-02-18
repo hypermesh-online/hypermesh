@@ -24,7 +24,7 @@ fn create_test_gpu_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         // Use default test proofs that pass validation (proper hash generation)
         consensus_proof: ConsensusProof::new_for_testing(),
         certificate_fingerprint: "test-cert".to_string(),

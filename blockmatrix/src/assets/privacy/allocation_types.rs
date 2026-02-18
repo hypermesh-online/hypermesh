@@ -61,20 +61,20 @@ impl PrivacyAllocationType {
     /// Get minimum required privacy level
     pub fn minimum_privacy_level(&self) -> PrivacyLevel {
         match self {
-            PrivacyAllocationType::Private => PrivacyLevel::Private,
-            PrivacyAllocationType::Public => PrivacyLevel::PublicNetwork,
-            PrivacyAllocationType::Anonymous => PrivacyLevel::P2P,
-            PrivacyAllocationType::Verified => PrivacyLevel::FullPublic,
+            PrivacyAllocationType::Private => PrivacyLevel::PRIVATE,
+            PrivacyAllocationType::Public => PrivacyLevel::PUBLIC,
+            PrivacyAllocationType::Anonymous => PrivacyLevel::PRIVATE,
+            PrivacyAllocationType::Verified => PrivacyLevel::PUBLIC,
         }
     }
     
     /// Get maximum allowed privacy level
     pub fn maximum_privacy_level(&self) -> PrivacyLevel {
         match self {
-            PrivacyAllocationType::Private => PrivacyLevel::PrivateNetwork,
-            PrivacyAllocationType::Public => PrivacyLevel::FullPublic,
-            PrivacyAllocationType::Anonymous => PrivacyLevel::PublicNetwork,
-            PrivacyAllocationType::Verified => PrivacyLevel::FullPublic,
+            PrivacyAllocationType::Private => PrivacyLevel::PRIVATE,
+            PrivacyAllocationType::Public => PrivacyLevel::PUBLIC,
+            PrivacyAllocationType::Anonymous => PrivacyLevel::PUBLIC,
+            PrivacyAllocationType::Verified => PrivacyLevel::PUBLIC,
         }
     }
     

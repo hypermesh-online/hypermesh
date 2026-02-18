@@ -401,7 +401,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_and_find_type() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );
@@ -429,7 +429,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_types() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );
@@ -459,7 +459,7 @@ mod tests {
     #[tokio::test]
     async fn test_registry_statistics() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::FullPublic,
+            PrivacyLevel::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );

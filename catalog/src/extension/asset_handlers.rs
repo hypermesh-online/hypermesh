@@ -197,7 +197,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: instance.resources.storage_mb * 1024 * 1024,
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PRIVATE,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -430,7 +430,7 @@ impl AssetExtensionHandler for LibraryHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: package.size_bytes,
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PUBLIC,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -617,7 +617,7 @@ impl AssetExtensionHandler for DatasetHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: dataset.size_bytes,
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PRIVATE,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -789,7 +789,7 @@ impl AssetExtensionHandler for TemplateHandler {
             updated_at: std::time::SystemTime::now(),
             size_bytes: 1024, // Templates are typically small
             metadata: metadata_map,
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PUBLIC,
             allocation: None,
             consensus_status: blockmatrix::extensions::ConsensusStatus {
                 validated: false,
@@ -836,7 +836,7 @@ mod tests {
                 ("language".to_string(), serde_json::json!("lua")),
                 ("version".to_string(), serde_json::json!("1.9.0")),
             ]),
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PRIVATE,
             allocation: None,
             consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
             parent_id: None,
@@ -861,7 +861,7 @@ mod tests {
                 ("version".to_string(), serde_json::json!("1.0.0")),
                 ("language".to_string(), serde_json::json!("lua")),
             ]),
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::FullPublic,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PUBLIC,
             allocation: None,
             consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
             parent_id: None,

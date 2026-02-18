@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
     info!("Starting bootstrap node at ({},{},{}) on port {}", x, y, z, port);
 
     let bootstrap_handle = tokio::spawn(async move {
-        start_node(x, y, z, port, None, PrivacyMode::Public).await
+        start_node(x, y, z, port, None, PrivacyMode::PUBLIC).await
     });
     handles.push(bootstrap_handle);
 
@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
         let port = *port;
 
         let handle = tokio::spawn(async move {
-            start_node(x, y, z, port, Some(bootstrap), PrivacyMode::Public).await
+            start_node(x, y, z, port, Some(bootstrap), PrivacyMode::PUBLIC).await
         });
         handles.push(handle);
 
@@ -116,7 +116,7 @@ async fn start_node(
     bootstrap_mgr.set_privacy_mode(privacy_mode).await?;
 
     // Initialize STOQ transport if not private
-    if privacy_mode != PrivacyMode::Private {
+    if privacy_mode != PrivacyMode::PRIVATE {
         let mut stoq_config = stoq::TransportConfig::default();
         stoq_config.port = port;
         stoq_config.bind_address = Ipv6Addr::UNSPECIFIED;

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::result::Result;
 use std::time::{Duration, SystemTime};
 
-pub use hypermesh_lib::PrivacyLevel;
+pub use hypermesh_lib::PrivacyMode as PrivacyLevel;
 
 /// Raw 32-byte asset hash. Distinct from hypermesh_lib::AssetId (string identifier).
 pub type RawAssetId = [u8; 32];

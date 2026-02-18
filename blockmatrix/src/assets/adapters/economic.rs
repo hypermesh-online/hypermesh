@@ -129,11 +129,11 @@ impl EconomicAssetAdapter {
             capabilities: AdapterCapabilities {
                 asset_type: AssetType::Economic,
                 supported_privacy_levels: vec![
-                    PrivacyLevel::Private,
-                    PrivacyLevel::PrivateNetwork,
-                    PrivacyLevel::P2P,
-                    PrivacyLevel::PublicNetwork,
-                    PrivacyLevel::FullPublic,
+                    PrivacyLevel::PRIVATE,
+                    PrivacyLevel::PRIVATE,
+                    PrivacyLevel::PRIVATE,
+                    PrivacyLevel::PUBLIC,
+                    PrivacyLevel::PUBLIC,
                 ],
                 supports_proxy_addressing: true,
                 supports_resource_monitoring: true,
@@ -197,11 +197,13 @@ impl EconomicAssetAdapter {
 
     /// Convert privacy level to economic privacy
     fn map_privacy_level(privacy: PrivacyLevel) -> EconomicPrivacy {
-        match privacy {
-            PrivacyLevel::Private => EconomicPrivacy::Private,
-            PrivacyLevel::PrivateNetwork | PrivacyLevel::P2P => EconomicPrivacy::P2P,
-            PrivacyLevel::PublicNetwork => EconomicPrivacy::Public,
-            PrivacyLevel::FullPublic => EconomicPrivacy::FullPublic,
+        if privacy == PrivacyLevel::PRIVATE {
+            EconomicPrivacy::Private
+        } else if privacy == PrivacyLevel::ANONYMOUS {
+            EconomicPrivacy::P2P
+        } else {
+            // PUBLIC
+            EconomicPrivacy::FullPublic
         }
     }
 }
@@ -277,7 +279,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             asset_id: asset_id.clone(),
             status: asset_state.status,
             allocation_config: AllocationConfig {
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 resource_allocation: ResourceAllocationConfig {
                     cpu_allocation: 1.0,
                     gpu_allocation: 0.0,

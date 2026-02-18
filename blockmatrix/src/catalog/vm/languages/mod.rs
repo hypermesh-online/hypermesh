@@ -642,7 +642,7 @@ impl Default for LanguageSpecificConfig {
                 "memory".to_string(),
                 "storage".to_string(),
             ],
-            privacy_level: Some(PrivacyLevel::Private),
+            privacy_level: Some(PrivacyLevel::PRIVATE),
         }
     }
 }

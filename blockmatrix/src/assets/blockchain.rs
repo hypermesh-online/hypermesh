@@ -61,28 +61,12 @@ pub struct HyperMeshAssetRecord {
     /// Consensus proofs (all 4 required: PoSp+PoSt+PoWk+PoTm)
     pub consensus_proofs: Vec<ConsensusProof>,
     /// Privacy level for this operation
-    pub privacy_level: AssetPrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Asset adapter that handled this operation
     pub adapter_type: AssetType,
 }
 
-/// Privacy levels for asset operations
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum AssetPrivacyLevel {
-    /// Internal network only
-    Private,
-    /// Specific networks/groups
-    PrivateNetwork,
-    /// Trusted peer sharing
-    P2P,
-    /// Specific public networks
-    PublicNetwork,
-    /// Maximum rewards, full HyperMesh participation
-    FullPublic,
-    /// Public access (general public visibility)
-    // STUB: Phase 3
-    Public,
-}
+use hypermesh_lib::PrivacyMode;
 
 impl HyperMeshAssetRecord {
     /// Create new asset record with consensus validation
@@ -92,7 +76,7 @@ impl HyperMeshAssetRecord {
         issuing_authority: String,
         data_payload: Vec<u8>,
         consensus_proofs: Vec<ConsensusProof>,
-        privacy_level: AssetPrivacyLevel,
+        privacy_level: PrivacyMode,
     ) -> Self {
         // Get adapter type from AssetId
         let adapter_type = asset_id.asset_type().unwrap_or(AssetType::Container);
@@ -150,7 +134,7 @@ impl HyperMeshAssetRecord {
         }
         
         // Hash privacy level
-        hasher.update(&[self.privacy_level.to_u8()]);
+        hasher.update(&[asset_privacy_to_u8(&self.privacy_level)]);
         
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
@@ -158,30 +142,30 @@ impl HyperMeshAssetRecord {
         hash
     }
 
-    /// Check if asset record meets privacy requirements
-    pub fn validates_privacy(&self, required_level: &AssetPrivacyLevel) -> bool {
-        match (required_level, &self.privacy_level) {
-            (AssetPrivacyLevel::Private, AssetPrivacyLevel::Private) => true,
-            (AssetPrivacyLevel::PrivateNetwork, AssetPrivacyLevel::PrivateNetwork | AssetPrivacyLevel::Private) => true,
-            (AssetPrivacyLevel::P2P, AssetPrivacyLevel::P2P | AssetPrivacyLevel::PrivateNetwork | AssetPrivacyLevel::Private) => true,
-            (AssetPrivacyLevel::PublicNetwork, _) => true, // Public network accepts all
-            (AssetPrivacyLevel::FullPublic, _) => true, // Full public accepts all
-            _ => false,
+    /// Check if asset record meets privacy requirements.
+    ///
+    /// PUBLIC accepts all. PRIVATE accepts PRIVATE. ANONYMOUS accepts only ANONYMOUS.
+    pub fn validates_privacy(&self, required_level: &PrivacyMode) -> bool {
+        if *required_level == PrivacyMode::PUBLIC {
+            true
+        } else if *required_level == PrivacyMode::PRIVATE {
+            self.privacy_level == PrivacyMode::PRIVATE || self.privacy_level == PrivacyMode::ANONYMOUS
+        } else {
+            // ANONYMOUS required level: only exact ANONYMOUS matches
+            self.privacy_level == *required_level
         }
     }
 }
 
-impl AssetPrivacyLevel {
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            AssetPrivacyLevel::Private => 0,
-            AssetPrivacyLevel::PrivateNetwork => 1,
-            AssetPrivacyLevel::P2P => 2,
-            AssetPrivacyLevel::PublicNetwork => 3,
-            AssetPrivacyLevel::FullPublic => 4,
-            // STUB: Phase 4b - Public privacy level added
-            AssetPrivacyLevel::Public => 5,
-        }
+/// Convert PrivacyMode to a u8 for hashing.
+pub fn asset_privacy_to_u8(mode: &PrivacyMode) -> u8 {
+    if *mode == PrivacyMode::ANONYMOUS {
+        0
+    } else if *mode == PrivacyMode::PRIVATE {
+        1
+    } else {
+        // PUBLIC
+        2
     }
 }
 
@@ -356,7 +340,7 @@ pub struct ComputeExecutionRecord {
     /// Required resources
     pub resource_requirements: ComputeResourceRequirements,
     /// Privacy level for execution
-    pub privacy_level: AssetPrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Execution results (if completed)
     pub execution_result: Option<ComputeExecutionResult>,
 }
@@ -416,12 +400,12 @@ mod tests {
             "test-authority".to_string(),
             b"test-data".to_vec(),
             consensus_proofs,
-            AssetPrivacyLevel::FullPublic,
+            PrivacyMode::PUBLIC,
         );
 
         assert_eq!(record.record_type, AssetRecordType::Creation);
         assert_eq!(record.issuing_authority, "test-authority");
-        assert_eq!(record.privacy_level.to_u8(), 4); // FullPublic = 4
+        assert_eq!(asset_privacy_to_u8(&record.privacy_level), 2); // PUBLIC = 2
     }
 
     #[tokio::test]
@@ -465,7 +449,7 @@ mod tests {
             "test-authority".to_string(),
             b"test-data".to_vec(),
             vec![consensus_proof],
-            AssetPrivacyLevel::FullPublic,
+            PrivacyMode::PUBLIC,
         );
 
         // Validate consensus proofs
@@ -486,12 +470,12 @@ mod tests {
             "test".to_string(),
             vec![],
             vec![],
-            AssetPrivacyLevel::P2P,
+            PrivacyMode::PRIVATE,
         );
 
-        assert!(record.validates_privacy(&AssetPrivacyLevel::FullPublic));
-        assert!(record.validates_privacy(&AssetPrivacyLevel::P2P));
-        assert!(!record.validates_privacy(&AssetPrivacyLevel::Private));
+        assert!(record.validates_privacy(&PrivacyMode::PUBLIC));
+        assert!(record.validates_privacy(&PrivacyMode::PRIVATE));
+        assert!(!record.validates_privacy(&PrivacyMode::ANONYMOUS));
     }
 
     #[test]
@@ -503,7 +487,7 @@ mod tests {
             "test".to_string(),
             vec![1, 2, 3],
             vec![],
-            AssetPrivacyLevel::Private,
+            PrivacyMode::PRIVATE,
         );
 
         let block_data = HyperMeshBlockData::AssetRecord(record);

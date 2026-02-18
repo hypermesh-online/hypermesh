@@ -573,9 +573,9 @@ impl AssetAdapter for NetworkAssetAdapter {
             privacy_level: request.privacy_level.clone(),
             qos_priority: 128, // Default priority
             traffic_shaping_enabled: true,
-            isolation_enabled: matches!(request.privacy_level, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork),
+            isolation_enabled: request.privacy_level == PrivacyLevel::PRIVATE,
             ipv6_addresses,
-            vlan_id: if matches!(request.privacy_level, PrivacyLevel::Private) {
+            vlan_id: if matches!(request.privacy_level, PrivacyLevel::PRIVATE) {
                 // Use first 16 bytes of content_hash to generate VLAN ID
                 let hash_as_u128 = u128::from_le_bytes(asset_id.content_hash[..16].try_into().unwrap());
                 Some(100 + (hash_as_u128 % 4000) as u16) // Generate unique VLAN ID
@@ -624,7 +624,7 @@ impl AssetAdapter for NetworkAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -750,7 +750,7 @@ impl AssetAdapter for NetworkAssetAdapter {
             })?;
         
         allocation.privacy_level = privacy.clone();
-        allocation.isolation_enabled = matches!(privacy, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork);
+        allocation.isolation_enabled = privacy == PrivacyLevel::PRIVATE;
         
         tracing::info!("Updated privacy level for network asset {}: {:?}", asset_id, privacy);
         Ok(())
@@ -854,11 +854,11 @@ impl AssetAdapter for NetworkAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Network,
             supported_privacy_levels: vec![
-                PrivacyLevel::Private,
-                PrivacyLevel::PrivateNetwork,
-                PrivacyLevel::P2P,
-                PrivacyLevel::PublicNetwork,
-                PrivacyLevel::FullPublic,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PUBLIC,
+                PrivacyLevel::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,
@@ -897,7 +897,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             // ConsensusProof::new expects: (stake, time, space, work)
             consensus_proof: ConsensusProof::new(
                 StakeProof {

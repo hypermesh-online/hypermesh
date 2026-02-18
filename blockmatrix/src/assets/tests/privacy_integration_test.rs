@@ -35,7 +35,7 @@ use hypermesh_assets::privacy::{
 async fn test_privacy_allocation_workflow() {
     // Create privacy manager configuration
     let manager_config = PrivacyManagerConfig {
-        default_privacy_level: PrivacyLevel::P2P,
+        default_privacy_level: PrivacyLevel::PRIVATE,
         default_resource_allocation: super::ResourceAllocationConfig::default(),
         global_consensus_requirements: super::ConsensusRequirementConfig::default(),
         base_reward_config: CaesarRewardConfig {
@@ -69,7 +69,7 @@ async fn test_privacy_allocation_workflow() {
     // Create user privacy configuration
     let user_config = UserPrivacyConfiguration {
         user_id: "test-user-123".to_string(),
-        preferred_privacy_level: PrivacyLevel::PublicNetwork,
+        preferred_privacy_level: PrivacyLevel::PUBLIC,
         resource_privacy_settings: HashMap::new(),
         consensus_requirements: super::ConsensusRequirementConfig::default(),
         reward_preferences: super::manager::CaesarRewardPreferences {
@@ -168,13 +168,13 @@ async fn test_privacy_allocation_workflow() {
     let allocation_result = privacy_manager.allocate_privacy_controlled_access(
         "test-user-123",
         &asset_id,
-        Some(PrivacyLevel::PublicNetwork), // Override default
+        Some(PrivacyLevel::PUBLIC), // Override default
         Some(consensus_proof),
     ).await.unwrap();
     
     // Verify allocation result
     assert_eq!(allocation_result.asset_id, asset_id);
-    assert_eq!(allocation_result.privacy_level, PrivacyLevel::PublicNetwork);
+    assert_eq!(allocation_result.privacy_level, PrivacyLevel::PUBLIC);
     assert!(matches!(allocation_result.allocation_type, PrivacyAllocationType::Public));
     
     // Verify resource configuration
@@ -245,10 +245,10 @@ async fn test_allocation_types_and_transitions() {
     assert!(verified.requires_consensus_proof()); // Only verified requires full consensus
     
     // Test privacy level mappings
-    assert_eq!(private.minimum_privacy_level(), PrivacyLevel::Private);
-    assert_eq!(public.minimum_privacy_level(), PrivacyLevel::PublicNetwork);
-    assert_eq!(anonymous.minimum_privacy_level(), PrivacyLevel::P2P);
-    assert_eq!(verified.minimum_privacy_level(), PrivacyLevel::FullPublic);
+    assert_eq!(private.minimum_privacy_level(), PrivacyLevel::PRIVATE);
+    assert_eq!(public.minimum_privacy_level(), PrivacyLevel::PUBLIC);
+    assert_eq!(anonymous.minimum_privacy_level(), PrivacyLevel::PRIVATE);
+    assert_eq!(verified.minimum_privacy_level(), PrivacyLevel::PUBLIC);
     
     // Test CAESAR reward multipliers
     assert_eq!(private.base_reward_multiplier(), 0.0); // No rewards
@@ -313,7 +313,7 @@ async fn test_caesar_reward_calculation() {
     
     // Test Full Public (maximum rewards)
     let full_public_config = reward_calculator.calculate_reward_config(
-        &PrivacyLevel::FullPublic,
+        &PrivacyLevel::PUBLIC,
         &resource_config,
         &user_preferences,
     ).await.unwrap();
@@ -323,7 +323,7 @@ async fn test_caesar_reward_calculation() {
     
     // Test Private (no rewards)
     let private_config = reward_calculator.calculate_reward_config(
-        &PrivacyLevel::Private,
+        &PrivacyLevel::PRIVATE,
         &resource_config,
         &user_preferences,
     ).await.unwrap();
@@ -332,7 +332,7 @@ async fn test_caesar_reward_calculation() {
     
     // Test P2P (intermediate rewards)
     let p2p_config = reward_calculator.calculate_reward_config(
-        &PrivacyLevel::P2P,
+        &PrivacyLevel::PRIVATE,
         &resource_config,
         &user_preferences,
     ).await.unwrap();
@@ -355,7 +355,7 @@ async fn test_caesar_reward_calculation() {
     let reward_result = reward_calculator.calculate_actual_rewards(
         allocation_duration,
         &resource_utilization,
-        &PrivacyLevel::FullPublic,
+        &PrivacyLevel::PUBLIC,
         &performance_metrics,
         "Silver", // User tier
     ).await.unwrap();
@@ -374,7 +374,7 @@ async fn test_caesar_reward_calculation() {
 #[tokio::test]
 async fn test_privacy_enforcement() {
     let manager_config = PrivacyManagerConfig {
-        default_privacy_level: PrivacyLevel::P2P,
+        default_privacy_level: PrivacyLevel::PRIVATE,
         default_resource_allocation: super::ResourceAllocationConfig::default(),
         global_consensus_requirements: super::ConsensusRequirementConfig::default(),
         base_reward_config: CaesarRewardConfig::default(),
@@ -396,7 +396,7 @@ async fn test_privacy_enforcement() {
     let allocation_result = super::PrivacyAllocationResult {
         asset_id: asset_id.clone(),
         allocation_type: PrivacyAllocationType::Public,
-        privacy_level: PrivacyLevel::PublicNetwork,
+        privacy_level: PrivacyLevel::PUBLIC,
         resource_config: super::ResourceAllocationConfig::default(),
         consensus_requirements: super::ConsensusRequirementConfig::default(),
         reward_config: CaesarRewardConfig::default(),
@@ -457,8 +457,8 @@ fn test_user_privacy_config_validation() {
     assert!(warnings.is_empty(), "Default config should have no validation warnings");
     
     // Test conflicting settings
-    config.privacy_settings.privacy_mode = super::config::PrivacyMode::MaximumPrivacy;
-    config.privacy_settings.default_privacy_level = PrivacyLevel::FullPublic;
+    config.privacy_settings.privacy_preference = super::config::PrivacyPreference::MaximumPrivacy;
+    config.privacy_settings.default_privacy_level = PrivacyLevel::PUBLIC;
     
     let warnings = config.validate().unwrap();
     assert!(!warnings.is_empty(), "Conflicting settings should produce warnings");

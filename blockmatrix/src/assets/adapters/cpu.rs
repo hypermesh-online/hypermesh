@@ -622,7 +622,7 @@ impl AssetAdapter for CpuAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -838,11 +838,11 @@ impl AssetAdapter for CpuAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Cpu,
             supported_privacy_levels: vec![
-                PrivacyLevel::Private,
-                PrivacyLevel::PrivateNetwork,
-                PrivacyLevel::P2P,
-                PrivacyLevel::PublicNetwork,
-                PrivacyLevel::FullPublic,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PUBLIC,
+                PrivacyLevel::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,
@@ -881,7 +881,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::Private,
+            privacy_level: PrivacyLevel::PRIVATE,
             // Use default test proofs that pass validation (proper hash generation)
             consensus_proof: ConsensusProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),

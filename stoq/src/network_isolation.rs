@@ -19,6 +19,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
+use hypermesh_lib::PrivacyMode;
 
 use crate::transport::{StoqTransport, Connection};
 
@@ -45,8 +46,8 @@ pub struct NetworkStack {
     pub transport: Arc<StoqTransport>,
     /// Active connections in this network
     pub connections: Arc<RwLock<HashMap<ConnectionId, Connection>>>,
-    /// Privacy tier for this network
-    pub privacy_tier: PrivacyTier,
+    /// Privacy mode for this network
+    pub privacy_tier: PrivacyMode,
     /// Network statistics
     pub stats: Arc<RwLock<NetworkStats>>,
     /// Explicit tunnels to other networks (if configured)
@@ -55,31 +56,6 @@ pub struct NetworkStack {
 
 /// Connection identifier
 pub type ConnectionId = u64;
-
-/// Privacy tier (matches BlockMatrix privacy tiers)
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum PrivacyTier {
-    /// Anonymous - Zero identity tracking
-    Anonymous,
-    /// Private P2P - Trusted peer circles
-    PrivateP2P,
-    /// Federated - Cross-network partner trust
-    Federated,
-    /// Public - Full transparency with PoS validation
-    Public,
-}
-
-impl PrivacyTier {
-    /// Get privacy tier name
-    pub fn name(&self) -> &str {
-        match self {
-            PrivacyTier::Anonymous => "Anonymous",
-            PrivacyTier::PrivateP2P => "PrivateP2P",
-            PrivacyTier::Federated => "Federated",
-            PrivacyTier::Public => "Public",
-        }
-    }
-}
 
 /// Network tunnel for explicit cross-network communication
 #[derive(Clone, Debug)]
@@ -193,7 +169,7 @@ impl NetworkIsolationManager {
         &self,
         network_id: NetworkId,
         name: String,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
     ) -> Result<()> {
         let mut stacks = self.network_stacks.write().await;
 
@@ -401,7 +377,7 @@ impl Clone for NetworkStack {
             name: self.name.clone(),
             transport: self.transport.clone(),
             connections: self.connections.clone(),
-            privacy_tier: self.privacy_tier.clone(),
+            privacy_tier: self.privacy_tier,
             stats: self.stats.clone(),
             tunnels: self.tunnels.clone(),
         }
@@ -423,7 +399,7 @@ mod tests {
         manager.create_network_stack(
             bank_network,
             "Bank Customer Portal".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
         ).await.unwrap();
 
         // Create employee network
@@ -431,7 +407,7 @@ mod tests {
         manager.create_network_stack(
             employee_network,
             "Employee VPN".to_string(),
-            PrivacyTier::PrivateP2P,
+            PrivacyMode::PRIVATE,
         ).await.unwrap();
 
         // Verify both exist
@@ -450,13 +426,13 @@ mod tests {
         manager.create_network_stack(
             network1,
             "Network 1".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
         ).await.unwrap();
 
         manager.create_network_stack(
             network2,
             "Network 2".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
         ).await.unwrap();
 
         // Verify same-network traffic allowed
@@ -483,13 +459,13 @@ mod tests {
         manager.create_network_stack(
             network1,
             "Network 1".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
         ).await.unwrap();
 
         manager.create_network_stack(
             network2,
             "Network 2".to_string(),
-            PrivacyTier::Federated,
+            PrivacyMode::PRIVATE,
         ).await.unwrap();
 
         // Create tunnel
@@ -518,7 +494,7 @@ mod tests {
         manager.create_network_stack(
             network1,
             "Network 1".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
         ).await.unwrap();
 
         assert_eq!(manager.active_networks().await.len(), 1);

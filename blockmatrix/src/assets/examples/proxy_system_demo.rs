@@ -121,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Allocate proxy address for asset
     let allocated_proxy_addr = proxy_manager.allocate_proxy_address(
         &asset_id,
-        PrivacyLevel::P2P,
+        PrivacyLevel::PRIVATE,
         &["HTTP".to_string(), "SOCKS5".to_string()],
     ).await?;
     println!("📍 Allocated proxy address for asset: {}", allocated_proxy_addr);

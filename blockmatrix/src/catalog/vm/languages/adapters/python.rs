@@ -328,7 +328,7 @@ class BlockchainStorage:
                 network_bandwidth_used: 0,
             },
             privacy_compliance: super::super::super::execution::PrivacyComplianceReport {
-                privacy_level_used: crate::catalog::vm::PrivacyLevel::Private,
+                privacy_level_used: crate::catalog::vm::PrivacyLevel::PRIVATE,
                 anonymization_applied: false,
                 data_sharing_events: vec![],
                 violations: vec![],

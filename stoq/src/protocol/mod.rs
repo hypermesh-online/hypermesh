@@ -29,7 +29,7 @@ pub use pos_validator::{
 
 // Re-export integration types
 pub use pos_integration::{
-    StoqPosIntegration, PrivacyTier, MatrixPosition, ShardAddress,
+    StoqPosIntegration, MatrixPosition, ShardAddress,
     AssetVerification, ConnectionStats, IntegrationStats,
 };
 

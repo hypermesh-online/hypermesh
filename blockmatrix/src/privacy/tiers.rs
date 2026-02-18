@@ -3,11 +3,11 @@
 // See the LICENSE file in the repository root for full license text.
 
 // Privacy tiers implementation for Block-MATRIX
-// Revolutionary Concept #5: Four privacy tiers with flexible transitions
+// Uses hypermesh_lib::PrivacyMode as canonical type
 
+use hypermesh_lib::{AccessScope, PrivacyMode};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 
 /// NodeId represents a unique identifier for a node in the network
 // TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
@@ -30,62 +30,6 @@ pub enum TrustLevel {
     Partner,
 }
 
-/// Privacy tier enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum PrivacyTier {
-    /// Anonymous - Zero identity tracking, Tor-like privacy
-    Anonymous,
-    /// Private P2P - Trusted peer circles only
-    PrivateP2P,
-    /// Federated - Cross-network partner trust
-    Federated,
-    /// Public - Full transparency with PoS validation
-    Public,
-}
-
-impl fmt::Display for PrivacyTier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PrivacyTier::Anonymous => write!(f, "Anonymous"),
-            PrivacyTier::PrivateP2P => write!(f, "Private P2P"),
-            PrivacyTier::Federated => write!(f, "Federated"),
-            PrivacyTier::Public => write!(f, "Public"),
-        }
-    }
-}
-
-impl PrivacyTier {
-    /// Get CAESAR reward multiplier for this tier
-    pub fn caesar_multiplier(&self) -> f64 {
-        match self {
-            PrivacyTier::Anonymous => 0.1,   // Minimal rewards
-            PrivacyTier::PrivateP2P => 0.4,  // Medium rewards
-            PrivacyTier::Federated => 0.7,    // Higher rewards
-            PrivacyTier::Public => 1.0,       // Maximum rewards
-        }
-    }
-
-    /// Check if identity tracking is required for this tier
-    pub fn requires_identity(&self) -> bool {
-        match self {
-            PrivacyTier::Anonymous => false,
-            PrivacyTier::PrivateP2P => true,
-            PrivacyTier::Federated => true,
-            PrivacyTier::Public => true,
-        }
-    }
-
-    /// Get validation requirements for this tier
-    pub fn validation_requirements(&self) -> ValidationRequirements {
-        match self {
-            PrivacyTier::Anonymous => ValidationRequirements::none(),
-            PrivacyTier::PrivateP2P => ValidationRequirements::peer_only(),
-            PrivacyTier::Federated => ValidationRequirements::federation(),
-            PrivacyTier::Public => ValidationRequirements::full(),
-        }
-    }
-}
-
 /// Validation requirements for a privacy tier
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationRequirements {
@@ -98,7 +42,7 @@ pub struct ValidationRequirements {
 }
 
 impl ValidationRequirements {
-    /// No validation required (anonymous tier)
+    /// No validation required (anonymous mode)
     pub fn none() -> Self {
         Self {
             proof_of_space: false,
@@ -110,7 +54,7 @@ impl ValidationRequirements {
         }
     }
 
-    /// Peer validation only (private P2P tier)
+    /// Peer validation only (private mode)
     pub fn peer_only() -> Self {
         Self {
             proof_of_space: false,
@@ -122,7 +66,7 @@ impl ValidationRequirements {
         }
     }
 
-    /// Federation validation (federated tier)
+    /// Federation validation (legacy -- now merged into peer_only for PRIVATE)
     pub fn federation() -> Self {
         Self {
             proof_of_space: true,
@@ -134,7 +78,7 @@ impl ValidationRequirements {
         }
     }
 
-    /// Full validation (public tier)
+    /// Full validation (public mode)
     pub fn full() -> Self {
         Self {
             proof_of_space: true,
@@ -145,6 +89,21 @@ impl ValidationRequirements {
             federation_validation: false,
         }
     }
+}
+
+/// Derive validation requirements from a PrivacyMode.
+///
+/// - ANONYMOUS (untracked) => none
+/// - PRIVATE (Bounded + tracked) => peer_only
+/// - PUBLIC (Unbounded + tracked) => full
+pub fn validation_requirements_for(mode: &PrivacyMode) -> ValidationRequirements {
+    if !mode.tracked {
+        return ValidationRequirements::none();
+    }
+    if mode.scope == AccessScope::Bounded {
+        return ValidationRequirements::peer_only();
+    }
+    ValidationRequirements::full()
 }
 
 /// Anonymous tier implementation - Zero identity tracking
@@ -437,19 +396,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_privacy_tier_caesar_multipliers() {
-        assert_eq!(PrivacyTier::Anonymous.caesar_multiplier(), 0.1);
-        assert_eq!(PrivacyTier::PrivateP2P.caesar_multiplier(), 0.4);
-        assert_eq!(PrivacyTier::Federated.caesar_multiplier(), 0.7);
-        assert_eq!(PrivacyTier::Public.caesar_multiplier(), 1.0);
+    fn test_privacy_mode_caesar_multipliers() {
+        assert_eq!(PrivacyMode::ANONYMOUS.caesar_multiplier(), 0.0);
+        assert_eq!(PrivacyMode::PRIVATE.caesar_multiplier(), 0.5);
+        assert_eq!(PrivacyMode::PUBLIC.caesar_multiplier(), 1.0);
     }
 
     #[test]
-    fn test_privacy_tier_identity_requirements() {
-        assert!(!PrivacyTier::Anonymous.requires_identity());
-        assert!(PrivacyTier::PrivateP2P.requires_identity());
-        assert!(PrivacyTier::Federated.requires_identity());
-        assert!(PrivacyTier::Public.requires_identity());
+    fn test_privacy_mode_identity_requirements() {
+        assert!(!PrivacyMode::ANONYMOUS.requires_identity());
+        assert!(PrivacyMode::PRIVATE.requires_identity());
+        assert!(PrivacyMode::PUBLIC.requires_identity());
     }
 
     #[test]
@@ -493,7 +450,6 @@ mod tests {
     fn test_federated_tier_partner_management() {
         let mut tier = FederatedTier::new(10);
         let network1 = [1u8; 16];
-        let network2 = [2u8; 16];
 
         assert!(tier.add_partner(network1, TrustLevel::Partner).is_ok());
         assert!(tier.meets_trust_requirement(&network1));
@@ -504,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_federated_tier_trust_levels() {
-        let tier = FederatedTier::new(10);
+        let _tier = FederatedTier::new(10);
         assert!(TrustLevel::Partner >= TrustLevel::Premium);
         assert!(TrustLevel::Premium >= TrustLevel::Standard);
         assert!(TrustLevel::Standard >= TrustLevel::Basic);
@@ -533,20 +489,16 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_requirements() {
-        let anon_req = PrivacyTier::Anonymous.validation_requirements();
+    fn test_validation_requirements_for_modes() {
+        let anon_req = validation_requirements_for(&PrivacyMode::ANONYMOUS);
         assert!(!anon_req.proof_of_stake);
         assert!(!anon_req.peer_validation);
 
-        let p2p_req = PrivacyTier::PrivateP2P.validation_requirements();
-        assert!(p2p_req.peer_validation);
-        assert!(!p2p_req.proof_of_stake);
+        let private_req = validation_requirements_for(&PrivacyMode::PRIVATE);
+        assert!(private_req.peer_validation);
+        assert!(!private_req.proof_of_stake);
 
-        let fed_req = PrivacyTier::Federated.validation_requirements();
-        assert!(fed_req.federation_validation);
-        assert!(fed_req.proof_of_space);
-
-        let pub_req = PrivacyTier::Public.validation_requirements();
+        let pub_req = validation_requirements_for(&PrivacyMode::PUBLIC);
         assert!(pub_req.proof_of_stake);
         assert!(pub_req.proof_of_work);
         assert!(pub_req.proof_of_time);
@@ -561,5 +513,12 @@ mod tests {
         let mut partial = ProofOfStateValidator::new();
         partial.validate_what = false;
         assert!(!partial.is_full_validation());
+    }
+
+    #[test]
+    fn test_privacy_mode_constants() {
+        let tier: PrivacyMode = PrivacyMode::PUBLIC;
+        assert_eq!(tier, PrivacyMode::PUBLIC);
+        assert_eq!(tier.caesar_multiplier(), 1.0);
     }
 }

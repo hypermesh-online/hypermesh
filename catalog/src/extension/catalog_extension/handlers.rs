@@ -69,7 +69,7 @@ impl HyperMeshExtension for CatalogExtension {
                     };
 
                     let catalog_registry = Arc::new(crate::registry::CatalogRegistry::new(
-                        blockmatrix::assets::PrivacyLevel::FullPublic,
+                        blockmatrix::assets::PrivacyLevel::PUBLIC,
                         crate::registry::TrustPolicy::default(),
                         crate::registry::RegistryConfig::default(),
                     ));

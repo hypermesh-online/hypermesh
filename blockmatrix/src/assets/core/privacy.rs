@@ -6,118 +6,83 @@
 //!
 //! User-configurable privacy levels for resource sharing with
 //! appropriate access controls and economic incentives.
+//!
+//! Migrated from old 5-variant PrivacyLevel enum to hypermesh_lib::PrivacyMode.
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 
+use hypermesh_lib::PrivacyMode;
+
 use super::AssetId;
 use super::status::AssetStatus;
 
-/// Privacy levels for asset sharing (from Proof of State patterns)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum PrivacyLevel {
-    /// Internal network only, no external access
-    #[default]
-    Private,
-    /// Specific networks/groups only
-    PrivateNetwork,
-    /// Trusted peer sharing
-    P2P,
-    /// Specific public networks
-    PublicNetwork,
-    /// Maximum CAESAR rewards, full HyperMesh node/"pivot"
-    FullPublic,
-}
+/// Backward-compatible alias: code that references `PrivacyLevel` keeps compiling.
+pub type PrivacyLevel = PrivacyMode;
 
-impl PrivacyLevel {
-    /// Get privacy level priority (lower is more private)
-    pub fn priority(&self) -> u8 {
-        match self {
-            PrivacyLevel::Private => 0,
-            PrivacyLevel::PrivateNetwork => 1,
-            PrivacyLevel::P2P => 2,
-            PrivacyLevel::PublicNetwork => 3,
-            PrivacyLevel::FullPublic => 4,
-        }
-    }
-    
-    /// Check if this privacy level allows access from another level
-    pub fn allows_access_from(&self, requester_level: &PrivacyLevel) -> bool {
-        match self {
-            PrivacyLevel::Private => false, // No external access
-            PrivacyLevel::PrivateNetwork => {
-                matches!(requester_level, PrivacyLevel::PrivateNetwork)
-            },
-            PrivacyLevel::P2P => {
-                matches!(requester_level, 
-                    PrivacyLevel::PrivateNetwork | PrivacyLevel::P2P)
-            },
-            PrivacyLevel::PublicNetwork => {
-                !matches!(requester_level, PrivacyLevel::Private)
-            },
-            PrivacyLevel::FullPublic => true, // Maximum accessibility
-        }
-    }
-    
-    /// Get expected CAESAR token reward multiplier for hosting paid content via NGauge
-    ///
-    /// IMPORTANT: CAESAR rewards only apply when hosting paid content through NGauge:
-    /// - Advertisements
-    /// - KYCML-related content
-    /// - Paid hosting services (AWS-meets-torrent model)
-    ///
-    /// You do NOT earn CAESAR for:
-    /// - General P2P network participation
-    /// - Using work computer on private/federated network
-    /// - Buying products/services (e.g., buying a car)
-    ///
-    /// Earnings are specific to Asset type and content hosting, not just network participation.
-    pub fn caesar_reward_multiplier(&self) -> f32 {
-        match self {
-            PrivacyLevel::Private => 0.0, // No paid content hosting at this level
-            PrivacyLevel::PrivateNetwork => 0.25,
-            PrivacyLevel::P2P => 0.5,
-            PrivacyLevel::PublicNetwork => 0.75,
-            PrivacyLevel::FullPublic => 1.0, // Maximum rewards for public paid content hosting
-        }
-    }
-    
-    /// Get human-readable description
-    pub fn description(&self) -> &'static str {
-        match self {
-            PrivacyLevel::Private => "Internal use only, no sharing",
-            PrivacyLevel::PrivateNetwork => "Shared within trusted network groups",
-            PrivacyLevel::P2P => "Shared with verified peers",
-            PrivacyLevel::PublicNetwork => "Available on public networks",
-            PrivacyLevel::FullPublic => "Fully public with maximum rewards",
-        }
-    }
-    
-    /// Check if privacy level supports specific features
-    pub fn supports_remote_access(&self) -> bool {
-        !matches!(self, PrivacyLevel::Private)
-    }
-    
-    pub fn supports_proxy_addressing(&self) -> bool {
-        matches!(self, 
-            PrivacyLevel::P2P | 
-            PrivacyLevel::PublicNetwork | 
-            PrivacyLevel::FullPublic
-        )
+// ---------------------------------------------------------------------------
+// Free functions replacing the old PrivacyLevel methods
+// ---------------------------------------------------------------------------
+
+/// Get privacy priority (lower is more restrictive, higher is more open).
+///
+/// PRIVATE = 0, ANONYMOUS = 1, PUBLIC = 2
+pub fn privacy_priority(mode: &PrivacyMode) -> u8 {
+    if *mode == PrivacyMode::PRIVATE {
+        0
+    } else if *mode == PrivacyMode::ANONYMOUS {
+        1
+    } else {
+        // PUBLIC
+        2
     }
 }
 
-impl std::fmt::Display for PrivacyLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PrivacyLevel::Private => write!(f, "Private"),
-            PrivacyLevel::PrivateNetwork => write!(f, "Private Network"),
-            PrivacyLevel::P2P => write!(f, "P2P"),
-            PrivacyLevel::PublicNetwork => write!(f, "Public Network"),
-            PrivacyLevel::FullPublic => write!(f, "Full Public"),
-        }
+/// Check if this privacy mode allows access from another mode.
+///
+/// ANONYMOUS allows nothing inbound.
+/// PRIVATE allows access only from PRIVATE.
+/// PUBLIC allows access from anyone.
+pub fn allows_access_from(mode: &PrivacyMode, requester: &PrivacyMode) -> bool {
+    if *mode == PrivacyMode::ANONYMOUS {
+        false
+    } else if *mode == PrivacyMode::PRIVATE {
+        *requester == PrivacyMode::PRIVATE
+    } else {
+        // PUBLIC accepts all
+        true
     }
+}
+
+/// CAESAR token reward multiplier (f32 version of PrivacyMode::caesar_multiplier).
+pub fn caesar_reward_multiplier(mode: &PrivacyMode) -> f32 {
+    mode.caesar_multiplier() as f32
+}
+
+/// Human-readable description.
+pub fn privacy_description(mode: &PrivacyMode) -> &'static str {
+    if *mode == PrivacyMode::ANONYMOUS {
+        "Anonymous - no identity, open participation"
+    } else if *mode == PrivacyMode::PRIVATE {
+        "Private - bounded group, identity required"
+    } else if *mode == PrivacyMode::PUBLIC {
+        "Public - open participation, full transparency"
+    } else {
+        "Custom privacy mode"
+    }
+}
+
+/// Whether this mode supports remote access.
+pub fn supports_remote_access(mode: &PrivacyMode) -> bool {
+    // Only ANONYMOUS (fully isolated) blocks remote access
+    *mode != PrivacyMode::ANONYMOUS
+}
+
+/// Whether this mode supports proxy addressing.
+pub fn supports_proxy_addressing(mode: &PrivacyMode) -> bool {
+    // PRIVATE and PUBLIC support proxy addressing
+    *mode == PrivacyMode::PRIVATE || *mode == PrivacyMode::PUBLIC
 }
 
 /// Asset allocation result with privacy enforcement
@@ -414,13 +379,13 @@ impl AssetAllocation {
         privacy_level: PrivacyLevel,
     ) -> Self {
         let allocation_config = AllocationConfig {
-            privacy_level: privacy_level.clone(),
+            privacy_level,
             resource_allocation: ResourceAllocationConfig::default(),
             concurrency_limits: ConcurrencyLimits::default(),
             duration_config: DurationConfig::default(),
             consensus_requirements: ConsensusRequirements::default(),
         };
-        
+
         let access_config = AccessConfig {
             allowed_certificates: vec![status.owner_certificate_fingerprint.clone()],
             allowed_networks: Vec::new(),
@@ -428,7 +393,7 @@ impl AssetAllocation {
             rate_limits: RateLimits::default(),
             auth_requirements: AuthRequirements::default(),
         };
-        
+
         Self {
             asset_id,
             status,
@@ -438,7 +403,7 @@ impl AssetAllocation {
             expires_at: None,
         }
     }
-    
+
     /// Check if allocation has expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
@@ -447,24 +412,24 @@ impl AssetAllocation {
             false
         }
     }
-    
+
     /// Set allocation expiry
     pub fn set_expiry(&mut self, duration: Duration) {
         self.expires_at = Some(self.allocated_at + duration);
     }
-    
+
     /// Check if access is allowed for a certificate
     pub fn allows_access(&self, certificate_fingerprint: &str) -> bool {
         self.access_config.allowed_certificates.contains(&certificate_fingerprint.to_string())
     }
-    
+
     /// Add allowed certificate
     pub fn add_allowed_certificate(&mut self, certificate_fingerprint: String) {
         if !self.access_config.allowed_certificates.contains(&certificate_fingerprint) {
             self.access_config.allowed_certificates.push(certificate_fingerprint);
         }
     }
-    
+
     /// Get remaining allocation time
     pub fn remaining_time(&self) -> Option<Duration> {
         if let Some(expires_at) = self.expires_at {
@@ -473,11 +438,11 @@ impl AssetAllocation {
             None
         }
     }
-    
+
     /// Calculate CAESAR token reward rate
     pub fn caesar_reward_rate(&self) -> f32 {
-        let base_rate = self.allocation_config.privacy_level.caesar_reward_multiplier();
-        
+        let base_rate = caesar_reward_multiplier(&self.allocation_config.privacy_level);
+
         // Adjust based on resource allocation
         let resource_factor = (
             self.allocation_config.resource_allocation.cpu_allocation +
@@ -486,7 +451,7 @@ impl AssetAllocation {
             self.allocation_config.resource_allocation.storage_allocation +
             self.allocation_config.resource_allocation.network_allocation
         ) / 5.0;
-        
+
         base_rate * resource_factor
     }
 }
@@ -501,16 +466,16 @@ mod tests {
 
     #[test]
     fn test_privacy_level_access_control() {
-        assert!(!PrivacyLevel::Private.allows_access_from(&PrivacyLevel::FullPublic));
-        assert!(PrivacyLevel::FullPublic.allows_access_from(&PrivacyLevel::Private));
-        assert!(PrivacyLevel::P2P.allows_access_from(&PrivacyLevel::PrivateNetwork));
+        assert!(!allows_access_from(&PrivacyMode::ANONYMOUS, &PrivacyMode::PUBLIC));
+        assert!(allows_access_from(&PrivacyMode::PUBLIC, &PrivacyMode::ANONYMOUS));
+        assert!(allows_access_from(&PrivacyMode::PRIVATE, &PrivacyMode::PRIVATE));
     }
 
     #[test]
     fn test_privacy_level_rewards() {
-        assert_eq!(PrivacyLevel::Private.caesar_reward_multiplier(), 0.0);
-        assert_eq!(PrivacyLevel::FullPublic.caesar_reward_multiplier(), 1.0);
-        assert!(PrivacyLevel::P2P.caesar_reward_multiplier() > 0.0);
+        assert_eq!(caesar_reward_multiplier(&PrivacyMode::ANONYMOUS), 0.0);
+        assert_eq!(caesar_reward_multiplier(&PrivacyMode::PUBLIC), 1.0);
+        assert!(caesar_reward_multiplier(&PrivacyMode::PRIVATE) > 0.0);
     }
 
     #[test]
@@ -519,48 +484,48 @@ mod tests {
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),
-            PrivacyLevel::P2P,
+            PrivacyMode::PRIVATE,
         );
-        
-        let allocation = AssetAllocation::new(asset_id.clone(), status, PrivacyLevel::P2P);
-        
+
+        let allocation = AssetAllocation::new(asset_id.clone(), status, PrivacyMode::PRIVATE);
+
         assert_eq!(allocation.asset_id, asset_id);
-        assert_eq!(allocation.allocation_config.privacy_level, PrivacyLevel::P2P);
+        assert_eq!(allocation.allocation_config.privacy_level, PrivacyMode::PRIVATE);
         assert!(!allocation.is_expired());
     }
-    
+
     #[test]
     fn test_allocation_expiry() {
         let asset_id = test_asset_id(AssetType::Memory);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),
-            PrivacyLevel::Private,
+            PrivacyMode::PRIVATE,
         );
-        
-        let mut allocation = AssetAllocation::new(asset_id, status, PrivacyLevel::Private);
+
+        let mut allocation = AssetAllocation::new(asset_id, status, PrivacyMode::PRIVATE);
         allocation.set_expiry(Duration::from_secs(1));
-        
+
         // Should not be expired immediately
         assert!(!allocation.is_expired());
-        
+
         // Should have remaining time
         assert!(allocation.remaining_time().is_some());
     }
-    
+
     #[test]
     fn test_caesar_reward_calculation() {
         let asset_id = test_asset_id(AssetType::Storage);
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert".to_string(),
-            PrivacyLevel::FullPublic,
+            PrivacyMode::PUBLIC,
         );
-        
-        let allocation = AssetAllocation::new(asset_id, status, PrivacyLevel::FullPublic);
+
+        let allocation = AssetAllocation::new(asset_id, status, PrivacyMode::PUBLIC);
         let reward_rate = allocation.caesar_reward_rate();
-        
-        // Full public with full resource allocation should give maximum rate
+
+        // Public with full resource allocation should give maximum rate
         assert_eq!(reward_rate, 1.0);
     }
 }

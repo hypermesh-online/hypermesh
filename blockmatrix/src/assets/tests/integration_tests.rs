@@ -61,7 +61,7 @@ fn create_cpu_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         consensus_proof: create_test_consensus_proof("cpu", 50, 16, 2), // CPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -82,7 +82,7 @@ fn create_gpu_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         consensus_proof: create_test_consensus_proof("gpu", 200, 20, 8 * 1024 * 1024 * 1024), // GPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -103,7 +103,7 @@ fn create_memory_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         consensus_proof: create_test_consensus_proof("memory", 100, 12, 1024 * 1024 * 1024), // Memory requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -125,7 +125,7 @@ fn create_storage_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::Private,
+        privacy_level: PrivacyLevel::PRIVATE,
         consensus_proof: create_test_consensus_proof("storage", 75, 14, 10 * 1024 * 1024 * 1024), // Storage requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -357,8 +357,8 @@ async fn test_adapter_capabilities() {
         assert!(!capabilities.features.is_empty(), "All adapters should have feature list");
         
         // Check privacy level support
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::Private));
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::FullPublic));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PRIVATE));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PUBLIC));
     }
 }
 
@@ -370,7 +370,7 @@ async fn test_privacy_level_configuration() {
     let allocation = adapter.allocate_asset(&request).await.unwrap();
     
     // Test privacy level changes
-    for privacy_level in vec![PrivacyLevel::Private, PrivacyLevel::P2P, PrivacyLevel::FullPublic] {
+    for privacy_level in vec![PrivacyLevel::PRIVATE, PrivacyLevel::PRIVATE, PrivacyLevel::PUBLIC] {
         let result = adapter.configure_privacy_level(&allocation.asset_id, privacy_level.clone()).await;
         assert!(result.is_ok(), "Privacy level configuration should succeed for {:?}", privacy_level);
     }

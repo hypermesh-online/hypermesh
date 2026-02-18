@@ -175,7 +175,7 @@ impl AssetAdapter for StorageAssetAdapter {
         let proxy_address = generate_proxy_address(&asset_id).await;
 
         // Create encryption key for quantum security
-        let encryption_key_id = if matches!(request.privacy_level, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork) {
+        let encryption_key_id = if request.privacy_level == PrivacyLevel::PRIVATE {
             Some(create_kyber_encryption_key().await)
         } else {
             None
@@ -237,7 +237,7 @@ impl AssetAdapter for StorageAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -345,7 +345,7 @@ impl AssetAdapter for StorageAssetAdapter {
         allocation.privacy_level = privacy.clone();
 
         // Update encryption based on privacy level
-        if matches!(privacy, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork) && allocation.encryption_key_id.is_none() {
+        if privacy == PrivacyLevel::PRIVATE && allocation.encryption_key_id.is_none() {
             allocation.encryption_key_id = Some(create_kyber_encryption_key().await);
             allocation.encryption_enabled = true;
         }
@@ -460,11 +460,11 @@ impl AssetAdapter for StorageAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Storage,
             supported_privacy_levels: vec![
-                PrivacyLevel::Private,
-                PrivacyLevel::PrivateNetwork,
-                PrivacyLevel::P2P,
-                PrivacyLevel::PublicNetwork,
-                PrivacyLevel::FullPublic,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE,
+                PrivacyLevel::PUBLIC,
+                PrivacyLevel::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,

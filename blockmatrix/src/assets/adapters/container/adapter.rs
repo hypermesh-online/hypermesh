@@ -263,7 +263,7 @@ impl AssetAdapter for ContainerAssetAdapter {
                     storage_usage: None, network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::Private, proxy_address: None,
+                privacy_level: PrivacyLevel::PRIVATE, proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
@@ -357,7 +357,7 @@ impl AssetAdapter for ContainerAssetAdapter {
             .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?;
 
         allocation.privacy_level = privacy.clone();
-        if matches!(privacy, PrivacyLevel::Private | PrivacyLevel::PrivateNetwork) {
+        if privacy == PrivacyLevel::PRIVATE {
             allocation.network_config.network_mode = NetworkMode::Custom("isolated".to_string());
         }
         tracing::info!("Updated privacy level for container asset {}: {:?}", asset_id, privacy);
@@ -455,8 +455,8 @@ impl AssetAdapter for ContainerAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Container,
             supported_privacy_levels: vec![
-                PrivacyLevel::Private, PrivacyLevel::PrivateNetwork,
-                PrivacyLevel::P2P, PrivacyLevel::PublicNetwork, PrivacyLevel::FullPublic,
+                PrivacyLevel::PRIVATE, PrivacyLevel::PRIVATE,
+                PrivacyLevel::PRIVATE, PrivacyLevel::PUBLIC, PrivacyLevel::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,

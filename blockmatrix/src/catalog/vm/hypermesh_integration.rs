@@ -13,9 +13,10 @@ use serde::{Serialize, Deserialize};
 use hypermesh_assets::blockchain::{
     HyperMeshAssetRecord, AssetRecordType, ComputeExecutionRecord,
     ComputeResourceRequirements, ComputeExecutionResult, ActualResourceUsage,
-    AssetPrivacyLevel, AssetBlockchainManager,
+    AssetBlockchainManager,
 };
 use hypermesh_assets::core::asset_id::{AssetId, AssetType};
+use hypermesh_lib::PrivacyMode;
 use crate::consensus::ConsensusProof;
 
 /// Catalog VM integration with HyperMesh blockchain
@@ -37,7 +38,7 @@ impl HyperMeshBlockchainClient {
     pub async fn request_compute_asset(
         &self,
         resource_requirements: ComputeResourceRequirements,
-        privacy_level: AssetPrivacyLevel,
+        privacy_level: PrivacyMode,
         consensus_proof: ConsensusProof,
     ) -> Result<AssetId, String> {
         // Create asset ID for compute resource
@@ -88,7 +89,7 @@ impl HyperMeshBlockchainClient {
             self.node_identity.clone(),
             result_data,
             vec![consensus_proof],
-            AssetPrivacyLevel::FullPublic, // Results are typically public
+            PrivacyMode::PUBLIC, // Results are typically public
         );
 
         // Store completion in blockchain
@@ -136,7 +137,7 @@ impl HyperMeshBlockchainClient {
     pub async fn validate_asset_access(
         &self,
         asset_id: &AssetId,
-        required_privacy_level: AssetPrivacyLevel,
+        required_privacy_level: PrivacyMode,
         consensus_proof: &ConsensusProof,
     ) -> Result<bool, String> {
         // Get current asset status
@@ -163,7 +164,7 @@ pub struct VMExecutionContext {
     /// Resource allocation details
     pub resource_allocation: ComputeResourceRequirements,
     /// Privacy level for this execution
-    pub privacy_level: AssetPrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Execution metadata
     pub execution_metadata: ExecutionMetadata,
 }
@@ -186,7 +187,7 @@ impl VMExecutionContext {
     pub fn new(
         asset_id: AssetId,
         resource_allocation: ComputeResourceRequirements,
-        privacy_level: AssetPrivacyLevel,
+        privacy_level: PrivacyMode,
         execution_metadata: ExecutionMetadata,
     ) -> Self {
         Self {
@@ -236,7 +237,7 @@ pub struct AssetBasedExecutionRequest {
     /// Required resources
     pub resource_requirements: ComputeResourceRequirements,
     /// Privacy level for execution
-    pub privacy_level: AssetPrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Consensus proof for resource allocation
     pub consensus_proof: ConsensusProof,
     /// Execution metadata
@@ -249,7 +250,7 @@ impl AssetBasedExecutionRequest {
         code: String,
         language: String,
         resource_requirements: ComputeResourceRequirements,
-        privacy_level: AssetPrivacyLevel,
+        privacy_level: PrivacyMode,
         consensus_proof: ConsensusProof,
         metadata: ExecutionMetadata,
     ) -> Self {
@@ -383,7 +384,7 @@ mod tests {
         let context = VMExecutionContext::new(
             asset_id,
             requirements.clone(),
-            AssetPrivacyLevel::P2P,
+            PrivacyMode::PRIVATE,
             metadata,
         );
 
@@ -464,7 +465,7 @@ mod tests {
             "println(\"Hello, HyperMesh!\")".to_string(),
             "julia".to_string(),
             requirements,
-            AssetPrivacyLevel::P2P,
+            PrivacyMode::PRIVATE,
             consensus_proof,
             metadata,
         );

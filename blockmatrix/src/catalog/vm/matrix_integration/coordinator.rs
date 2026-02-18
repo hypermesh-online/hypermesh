@@ -46,7 +46,7 @@ impl EntityAssetCoordinator {
                 entity_domain: entity_domain.to_string(),
                 max_compute_allocation: config.max_external_allocation.clone(),
                 allowed_operations: vec![],
-                resource_privacy_level: PrivacyLevel::P2P,
+                resource_privacy_level: PrivacyLevel::PRIVATE,
                 max_duration_seconds: 3600,
             },
         };

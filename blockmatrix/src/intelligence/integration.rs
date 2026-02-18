@@ -227,63 +227,45 @@ impl ComponentIntegration {
         debug!("Integrating privacy tier {:?} with pipeline", privacy_tier);
 
         // Adjust pipeline configuration based on privacy tier
-        match privacy_tier {
-            PrivacyTier::Public => {
-                // Maximum security and redundancy for public tier
-                pipeline.encryption = EncryptionConfig {
-                    quantum_resistant: true,
-                    key_iterations: 100_000,
-                    nonce_size: 12,
-                };
-                pipeline.sharding = ShardingConfig {
-                    data_shards: 10,
-                    parity_shards: 4,
-                    target_shard_size: 1024 * 1024,
-                };
-                pipeline.compression.level = 6;
-            }
-            PrivacyTier::Federated => {
-                // Balanced configuration for federated networks
-                pipeline.encryption = EncryptionConfig {
-                    quantum_resistant: true,
-                    key_iterations: 100_000,
-                    nonce_size: 12,
-                };
-                pipeline.sharding = ShardingConfig {
-                    data_shards: 8,
-                    parity_shards: 3,
-                    target_shard_size: 1024 * 1024,
-                };
-                pipeline.compression.level = 4;
-            }
-            PrivacyTier::PrivateP2P => {
-                // Performance-optimized for trusted peers
-                pipeline.encryption = EncryptionConfig {
-                    quantum_resistant: false,
-                    key_iterations: 50_000,
-                    nonce_size: 12,
-                };
-                pipeline.sharding = ShardingConfig {
-                    data_shards: 6,
-                    parity_shards: 2,
-                    target_shard_size: 2 * 1024 * 1024,
-                };
-                pipeline.compression.level = 3;
-            }
-            PrivacyTier::Anonymous => {
-                // Minimal tracking, fast processing
-                pipeline.encryption = EncryptionConfig {
-                    quantum_resistant: false,
-                    key_iterations: 25_000,
-                    nonce_size: 12,
-                };
-                pipeline.sharding = ShardingConfig {
-                    data_shards: 4,
-                    parity_shards: 2,
-                    target_shard_size: 4 * 1024 * 1024,
-                };
-                pipeline.compression.level = 2;
-            }
+        if *privacy_tier == PrivacyTier::PUBLIC {
+            // Maximum security and redundancy for public tier
+            pipeline.encryption = EncryptionConfig {
+                quantum_resistant: true,
+                key_iterations: 100_000,
+                nonce_size: 12,
+            };
+            pipeline.sharding = ShardingConfig {
+                data_shards: 10,
+                parity_shards: 4,
+                target_shard_size: 1024 * 1024,
+            };
+            pipeline.compression.level = 6;
+        } else if *privacy_tier == PrivacyTier::PRIVATE {
+            // Federated-level config (more secure of the collapsed pair)
+            pipeline.encryption = EncryptionConfig {
+                quantum_resistant: true,
+                key_iterations: 100_000,
+                nonce_size: 12,
+            };
+            pipeline.sharding = ShardingConfig {
+                data_shards: 8,
+                parity_shards: 3,
+                target_shard_size: 1024 * 1024,
+            };
+            pipeline.compression.level = 4;
+        } else {
+            // ANONYMOUS: minimal tracking, fast processing
+            pipeline.encryption = EncryptionConfig {
+                quantum_resistant: false,
+                key_iterations: 25_000,
+                nonce_size: 12,
+            };
+            pipeline.sharding = ShardingConfig {
+                data_shards: 4,
+                parity_shards: 2,
+                target_shard_size: 4 * 1024 * 1024,
+            };
+            pipeline.compression.level = 2;
         }
 
         self.record_call("privacy_pipeline", start.elapsed()).await;
@@ -354,13 +336,8 @@ impl ComponentIntegration {
         // Calculate path between coordinates
         let path = vec![source, destination]; // Simple direct path
 
-        // Map privacy tier to STOQ tier
-        let stoq_tier = match privacy_tier {
-            PrivacyTier::Anonymous => StoqPrivacyTier::Anonymous,
-            PrivacyTier::PrivateP2P => StoqPrivacyTier::PrivateP2P,
-            PrivacyTier::Federated => StoqPrivacyTier::Federated,
-            PrivacyTier::Public => StoqPrivacyTier::Public,
-        };
+        // PrivacyTier is now an alias for PrivacyMode (same as StoqPrivacyTier)
+        let stoq_tier: StoqPrivacyTier = *privacy_tier;
 
         // Establish STOQ connection with matrix-aware routing
         let endpoint = stoq::Endpoint {
@@ -631,7 +608,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
         // Placeholder implementation
         Ok(NetworkConfig {
             network_id: network.clone(),
-            privacy_tier: PrivacyTier::Public,
+            privacy_tier: PrivacyTier::PUBLIC,
         })
     }
 
@@ -704,7 +681,7 @@ mod tests {
         let mut pipeline_config = crate::assets::pipeline::PipelineConfig::default();
 
         integration
-            .integrate_privacy_pipeline(&PrivacyTier::Public, &mut pipeline_config)
+            .integrate_privacy_pipeline(&PrivacyTier::PUBLIC, &mut pipeline_config)
             .await
             .unwrap();
 

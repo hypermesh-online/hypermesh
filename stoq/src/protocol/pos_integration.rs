@@ -13,57 +13,18 @@ use std::time::{SystemTime, Duration};
 use parking_lot::RwLock;
 use dashmap::DashMap;
 use tracing::{debug, info, warn};
+use hypermesh_lib::PrivacyMode;
 
 use super::pos_validator::{PosToken, PosTokenValidator};
 use crate::transport::certificate_strategy::NetworkType;
 
-/// Privacy tier for protocol-level enforcement
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrivacyTier {
-    /// No validation, no logging, ephemeral
-    Anonymous,
-    /// Peer-only validation, minimal logging
-    P2P,
-    /// Federation-scoped validation and logging
-    Federated,
-    /// Full PoS validation, full transparency
-    Public,
-}
-
-impl From<&NetworkType> for PrivacyTier {
+impl From<&NetworkType> for PrivacyMode {
     fn from(network_type: &NetworkType) -> Self {
         match network_type {
-            NetworkType::Anonymous => PrivacyTier::Anonymous,
-            NetworkType::P2P => PrivacyTier::P2P,
-            NetworkType::Federated { .. } => PrivacyTier::Federated,
-            NetworkType::Public => PrivacyTier::Public,
-        }
-    }
-}
-
-impl PrivacyTier {
-    /// Check if this tier requires PoS validation
-    pub fn requires_pos_validation(&self) -> bool {
-        matches!(self, PrivacyTier::Public)
-    }
-
-    /// Check if this tier allows logging
-    pub fn allows_logging(&self) -> bool {
-        !matches!(self, PrivacyTier::Anonymous)
-    }
-
-    /// Check if this tier requires full 4-proof validation
-    pub fn requires_full_proofs(&self) -> bool {
-        matches!(self, PrivacyTier::Public)
-    }
-
-    /// Get connection timeout for this tier
-    pub fn connection_timeout(&self) -> Duration {
-        match self {
-            PrivacyTier::Anonymous => Duration::from_secs(30),
-            PrivacyTier::P2P => Duration::from_secs(60),
-            PrivacyTier::Federated => Duration::from_secs(120),
-            PrivacyTier::Public => Duration::from_secs(300),
+            NetworkType::Anonymous => PrivacyMode::ANONYMOUS,
+            NetworkType::P2P => PrivacyMode::PRIVATE,
+            NetworkType::Federated { .. } => PrivacyMode::PRIVATE,
+            NetworkType::Public => PrivacyMode::PUBLIC,
         }
     }
 }
@@ -128,7 +89,7 @@ struct ConnectionState {
     /// Connection ID
     pub connection_id: String,
     /// Privacy tier for this connection
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
     /// Last validated PoS token (if applicable)
     pub last_pos_token: Option<PosToken>,
     /// Connection established time
@@ -154,7 +115,7 @@ pub struct StoqPosIntegration {
     shard_registry: Arc<DashMap<u32, ShardAddress>>,
 
     /// Privacy tier configuration
-    default_tier: RwLock<PrivacyTier>,
+    default_tier: RwLock<PrivacyMode>,
 }
 
 impl StoqPosIntegration {
@@ -165,12 +126,12 @@ impl StoqPosIntegration {
             connection_states: Arc::new(DashMap::new()),
             asset_cache: Arc::new(DashMap::new()),
             shard_registry: Arc::new(DashMap::new()),
-            default_tier: RwLock::new(PrivacyTier::Public), // Default to most secure
+            default_tier: RwLock::new(PrivacyMode::PUBLIC), // Default to most secure
         }
     }
 
     /// Set default privacy tier
-    pub fn set_default_tier(&self, tier: PrivacyTier) {
+    pub fn set_default_tier(&self, tier: PrivacyMode) {
         *self.default_tier.write() = tier;
     }
 
@@ -181,10 +142,10 @@ impl StoqPosIntegration {
         network_type: &NetworkType,
         pos_token: Option<&PosToken>,
     ) -> Result<bool> {
-        let privacy_tier = PrivacyTier::from(network_type);
+        let privacy_tier = PrivacyMode::from(network_type);
 
         // Anonymous connections always succeed without validation
-        if privacy_tier == PrivacyTier::Anonymous {
+        if privacy_tier == PrivacyMode::ANONYMOUS {
             if privacy_tier.allows_logging() {
                 debug!("Anonymous connection {} established (no validation)", connection_id);
             }
@@ -193,15 +154,15 @@ impl StoqPosIntegration {
             return Ok(true);
         }
 
-        // P2P and Federated require connection-level validation (handled by certificate strategy)
-        if privacy_tier == PrivacyTier::P2P || privacy_tier == PrivacyTier::Federated {
+        // Private (bounded) connections require connection-level validation (handled by certificate strategy)
+        if privacy_tier == PrivacyMode::PRIVATE {
             info!("Connection {} established for {:?} network", connection_id, privacy_tier);
             self.register_connection(connection_id, privacy_tier, None);
             return Ok(true);
         }
 
         // Public network requires full PoS validation
-        if privacy_tier == PrivacyTier::Public {
+        if privacy_tier == PrivacyMode::PUBLIC {
             let token = pos_token.ok_or_else(||
                 anyhow!("Public network requires PoS token")
             )?;
@@ -234,7 +195,7 @@ impl StoqPosIntegration {
     fn register_connection(
         &self,
         connection_id: String,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
         pos_token: Option<PosToken>,
     ) {
         let now = SystemTime::now();
@@ -401,7 +362,7 @@ impl StoqPosIntegration {
             .ok_or_else(|| anyhow!("Unknown connection: {}", connection_id))?;
 
         // Anonymous tier restrictions
-        if conn_state.privacy_tier == PrivacyTier::Anonymous {
+        if conn_state.privacy_tier == PrivacyMode::ANONYMOUS {
             // No persistent storage, no tracking
             if operation.contains("log") || operation.contains("store") {
                 return Err(anyhow!(
@@ -412,7 +373,7 @@ impl StoqPosIntegration {
         }
 
         // Public tier requirements
-        if conn_state.privacy_tier == PrivacyTier::Public {
+        if conn_state.privacy_tier == PrivacyMode::PUBLIC {
             // Require PoS token validation
             if conn_state.last_pos_token.is_none() {
                 return Err(anyhow!(
@@ -445,11 +406,12 @@ impl StoqPosIntegration {
 
         for entry in self.connection_states.iter() {
             stats.total_connections += 1;
-            match entry.privacy_tier {
-                PrivacyTier::Anonymous => stats.anonymous_connections += 1,
-                PrivacyTier::P2P => stats.p2p_connections += 1,
-                PrivacyTier::Federated => stats.federated_connections += 1,
-                PrivacyTier::Public => stats.public_connections += 1,
+            if entry.privacy_tier == PrivacyMode::ANONYMOUS {
+                stats.anonymous_connections += 1;
+            } else if entry.privacy_tier == PrivacyMode::PRIVATE {
+                stats.private_connections += 1;
+            } else if entry.privacy_tier == PrivacyMode::PUBLIC {
+                stats.public_connections += 1;
             }
         }
 
@@ -471,7 +433,7 @@ impl StoqPosIntegration {
         let mut removed = 0;
 
         self.connection_states.retain(|_, state| {
-            let timeout = state.privacy_tier.connection_timeout();
+            let timeout = Duration::from_secs(state.privacy_tier.connection_timeout_secs());
             let is_active = now.duration_since(state.last_activity)
                 .map(|d| d < timeout)
                 .unwrap_or(false);
@@ -513,7 +475,7 @@ impl StoqPosIntegration {
 #[derive(Debug, Clone)]
 pub struct ConnectionStats {
     pub connection_id: String,
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
     pub established_at: SystemTime,
     pub last_activity: SystemTime,
     pub packet_count: u64,
@@ -525,8 +487,7 @@ pub struct ConnectionStats {
 pub struct IntegrationStats {
     pub total_connections: usize,
     pub anonymous_connections: usize,
-    pub p2p_connections: usize,
-    pub federated_connections: usize,
+    pub private_connections: usize,
     pub public_connections: usize,
     pub cached_assets: usize,
     pub registered_shards: usize,
@@ -597,7 +558,7 @@ mod tests {
         assert!(result);
 
         let stats = integration.get_connection_stats("conn1").unwrap();
-        assert_eq!(stats.privacy_tier, PrivacyTier::Public);
+        assert_eq!(stats.privacy_tier, PrivacyMode::PUBLIC);
         assert!(stats.has_pos_token);
     }
 
@@ -621,7 +582,7 @@ mod tests {
         // Register connection first
         integration.register_connection(
             "conn1".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
             None,
         );
 
@@ -697,7 +658,7 @@ mod tests {
         // Anonymous connection
         integration.register_connection(
             "anon".to_string(),
-            PrivacyTier::Anonymous,
+            PrivacyMode::ANONYMOUS,
             None,
         );
 
@@ -708,7 +669,7 @@ mod tests {
         // Public connection without PoS token
         integration.register_connection(
             "public".to_string(),
-            PrivacyTier::Public,
+            PrivacyMode::PUBLIC,
             None,
         );
 
@@ -721,16 +682,15 @@ mod tests {
     fn test_statistics() {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
-        integration.register_connection("c1".to_string(), PrivacyTier::Anonymous, None);
-        integration.register_connection("c2".to_string(), PrivacyTier::P2P, None);
-        integration.register_connection("c3".to_string(), PrivacyTier::Federated, None);
-        integration.register_connection("c4".to_string(), PrivacyTier::Public, None);
+        integration.register_connection("c1".to_string(), PrivacyMode::ANONYMOUS, None);
+        integration.register_connection("c2".to_string(), PrivacyMode::PRIVATE, None);
+        integration.register_connection("c3".to_string(), PrivacyMode::PRIVATE, None);
+        integration.register_connection("c4".to_string(), PrivacyMode::PUBLIC, None);
 
         let stats = integration.get_stats();
         assert_eq!(stats.total_connections, 4);
         assert_eq!(stats.anonymous_connections, 1);
-        assert_eq!(stats.p2p_connections, 1);
-        assert_eq!(stats.federated_connections, 1);
+        assert_eq!(stats.private_connections, 2);
         assert_eq!(stats.public_connections, 1);
     }
 }

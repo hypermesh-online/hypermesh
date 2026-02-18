@@ -64,11 +64,9 @@ async fn test_gate2_asset_system_complete() {
     // 4. Test Privacy Levels
     println!("\n✓ Testing Privacy Allocation Types...");
     let privacy_levels = vec![
-        PrivacyLevel::Private,
-        PrivacyLevel::PrivateNetwork,
-        PrivacyLevel::P2P,
-        PrivacyLevel::PublicNetwork,
-        PrivacyLevel::FullPublic,
+        PrivacyLevel::ANONYMOUS,
+        PrivacyLevel::PRIVATE,
+        PrivacyLevel::PUBLIC,
     ];
 
     for level in &privacy_levels {

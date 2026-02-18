@@ -66,18 +66,20 @@ impl ValidationPolicy {
             requires_pos: true,
             validate_asset_hash: true,
             check_matrix_routing: true,
-            privacy_tier: 2, // Federated
+            privacy_tier: 2, // Private (Bounded+tracked)
             max_packet_size: 9000, // Jumbo frames
             rate_limit_per_sec: 100,
             _reserved: [0u8; 8],
         }
     }
 
-    /// Create policy for specific privacy tier
+    /// Create policy for a privacy mode (u8 from `PrivacyMode::to_ebpf_u8()`)
+    ///
+    /// eBPF u8 values: 0=Anonymous, 2=Private, 3=Public
     pub fn for_privacy_tier(tier: u8) -> Self {
         match tier {
             0 => Self {
-                // Anonymous tier - minimal validation
+                // Anonymous - minimal validation, no tracking
                 requires_pos: false,
                 validate_asset_hash: false,
                 check_matrix_routing: false,
@@ -86,18 +88,8 @@ impl ValidationPolicy {
                 rate_limit_per_sec: 100, // Lower rate limit
                 _reserved: [0u8; 8],
             },
-            1 => Self {
-                // Private P2P tier - peer validation only
-                requires_pos: false,
-                validate_asset_hash: true,
-                check_matrix_routing: false,
-                privacy_tier: 1,
-                max_packet_size: 65535,
-                rate_limit_per_sec: 500,
-                _reserved: [0u8; 8],
-            },
-            2 => Self {
-                // Federated tier - cross-network validation
+            1 | 2 => Self {
+                // Private (Bounded) - peer validation, identity tracked
                 requires_pos: true,
                 validate_asset_hash: true,
                 check_matrix_routing: true,
@@ -107,7 +99,7 @@ impl ValidationPolicy {
                 _reserved: [0u8; 8],
             },
             3 => Self {
-                // Public tier - full validation
+                // Public - full validation, full transparency
                 requires_pos: true,
                 validate_asset_hash: true,
                 check_matrix_routing: true,
@@ -261,36 +253,33 @@ mod tests {
     }
 
     #[test]
-    fn test_privacy_tier_policies() {
-        // Test Anonymous tier (0)
+    fn test_privacy_mode_policies() {
+        // Test Anonymous (0)
         let anon = ValidationPolicy::for_privacy_tier(0);
         assert!(!anon.requires_pos);
         assert!(!anon.validate_asset_hash);
         assert_eq!(anon.privacy_tier, 0);
         assert_eq!(anon.rate_limit_per_sec, 100);
 
-        // Test Private P2P tier (1)
-        let p2p = ValidationPolicy::for_privacy_tier(1);
-        assert!(!p2p.requires_pos);
-        assert!(p2p.validate_asset_hash);
-        assert_eq!(p2p.privacy_tier, 1);
-        assert_eq!(p2p.rate_limit_per_sec, 500);
+        // Test Private (2) — Bounded+tracked
+        let private = ValidationPolicy::for_privacy_tier(2);
+        assert!(private.requires_pos);
+        assert!(private.validate_asset_hash);
+        assert!(private.check_matrix_routing);
+        assert_eq!(private.privacy_tier, 2);
+        assert_eq!(private.rate_limit_per_sec, 1000);
 
-        // Test Federated tier (2)
-        let federated = ValidationPolicy::for_privacy_tier(2);
-        assert!(federated.requires_pos);
-        assert!(federated.validate_asset_hash);
-        assert!(federated.check_matrix_routing);
-        assert_eq!(federated.privacy_tier, 2);
-        assert_eq!(federated.rate_limit_per_sec, 1000);
-
-        // Test Public tier (3)
+        // Test Public (3)
         let public = ValidationPolicy::for_privacy_tier(3);
         assert!(public.requires_pos);
         assert!(public.validate_asset_hash);
         assert!(public.check_matrix_routing);
         assert_eq!(public.privacy_tier, 3);
         assert_eq!(public.rate_limit_per_sec, 10000);
+
+        // Test legacy tier 1 maps to Private
+        let legacy_p2p = ValidationPolicy::for_privacy_tier(1);
+        assert_eq!(legacy_p2p.privacy_tier, private.privacy_tier);
     }
 
     #[test]

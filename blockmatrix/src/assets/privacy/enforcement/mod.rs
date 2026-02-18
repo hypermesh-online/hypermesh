@@ -170,7 +170,7 @@ impl PrivacyEnforcer {
 
         // Apply privacy level restrictions
         match allocation.privacy_level {
-            PrivacyLevel::Private => {
+            PrivacyLevel::PRIVATE => {
                 // Only allow local access
                 if !self.is_local_access(requester_id).await? {
                     return Ok(AccessControlResult {
@@ -182,7 +182,7 @@ impl PrivacyEnforcer {
                     });
                 }
             },
-            PrivacyLevel::FullPublic => {
+            PrivacyLevel::PUBLIC => {
                 // Require consensus proof validation
                 if allocation.allocation_type == PrivacyAllocationType::Verified {
                     // Check for valid consensus proof

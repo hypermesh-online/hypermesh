@@ -597,7 +597,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Public,
+                    privacy_tier: PrivacyTier::PUBLIC,
                     member_count: 100,
                     is_public: true,
                 },
@@ -613,7 +613,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::Federated,
+                    privacy_tier: PrivacyTier::PRIVATE,
                     member_count: 50,
                     is_public: false,
                 },
@@ -642,12 +642,12 @@ mod tests {
 
         // Join bank network
         let bank_network = [1u8; 16];
-        coordinator.join_network(bank_network, PrivacyTier::Public).await.unwrap();
+        coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
 
         // Join dealer network
         let dealer_network = [2u8; 16];
         coordinator.membership.discover_networks().await.unwrap();
-        coordinator.join_network(dealer_network, PrivacyTier::Federated).await.unwrap();
+        coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
 
         // Verify both active
         let active = coordinator.active_networks().await;
@@ -738,7 +738,7 @@ mod tests {
 
         coordinator.membership.discover_networks().await.unwrap();
         let network1 = [1u8; 16];
-        coordinator.join_network(network1, PrivacyTier::Public).await.unwrap();
+        coordinator.join_network(network1, PrivacyTier::PUBLIC).await.unwrap();
 
         // Get isolation report
         let report = coordinator.verify_isolation().await.unwrap();

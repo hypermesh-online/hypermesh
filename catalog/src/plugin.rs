@@ -60,7 +60,7 @@ impl CatalogPlugin {
                 settings: serde_json::Value::Null,
                 resource_limits: ResourceLimits::default(),
                 granted_capabilities: HashSet::new(),
-                privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
+                privacy_level: blockmatrix::assets::core::PrivacyLevel::PRIVATE,
                 debug_mode: false,
             },
             initialized: false,
@@ -318,7 +318,7 @@ mod tests {
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::VMExecution,
             ]),
-            privacy_level: blockmatrix::assets::core::PrivacyLevel::Private,
+            privacy_level: blockmatrix::assets::core::PrivacyLevel::PRIVATE,
             debug_mode: true,
         };
 

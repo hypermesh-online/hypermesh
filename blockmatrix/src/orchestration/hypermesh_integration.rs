@@ -69,7 +69,7 @@ impl Default for HyperMeshIntegrationConfig {
         Self {
             auto_asset_allocation: true,
             enable_consensus_validation: true,
-            default_privacy_level: PrivacyLevel::Private,
+            default_privacy_level: PrivacyLevel::PRIVATE,
             resource_allocation_strategy: ResourceAllocationStrategy::Balanced,
             max_containers_per_node: 100,
             reallocation_threshold: 0.8,
@@ -162,7 +162,7 @@ pub struct QoSRequirements {
 }
 
 /// Privacy requirements for container deployment
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyRequirements {
     /// Privacy level for container execution
     pub execution_privacy: PrivacyLevel,
@@ -174,6 +174,18 @@ pub struct PrivacyRequirements {
     pub encryption_requirements: EncryptionRequirements,
     /// Access control requirements
     pub access_control: AccessControlRequirements,
+}
+
+impl Default for PrivacyRequirements {
+    fn default() -> Self {
+        Self {
+            execution_privacy: PrivacyLevel::PRIVATE,
+            storage_privacy: PrivacyLevel::PRIVATE,
+            network_privacy: PrivacyLevel::PRIVATE,
+            encryption_requirements: EncryptionRequirements::default(),
+            access_control: AccessControlRequirements::default(),
+        }
+    }
 }
 
 /// Encryption requirements
@@ -461,7 +473,7 @@ impl HyperMeshContainerOrchestrator {
                     container: None,
                     economic: None,
                 },
-                privacy_level: PrivacyLevel::Private,
+                privacy_level: PrivacyLevel::PRIVATE,
                 consensus_proof: consensus_proof.clone(),
                 certificate_fingerprint: String::new(),
                 duration_limit: Some(requirements.duration),

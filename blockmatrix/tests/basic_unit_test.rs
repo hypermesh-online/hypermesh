@@ -77,14 +77,12 @@ fn test_privacy_levels_ordering() {
     use blockmatrix::PrivacyLevel;
 
     let levels = [
-        PrivacyLevel::Private,
-        PrivacyLevel::PrivateNetwork,
-        PrivacyLevel::P2P,
-        PrivacyLevel::PublicNetwork,
-        PrivacyLevel::FullPublic,
+        PrivacyLevel::ANONYMOUS,
+        PrivacyLevel::PRIVATE,
+        PrivacyLevel::PUBLIC,
     ];
 
-    // Test that all 5 privacy levels are distinct
+    // Test that all 3 privacy levels are distinct
     for i in 0..levels.len() {
         for j in (i + 1)..levels.len() {
             assert_ne!(levels[i], levels[j], "Privacy levels should be distinct");

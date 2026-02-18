@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::time::Duration;
+use hypermesh_lib::PrivacyMode;
 use hypermesh_assets::{
     cross_chain::{
         CrossNetworkValidator, CrossChainValidationManager, BusinessWorkflowType,
@@ -22,7 +23,6 @@ use hypermesh_assets::{
         ProofRequirement,
     },
     core::asset_id::{AssetId, AssetType},
-    blockchain::AssetPrivacyLevel,
 };
 
 /// Test cross-network validator creation and basic functionality
@@ -297,7 +297,7 @@ async fn test_entity_configuration() {
                 ("trusted-partner.hypermesh.online".to_string(), vec!["shared_info".to_string()]),
             ]),
             zk_proof_fields: vec!["sensitive_value".to_string()],
-            default_privacy_level: AssetPrivacyLevel::PrivateNetwork,
+            default_privacy_level: PrivacyMode::PRIVATE,
         },
         trusted_partners: vec!["partner.hypermesh.online".to_string()],
     };
@@ -438,18 +438,18 @@ async fn test_entity_types() {
 #[tokio::test] 
 async fn test_privacy_level_access() {
     // Test privacy levels from most restrictive to least restrictive
-    let private = AssetPrivacyLevel::Private;
-    let private_network = AssetPrivacyLevel::PrivateNetwork;
-    let p2p = AssetPrivacyLevel::P2P;
-    let public_network = AssetPrivacyLevel::PublicNetwork;
-    let full_public = AssetPrivacyLevel::FullPublic;
+    let private = PrivacyMode::PRIVATE;
+    let private_network = PrivacyMode::PRIVATE;
+    let p2p = PrivacyMode::PRIVATE;
+    let public_network = PrivacyMode::PUBLIC;
+    let full_public = PrivacyMode::PUBLIC;
 
     // Verify all privacy levels exist
-    assert!(matches!(private, AssetPrivacyLevel::Private));
-    assert!(matches!(private_network, AssetPrivacyLevel::PrivateNetwork));
-    assert!(matches!(p2p, AssetPrivacyLevel::P2P));
-    assert!(matches!(public_network, AssetPrivacyLevel::PublicNetwork));
-    assert!(matches!(full_public, AssetPrivacyLevel::FullPublic));
+    assert!(matches!(private, PrivacyMode::PRIVATE));
+    assert!(matches!(private_network, PrivacyMode::PRIVATE));
+    assert!(matches!(p2p, PrivacyMode::PRIVATE));
+    assert!(matches!(public_network, PrivacyMode::PUBLIC));
+    assert!(matches!(full_public, PrivacyMode::PUBLIC));
 }
 
 /// Test complex validation chain with multiple dependencies

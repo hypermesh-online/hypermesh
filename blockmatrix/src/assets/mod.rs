@@ -44,7 +44,7 @@ pub use multi_node::{
 };
 
 pub use blockchain::{
-    HyperMeshAssetRecord, AssetRecordType, AssetPrivacyLevel,
+    HyperMeshAssetRecord, AssetRecordType,
     AssetBlockchainManager,
 };
 

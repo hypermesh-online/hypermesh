@@ -29,7 +29,7 @@ async fn test_matrix_stoq_initialization() -> Result<()> {
         coordinate,
         "test_node_001".to_string(),
         transport.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?;
 
     // Verify integration was created successfully
@@ -62,14 +62,14 @@ async fn test_matrix_node_communication() -> Result<()> {
         coord1,
         "node_001".to_string(),
         transport1.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?);
 
     let integration2 = Arc::new(MatrixStoqIntegration::new(
         coord2,
         "node_002".to_string(),
         transport2.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?);
 
     // Start accepting connections on node 2
@@ -132,21 +132,21 @@ async fn test_matrix_neighbor_discovery() -> Result<()> {
         coord1,
         "node_001".to_string(),
         transport1.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?);
 
     let integration2 = Arc::new(MatrixStoqIntegration::new(
         coord2,
         "node_002".to_string(),
         transport2.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?);
 
     let integration3 = Arc::new(MatrixStoqIntegration::new(
         coord3,
         "node_003".to_string(),
         transport3.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?);
 
     // Get addresses
@@ -207,7 +207,7 @@ async fn test_matrix_position_broadcast() -> Result<()> {
         coordinate,
         "broadcast_node".to_string(),
         transport.clone(),
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
     ).await?;
 
     // Test position broadcast (should succeed even with no connections)
@@ -233,7 +233,7 @@ async fn test_network_manager_with_stoq_integration() -> Result<()> {
     let manager = NetworkManager::new(
         coordinate,
         transport,
-        PrivacyMode::Public,
+        PrivacyMode::PUBLIC,
         vec![], // No bootstrap nodes for test
     ).await?;
 

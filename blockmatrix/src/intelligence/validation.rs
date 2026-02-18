@@ -335,7 +335,7 @@ impl IntegrationValidator {
 
         // Test privacy tier validation
         let test_asset_id = "test_asset";
-        let test_level = crate::assets::core::PrivacyLevel::FullPublic;
+        let test_level = crate::assets::core::PrivacyLevel::PUBLIC;
 
         match privacy.check_access(test_asset_id, &test_level).await {
             Ok(_) => ValidationResult::Passed {
@@ -438,7 +438,7 @@ impl IntegrationValidator {
         };
 
         // Step 1: Privacy check
-        let _privacy_level = crate::assets::core::PrivacyLevel::PrivateNetwork;
+        let _privacy_level = crate::assets::core::PrivacyLevel::PRIVATE;
         // PrivacyManager validation is tested separately, skip detailed access check in cross-component test
         // Focus on data flow integration instead
 
@@ -467,7 +467,7 @@ impl IntegrationValidator {
         if let Err(e) = network.register_asset(
             test_network,
             processed.asset_id.clone(),
-            PrivacyTier::Federated,
+            PrivacyTier::PRIVATE,
             vec![],
         ).await {
             return ValidationResult::Failed {

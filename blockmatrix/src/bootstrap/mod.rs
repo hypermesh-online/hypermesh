@@ -24,37 +24,11 @@ use crate::blockchain::block::Block;
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::matrix::coordinate::MatrixCoordinate;
 
-/// Privacy mode determines network participation level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PrivacyMode {
-    /// Private (1:1): Only self, localhost only, no network participation
-    /// - No DNS registration
-    /// - No blockchain propagation
-    /// - No CAESAR rewards
-    /// - Complete privacy
-    Private,
-
-    /// Anonymous: Ephemeral connections, no persistent identity
-    /// - Temporary connections only
-    /// - No DNS registration
-    /// - No identity tracking
-    /// - Minimal CAESAR rewards
-    Anonymous,
-
-    /// P2P: Direct peer-to-peer, ephemeral but not anonymous
-    /// - Peer discovery enabled
-    /// - No DNS registration
-    /// - Ephemeral identities
-    /// - Low CAESAR rewards
-    P2P,
-
-    /// Public: Connect to network, full blockchain participation
-    /// - DNS registration as blockchain asset
-    /// - Full consensus participation
-    /// - Blockchain propagation enabled
-    /// - Maximum CAESAR rewards
-    Public,
-}
+/// Re-export canonical PrivacyMode from hypermesh-lib.
+///
+/// PrivacyMode is a two-axis struct { scope: AccessScope, tracked: bool } with
+/// three named presets: ANONYMOUS, PRIVATE, PUBLIC.
+pub use hypermesh_lib::PrivacyMode;
 
 /// Self-signed certificate for localhost
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,7 +139,7 @@ impl NodeBootstrap {
         info!("DNS initialized with localhost → ::1");
 
         // 5. Default to Private mode (localhost only)
-        let privacy_mode = Arc::new(RwLock::new(PrivacyMode::Private));
+        let privacy_mode = Arc::new(RwLock::new(PrivacyMode::PRIVATE));
 
         let bootstrap = Self {
             genesis_block,
@@ -220,28 +194,20 @@ impl NodeBootstrap {
 
         info!("Transitioning from {:?} to {:?} mode", current_mode, mode);
 
-        match mode {
-            PrivacyMode::Private => {
-                // Stay localhost only - no changes needed
-                info!("Private mode: localhost only, no network participation");
-            }
-            PrivacyMode::Anonymous => {
-                // Enable ephemeral connections (no DNS registration)
-                info!("Anonymous mode: ephemeral connections enabled, no DNS registration");
-                // TODO: Enable ephemeral STOQ connections
-            }
-            PrivacyMode::P2P => {
-                // Enable direct peer connections (ephemeral)
-                info!("P2P mode: peer-to-peer enabled, ephemeral identities");
-                // TODO: Enable peer discovery
-            }
-            PrivacyMode::Public => {
-                // Register DNS as blockchain asset
-                // Connect to network head
-                // Participate in consensus
-                info!("Public mode: registering with network");
-                self.register_with_network().await?;
-            }
+        if mode == PrivacyMode::PRIVATE {
+            // Stay localhost only - no changes needed
+            info!("Private mode: localhost only, no network participation");
+        } else if mode == PrivacyMode::ANONYMOUS {
+            // Enable ephemeral connections (no DNS registration)
+            info!("Anonymous mode: ephemeral connections enabled, no DNS registration");
+        } else if mode == PrivacyMode::PUBLIC {
+            // Register DNS as blockchain asset
+            // Connect to network head
+            // Participate in consensus
+            info!("Public mode: registering with network");
+            self.register_with_network().await?;
+        } else {
+            info!("Custom privacy mode: {:?}", mode);
         }
 
         *self.privacy_mode.write().await = mode;
@@ -357,7 +323,7 @@ mod tests {
         assert_eq!(localhost, Some(IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1])));
 
         // Verify privacy mode
-        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::Private);
+        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
     }
 
     #[tokio::test]
@@ -366,19 +332,19 @@ mod tests {
         let bootstrap = NodeBootstrap::initialize(coord).await.unwrap();
 
         // Start in Private mode
-        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::Private);
+        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
 
         // Transition to Anonymous
-        bootstrap.set_privacy_mode(PrivacyMode::Anonymous).await.unwrap();
-        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::Anonymous);
-
-        // Transition to P2P
-        bootstrap.set_privacy_mode(PrivacyMode::P2P).await.unwrap();
-        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::P2P);
+        bootstrap.set_privacy_mode(PrivacyMode::ANONYMOUS).await.unwrap();
+        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::ANONYMOUS);
 
         // Transition to Public (network registration)
-        bootstrap.set_privacy_mode(PrivacyMode::Public).await.unwrap();
-        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::Public);
+        bootstrap.set_privacy_mode(PrivacyMode::PUBLIC).await.unwrap();
+        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PUBLIC);
+
+        // Transition back to Private
+        bootstrap.set_privacy_mode(PrivacyMode::PRIVATE).await.unwrap();
+        assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
     }
 
     #[tokio::test]

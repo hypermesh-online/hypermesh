@@ -226,14 +226,14 @@ async fn test_gate3_privacy_aware_routing() {
     let router = ProxyRouter::new().await.unwrap();
 
     // Test privacy level compatibility
-    assert!(router.privacy_levels_compatible(&PrivacyLevel::FullPublic, &PrivacyLevel::Private));
-    assert!(router.privacy_levels_compatible(&PrivacyLevel::P2P, &PrivacyLevel::Private));
-    assert!(!router.privacy_levels_compatible(&PrivacyLevel::Private, &PrivacyLevel::PublicNetwork));
+    assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PRIVATE));
+    assert!(router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PRIVATE));
+    assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PUBLIC));
 
     println!("Privacy level compatibility:");
-    println!("  ✓ FullPublic compatible with Private: OK");
-    println!("  ✓ P2P compatible with Private: OK");
-    println!("  ✓ Private NOT compatible with PublicNetwork: OK");
+    println!("  ✓ PUBLIC compatible with PRIVATE: OK");
+    println!("  ✓ PRIVATE compatible with PRIVATE: OK");
+    println!("  ✓ PRIVATE NOT compatible with PUBLIC: OK");
 
     println!("✓ Privacy-aware routing working correctly");
 }
