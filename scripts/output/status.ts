@@ -166,7 +166,7 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "NodeId and AssetId newtypes",
+        "NodeId, AssetId, NetworkId, and ContentHash newtypes",
         "PrivacyMode struct (2-axis: AccessScope + tracked)",
         "BlockchainScope enum (6 scopes)",
         "ProofType enum (PoSpace/PoStake/PoWork/PoTime)",
