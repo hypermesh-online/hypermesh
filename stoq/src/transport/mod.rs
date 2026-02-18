@@ -17,7 +17,6 @@ pub mod stats;
 pub mod manager;
 pub mod operations;
 
-#[cfg(feature = "ebpf")]
 pub mod ebpf;
 
 // Re-exports for backward compatibility

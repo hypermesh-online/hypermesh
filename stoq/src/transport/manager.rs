@@ -28,8 +28,7 @@ use super::adaptive::{AdaptiveConnection, AdaptationManager};
 use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};
 use crate::extensions::DefaultStoqExtensions;
 
-#[cfg(feature = "ebpf")]
-use super::ebpf;
+use super::ebpf::StoqEbpfTransport;
 
 // Global initialization for crypto provider
 static CRYPTO_INIT: std::sync::Once = std::sync::Once::new();
@@ -56,9 +55,8 @@ pub struct StoqTransport {
     pub(crate) adaptation_manager: Arc<AdaptationManager>,
     /// Adaptive connections mapping
     pub(crate) adaptive_connections: Arc<DashMap<String, Arc<AdaptiveConnection>>>,
-    /// eBPF transport acceleration (if available)
-    #[cfg(feature = "ebpf")]
-    pub(crate) ebpf_transport: Option<Arc<RwLock<ebpf::EbpfTransport>>>,
+    /// eBPF transport acceleration (delegates to hypermesh-ebpf)
+    pub(crate) ebpf_transport: Option<Arc<RwLock<StoqEbpfTransport>>>,
     /// STOQ + PoS protocol integration
     pub(crate) pos_integration: Arc<StoqPosIntegration>,
 }
@@ -273,10 +271,9 @@ impl StoqTransport {
         // Create STOQ + PoS integration with 5-minute cache TTL
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
-        // Initialize eBPF transport acceleration if available
-        #[cfg(feature = "ebpf")]
-        let ebpf_transport = match ebpf::EbpfTransport::new() {
-            Ok(ebpf) => {
+        // Initialize eBPF transport acceleration (delegates to hypermesh-ebpf)
+        let ebpf_transport = match StoqEbpfTransport::new() {
+            Ok(mut ebpf) => {
                 if ebpf.is_available() {
                     info!("eBPF transport acceleration available");
 
@@ -315,7 +312,6 @@ impl StoqTransport {
             handshake_extension,
             adaptation_manager,
             adaptive_connections: Arc::new(DashMap::new()),
-            #[cfg(feature = "ebpf")]
             ebpf_transport,
             pos_integration,
         })
@@ -719,7 +715,6 @@ impl Clone for StoqTransport {
             handshake_extension: self.handshake_extension.clone(),
             adaptation_manager: self.adaptation_manager.clone(),
             adaptive_connections: self.adaptive_connections.clone(),
-            #[cfg(feature = "ebpf")]
             ebpf_transport: self.ebpf_transport.clone(),
             pos_integration: self.pos_integration.clone(),
         }

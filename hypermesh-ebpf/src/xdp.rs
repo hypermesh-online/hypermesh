@@ -1,0 +1,578 @@
+// Copyright (C) 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
+//! Unified XDP (eXpress Data Path) Management
+//!
+//! Provides kernel-level packet classification, filtering, and routing
+//! for the HyperMesh node. Merges HyperMesh intelligence validation
+//! (PoS, asset hash, routing) with XDP program attachment and management.
+//!
+//! This is THE single XDP manager for the entire HyperMesh stack.
+//! STOQ and blockmatrix are consumers via the `HyperMeshEbpf` orchestrator.
+
+use anyhow::Result;
+#[cfg(feature = "kernel-attach")]
+use anyhow::anyhow;
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
+
+use crate::policy_maps::PolicyManager;
+use crate::hypermesh_headers::*;
+use hypermesh_lib::MatrixPosition;
+
+// -----------------------------------------------------------------------
+// Packet decision types (the three execution paths)
+// -----------------------------------------------------------------------
+
+/// Decision for an incoming packet. Represents the three HyperMesh execution paths:
+/// 1. Pass (local execution)
+/// 2. Redirect (zero-copy AF_XDP to STOQ)
+/// 3. Forward (delegate to another matrix node)
+/// 4. Drop (invalid)
+#[derive(Debug, Clone, PartialEq)]
+pub enum PacketDecision {
+    /// XDP_PASS - deliver to local userspace for processing
+    Pass,
+    /// XDP_REDIRECT - zero-copy transfer to AF_XDP socket for STOQ
+    Redirect { socket_index: u32 },
+    /// XDP_TX / forward - delegate to another matrix node
+    Forward { next_hop: MatrixPosition },
+    /// XDP_DROP - packet is invalid, discard
+    Drop { reason: String },
+}
+
+/// Legacy filter action (kept for backward compatibility with existing tests)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterAction {
+    /// Pass packet to userspace
+    Pass,
+    /// Drop packet at kernel level
+    Drop,
+    /// Redirect to AF_XDP socket for zero-copy
+    Redirect,
+}
+
+// -----------------------------------------------------------------------
+// XDP attach mode and stats
+// -----------------------------------------------------------------------
+
+/// XDP attach mode
+#[derive(Debug, Clone, Copy)]
+pub enum XdpAttachMode {
+    /// Native mode (fastest, requires driver support)
+    Native,
+    /// Generic/SKB mode (slower, works everywhere)
+    Generic,
+    /// Offloaded to NIC hardware (if supported)
+    Offload,
+}
+
+/// XDP program statistics aggregated from kernel maps
+#[derive(Debug, Default, Clone)]
+pub struct XdpStats {
+    pub packets_passed: u64,
+    pub packets_dropped: u64,
+    pub packets_redirected: u64,
+    pub bytes_processed: u64,
+}
+
+/// XDP filter configuration
+#[derive(Debug, Clone)]
+pub struct XdpFilterConfig {
+    /// Allow only QUIC packets (UDP port 9292)
+    pub filter_quic_only: bool,
+    /// Drop non-IPv6 packets
+    pub drop_ipv4: bool,
+    /// Maximum packet size to process
+    pub max_packet_size: usize,
+    /// Enable connection tracking in kernel map
+    pub enable_connection_tracking: bool,
+}
+
+impl Default for XdpFilterConfig {
+    fn default() -> Self {
+        Self {
+            filter_quic_only: true,
+            drop_ipv4: true,
+            max_packet_size: 65535,
+            enable_connection_tracking: true,
+        }
+    }
+}
+
+// -----------------------------------------------------------------------
+// Attached program tracking
+// -----------------------------------------------------------------------
+
+struct AttachedProgram {
+    _interface: String,
+    _attach_mode: XdpAttachMode,
+}
+
+// -----------------------------------------------------------------------
+// Unified XDP Manager
+// -----------------------------------------------------------------------
+
+/// Unified XDP manager for the HyperMesh eBPF subsystem.
+///
+/// Combines XDP program attachment/detachment with HyperMesh-specific
+/// packet validation (PoS headers, asset hashes, matrix routing).
+pub struct XdpManager {
+    /// Attached interfaces and their programs
+    attached: Arc<RwLock<HashMap<String, AttachedProgram>>>,
+    /// Per-interface XDP statistics
+    stats: Arc<RwLock<XdpStats>>,
+    /// Whether XDP kernel support is detected
+    available: bool,
+    /// Policy manager for validation decisions
+    policy_manager: PolicyManager,
+    /// Loaded BPF handle (only present when kernel-attach feature enabled)
+    #[cfg(feature = "kernel-attach")]
+    bpf: Option<aya::Bpf>,
+}
+
+impl XdpManager {
+    /// Create a new XDP manager
+    pub fn new(policy_manager: PolicyManager) -> Result<Self> {
+        let available = Self::check_xdp_support();
+
+        if available {
+            tracing::info!("XDP support detected on this system");
+        } else {
+            tracing::debug!("XDP not available, userspace validation active");
+        }
+
+        Ok(Self {
+            attached: Arc::new(RwLock::new(HashMap::new())),
+            stats: Arc::new(RwLock::new(XdpStats::default())),
+            available,
+            policy_manager,
+            #[cfg(feature = "kernel-attach")]
+            bpf: None,
+        })
+    }
+
+    fn check_xdp_support() -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            std::path::Path::new("/sys/fs/bpf").exists()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    /// Whether XDP kernel attachment is available
+    pub fn is_available(&self) -> bool {
+        self.available
+    }
+
+    // -------------------------------------------------------------------
+    // XDP program attachment
+    // -------------------------------------------------------------------
+
+    /// Attach the HyperMesh XDP program to a network interface.
+    ///
+    /// With `kernel-attach` feature: loads the unified `hypermesh_xdp` program
+    /// into the kernel and attaches to the interface via aya.
+    /// Without: tracks attachment state for userspace fallback.
+    #[cfg(feature = "kernel-attach")]
+    pub fn attach(&mut self, interface: &str) -> Result<()> {
+        self.attach_with_mode(interface, XdpAttachMode::Generic)
+    }
+
+    #[cfg(not(feature = "kernel-attach"))]
+    pub fn attach(&mut self, interface: &str) -> Result<()> {
+        self.attach_with_mode(interface, XdpAttachMode::Generic)
+    }
+
+    /// Attach with a specific XDP mode (Native/Generic/Offload)
+    pub fn attach_with_mode(
+        &mut self,
+        interface: &str,
+        mode: XdpAttachMode,
+    ) -> Result<()> {
+        #[cfg(feature = "kernel-attach")]
+        {
+            if self.available {
+                self.try_kernel_attach(interface, mode)?;
+            }
+        }
+
+        // Track attachment regardless of kernel/userspace mode
+        let prog = AttachedProgram {
+            _interface: interface.to_string(),
+            _attach_mode: mode,
+        };
+        self.attached.write().insert(interface.to_string(), prog);
+
+        // Sync policies to kernel maps if attached
+        self.policy_manager.sync_to_kernel()?;
+
+        tracing::info!(
+            "XDP manager attached to {} ({} mode)",
+            interface,
+            if self.available { "kernel" } else { "userspace" }
+        );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "kernel-attach")]
+    fn try_kernel_attach(
+        &mut self,
+        interface: &str,
+        mode: XdpAttachMode,
+    ) -> Result<()> {
+        use aya::programs::{Xdp, XdpFlags};
+
+        let bpf_paths = [
+            std::path::PathBuf::from("/sys/fs/bpf/hypermesh_xdp"),
+            std::path::PathBuf::from("target/bpf/hypermesh_xdp.o"),
+            std::path::PathBuf::from("target/bpf/stoq_xdp.o"),
+        ];
+
+        let load_path = bpf_paths.iter().find(|p| p.exists());
+
+        if let Some(path) = load_path {
+            match aya::Bpf::load_file(path) {
+                Ok(mut bpf) => {
+                    // Try hypermesh program name first, then stoq
+                    let prog_name = if bpf.program("hypermesh_xdp_filter").is_some() {
+                        "hypermesh_xdp_filter"
+                    } else {
+                        "stoq_xdp_filter"
+                    };
+
+                    if let Some(program) = bpf.program_mut(prog_name) {
+                        let xdp: &mut Xdp = program.try_into()
+                            .map_err(|e| anyhow!("Not an XDP program: {}", e))?;
+                        xdp.load()
+                            .map_err(|e| anyhow!("Failed to load XDP: {}", e))?;
+                        let flags = match mode {
+                            XdpAttachMode::Native => XdpFlags::default(),
+                            XdpAttachMode::Generic => XdpFlags::SKB_MODE,
+                            XdpAttachMode::Offload => XdpFlags::HW_MODE,
+                        };
+                        xdp.attach(interface, flags)
+                            .map_err(|e| anyhow!("Failed to attach XDP to {}: {}", interface, e))?;
+                        self.bpf = Some(bpf);
+                        tracing::info!(
+                            "XDP program '{}' attached to {} from {:?}",
+                            prog_name, interface, path
+                        );
+                    } else {
+                        tracing::warn!(
+                            "No XDP filter program found in {:?}, using userspace",
+                            path
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load eBPF from {:?}: {}. Userspace fallback.",
+                        path, e
+                    );
+                }
+            }
+        } else {
+            tracing::info!(
+                "No compiled eBPF object found, userspace fallback for {}",
+                interface
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Detach XDP program from a specific interface
+    pub fn detach(&mut self, interface: &str) -> Result<()> {
+        if self.attached.write().remove(interface).is_some() {
+            tracing::info!("XDP program detached from {}", interface);
+        }
+        Ok(())
+    }
+
+    /// Detach all XDP programs
+    pub fn detach_all(&mut self) -> Result<()> {
+        self.attached.write().clear();
+
+        #[cfg(feature = "kernel-attach")]
+        {
+            if self.bpf.take().is_some() {
+                tracing::info!("eBPF programs unloaded from kernel");
+            }
+        }
+
+        tracing::info!("All XDP programs detached");
+        Ok(())
+    }
+
+    // -------------------------------------------------------------------
+    // Packet validation (userspace path)
+    // -------------------------------------------------------------------
+
+    /// Validate a packet and return a decision (the three execution paths).
+    ///
+    /// This is the userspace validation path. With kernel-attach, the XDP
+    /// program handles this at kernel level; this function serves as fallback.
+    pub fn validate_packet(
+        &self,
+        connection_id: u64,
+        packet_data: &[u8],
+    ) -> PacketDecision {
+        let policy = self.policy_manager.get_policy(connection_id);
+
+        // Check packet size
+        if packet_data.len() > policy.max_packet_size as usize {
+            return PacketDecision::Drop {
+                reason: format!(
+                    "Packet too large: {} > {}",
+                    packet_data.len(),
+                    policy.max_packet_size
+                ),
+            };
+        }
+
+        // Default: pass to userspace for processing
+        PacketDecision::Pass
+    }
+
+    /// Validate a packet returning legacy FilterAction for backward compatibility
+    pub fn validate_packet_userspace(
+        &self,
+        connection_id: u64,
+        packet_data: &[u8],
+    ) -> FilterAction {
+        match self.validate_packet(connection_id, packet_data) {
+            PacketDecision::Pass => FilterAction::Pass,
+            PacketDecision::Redirect { .. } => FilterAction::Redirect,
+            PacketDecision::Forward { .. } => FilterAction::Pass,
+            PacketDecision::Drop { .. } => FilterAction::Drop,
+        }
+    }
+
+    /// Validate Proof of State extension header
+    pub fn validate_proof_of_state(&self, proof: &ProofOfStateHeader) -> bool {
+        if !proof.validate_timestamps() {
+            tracing::warn!("Proof of State timestamp validation failed");
+            return false;
+        }
+        true
+    }
+
+    /// Validate Asset Hash extension header
+    pub fn validate_asset_hash(
+        &self,
+        header: &AssetHashHeader,
+        _payload: &[u8],
+    ) -> bool {
+        if !header.validate_shard_indices() {
+            tracing::warn!("Invalid shard indices in asset hash header");
+            return false;
+        }
+        true
+    }
+
+    /// Validate Matrix Routing extension header
+    pub fn validate_matrix_routing(
+        &self,
+        routing: &MatrixRoutingHeader,
+        matrix_size: u16,
+    ) -> bool {
+        if !routing.validate_path(matrix_size) {
+            tracing::warn!("Invalid matrix routing path");
+            return false;
+        }
+        true
+    }
+
+    // -------------------------------------------------------------------
+    // Kernel map operations
+    // -------------------------------------------------------------------
+
+    /// Update XDP filter rules in kernel map
+    #[allow(unused_variables)]
+    pub fn update_filter(
+        &mut self,
+        src_ip: [u8; 16],
+        dst_ip: [u8; 16],
+        action: XdpAction,
+    ) -> Result<()> {
+        #[cfg(feature = "kernel-attach")]
+        {
+            if let Some(ref mut bpf) = self.bpf {
+                use aya::maps::HashMap as BpfHashMap;
+
+                let mut key = [0u8; 32];
+                key[..16].copy_from_slice(&src_ip);
+                key[16..].copy_from_slice(&dst_ip);
+
+                let action_val: u32 = action as u32;
+
+                if let Some(map) = bpf.map_mut("filter_map") {
+                    match BpfHashMap::<_, [u8; 32], u32>::try_from(map) {
+                        Ok(mut filter_map) => {
+                            filter_map.insert(&key, &action_val, 0)
+                                .map_err(|e| anyhow!("Failed to update filter map: {}", e))?;
+                            tracing::debug!("Updated XDP filter rule");
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to access filter_map: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Read current statistics from XDP maps
+    pub fn get_stats(&self) -> XdpStats {
+        self.stats.read().clone()
+    }
+
+    /// Update stats by reading from kernel eBPF maps
+    pub fn update_stats(&mut self) -> Result<()> {
+        #[cfg(feature = "kernel-attach")]
+        {
+            if let Some(ref mut bpf) = self.bpf {
+                use aya::maps::PerCpuArray;
+
+                if let Some(map) = bpf.map_mut("stats_map") {
+                    if let Ok(stats_array) = PerCpuArray::<_, [u64; 4]>::try_from(map) {
+                        if let Ok(per_cpu_values) = stats_array.get(&0, 0) {
+                            let mut aggregated = XdpStats::default();
+                            for values in per_cpu_values.iter() {
+                                aggregated.packets_passed += values[0];
+                                aggregated.packets_dropped += values[1];
+                                aggregated.packets_redirected += values[2];
+                                aggregated.bytes_processed += values[3];
+                            }
+                            *self.stats.write() = aggregated;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Get the interface name this manager is attached to (first attached)
+    pub fn interface(&self) -> Option<String> {
+        self.attached.read().keys().next().cloned()
+    }
+
+    /// Get policy manager reference
+    pub fn policy_manager(&self) -> &PolicyManager {
+        &self.policy_manager
+    }
+}
+
+/// XDP action to take on packets (matches kernel XDP_* constants)
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+pub enum XdpAction {
+    /// Drop the packet
+    Drop = 1,
+    /// Pass packet to normal network stack
+    Pass = 2,
+    /// Redirect packet to AF_XDP socket
+    Redirect = 3,
+}
+
+impl Drop for XdpManager {
+    fn drop(&mut self) {
+        let _ = self.detach_all();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::policy_maps::ValidationPolicy;
+
+    #[test]
+    fn test_xdp_manager_creation() {
+        let policy = PolicyManager::new().expect("test: create policy manager");
+        let manager = XdpManager::new(policy);
+        assert!(manager.is_ok());
+    }
+
+    #[test]
+    fn test_filter_config_default() {
+        let config = XdpFilterConfig::default();
+        assert!(config.filter_quic_only);
+        assert!(config.drop_ipv4);
+        assert_eq!(config.max_packet_size, 65535);
+    }
+
+    #[test]
+    fn test_packet_decision_pass() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_default_policy(ValidationPolicy::permissive());
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = vec![0u8; 1500];
+        let decision = mgr.validate_packet(123, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_packet_decision_drop_oversized() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        // Default policy has max_packet_size = 65535
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let large_packet = vec![0u8; 70000];
+        let decision = mgr.validate_packet(123, &large_packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("too large"));
+            }
+            other => assert!(false, "Expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_userspace_validation_compat() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_default_policy(ValidationPolicy::permissive());
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = vec![0u8; 1500];
+        let action = mgr.validate_packet_userspace(123, &packet);
+        assert_eq!(action, FilterAction::Pass);
+    }
+
+    #[test]
+    fn test_proof_of_state_validation() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("test: get system time")
+            .as_micros() as u64;
+
+        let valid_proof = ProofOfStateHeader {
+            who: [1u8; 32],
+            what: [2u8; 32],
+            when: now,
+            where_: [3u8; 16],
+        };
+        assert!(mgr.validate_proof_of_state(&valid_proof));
+
+        // Future proof (invalid)
+        let future_proof = ProofOfStateHeader {
+            who: [1u8; 32],
+            what: [2u8; 32],
+            when: now + 10 * 60 * 1_000_000,
+            where_: [3u8; 16],
+        };
+        assert!(!mgr.validate_proof_of_state(&future_proof));
+    }
+}

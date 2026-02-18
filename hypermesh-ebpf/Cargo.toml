@@ -3,7 +3,7 @@ name = "hypermesh-ebpf"
 version = "0.1.0"
 edition = "2021"
 authors = ["HyperMesh Team"]
-description = "HyperMesh eBPF Intelligence Layer - Kernel-level validation for Proof of State"
+description = "HyperMesh eBPF Intelligence Layer - THE single source of truth for all eBPF code"
 license = "MIT OR Apache-2.0"
 
 [lints]
@@ -13,13 +13,17 @@ workspace = true
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
-# STOQ types only (no runtime dependencies)
-stoq = { path = "../stoq", default-features = false, features = [] }
-
 # eBPF infrastructure
 aya = "0.12"
 aya-log = "0.2"
 libbpf-sys = "1.4"
+
+# Async runtime (for AF_XDP socket operations and validation hooks)
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Zero-copy packet I/O
+bytes = { workspace = true }
 
 # Core serialization
 serde = { workspace = true }
@@ -45,8 +49,10 @@ parking_lot = { workspace = true }
 
 [features]
 default = []
-# Feature for enabling actual eBPF program loading (requires privileges)
+# Feature for enabling actual eBPF program loading and XDP attachment (requires privileges)
 kernel-attach = []
+# Feature for compiling eBPF programs from C source (requires clang)
+ebpf-loader = []
 
 [lib]
 name = "hypermesh_ebpf"

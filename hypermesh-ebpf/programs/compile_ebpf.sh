@@ -1,5 +1,6 @@
 #!/bin/bash
 # compile_ebpf.sh - Compile all eBPF programs for HyperMesh
+# Location: hypermesh-ebpf/programs/
 
 set -e
 
@@ -9,14 +10,18 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo -e "${GREEN}HyperMesh eBPF Program Compiler${NC}"
 echo "================================"
+echo "Working directory: $SCRIPT_DIR"
 
 # Check for required tools
 check_tool() {
     if ! command -v "$1" &> /dev/null; then
         echo -e "${RED}Error: $1 is not installed${NC}"
-        echo "Please install required tools first (see README.md)"
+        echo "Please install required tools first"
         exit 1
     fi
 }
@@ -66,11 +71,11 @@ compile_program() {
     fi
 }
 
-# Compile all .c files
+# Compile all .c files in this directory
 SUCCESS_COUNT=0
 FAIL_COUNT=0
 
-for prog in *.c; do
+for prog in "$SCRIPT_DIR"/*.c; do
     if [ -f "$prog" ]; then
         if compile_program "$prog"; then
             ((SUCCESS_COUNT++))
@@ -93,7 +98,7 @@ if [ $FAIL_COUNT -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "1. Ensure you have CAP_BPF capability or run as root"
-    echo "2. Run: cargo test --test test_ebpf_kernel_integration"
+    echo "2. Run: cargo test -p hypermesh-ebpf"
     echo "3. Check dmesg for any kernel messages"
 else
     echo ""
@@ -107,4 +112,4 @@ fi
 # List compiled programs
 echo ""
 echo "Compiled eBPF programs:"
-ls -lh *.o 2>/dev/null || echo "No .o files found"
+ls -lh "$SCRIPT_DIR"/*.o 2>/dev/null || echo "No .o files found"

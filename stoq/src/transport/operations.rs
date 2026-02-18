@@ -15,25 +15,21 @@ use super::manager::StoqTransport;
 use super::adaptive::AdaptiveConnection;
 use super::config::NetworkTier;
 
-#[cfg(feature = "ebpf")]
-use super::ebpf;
-
 impl StoqTransport {
     /// Send data with transport layer optimizations
     pub async fn send(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let start_time = std::time::Instant::now();
 
-        // Try eBPF zero-copy send if available
-        #[cfg(feature = "ebpf")]
-        {
-            if let Some(ebpf) = &self.ebpf_transport {
-                if let Ok(socket) = ebpf.read().create_af_xdp_socket("lo", 0) {
-                    if socket.send(data).await.is_ok() {
-                        self.metrics.record_bytes_sent(data.len());
-                        self.performance_stats.read().record_zero_copy();
-                        return Ok(());
-                    }
-                }
+        // Try eBPF zero-copy send if available (delegates to hypermesh-ebpf)
+        // Scope the write guard so it doesn't span the .await point
+        let af_xdp_socket = self.ebpf_transport.as_ref().and_then(|ebpf| {
+            ebpf.write().create_af_xdp_socket("lo", 0).ok()
+        });
+        if let Some(socket) = af_xdp_socket {
+            if socket.send(data).await.is_ok() {
+                self.metrics.record_bytes_sent(data.len());
+                self.performance_stats.read().record_zero_copy();
+                return Ok(());
             }
         }
 
@@ -288,34 +284,21 @@ impl StoqTransport {
         }
     }
 
-    /// Get eBPF capabilities and status
-    #[cfg(feature = "ebpf")]
-    pub fn get_ebpf_status(&self) -> Option<ebpf::EbpfCapabilities> {
-        self.ebpf_transport.as_ref().map(|t| t.read().capabilities.clone())
+    /// Get eBPF capabilities and status (delegates to hypermesh-ebpf)
+    pub fn get_ebpf_status(&self) -> Option<super::ebpf::EbpfCapabilities> {
+        self.ebpf_transport.as_ref().map(|t| t.read().capabilities().clone())
     }
 
-    #[cfg(not(feature = "ebpf"))]
-    pub fn get_ebpf_status(&self) -> Option<()> {
-        None
+    /// Get eBPF metrics if available (delegates to hypermesh-ebpf)
+    pub fn get_ebpf_metrics(&self) -> Option<super::ebpf::HyperMeshMetrics> {
+        self.ebpf_transport.as_ref().map(|t| t.read().metrics().collect())
     }
 
-    /// Get eBPF metrics if available
-    #[cfg(feature = "ebpf")]
-    pub fn get_ebpf_metrics(&self) -> Option<ebpf::metrics::EbpfMetrics> {
-        self.ebpf_transport.as_ref().and_then(|t| t.read().get_metrics())
-    }
-
-    #[cfg(not(feature = "ebpf"))]
-    pub fn get_ebpf_metrics(&self) -> Option<()> {
-        None
-    }
-
-    /// Attach XDP program to interface for acceleration
-    #[cfg(feature = "ebpf")]
+    /// Attach XDP program to interface for acceleration (delegates to hypermesh-ebpf)
     pub fn attach_xdp_to_interface(&self, interface: &str) -> Result<()> {
         use anyhow::anyhow;
         if let Some(ebpf) = &self.ebpf_transport {
-            ebpf.read().attach_xdp(interface)?;
+            ebpf.write().attach_xdp(interface)?;
             info!("XDP acceleration enabled on interface {}", interface);
             Ok(())
         } else {
@@ -323,28 +306,15 @@ impl StoqTransport {
         }
     }
 
-    #[cfg(not(feature = "ebpf"))]
-    pub fn attach_xdp_to_interface(&self, _interface: &str) -> Result<()> {
-        use anyhow::anyhow;
-        Err(anyhow!("eBPF feature not compiled"))
-    }
-
-    /// Create AF_XDP zero-copy socket for interface
-    #[cfg(feature = "ebpf")]
+    /// Create AF_XDP zero-copy socket for interface (delegates to hypermesh-ebpf)
     pub fn create_zero_copy_socket(&self, interface: &str, queue_id: u32) -> Result<()> {
         use anyhow::anyhow;
         if let Some(ebpf) = &self.ebpf_transport {
-            let _socket = ebpf.read().create_af_xdp_socket(interface, queue_id)?;
+            let _socket = ebpf.write().create_af_xdp_socket(interface, queue_id)?;
             info!("Created AF_XDP zero-copy socket for {}:{}", interface, queue_id);
             Ok(())
         } else {
             Err(anyhow!("eBPF transport not available"))
         }
-    }
-
-    #[cfg(not(feature = "ebpf"))]
-    pub fn create_zero_copy_socket(&self, _interface: &str, _queue_id: u32) -> Result<()> {
-        use anyhow::anyhow;
-        Err(anyhow!("eBPF feature not compiled"))
     }
 }

@@ -1,19 +1,20 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (C) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! HyperMesh-Specific Metrics
+//! Unified HyperMesh Metrics
 //!
-//! Extends STOQ transport metrics with HyperMesh intelligence metrics.
-//! These metrics track validation performance, consensus operations, and
-//! intelligence layer activity.
+//! Combines HyperMesh intelligence metrics (PoS, asset, routing, privacy)
+//! with transport-level metrics (packet counts, latency, throughput).
+//! This is the single metrics collection point for the eBPF subsystem.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 use parking_lot::RwLock;
 use serde::{Serialize, Deserialize};
 
-/// HyperMesh intelligence metrics
+/// Unified HyperMesh metrics combining intelligence and transport layers.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HyperMeshMetrics {
     /// Proof of State validation metrics
@@ -24,6 +25,8 @@ pub struct HyperMeshMetrics {
     pub routing_metrics: MatrixRoutingMetrics,
     /// Privacy tier enforcement metrics
     pub privacy_metrics: PrivacyTierMetrics,
+    /// Transport-level packet metrics
+    pub transport_metrics: TransportMetrics,
 }
 
 /// Proof of State validation metrics
@@ -150,6 +153,45 @@ impl PrivacyTierMetrics {
     }
 }
 
+/// Transport-level metrics from eBPF/XDP layer
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransportMetrics {
+    /// Total packets processed by XDP
+    pub total_packets: u64,
+    /// Packets per second (current rate)
+    pub packets_per_second: f64,
+    /// Bytes per second (current throughput)
+    pub bytes_per_second: f64,
+    /// Total bytes processed
+    pub total_bytes: u64,
+    /// Packets dropped at kernel level
+    pub kernel_drops: u64,
+    /// Packets redirected to AF_XDP
+    pub af_xdp_redirects: u64,
+    /// Zero-copy operations count
+    pub zero_copy_ops: u64,
+    /// Standard I/O fallback operations count
+    pub memcpy_ops: u64,
+    /// Latency: minimum (microseconds)
+    pub latency_min_us: u64,
+    /// Latency: maximum (microseconds)
+    pub latency_max_us: u64,
+    /// Latency: average (microseconds)
+    pub latency_avg_us: u64,
+}
+
+impl TransportMetrics {
+    /// Get throughput in Gbps
+    pub fn throughput_gbps(&self) -> f64 {
+        self.bytes_per_second * 8.0 / 1_000_000_000.0
+    }
+
+    /// Get packet rate in millions of packets per second
+    pub fn packet_rate_mpps(&self) -> f64 {
+        self.packets_per_second / 1_000_000.0
+    }
+}
+
 /// HyperMesh metrics collector
 pub struct HyperMeshMetricsCollector {
     /// Atomic counters for lock-free updates
@@ -171,6 +213,21 @@ pub struct HyperMeshMetricsCollector {
     privacy_private: Arc<AtomicU64>,
     privacy_public: Arc<AtomicU64>,
     privacy_violations: Arc<AtomicU64>,
+
+    // Transport-level counters
+    transport_packets: Arc<AtomicU64>,
+    transport_bytes: Arc<AtomicU64>,
+    transport_drops: Arc<AtomicU64>,
+    transport_redirects: Arc<AtomicU64>,
+    transport_zero_copy: Arc<AtomicU64>,
+    transport_memcpy: Arc<AtomicU64>,
+
+    /// Last collection timestamp for rate calculations
+    last_collection: Arc<RwLock<Instant>>,
+    /// Previous packet count for rate calculation
+    prev_packets: Arc<AtomicU64>,
+    /// Previous byte count for rate calculation
+    prev_bytes: Arc<AtomicU64>,
 
     /// Current metrics snapshot
     current: Arc<RwLock<HyperMeshMetrics>>,
@@ -198,6 +255,17 @@ impl HyperMeshMetricsCollector {
             privacy_private: Arc::new(AtomicU64::new(0)),
             privacy_public: Arc::new(AtomicU64::new(0)),
             privacy_violations: Arc::new(AtomicU64::new(0)),
+
+            transport_packets: Arc::new(AtomicU64::new(0)),
+            transport_bytes: Arc::new(AtomicU64::new(0)),
+            transport_drops: Arc::new(AtomicU64::new(0)),
+            transport_redirects: Arc::new(AtomicU64::new(0)),
+            transport_zero_copy: Arc::new(AtomicU64::new(0)),
+            transport_memcpy: Arc::new(AtomicU64::new(0)),
+
+            last_collection: Arc::new(RwLock::new(Instant::now())),
+            prev_packets: Arc::new(AtomicU64::new(0)),
+            prev_bytes: Arc::new(AtomicU64::new(0)),
 
             current: Arc::new(RwLock::new(HyperMeshMetrics::default())),
         })
@@ -260,6 +328,38 @@ impl HyperMeshMetricsCollector {
         self.privacy_violations.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Record a transport packet processed by XDP
+    pub fn record_transport_packet(&self, size: u64) {
+        self.transport_packets.fetch_add(1, Ordering::Relaxed);
+        self.transport_bytes.fetch_add(size, Ordering::Relaxed);
+    }
+
+    /// Record a kernel-level packet drop
+    pub fn record_transport_drop(&self) {
+        self.transport_drops.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record an AF_XDP redirect
+    pub fn record_transport_redirect(&self) {
+        self.transport_redirects.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a zero-copy operation
+    pub fn record_zero_copy(&self) {
+        self.transport_zero_copy.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a memcpy fallback operation
+    pub fn record_memcpy(&self) {
+        self.transport_memcpy.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Get throughput in Gbps based on current metrics
+    pub fn throughput_gbps(&self) -> f64 {
+        let metrics = self.current.read();
+        metrics.transport_metrics.throughput_gbps()
+    }
+
     /// Collect current metrics snapshot
     pub fn collect(&self) -> HyperMeshMetrics {
         let mut metrics = self.current.write();
@@ -287,6 +387,32 @@ impl HyperMeshMetricsCollector {
         metrics.privacy_metrics.public_connections = self.privacy_public.load(Ordering::Relaxed);
         metrics.privacy_metrics.tier_violations = self.privacy_violations.load(Ordering::Relaxed);
 
+        // Update transport metrics
+        let now = Instant::now();
+        let packets = self.transport_packets.load(Ordering::Relaxed);
+        let bytes = self.transport_bytes.load(Ordering::Relaxed);
+
+        let elapsed = now.duration_since(*self.last_collection.read()).as_secs_f64();
+        if elapsed > 0.0 {
+            let prev_p = self.prev_packets.load(Ordering::Relaxed);
+            let prev_b = self.prev_bytes.load(Ordering::Relaxed);
+            let pkt_diff = packets.saturating_sub(prev_p);
+            let byte_diff = bytes.saturating_sub(prev_b);
+            metrics.transport_metrics.packets_per_second = pkt_diff as f64 / elapsed;
+            metrics.transport_metrics.bytes_per_second = byte_diff as f64 / elapsed;
+        }
+
+        metrics.transport_metrics.total_packets = packets;
+        metrics.transport_metrics.total_bytes = bytes;
+        metrics.transport_metrics.kernel_drops = self.transport_drops.load(Ordering::Relaxed);
+        metrics.transport_metrics.af_xdp_redirects = self.transport_redirects.load(Ordering::Relaxed);
+        metrics.transport_metrics.zero_copy_ops = self.transport_zero_copy.load(Ordering::Relaxed);
+        metrics.transport_metrics.memcpy_ops = self.transport_memcpy.load(Ordering::Relaxed);
+
+        self.prev_packets.store(packets, Ordering::Relaxed);
+        self.prev_bytes.store(bytes, Ordering::Relaxed);
+        *self.last_collection.write() = now;
+
         metrics.clone()
     }
 
@@ -310,6 +436,16 @@ impl HyperMeshMetricsCollector {
         self.privacy_private.store(0, Ordering::Relaxed);
         self.privacy_public.store(0, Ordering::Relaxed);
         self.privacy_violations.store(0, Ordering::Relaxed);
+
+        self.transport_packets.store(0, Ordering::Relaxed);
+        self.transport_bytes.store(0, Ordering::Relaxed);
+        self.transport_drops.store(0, Ordering::Relaxed);
+        self.transport_redirects.store(0, Ordering::Relaxed);
+        self.transport_zero_copy.store(0, Ordering::Relaxed);
+        self.transport_memcpy.store(0, Ordering::Relaxed);
+        self.prev_packets.store(0, Ordering::Relaxed);
+        self.prev_bytes.store(0, Ordering::Relaxed);
+        *self.last_collection.write() = Instant::now();
 
         *self.current.write() = HyperMeshMetrics::default();
 
@@ -355,6 +491,18 @@ impl std::fmt::Display for HyperMeshMetrics {
             self.privacy_metrics.public_connections)?;
         writeln!(f, "    Violations: {}", self.privacy_metrics.tier_violations)?;
 
+        writeln!(f, "  Transport:")?;
+        writeln!(f, "    Packets: {}, {:.2} pps, {:.2} Gbps",
+            self.transport_metrics.total_packets,
+            self.transport_metrics.packets_per_second,
+            self.transport_metrics.throughput_gbps())?;
+        writeln!(f, "    Drops: {}, AF_XDP Redirects: {}",
+            self.transport_metrics.kernel_drops,
+            self.transport_metrics.af_xdp_redirects)?;
+        writeln!(f, "    Zero-copy: {}, Memcpy: {}",
+            self.transport_metrics.zero_copy_ops,
+            self.transport_metrics.memcpy_ops)?;
+
         Ok(())
     }
 }
@@ -365,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_metrics_collector() {
-        let collector = HyperMeshMetricsCollector::new().unwrap();
+        let collector = HyperMeshMetricsCollector::new().expect("test: create metrics collector");
 
         collector.record_pos_validation(true);
         collector.record_pos_validation(false);
@@ -396,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_metrics_reset() {
-        let collector = HyperMeshMetricsCollector::new().unwrap();
+        let collector = HyperMeshMetricsCollector::new().expect("test: create metrics collector");
 
         collector.record_pos_validation(true);
         collector.record_asset_validation(true, false);
@@ -409,5 +557,42 @@ mod tests {
         let metrics = collector.collect();
         assert_eq!(metrics.pos_metrics.total_validations, 0);
         assert_eq!(metrics.asset_metrics.total_validations, 0);
+    }
+
+    #[test]
+    fn test_transport_metrics() {
+        let collector = HyperMeshMetricsCollector::new().expect("test: create metrics collector");
+
+        collector.record_transport_packet(1500);
+        collector.record_transport_packet(800);
+        collector.record_transport_drop();
+        collector.record_transport_redirect();
+        collector.record_zero_copy();
+        collector.record_memcpy();
+
+        let metrics = collector.collect();
+        assert_eq!(metrics.transport_metrics.total_packets, 2);
+        assert_eq!(metrics.transport_metrics.total_bytes, 2300);
+        assert_eq!(metrics.transport_metrics.kernel_drops, 1);
+        assert_eq!(metrics.transport_metrics.af_xdp_redirects, 1);
+        assert_eq!(metrics.transport_metrics.zero_copy_ops, 1);
+        assert_eq!(metrics.transport_metrics.memcpy_ops, 1);
+    }
+
+    #[test]
+    fn test_transport_metrics_reset() {
+        let collector = HyperMeshMetricsCollector::new().expect("test: create metrics collector");
+
+        collector.record_transport_packet(1000);
+        collector.record_transport_drop();
+
+        let metrics = collector.collect();
+        assert_eq!(metrics.transport_metrics.total_packets, 1);
+
+        collector.reset();
+
+        let metrics = collector.collect();
+        assert_eq!(metrics.transport_metrics.total_packets, 0);
+        assert_eq!(metrics.transport_metrics.kernel_drops, 0);
     }
 }
