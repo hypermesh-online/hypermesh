@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
-use super::{AssetId, ConsensusProof};
+use super::{AssetRegistration, ConsensusProof};
 use super::privacy::PrivacyLevel;
 use super::proxy::ProxyAddress;
 use super::adapter::ResourceUsage;
@@ -20,7 +20,7 @@ use super::adapter::ResourceUsage;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetStatus {
     /// Unique asset identifier
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Current operational state
     pub state: AssetState,
     /// When asset was allocated
@@ -204,7 +204,7 @@ pub enum HealthTrend {
 impl AssetStatus {
     /// Create new asset status with default values
     pub fn new(
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         owner_certificate_fingerprint: String,
         privacy_level: PrivacyLevel,
     ) -> Self {
@@ -402,13 +402,13 @@ impl std::fmt::Display for AlertCategory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::AssetId;
+    use super::AssetRegistration;
     use crate::AssetType;
     use crate::assets::core::privacy::PrivacyLevel;
     use crate::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
-    // Test helper to create AssetId from AssetType
-    fn test_asset_id(asset_type: AssetType) -> AssetId {
+    // Test helper to create AssetRegistration from AssetType
+    fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
         let data = AssetData {
             config: vec![1, 2, 3],
             definition: vec![4, 5, 6],
@@ -424,7 +424,7 @@ mod tests {
             AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
             _ => AssetCategory::BaseSystem(BaseSystemType::Container),
         };
-        AssetId::from_asset_data(&data, NetworkScope::Global, category)
+        AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
     }
 
     #[test]

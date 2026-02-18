@@ -15,8 +15,9 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType, NetworkId,
+    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
     StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate, PeerId,
+    new_random_network_id,
 };
 
 /// P2P network handler - direct peer-to-peer with self-signed certificates
@@ -195,7 +196,7 @@ impl NetworkHandler for P2PNetworkHandler {
         }
 
         let connection = NetworkConnection {
-            network_id: NetworkId::new_v4(),
+            network_id: new_random_network_id(),
             network_type: NetworkType::P2P,
             stoq_transport: stoq,
             certificate: Some(self.self_signed_cert.clone()),

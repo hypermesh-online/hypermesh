@@ -22,12 +22,12 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{AssetType, AssetResult};
-use super::NodeId;
+use super::PeerIdentity;
 
 /// Load balancer for resource distribution
 pub struct LoadBalancer {
     /// Node load metrics
-    node_loads: Arc<RwLock<HashMap<NodeId, ResourceMetrics>>>,
+    node_loads: Arc<RwLock<HashMap<PeerIdentity, ResourceMetrics>>>,
     /// Balancing strategy
     strategy: BalancingStrategy,
     /// Configuration
@@ -79,7 +79,7 @@ pub enum BalancingStrategy {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceMetrics {
     /// Node ID
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// CPU utilization (0.0-1.0)
     pub cpu_utilization: f64,
     /// Memory utilization (0.0-1.0)
@@ -109,7 +109,7 @@ impl LoadBalancer {
     }
 
     /// Select best node for asset
-    pub async fn select_node(&self, asset_type: AssetType) -> AssetResult<NodeId> {
+    pub async fn select_node(&self, asset_type: AssetType) -> AssetResult<PeerIdentity> {
         let loads = self.node_loads.read().await;
 
         match self.strategy {
@@ -151,7 +151,7 @@ impl LoadBalancer {
     }
 
     /// Get load statistics
-    pub async fn get_load_stats(&self) -> HashMap<NodeId, f64> {
+    pub async fn get_load_stats(&self) -> HashMap<PeerIdentity, f64> {
         let loads = self.node_loads.read().await;
         loads.iter()
             .map(|(id, m)| {
@@ -162,7 +162,7 @@ impl LoadBalancer {
     }
 
     /// Predict future load
-    pub async fn predict_load(&self, node_id: &NodeId, duration: Duration) -> f64 {
+    pub async fn predict_load(&self, node_id: &PeerIdentity, duration: Duration) -> f64 {
         // Simple prediction based on current load
         // In production, would use ML models
         let loads = self.node_loads.read().await;

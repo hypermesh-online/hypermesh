@@ -5,8 +5,8 @@
 //! Error types for HyperMesh Transport Layer
 
 use thiserror::Error;
-// NodeId is a HyperMesh concept, not from stoq
-use super::types::NodeId;
+// PeerIdentity is a HyperMesh concept, not from stoq
+use super::types::PeerIdentity;
 
 /// Transport result type alias
 pub type Result<T> = std::result::Result<T, TransportError>;
@@ -235,7 +235,7 @@ pub trait TransportErrorContext<T> {
     fn transport_context(self, context: &str) -> Result<T>;
     
     /// Add node context to errors
-    fn node_context(self, node_id: &NodeId) -> Result<T>;
+    fn node_context(self, node_id: &PeerIdentity) -> Result<T>;
 }
 
 impl<T, E> TransportErrorContext<T> for std::result::Result<T, E>
@@ -253,8 +253,8 @@ where
             }
         })
     }
-    
-    fn node_context(self, node_id: &NodeId) -> Result<T> {
+
+    fn node_context(self, node_id: &PeerIdentity) -> Result<T> {
         self.map_err(|e| {
             let transport_err = e.into();
             let context = format!("Node: {:?}", node_id);
@@ -298,7 +298,7 @@ mod tests {
         ];
         
         let not_retryable = vec![
-            TransportError::AuthenticationFailedWithDetails(NodeId::from_name("test").to_string(), "test".to_string()),
+            TransportError::AuthenticationFailedWithDetails(PeerIdentity::from_name("test").to_string(), "test".to_string()),
             TransportError::Configuration("test".to_string()),
             TransportError::InvalidOperation("test".to_string()),
         ];

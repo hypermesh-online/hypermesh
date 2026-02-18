@@ -29,8 +29,8 @@ pub mod proxy;
 
 // Re-exports
 pub use asset_id::{
-    AssetId, AssetType, AssetIdError, SecurityError,
-    NetworkScope, RegistryId, FederationId, NodeId,
+    AssetRegistration, AssetType, AssetIdError, SecurityError,
+    NetworkScope, RegistryId, FederationId, NodeFingerprint,
     AssetCategory, BaseSystemType, ApplicationDomain,
     ProofScope, ProofRequirements, ScopeBinding,
     AssetData,
@@ -151,7 +151,7 @@ pub use crate::consensus::proof_of_state_integration::{
 /// Core asset manager coordinating all asset operations
 pub struct AssetManager {
     /// Registry of all assets by ID
-    assets: Arc<RwLock<HashMap<AssetId, AssetStatus>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, AssetStatus>>>,
     /// Registry of asset adapters by type
     adapters: Arc<RwLock<HashMap<AssetType, Arc<dyn AssetAdapter>>>>,
     /// Proxy address resolver
@@ -253,7 +253,7 @@ impl AssetManager {
     }
     
     /// Deallocate an asset
-    pub async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    pub async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Derive asset type from category
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
@@ -275,7 +275,7 @@ impl AssetManager {
     }
 
     /// Get current status of an asset
-    pub async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    pub async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         // First check local registry
         {
             let assets = self.assets.read().await;
@@ -299,7 +299,7 @@ impl AssetManager {
     /// Configure privacy level for an asset
     pub async fn configure_privacy(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         privacy_level: PrivacyLevel,
     ) -> AssetResult<()> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
@@ -314,7 +314,7 @@ impl AssetManager {
     }
 
     /// Assign proxy address for remote access
-    pub async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    pub async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
@@ -332,7 +332,7 @@ impl AssetManager {
     }
 
     /// Resolve proxy address to asset ID
-    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         self.proxy_resolver.resolve(proxy_addr).await
             .ok_or_else(|| AssetError::ProxyResolutionFailed {
                 address: proxy_addr.clone()
@@ -352,7 +352,7 @@ impl AssetManager {
     }
 
     /// Get resource usage for an asset
-    pub async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    pub async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
@@ -367,7 +367,7 @@ impl AssetManager {
     /// Set resource limits for an asset
     pub async fn set_resource_limits(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         limits: ResourceLimits,
     ) -> AssetResult<()> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;

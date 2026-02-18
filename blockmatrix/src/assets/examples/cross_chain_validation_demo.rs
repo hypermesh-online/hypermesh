@@ -25,7 +25,7 @@ use hypermesh_assets::{
         MatrixBlockchainManager, EntityConfig, EntityType, MatrixCoordinate,
         GeographicDimension, OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
     },
-    core::asset_id::{AssetId, AssetType},
+    core::asset_id::{AssetRegistration, AssetType},
 };
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     register_validation_rules(&mut validator_manager).await?;
     
     // Demonstrate vehicle purchase workflow
-    let vehicle_asset_id = AssetId::new(AssetType::Container); // Vehicle as asset
+    let vehicle_asset_id = AssetRegistration::new(AssetType::Container); // Vehicle as asset
     
     println!("\n🔍 Step 1: Performing Vehicle Purchase Cross-Chain Validation");
     println!("--------------------------------------------------------------");
@@ -468,7 +468,7 @@ async fn register_validation_rules(
 }
 
 /// Create a sample cross-network validator
-fn create_sample_validator(vehicle_asset_id: AssetId) -> Result<CrossNetworkValidator, Box<dyn std::error::Error>> {
+fn create_sample_validator(vehicle_asset_id: AssetRegistration) -> Result<CrossNetworkValidator, Box<dyn std::error::Error>> {
     let zk_statements = vec![
         ZKProofStatement {
             statement_id: "loan_amount_sufficient".to_string(),

@@ -32,7 +32,7 @@ use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 
 // Component imports
-use crate::transport::{HyperMeshTransport, TransportConfig, NodeId};
+use crate::transport::{HyperMeshTransport, TransportConfig, PeerIdentity};
 use crate::consensus::{ConsensusManager, ConsensusConfig};
 use hypermesh_container::{ContainerRuntime, ContainerRuntimeConfig};
 use hypermesh_security::{HyperMeshSecurity, SecurityConfig};

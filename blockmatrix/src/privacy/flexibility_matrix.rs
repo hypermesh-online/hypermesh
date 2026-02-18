@@ -6,14 +6,9 @@
 // Enables flexible privacy configurations where network and asset tiers can differ
 
 use super::tiers::{validation_requirements_for, ValidationRequirements};
-use hypermesh_lib::{AccessScope, PrivacyMode};
+use hypermesh_lib::{AccessScope, ContentHash, PrivacyMode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-/// Asset identifier type
-// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
-// (lib uses AssetId(pub String), this uses type alias to [u8; 32])
-pub type AssetId = [u8; 32];
 
 /// Privacy Flexibility Matrix - Core of the flexible privacy system
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,7 +18,7 @@ pub struct PrivacyFlexibilityMatrix {
     /// How assets are shared and accessed
     pub asset_tier: PrivacyMode,
     /// Per-asset overrides for fine-grained control
-    pub asset_overrides: HashMap<AssetId, PrivacyMode>,
+    pub asset_overrides: HashMap<ContentHash, PrivacyMode>,
     /// Network visibility settings
     pub network_visibility: NetworkVisibility,
     /// Asset sharing settings
@@ -54,12 +49,12 @@ impl PrivacyFlexibilityMatrix {
     }
 
     /// Set a specific privacy mode for an individual asset
-    pub fn set_asset_override(&mut self, asset_id: AssetId, mode: PrivacyMode) {
+    pub fn set_asset_override(&mut self, asset_id: ContentHash, mode: PrivacyMode) {
         self.asset_overrides.insert(asset_id, mode);
     }
 
     /// Get the effective privacy mode for a specific asset
-    pub fn get_asset_tier(&self, asset_id: &AssetId) -> PrivacyMode {
+    pub fn get_asset_tier(&self, asset_id: &ContentHash) -> PrivacyMode {
         self.asset_overrides
             .get(asset_id)
             .copied()
@@ -67,7 +62,7 @@ impl PrivacyFlexibilityMatrix {
     }
 
     /// Remove an asset override, reverting to default asset tier
-    pub fn remove_asset_override(&mut self, asset_id: &AssetId) -> Option<PrivacyMode> {
+    pub fn remove_asset_override(&mut self, asset_id: &ContentHash) -> Option<PrivacyMode> {
         self.asset_overrides.remove(asset_id)
     }
 
@@ -338,12 +333,12 @@ mod tests {
     #[test]
     fn test_asset_overrides() {
         let mut matrix = PrivacyFlexibilityMatrix::uniform(PrivacyMode::PUBLIC);
-        let asset_id = [1u8; 32];
+        let asset_id = ContentHash([1u8; 32]);
 
         matrix.set_asset_override(asset_id, PrivacyMode::ANONYMOUS);
         assert_eq!(matrix.get_asset_tier(&asset_id), PrivacyMode::ANONYMOUS);
 
-        let other_asset = [2u8; 32];
+        let other_asset = ContentHash([2u8; 32]);
         assert_eq!(matrix.get_asset_tier(&other_asset), PrivacyMode::PUBLIC);
 
         matrix.remove_asset_override(&asset_id);

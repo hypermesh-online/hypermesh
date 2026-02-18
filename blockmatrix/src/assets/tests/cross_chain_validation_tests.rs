@@ -22,13 +22,13 @@ use hypermesh_assets::{
         GeographicDimension, OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
         ProofRequirement,
     },
-    core::asset_id::{AssetId, AssetType},
+    core::asset_id::{AssetRegistration, AssetType},
 };
 
 /// Test cross-network validator creation and basic functionality
 #[tokio::test]
 async fn test_cross_network_validator_creation() {
-    let asset_id = AssetId::new(AssetType::Container);
+    let asset_id = AssetRegistration::new(AssetType::Container);
     
     let validator = CrossNetworkValidator {
         source_network: "test.hypermesh.online".to_string(),
@@ -354,7 +354,7 @@ async fn test_validation_chain_dependencies() {
 /// Test comprehensive vehicle purchase workflow validation
 #[tokio::test]
 async fn test_vehicle_purchase_workflow() {
-    let vehicle_asset_id = AssetId::new(AssetType::Container);
+    let vehicle_asset_id = AssetRegistration::new(AssetType::Container);
     let matrix_manager = MatrixBlockchainManager::new();
     let mut validation_manager = CrossChainValidationManager::new(matrix_manager);
 
@@ -455,7 +455,7 @@ async fn test_privacy_level_access() {
 /// Test complex validation chain with multiple dependencies
 #[tokio::test]
 async fn test_complex_validation_chain() {
-    let asset_id = AssetId::new(AssetType::Container);
+    let asset_id = AssetRegistration::new(AssetType::Container);
     
     // Create a complex validation chain with multiple parallel and sequential steps
     let validation_chain = vec![

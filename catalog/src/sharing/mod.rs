@@ -26,7 +26,7 @@ pub use discovery::{DiscoveryService, AssetIndex, SearchCapabilities};
 pub use protocols::{SharingProtocol, SharePermission, BandwidthAllocation};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
-use crate::{AssetId, AssetPackage, AssetMetadata};
+use crate::{AssetRegistration, AssetPackage, AssetMetadata};
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,9 +166,9 @@ pub enum SharingEvent {
     /// Peer left network
     PeerLeft { node_id: String },
     /// Package shared
-    PackageShared { asset_id: AssetId, recipient: String },
+    PackageShared { asset_id: AssetRegistration, recipient: String },
     /// Package mirrored
-    PackageMirrored { asset_id: AssetId, mirror_node: String },
+    PackageMirrored { asset_id: AssetRegistration, mirror_node: String },
     /// Synchronization completed
     SyncCompleted { peer: String, packages_synced: u32 },
     /// Synchronization failed
@@ -294,13 +294,13 @@ impl SharingManager {
         package: &AssetPackage,
         permission: SharePermission,
     ) -> Result<()> {
-        // Create AssetId from package data (using package hash and spec)
+        // Create AssetRegistration from package data (using package hash and spec)
         let asset_data = blockmatrix::assets::core::AssetData {
             config: package.package_hash.as_bytes().to_vec(),
             definition: serde_json::to_vec(&package.spec).unwrap_or_default(),
             metadata: vec![],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             blockmatrix::assets::core::NetworkScope::Global,
             blockmatrix::assets::core::AssetCategory::Application(
@@ -424,7 +424,7 @@ impl SharingManager {
     }
 
     /// Search for packages across the network
-    pub async fn search_packages(&self, query: &str) -> Result<Vec<(AssetId, AssetMetadata)>> {
+    pub async fn search_packages(&self, query: &str) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         // Search local and cached packages first
         let local_results = self.discovery_service.search_local(query).await?;
 
@@ -450,7 +450,7 @@ impl SharingManager {
     }
 
     /// Get package from network
-    pub async fn get_package(&self, asset_id: &AssetId) -> Result<AssetPackage> {
+    pub async fn get_package(&self, asset_id: &AssetRegistration) -> Result<AssetPackage> {
         // Check local availability first
         if let Some(package) = self.discovery_service.get_local_package(asset_id).await? {
             return Ok(package);
@@ -514,7 +514,7 @@ impl SharingManager {
 
     async fn should_mirror_package(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         _metadata: &AssetMetadata,
     ) -> Result<bool> {
         // Check if we already have it

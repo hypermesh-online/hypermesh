@@ -20,7 +20,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, NetworkUsage,
@@ -33,7 +33,7 @@ use crate::assets::core::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkAllocation {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Allocated network interfaces
     pub allocated_interfaces: Vec<String>,
     /// Allocated bandwidth in Mbps
@@ -84,7 +84,7 @@ pub struct NetworkInterface {
     /// Current status
     pub status: InterfaceStatus,
     /// Current allocation asset ID
-    pub allocated_to: Option<AssetId>,
+    pub allocated_to: Option<AssetRegistration>,
     /// Interface statistics
     pub interface_stats: InterfaceStats,
 }
@@ -190,15 +190,15 @@ pub struct NetworkSecurity {
 /// Network Asset Adapter implementation
 pub struct NetworkAssetAdapter {
     /// Active network allocations by asset ID
-    allocations: Arc<RwLock<HashMap<AssetId, NetworkAllocation>>>,
+    allocations: Arc<RwLock<HashMap<AssetRegistration, NetworkAllocation>>>,
     /// Network interface information and status
     network_interfaces: Arc<RwLock<HashMap<String, NetworkInterface>>>,
     /// Interface allocation mapping (interface_name -> asset_id)
-    interface_allocations: Arc<RwLock<HashMap<String, AssetId>>>,
+    interface_allocations: Arc<RwLock<HashMap<String, AssetRegistration>>>,
     /// QoS configurations by asset ID
-    qos_configs: Arc<RwLock<HashMap<AssetId, QoSConfig>>>,
+    qos_configs: Arc<RwLock<HashMap<AssetRegistration, QoSConfig>>>,
     /// Proxy address mappings
-    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
+    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     /// Total network bandwidth in Mbps
     total_bandwidth: u64,
     /// Available network bandwidth in Mbps
@@ -310,7 +310,7 @@ impl NetworkAssetAdapter {
     async fn allocate_network_bandwidth(
         &self,
         network_req: &NetworkRequirements,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> AssetResult<(Vec<String>, u64)> {
         let mut interfaces = self.network_interfaces.write().await;
         let mut interface_allocations = self.interface_allocations.write().await;
@@ -394,7 +394,7 @@ impl NetworkAssetAdapter {
     }
     
     /// Generate proxy address for network access
-    async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+    async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
@@ -417,7 +417,7 @@ impl NetworkAssetAdapter {
     }
     
     /// Configure Quality of Service
-    async fn configure_qos(&self, _asset_id: &AssetId, network_req: &NetworkRequirements) -> QoSConfig {
+    async fn configure_qos(&self, _asset_id: &AssetRegistration, network_req: &NetworkRequirements) -> QoSConfig {
         let priority = if network_req.max_latency_us.unwrap_or(10000) < 1000 {
             200 // High priority for low latency requirements
         } else {
@@ -542,7 +542,7 @@ impl AssetAdapter for NetworkAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Network),
@@ -651,7 +651,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         })
     }
     
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Get allocation record
         let allocation = {
             let mut allocations = self.allocations.write().await;
@@ -708,7 +708,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         Ok(())
     }
     
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -742,7 +742,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         })
     }
     
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -756,7 +756,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         Ok(())
     }
     
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let proxy_address = Self::generate_proxy_address(asset_id).await;
         
         // Find existing proxy address
@@ -770,7 +770,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         Ok(proxy_address)
     }
     
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
         proxy_mappings.get(proxy_addr)
             .cloned()
@@ -779,7 +779,7 @@ impl AssetAdapter for NetworkAssetAdapter {
             })
     }
     
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -805,7 +805,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         })
     }
     
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         if let Some(network_limit) = limits.network_limit {
             tracing::info!(
                 "Set network limits for asset {}: max {} Mbps, max {} connections",

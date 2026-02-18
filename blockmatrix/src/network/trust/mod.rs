@@ -59,26 +59,22 @@ impl NetworkType {
     }
 }
 
-/// Network identifier
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct NetworkId(Uuid);
+/// Network identifier re-exported from hypermesh_lib (128-bit, UUID-compatible).
+///
+/// Construction:
+///   - Random: `new_random_network_id()`
+///   - From bytes: `NetworkId([u8; 16])`
+///   - From UUID: `NetworkId(*uuid.as_bytes())`
+pub use hypermesh_lib::NetworkId;
 
-impl NetworkId {
-    /// Create new unique network ID
-    pub fn new_v4() -> Self {
-        NetworkId(Uuid::new_v4())
-    }
-
-    /// Get UUID representation
-    pub fn as_uuid(&self) -> &Uuid {
-        &self.0
-    }
+/// Create a new random NetworkId (replaces the old `NetworkId::new_v4()`).
+pub fn new_random_network_id() -> NetworkId {
+    NetworkId(*Uuid::new_v4().as_bytes())
 }
 
-impl std::fmt::Display for NetworkId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
+/// Convert a NetworkId to a UUID (replaces the old `.as_uuid()` method).
+pub fn network_id_as_uuid(id: &NetworkId) -> Uuid {
+    Uuid::from_bytes(id.0)
 }
 
 /// Peer identifier

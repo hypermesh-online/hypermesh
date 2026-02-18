@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::consensus::proof::ConsensusProof;
 use super::{VMConsensusContext, ConsensusExecutionResult, ProofValidationResults, ResourceUsageMetrics};
-use crate::catalog::vm::AssetId;
+use crate::catalog::vm::ExecutionId;
 
 /// A consensus-native VM operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct ConsensusOperation {
     /// Type of operation (load, store, compute, sync, etc.)
     operation_type: String,
     /// Asset being operated on
-    asset_id: AssetId,
+    asset_id: ExecutionId,
     /// Consensus proof for this operation
     consensus_proof: ConsensusProof,
     /// Operation creation timestamp
@@ -81,7 +81,7 @@ impl ConsensusOperation {
     /// Create new consensus operation
     pub fn new(
         operation_type: String,
-        asset_id: AssetId,
+        asset_id: ExecutionId,
         consensus_proof: ConsensusProof,
         _context: Arc<VMConsensusContext>,
     ) -> Self {
@@ -342,7 +342,7 @@ impl ConsensusOperation {
     }
     
     /// Get asset ID
-    pub fn asset_id(&self) -> AssetId {
+    pub fn asset_id(&self) -> ExecutionId {
         self.asset_id
     }
     
@@ -429,7 +429,7 @@ impl Default for ConsensusOperation {
 /// Operation builder for creating consensus operations with specific requirements
 pub struct ConsensusOperationBuilder {
     operation_type: String,
-    asset_id: Option<AssetId>,
+    asset_id: Option<ExecutionId>,
     consensus_proof: Option<ConsensusProof>,
     metadata: OperationMetadata,
 }
@@ -446,7 +446,7 @@ impl ConsensusOperationBuilder {
     }
     
     /// Set asset ID
-    pub fn with_asset_id(mut self, asset_id: AssetId) -> Self {
+    pub fn with_asset_id(mut self, asset_id: ExecutionId) -> Self {
         self.asset_id = Some(asset_id);
         self
     }

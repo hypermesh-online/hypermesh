@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
 use hypermesh_assets::core::{
-    AssetId, AssetType, PrivacyLevel,
+    AssetRegistration, AssetType, PrivacyLevel,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     WorkloadType, WorkState
 };
@@ -125,7 +125,7 @@ async fn test_privacy_allocation_workflow() {
     privacy_manager.register_user_config("test-user-123".to_string(), user_config).await.unwrap();
     
     // Create test asset
-    let asset_id = AssetId::new(AssetType::Cpu);
+    let asset_id = AssetRegistration::new(AssetType::Cpu);
     
     // Create consensus proof (all four proofs required)
     let space_proof = SpaceProof {
@@ -392,7 +392,7 @@ async fn test_privacy_enforcement() {
     let enforcer = PrivacyEnforcer::new(&manager_config).await.unwrap();
     
     // Create test allocation
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     let allocation_result = super::PrivacyAllocationResult {
         asset_id: asset_id.clone(),
         allocation_type: PrivacyAllocationType::Public,

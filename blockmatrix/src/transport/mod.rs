@@ -27,7 +27,7 @@ pub mod pool;
 
 
 // Re-export main types
-pub use types::NodeId;
+pub use types::PeerIdentity;
 
 pub use config::{
     TransportConfig, HyperMeshTransportConfig,
@@ -103,10 +103,10 @@ pub trait HyperMeshTransportTrait: Send + Sync {
     async fn connect(&self, endpoint: &HyperMeshEndpoint) -> Result<HyperMeshConnection>;
 
     /// Send message to a node
-    async fn send(&self, node_id: &NodeId, message: &[u8]) -> Result<()>;
+    async fn send(&self, node_id: &PeerIdentity, message: &[u8]) -> Result<()>;
 
     /// Receive message from any node
-    async fn receive(&self) -> Result<(NodeId, Vec<u8>)>;
+    async fn receive(&self) -> Result<(PeerIdentity, Vec<u8>)>;
 
     /// Get transport statistics
     fn get_stats(&self) -> HyperMeshTransportStats;
@@ -144,7 +144,7 @@ impl HyperMeshTransport {
     }
 
     /// Connect to a node
-    pub async fn connect_to_node(&self, _node_id: NodeId, _endpoint: &stoq::Endpoint) -> Result<()> {
+    pub async fn connect_to_node(&self, _node_id: PeerIdentity, _endpoint: &stoq::Endpoint) -> Result<()> {
         Ok(()) // Stub implementation
     }
 
@@ -159,8 +159,8 @@ impl HyperMeshTransport {
     }
 
     /// Accept a connection
-    pub async fn accept(&self) -> Result<(String, NodeId)> {
-        Ok((String::new(), NodeId::from_name(""))) // Stub implementation
+    pub async fn accept(&self) -> Result<(String, PeerIdentity)> {
+        Ok((String::new(), PeerIdentity::from_name(""))) // Stub implementation
     }
 
     /// Close a connection
@@ -169,13 +169,13 @@ impl HyperMeshTransport {
     }
 
     /// Send message to a node
-    pub async fn send_message(&self, _node_id: &NodeId, _message: Vec<u8>) -> Result<()> {
+    pub async fn send_message(&self, _node_id: &PeerIdentity, _message: Vec<u8>) -> Result<()> {
         Ok(()) // Stub implementation
     }
 
     /// Receive message
-    pub async fn receive_message(&self) -> Result<(NodeId, Vec<u8>)> {
-        Ok((NodeId::from_name(""), Vec::new())) // Stub implementation
+    pub async fn receive_message(&self) -> Result<(PeerIdentity, Vec<u8>)> {
+        Ok((PeerIdentity::from_name(""), Vec::new())) // Stub implementation
     }
 }
 

@@ -23,11 +23,11 @@ use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{
-    AssetId, AssetType, AssetResult, AssetError,
+    AssetRegistration, AssetType, AssetResult, AssetError,
 };
 
 use super::{
-    NodeId, NetworkTopology, NetworkPartition, DistributedAssetState,
+    PeerIdentity, NetworkTopology, NetworkPartition, DistributedAssetState,
     AllocationDecision, ResourceSharingRequest, ResourceSharingOffer,
     MultiNodeEvent, MultiNodeCoordinatorTrait, MultiNodeMetrics,
 };
@@ -36,7 +36,7 @@ use super::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInfo {
     /// Node identifier
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// Node capabilities
     pub capabilities: NodeCapabilities,
     /// Node status
@@ -160,17 +160,17 @@ pub struct NodePerformanceMetrics {
 /// Multi-node coordinator implementation
 pub struct MultiNodeCoordinator {
     /// Local node information
-    local_node: Arc<RwLock<NodeId>>,
+    local_node: Arc<RwLock<PeerIdentity>>,
     /// All known nodes
-    nodes: Arc<RwLock<HashMap<NodeId, NodeInfo>>>,
+    nodes: Arc<RwLock<HashMap<PeerIdentity, NodeInfo>>>,
     /// Network topology
     topology: Arc<RwLock<NetworkTopology>>,
     /// Active network partitions
     partitions: Arc<RwLock<Vec<NetworkPartition>>>,
     /// Distributed asset states
-    asset_states: Arc<RwLock<HashMap<AssetId, DistributedAssetState>>>,
+    asset_states: Arc<RwLock<HashMap<AssetRegistration, DistributedAssetState>>>,
     /// Pending allocation decisions
-    pending_allocations: Arc<RwLock<HashMap<AssetId, AllocationDecision>>>,
+    pending_allocations: Arc<RwLock<HashMap<AssetRegistration, AllocationDecision>>>,
     /// Resource sharing requests
     sharing_requests: Arc<RwLock<Vec<ResourceSharingRequest>>>,
     /// Resource sharing offers
@@ -230,7 +230,7 @@ impl MultiNodeCoordinator {
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
 
         Self {
-            local_node: Arc::new(RwLock::new(NodeId {
+            local_node: Arc::new(RwLock::new(PeerIdentity {
                 name: "local".to_string(),
                 id: [0u8; 32],
                 address: "::1".parse().unwrap(),
@@ -336,7 +336,7 @@ impl MultiNodeCoordinator {
 
                 // Detect network partitions using graph connectivity
                 let nodes_read = nodes.read().await;
-                let active_nodes: HashSet<NodeId> = nodes_read
+                let active_nodes: HashSet<PeerIdentity> = nodes_read
                     .iter()
                     .filter(|(_, info)| info.status == NodeStatus::Active)
                     .map(|(id, _)| id.clone())
@@ -498,7 +498,7 @@ impl MultiNodeCoordinator {
                 let states_read = asset_states.read().await;
 
                 // Calculate load distribution
-                let mut node_loads: HashMap<NodeId, f64> = HashMap::new();
+                let mut node_loads: HashMap<PeerIdentity, f64> = HashMap::new();
 
                 for (node_id, node_info) in nodes_read.iter() {
                     let cpu_load = node_info.performance_metrics.cpu_utilization as f64;
@@ -546,10 +546,10 @@ impl MultiNodeCoordinator {
     }
 
     /// Select best node for asset allocation
-    async fn select_allocation_node(&self, asset_type: AssetType) -> AssetResult<NodeId> {
+    async fn select_allocation_node(&self, asset_type: AssetType) -> AssetResult<PeerIdentity> {
         let nodes = self.nodes.read().await;
 
-        let eligible_nodes: Vec<(&NodeId, &NodeInfo)> = nodes.iter()
+        let eligible_nodes: Vec<(&PeerIdentity, &NodeInfo)> = nodes.iter()
             .filter(|(_, info)| {
                 info.status == NodeStatus::Active &&
                 info.capabilities.supported_assets.contains(&asset_type)
@@ -592,14 +592,14 @@ impl MultiNodeCoordinator {
                    (performance * 0.2) +
                    (response_time * 0.2);
 
-        // trust_score field removed from NodeId, using default value of 1.0
+        // trust_score field removed from PeerIdentity, using default value of 1.0
         score * 1.0_f64
     }
 }
 
 #[async_trait]
 impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
-    async fn initialize(&mut self, local_node: NodeId) -> AssetResult<()> {
+    async fn initialize(&mut self, local_node: PeerIdentity) -> AssetResult<()> {
         *self.local_node.write().await = local_node;
         self.start().await?;
         Ok(())
@@ -657,9 +657,9 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(())
     }
 
-    async fn allocate_asset(&self, asset_id: AssetId) -> AssetResult<AllocationDecision> {
+    async fn allocate_asset(&self, asset_id: AssetRegistration) -> AssetResult<AllocationDecision> {
         let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
-            message: "AssetId missing asset_type field".to_string(),
+            message: "AssetRegistration missing asset_type field".to_string(),
         })?;
         let target_node = self.select_allocation_node(asset_type).await?;
 
@@ -677,7 +677,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(decision)
     }
 
-    async fn migrate_asset(&self, asset_id: AssetId, target_node: NodeId) -> AssetResult<()> {
+    async fn migrate_asset(&self, asset_id: AssetRegistration, target_node: PeerIdentity) -> AssetResult<()> {
         let states = self.asset_states.read().await;
 
         let current_state = states.get(&asset_id)
@@ -705,11 +705,11 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(())
     }
 
-    async fn handle_node_failure(&self, failed_node: NodeId) -> AssetResult<()> {
+    async fn handle_node_failure(&self, failed_node: PeerIdentity) -> AssetResult<()> {
         let states = self.asset_states.read().await;
 
         // Find assets on failed node
-        let affected_assets: Vec<AssetId> = states.iter()
+        let affected_assets: Vec<AssetRegistration> = states.iter()
             .filter(|(_, state)| state.primary_node == failed_node)
             .map(|(id, _)| id.clone())
             .collect();
@@ -717,7 +717,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         // Migrate affected assets
         for asset_id in affected_assets {
             let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
-                message: "AssetId missing asset_type field during migration".to_string(),
+                message: "AssetRegistration missing asset_type field during migration".to_string(),
             })?;
             let new_node = self.select_allocation_node(asset_type).await?;
             self.migrate_asset(asset_id, new_node).await?;
@@ -726,10 +726,10 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(())
     }
 
-    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<NodeId>> {
+    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>> {
         let nodes = self.nodes.read().await;
 
-        let byzantine: Vec<NodeId> = nodes.iter()
+        let byzantine: Vec<PeerIdentity> = nodes.iter()
             .filter(|(_, info)| info.status == NodeStatus::Suspected)
             .map(|(id, _)| id.clone())
             .collect();
@@ -737,7 +737,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(byzantine)
     }
 
-    async fn sync_asset_state(&self, asset_id: AssetId) -> AssetResult<DistributedAssetState> {
+    async fn sync_asset_state(&self, asset_id: AssetRegistration) -> AssetResult<DistributedAssetState> {
         let states = self.asset_states.read().await;
 
         states.get(&asset_id)

@@ -126,7 +126,7 @@ impl TierSwitcher {
         } else if mode == PrivacyMode::PRIVATE {
             self.private_tier = Some(PrivateP2PTier::new(100));
         } else if mode == PrivacyMode::PUBLIC {
-            let node_id = [0u8; 32]; // Would be generated in practice
+            let node_id = NodeId([0u8; 32]); // Would be generated in practice
             self.public_tier = Some(PublicTier::new(node_id));
         } else {
             // Fallback for custom modes: use private tier
@@ -243,11 +243,11 @@ impl TierSwitcher {
             // Handle identity changes
             if from == PrivacyMode::ANONYMOUS && to != PrivacyMode::ANONYMOUS {
                 // Generate identity for previously anonymous connection
-                let mut new_id = [0u8; 32];
-                for (i, byte) in new_id.iter_mut().enumerate() {
+                let mut raw = [0u8; 32];
+                for (i, byte) in raw.iter_mut().enumerate() {
                     *byte = (i as u8).wrapping_add(rand::random::<u8>());
                 }
-                conn.peer_id = Some(new_id);
+                conn.peer_id = Some(NodeId(raw));
             } else if to == PrivacyMode::ANONYMOUS {
                 // Remove identity for anonymous mode
                 conn.peer_id = None;
@@ -437,8 +437,8 @@ mod tests {
 
         // Add some connections to private tier
         if let Some(tier) = &mut switcher.private_tier {
-            tier.add_peer([1u8; 32]).unwrap();
-            tier.add_peer([2u8; 32]).unwrap();
+            tier.add_peer(NodeId([1u8; 32])).expect("test: add_peer");
+            tier.add_peer(NodeId([2u8; 32])).expect("test: add_peer");
         }
 
         switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn test_connection_info_serialization() {
         let conn = ConnectionInfo {
-            peer_id: Some([1u8; 32]),
+            peer_id: Some(NodeId([1u8; 32])),
             connection_type: ConnectionType::Peer,
             established_at: 12345,
             last_activity: 23456,

@@ -21,7 +21,7 @@ use super::{
 use super::forwarding::{ForwardingRule, ForwardingRuleType};
 
 use crate::assets::core::{
-    ProxyAddress, AssetId, AssetResult, AssetError, PrivacyLevel,
+    ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyLevel,
     ProxyNodeInfo
 };
 
@@ -68,7 +68,7 @@ struct ProxyMapping {
     proxy_address: ProxyAddress,
     
     /// Target asset ID
-    target_asset_id: AssetId,
+    target_asset_id: AssetRegistration,
     
     /// Target node information
     target_node_id: String,
@@ -225,7 +225,7 @@ impl RemoteProxyManager {
     /// Allocate a new proxy address for an asset (CRITICAL NAT functionality)
     pub async fn allocate_proxy_address(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         privacy_level: PrivacyLevel,
         capabilities_required: &[String],
     ) -> AssetResult<ProxyAddress> {
@@ -300,7 +300,7 @@ impl RemoteProxyManager {
     }
     
     /// Resolve proxy address to local asset information (CRITICAL NAT functionality)
-    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let mappings = self.address_mappings.read().await;
         let mapping = mappings.get(proxy_addr)
             .ok_or_else(|| AssetError::ProxyResolutionFailed {

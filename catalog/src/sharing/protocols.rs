@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
 use std::time::{Duration, SystemTime};
-use crate::{AssetId, AssetPackage, AssetMetadata};
+use crate::{AssetRegistration, AssetPackage, AssetMetadata};
 use super::PeerInfo;
 
 /// Share permission levels
@@ -91,7 +91,7 @@ struct ActiveTransfer {
     /// Peer ID
     peer_id: String,
     /// Asset being transferred
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     /// Transfer direction
     direction: TransferDirection,
     /// Priority
@@ -134,22 +134,22 @@ pub struct ContributionStats {
 pub enum ProtocolMessage {
     /// Request package
     RequestPackage {
-        asset_id: String,  // Package hash, not BlockMatrix AssetId
+        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
         requester: String,
     },
     /// Package response
     PackageResponse {
-        asset_id: String,  // Package hash, not BlockMatrix AssetId
+        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
         package: AssetPackage,
     },
     /// Package metadata
     PackageMetadata {
-        asset_id: String,  // Package hash, not BlockMatrix AssetId
+        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
         metadata: AssetMetadata,
     },
     /// Availability notification
     AvailabilityNotification {
-        asset_id: String,  // Package hash, not BlockMatrix AssetId
+        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
         available: bool,
     },
     /// Bandwidth negotiation
@@ -290,16 +290,16 @@ impl SharingProtocol {
 
         // Create transfer
         let transfer_id = uuid::Uuid::new_v4().to_string();
-        // Parse asset_id from string to AssetId
-        let parsed_asset_id = AssetId::from_hex_string(asset_id)
+        // Parse asset_id from string to AssetRegistration
+        let parsed_asset_id = AssetRegistration::from_hex_string(asset_id)
             .unwrap_or_else(|_| {
-                // Fallback: create a default AssetId from empty data
+                // Fallback: create a default AssetRegistration from empty data
                 let asset_data = blockmatrix::assets::core::AssetData {
                     config: vec![],
                     definition: vec![],
                     metadata: vec![],
                 };
-                AssetId::from_asset_data(
+                AssetRegistration::from_asset_data(
                     &asset_data,
                     blockmatrix::assets::core::NetworkScope::Global,
                     blockmatrix::assets::core::AssetCategory::Application(
@@ -361,15 +361,15 @@ impl SharingProtocol {
 
         // Create transfer
         let transfer_id = uuid::Uuid::new_v4().to_string();
-        // Parse package hash to AssetId
-        let parsed_asset_id = AssetId::from_hex_string(&package.package_hash)
+        // Parse package hash to AssetRegistration
+        let parsed_asset_id = AssetRegistration::from_hex_string(&package.package_hash)
             .unwrap_or_else(|_| {
                 // Fallback: create from hash bytes
                 let mut hash_bytes = [0u8; 32];
                 if let Ok(bytes) = hex::decode(&package.package_hash) {
                     hash_bytes[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
                 }
-                AssetId::new_from_hash(&hash_bytes)
+                AssetRegistration::new_from_hash(&hash_bytes)
             });
         let transfer = ActiveTransfer {
             id: transfer_id.clone(),
@@ -442,7 +442,7 @@ impl SharingProtocol {
     /// Set share permissions for package
     pub async fn set_permission(
         &self,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
         _permission: SharePermission,
     ) -> Result<()> {
         // Would store permission mapping
@@ -505,7 +505,7 @@ impl SharingProtocol {
     async fn receive_package_with_limiting(
         &self,
         _peer_id: &str,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
     ) -> Result<AssetPackage> {
         // Would receive with bandwidth limiting
         // Using semaphore permits for rate limiting
@@ -647,7 +647,7 @@ pub struct TransferStats {
     /// Peer ID
     pub peer_id: String,
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Progress (0-1)
     pub progress: f64,
     /// Current speed (bytes/sec)

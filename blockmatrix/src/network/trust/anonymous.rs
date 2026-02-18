@@ -14,9 +14,9 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType, NetworkId,
+    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
     StoqTransport, PeerInfo, AssetRequest, AssetResponse, EphemeralKey,
-    generate_ephemeral_key,
+    generate_ephemeral_key, new_random_network_id,
 };
 
 /// Anonymous network handler - ephemeral connections with no identity
@@ -89,7 +89,7 @@ impl NetworkHandler for AnonymousNetworkHandler {
         );
 
         let connection = NetworkConnection {
-            network_id: NetworkId::new_v4(),
+            network_id: new_random_network_id(),
             network_type: NetworkType::Anonymous,
             stoq_transport: stoq,
             certificate: None, // No certificates in anonymous mode

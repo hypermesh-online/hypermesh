@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
 use std::cmp::Ordering;
 
-use crate::{AssetId, AssetMetadata};
+use crate::{AssetRegistration, AssetMetadata};
 use crate::registry::CatalogRegistry;
 use super::topology::NodeLocation;
 
@@ -94,7 +94,7 @@ pub struct MirrorNode {
     /// Average response time (ms)
     pub avg_response_time: u64,
     /// Packages mirrored
-    pub mirrored_packages: HashSet<AssetId>,
+    pub mirrored_packages: HashSet<AssetRegistration>,
     /// Last health check
     pub last_health_check: SystemTime,
 }
@@ -122,7 +122,7 @@ pub struct PopularityMetrics {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MirrorStatus {
     /// Package ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Mirror nodes
     pub mirror_nodes: Vec<String>,
     /// Replication factor achieved
@@ -138,7 +138,7 @@ pub struct MirrorStatus {
 /// Priority queue item for mirroring decisions
 #[derive(Debug, Clone)]
 struct MirrorCandidate {
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     priority: f64,
     size: u64,
 }
@@ -170,8 +170,8 @@ pub struct MirrorManager {
     replication_factor: u32,
     registry: Arc<CatalogRegistry>,
     mirror_nodes: Arc<RwLock<HashMap<String, MirrorNode>>>,
-    package_mirrors: Arc<RwLock<HashMap<AssetId, MirrorStatus>>>,
-    popularity_metrics: Arc<RwLock<HashMap<AssetId, PopularityMetrics>>>,
+    package_mirrors: Arc<RwLock<HashMap<AssetRegistration, MirrorStatus>>>,
+    popularity_metrics: Arc<RwLock<HashMap<AssetRegistration, PopularityMetrics>>>,
     mirror_queue: Arc<RwLock<BinaryHeap<MirrorCandidate>>>,
     replication_config: Arc<ReplicationConfig>,
     // instruction_generator: Arc<InstructionGenerator>,  // Commented until BlockMatrix integration
@@ -204,7 +204,7 @@ impl MirrorManager {
     /// Mirror a package
     pub async fn mirror_package(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         metadata: &AssetMetadata,
     ) -> Result<MirrorStatus> {
         // Check if already mirrored sufficiently
@@ -498,7 +498,7 @@ impl MirrorManager {
     }
 
     /// Queue package for mirroring
-    async fn queue_for_mirroring(&self, asset_id: &AssetId, priority: f64) -> Result<bool> {
+    async fn queue_for_mirroring(&self, asset_id: &AssetRegistration, priority: f64) -> Result<bool> {
         let mut queue = self.mirror_queue.write().await;
 
         // Check if already queued
@@ -538,7 +538,7 @@ impl MirrorManager {
     /// Replicate package to specific node
     async fn replicate_to_node(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         _metadata: &AssetMetadata,
         node_id: &str,
     ) -> Result<()> {
@@ -557,7 +557,7 @@ impl MirrorManager {
 
     async fn replicate_to_specific_node(
         &self,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
         _node_id: &str,
     ) -> Result<()> {
         // Would get metadata and call replicate_to_node
@@ -565,7 +565,7 @@ impl MirrorManager {
     }
 
     /// Get mirror status
-    pub async fn get_mirror_status(&self, asset_id: &AssetId) -> Result<Option<MirrorStatus>> {
+    pub async fn get_mirror_status(&self, asset_id: &AssetRegistration) -> Result<Option<MirrorStatus>> {
         let mirrors = self.package_mirrors.read().await;
         Ok(mirrors.get(asset_id).cloned())
     }
@@ -580,7 +580,7 @@ impl MirrorManager {
     /// Update popularity metrics
     pub async fn update_popularity(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         download_event: bool,
         user_id: Option<String>,
     ) -> Result<()> {
@@ -696,7 +696,7 @@ impl MirrorManager {
 
     async fn select_optimal_nodes(
         &self,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
         _target_availability: f64,
         _max_latency_ms: u64,
     ) -> Result<Vec<String>> {
@@ -704,12 +704,12 @@ impl MirrorManager {
         Ok(Vec::new())
     }
 
-    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetId>> {
+    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetRegistration>> {
         // Would query package registry for priority
         Ok(Vec::new())
     }
 
-    async fn select_regional_packages(&self, _region: &str) -> Result<Vec<AssetId>> {
+    async fn select_regional_packages(&self, _region: &str) -> Result<Vec<AssetRegistration>> {
         // Would select packages popular in region
         Ok(Vec::new())
     }

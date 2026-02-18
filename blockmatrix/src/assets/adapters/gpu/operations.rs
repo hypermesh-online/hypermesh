@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetId, AssetResult, AssetError,
+    AssetRegistration, AssetResult, AssetError,
     ProxyAddress, GpuRequirements, ConsensusProof,
 };
 
@@ -36,7 +36,7 @@ impl GpuAssetAdapter {
     pub(crate) async fn allocate_gpu_devices(
         &self,
         gpu_req: &GpuRequirements,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> AssetResult<(Vec<u32>, u64)> {
         let mut devices = self.gpu_devices.write().await;
         let mut device_allocations = self.device_allocations.write().await;
@@ -111,7 +111,7 @@ impl GpuAssetAdapter {
     }
 
     /// Generate proxy address for GPU access
-    pub(crate) async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+    pub(crate) async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
@@ -123,7 +123,7 @@ impl GpuAssetAdapter {
     }
 
     /// Create GPU compute context for isolation
-    pub(crate) async fn create_gpu_context(&self, asset_id: &AssetId, device_id: u32) -> String {
+    pub(crate) async fn create_gpu_context(&self, asset_id: &AssetRegistration, device_id: u32) -> String {
         let context_id = format!("gpu_ctx_{}_{}", device_id, hex::encode(&asset_id.content_hash[..8]));
 
         let context = GpuContext {

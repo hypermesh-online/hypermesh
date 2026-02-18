@@ -20,7 +20,7 @@ pub mod storage;
 
 // Re-export main types for easy access
 pub use core::{
-    AssetManager, AssetId, AssetType, AssetAllocation,
+    AssetManager, AssetRegistration, AssetType, AssetAllocation,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     WorkloadType, WorkState, PrivacyLevel, AssetStatistics, AssetAdapter, AssetError,
 };

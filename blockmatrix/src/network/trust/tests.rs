@@ -319,8 +319,8 @@ mod unit_tests {
 
     #[test]
     fn test_network_id() {
-        let id1 = NetworkId::new_v4();
-        let id2 = NetworkId::new_v4();
+        let id1 = new_random_network_id();
+        let id2 = new_random_network_id();
         assert_ne!(id1, id2); // Should be unique
     }
 

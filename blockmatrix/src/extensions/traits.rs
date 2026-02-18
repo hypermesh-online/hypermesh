@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use semver::Version;
 
-use crate::assets::core::{AssetManager, AssetId, AssetType, ConsensusProof};
+use crate::assets::core::{AssetManager, AssetRegistration, AssetType, ConsensusProof};
 use super::types::*;
 use super::asset_types::*;
 use super::package_types::*;
@@ -55,25 +55,25 @@ pub trait AssetExtensionHandler: Send + Sync {
     fn asset_type(&self) -> AssetType;
 
     /// Create a new asset instance
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId>;
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration>;
 
     /// Update an existing asset
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()>;
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()>;
 
     /// Delete an asset
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()>;
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()>;
 
     /// Query assets based on criteria
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>>;
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>>;
 
     /// Get asset metadata
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata>;
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata>;
 
     /// Validate asset with consensus proofs
-    async fn validate_asset(&self, id: &AssetId, proof: ConsensusProof) -> ExtensionResult<bool>;
+    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool>;
 
     /// Handle asset-specific operations
-    async fn handle_operation(&self, id: &AssetId, operation: AssetOperation) -> ExtensionResult<OperationResult>;
+    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult>;
 }
 
 /// Asset library extension trait for Catalog-like functionality

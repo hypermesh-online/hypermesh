@@ -15,9 +15,9 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType, NetworkId,
+    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
     StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate, PeerId,
-    request_federation_membership,
+    request_federation_membership, new_random_network_id,
 };
 
 /// Federated network handler - federation-specific trust anchor
@@ -151,7 +151,7 @@ impl NetworkHandler for FederatedNetworkHandler {
         self.discover_members(&stoq).await?;
 
         let connection = NetworkConnection {
-            network_id: NetworkId::new_v4(),
+            network_id: new_random_network_id(),
             network_type: NetworkType::Federated { gateway_url },
             stoq_transport: stoq,
             certificate: Some(federation_cert),

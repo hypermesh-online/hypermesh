@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetId, AssetError, AssetResult, PrivacyLevel, StorageRequirements, StorageType,
+    AssetRegistration, AssetError, AssetResult, PrivacyLevel, StorageRequirements, StorageType,
 };
 use super::sharding::ShardingConfig;
 use super::devices::{StorageDevice, StorageStatus};
@@ -26,7 +26,7 @@ use super::devices::{StorageDevice, StorageStatus};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StorageAllocation {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Allocated storage devices
     pub allocated_devices: Vec<String>,
     /// Total allocated size in bytes
@@ -71,7 +71,7 @@ pub struct StoragePool {
     /// Devices in pool
     pub devices: Vec<String>,
     /// Active allocations
-    pub allocations: Vec<AssetId>,
+    pub allocations: Vec<AssetRegistration>,
     /// Pool health status
     pub health_status: PoolHealthStatus,
 }
@@ -127,9 +127,9 @@ pub enum StorageOperation {
 /// Allocate storage from devices
 pub async fn allocate_storage_from_devices(
     storage_req: &StorageRequirements,
-    asset_id: &AssetId,
+    asset_id: &AssetRegistration,
     storage_devices: &Arc<RwLock<HashMap<String, StorageDevice>>>,
-    device_allocations: &Arc<RwLock<HashMap<String, AssetId>>>,
+    device_allocations: &Arc<RwLock<HashMap<String, AssetRegistration>>>,
 ) -> AssetResult<(Vec<String>, u64)> {
     let mut devices = storage_devices.write().await;
     let mut device_allocs = device_allocations.write().await;
@@ -207,7 +207,7 @@ pub async fn allocate_storage_from_devices(
 pub async fn deallocate_storage_from_devices(
     allocation: &StorageAllocation,
     storage_devices: &Arc<RwLock<HashMap<String, StorageDevice>>>,
-    device_allocations: &Arc<RwLock<HashMap<String, AssetId>>>,
+    device_allocations: &Arc<RwLock<HashMap<String, AssetRegistration>>>,
 ) -> AssetResult<()> {
     let mut devices = storage_devices.write().await;
     let mut device_allocs = device_allocations.write().await;

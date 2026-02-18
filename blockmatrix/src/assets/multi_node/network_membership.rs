@@ -16,11 +16,11 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
-use crate::assets::core::{AssetId, AssetResult, AssetError};
-use super::NodeId;
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
+use super::PeerIdentity;
 
-/// Network identifier (maps to TrustChain NetworkId)
-pub type NetworkId = [u8; 16];
+/// Canonical NetworkId from hypermesh-lib (newtype over [u8; 16]).
+pub use hypermesh_lib::NetworkId;
 
 /// Network membership information
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ pub struct NetworkMembership {
     /// Privacy tier for this network
     pub privacy_tier: PrivacyTier,
     /// Assets visible in this network
-    pub visible_assets: HashSet<AssetId>,
+    pub visible_assets: HashSet<AssetRegistration>,
     /// Role in this network
     pub role: NetworkRole,
 }
@@ -123,7 +123,7 @@ pub struct NetworkDiscovery {
     /// Description
     pub description: String,
     /// Entry point nodes
-    pub entry_points: Vec<NodeId>,
+    pub entry_points: Vec<PeerIdentity>,
     /// Requirements for joining
     pub requirements: JoinRequirements,
     /// Privacy tier
@@ -192,7 +192,7 @@ pub enum ApprovalProcess {
 #[allow(dead_code)] // Fields used during network membership management
 pub struct MultiNetworkMembership {
     /// Node ID
-    local_node: NodeId,
+    local_node: PeerIdentity,
     /// Current memberships
     memberships: Arc<RwLock<HashMap<NetworkId, NetworkMembership>>>,
     /// Discovered networks
@@ -219,7 +219,7 @@ pub trait TrustChainClient: Send + Sync {
 
 impl MultiNetworkMembership {
     /// Create new multi-network membership manager
-    pub fn new(local_node: NodeId, trustchain_client: Arc<dyn TrustChainClient>) -> Self {
+    pub fn new(local_node: PeerIdentity, trustchain_client: Arc<dyn TrustChainClient>) -> Self {
         Self {
             local_node,
             memberships: Arc::new(RwLock::new(HashMap::new())),
@@ -291,7 +291,7 @@ impl MultiNetworkMembership {
 
         tracing::info!(
             "Joined network {} with privacy tier {:?}",
-            hex::encode(&network_id),
+            network_id,
             privacy_tier
         );
 
@@ -309,7 +309,7 @@ impl MultiNetworkMembership {
             // Revoke credentials via TrustChain
             self.trustchain_client.revoke_credentials(network_id).await?;
 
-            tracing::info!("Left network {}", hex::encode(&network_id));
+            tracing::info!("Left network {}", network_id);
             Ok(())
         } else {
             Err(AssetError::NetworkError {
@@ -331,7 +331,7 @@ impl MultiNetworkMembership {
     pub async fn add_asset_to_network(
         &self,
         network_id: NetworkId,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
     ) -> AssetResult<()> {
         let mut memberships = self.memberships.write().await;
 
@@ -349,7 +349,7 @@ impl MultiNetworkMembership {
     pub async fn is_asset_visible(
         &self,
         network_id: NetworkId,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> bool {
         let memberships = self.memberships.read().await;
 
@@ -359,7 +359,7 @@ impl MultiNetworkMembership {
     }
 
     /// Get networks where asset is visible
-    pub async fn networks_for_asset(&self, asset_id: &AssetId) -> Vec<NetworkId> {
+    pub async fn networks_for_asset(&self, asset_id: &AssetRegistration) -> Vec<NetworkId> {
         let memberships = self.memberships.read().await;
 
         memberships.iter()
@@ -400,7 +400,7 @@ mod tests {
         async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
             Ok(vec![
                 NetworkDiscovery {
-                    network_id: [1u8; 16],
+                    network_id: NetworkId([1u8; 16]),
                     name: "Bank Customer Portal".to_string(),
                     description: "Public banking services".to_string(),
                     entry_points: vec![],
@@ -421,27 +421,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_network_discovery() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
         let client = Arc::new(MockTrustChainClient);
         let membership = MultiNetworkMembership::new(node_id, client);
 
-        let networks = membership.discover_networks().await.unwrap();
+        let networks = membership.discover_networks().await.expect("test: discover");
         assert_eq!(networks.len(), 1);
         assert_eq!(networks[0].name, "Bank Customer Portal");
     }
 
     #[tokio::test]
     async fn test_join_leave_network() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
@@ -449,22 +449,22 @@ mod tests {
         let membership = MultiNetworkMembership::new(node_id, client);
 
         // Discover networks first
-        let networks = membership.discover_networks().await.unwrap();
+        let networks = membership.discover_networks().await.expect("test: discover");
         let network_id = networks[0].network_id;
 
         // Join network
-        membership.join_network(network_id, PrivacyTier::PUBLIC).await.unwrap();
+        membership.join_network(network_id, PrivacyTier::PUBLIC).await.expect("test: join");
 
         // Leave network
-        membership.leave_network(network_id).await.unwrap();
+        membership.leave_network(network_id).await.expect("test: leave");
     }
 
     #[tokio::test]
     async fn test_asset_visibility() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
@@ -472,14 +472,14 @@ mod tests {
         let membership = MultiNetworkMembership::new(node_id, client);
 
         // Discover and join network
-        let networks = membership.discover_networks().await.unwrap();
+        let networks = membership.discover_networks().await.expect("test: discover");
         let network_id = networks[0].network_id;
-        membership.join_network(network_id, PrivacyTier::PUBLIC).await.unwrap();
+        membership.join_network(network_id, PrivacyTier::PUBLIC).await.expect("test: join");
 
         // Add asset to network
         use crate::assets::core::AssetType;
         let asset_id = test_asset_id(AssetType::Cpu);
-        membership.add_asset_to_network(network_id, asset_id.clone()).await.unwrap();
+        membership.add_asset_to_network(network_id, asset_id.clone()).await.expect("test: add asset");
 
         // Check visibility
         assert!(membership.is_asset_visible(network_id, &asset_id).await);

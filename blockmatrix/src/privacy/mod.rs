@@ -24,7 +24,7 @@ pub use hypermesh_lib::PrivacyMode as PrivacyTier;
 
 pub use flexibility_matrix::{
     PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,
-    ValidationError, PrivacyPresets, AssetId,
+    ValidationError, PrivacyPresets,
 };
 
 pub use switching::{
@@ -248,8 +248,8 @@ mod tests {
 
         let action = PolicyAction {
             action_type: ActionType::ShareResource,
-            actor: Some([1u8; 32]),
-            target: Some([2u8; 32]),
+            actor: Some(NodeId([1u8; 32])),
+            target: Some(NodeId([2u8; 32])),
             provided_validations: validations,
             queries_identity: false,
             queries_location: false,

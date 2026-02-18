@@ -2,12 +2,12 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Test utilities for creating AssetId instances in tests
+//! Test utilities for creating AssetRegistration instances in tests
 
-use crate::assets::core::{AssetId, AssetType, AssetData, NetworkScope, AssetCategory, BaseSystemType, ApplicationDomain};
+use crate::assets::core::{AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, BaseSystemType, ApplicationDomain};
 
-/// Create a test AssetId from an AssetType
-pub fn test_asset_id(asset_type: AssetType) -> AssetId {
+/// Create a test AssetRegistration from an AssetType
+pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
     let data = AssetData {
         config: vec![1, 2, 3],
         definition: vec![4, 5, 6],
@@ -27,19 +27,19 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetId {
         }),
         AssetType::VirtualMachine => AssetCategory::BaseSystem(BaseSystemType::Container),
     };
-    AssetId::from_asset_data(&data, NetworkScope::Global, category)
+    AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }
 
-/// Create a vector of test AssetIds for use in Block::new() tests.
-/// The count parameter determines how many AssetIds to generate.
-pub fn test_asset_ids(count: usize) -> Vec<AssetId> {
+/// Create a vector of test AssetRegistrations for use in Block::new() tests.
+/// The count parameter determines how many AssetRegistrations to generate.
+pub fn test_asset_ids(count: usize) -> Vec<AssetRegistration> {
     (0..count.max(1)).map(|i| {
         test_asset_id_with_content(AssetType::Storage, vec![i as u8])
     }).collect()
 }
 
-/// Create a test AssetId with custom content
-pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> AssetId {
+/// Create a test AssetRegistration with custom content
+pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> AssetRegistration {
     let data = AssetData {
         config: content.clone(),
         definition: content.clone(),
@@ -59,5 +59,5 @@ pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> As
         }),
         AssetType::VirtualMachine => AssetCategory::BaseSystem(BaseSystemType::Container),
     };
-    AssetId::from_asset_data(&data, NetworkScope::Global, category)
+    AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }

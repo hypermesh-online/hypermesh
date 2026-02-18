@@ -12,7 +12,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use super::{AssetId, AssetType, AssetResult, ConsensusProof};
+use super::{AssetRegistration, AssetType, AssetResult, ConsensusProof};
 use super::status::AssetStatus;
 use super::privacy::{PrivacyLevel, AssetAllocation};
 use super::proxy::ProxyAddress;
@@ -32,25 +32,25 @@ pub trait AssetAdapter: Send + Sync {
     async fn allocate_asset(&self, request: &AssetAllocationRequest) -> AssetResult<AssetAllocation>;
     
     /// Deallocate an asset instance
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()>;
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()>;
     
     /// Get current status of an asset
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus>;
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus>;
     
     /// Configure privacy level for asset sharing
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()>;
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()>;
     
     /// Assign remote proxy address (NAT-like system)
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress>;
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress>;
     
     /// Resolve proxy address to local asset reference
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId>;
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration>;
     
     /// Get real-time resource usage
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage>;
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage>;
     
     /// Set resource limits
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()>;
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()>;
     
     /// Health check for adapter functionality
     async fn health_check(&self) -> AssetResult<AdapterHealth>;

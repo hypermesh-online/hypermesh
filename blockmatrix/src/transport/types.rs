@@ -8,12 +8,12 @@ use serde::{Serialize, Deserialize};
 use std::fmt;
 use std::net::Ipv6Addr;
 
-/// BlockMatrix's transport-layer node identifier with network addressing.
+/// BlockMatrix's transport-layer peer identity with network addressing.
 /// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries the full
 /// transport context: human-readable name, 32-byte cryptographic ID, IPv6 address,
 /// and public key for peer verification during STOQ connections.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct NodeId {
+pub struct PeerIdentity {
     /// Human-readable node name
     pub name: String,
     /// Cryptographic node identifier (32-byte from certificate)
@@ -24,7 +24,7 @@ pub struct NodeId {
     pub pub_key: Vec<u8>,
 }
 
-impl NodeId {
+impl PeerIdentity {
     /// Create from name (for testing)
     pub fn from_name(name: impl Into<String>) -> Self {
         let name = name.into();
@@ -52,19 +52,19 @@ impl NodeId {
     }
 }
 
-impl fmt::Display for NodeId {
+impl fmt::Display for PeerIdentity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl From<String> for NodeId {
+impl From<String> for PeerIdentity {
     fn from(name: String) -> Self {
         Self::from_name(name)
     }
 }
 
-impl From<&str> for NodeId {
+impl From<&str> for PeerIdentity {
     fn from(name: &str) -> Self {
         Self::from_name(name)
     }

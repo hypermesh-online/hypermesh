@@ -10,7 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use anyhow::Result;
 use crate::consensus::{ConsensusProof, ConsensusError, ConsensusConfig};
-use crate::transport::NodeId;
+use crate::transport::PeerIdentity;
 
 /// Result type for consensus operations
 pub type ConsensusResult<T> = Result<T, ConsensusError>;
@@ -22,7 +22,7 @@ pub trait AsyncConsensus: Send + Sync {
     async fn create_consensus_proof(
         &self,
         asset_id: &str,
-        node_id: &NodeId,
+        node_id: &PeerIdentity,
         operation_type: &str,
     ) -> ConsensusResult<ConsensusProof>;
 
@@ -77,7 +77,7 @@ impl AsyncConsensus for DefaultConsensus {
     async fn create_consensus_proof(
         &self,
         _asset_id: &str,
-        _node_id: &NodeId,
+        _node_id: &PeerIdentity,
         _operation_type: &str,
     ) -> ConsensusResult<ConsensusProof> {
         // For now, generate a test consensus proof

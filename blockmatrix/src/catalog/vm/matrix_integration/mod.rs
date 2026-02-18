@@ -51,14 +51,14 @@ mod tests {
 
     #[test]
     fn test_cross_entity_validation_creation() {
-        use crate::assets::core::{AssetId, AssetData, NetworkScope, AssetCategory, BaseSystemType};
+        use crate::assets::core::{AssetRegistration, AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
         let data = AssetData {
             config: vec![1, 2, 3],
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Container),

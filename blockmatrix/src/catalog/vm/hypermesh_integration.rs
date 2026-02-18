@@ -15,7 +15,7 @@ use hypermesh_assets::blockchain::{
     ComputeResourceRequirements, ComputeExecutionResult, ActualResourceUsage,
     AssetBlockchainManager,
 };
-use hypermesh_assets::core::asset_id::{AssetId, AssetType};
+use hypermesh_assets::core::asset_id::{AssetRegistration, AssetType};
 use hypermesh_lib::PrivacyMode;
 use crate::consensus::ConsensusProof;
 
@@ -40,7 +40,7 @@ impl HyperMeshBlockchainClient {
         resource_requirements: ComputeResourceRequirements,
         privacy_level: PrivacyMode,
         consensus_proof: ConsensusProof,
-    ) -> Result<AssetId, String> {
+    ) -> Result<AssetRegistration, String> {
         // Create asset ID for compute resource
         let asset_type = if resource_requirements.gpu_required {
             AssetType::Gpu
@@ -48,7 +48,7 @@ impl HyperMeshBlockchainClient {
             AssetType::Cpu
         };
         
-        let asset_id = AssetId::new(asset_type);
+        let asset_id = AssetRegistration::new(asset_type);
 
         // Create asset record for compute allocation request
         let allocation_data = serde_json::to_vec(&resource_requirements)
@@ -74,7 +74,7 @@ impl HyperMeshBlockchainClient {
     /// Store execution results back to HyperMesh blockchain
     pub async fn store_execution_result(
         &self,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         execution_result: ComputeExecutionResult,
         consensus_proof: ConsensusProof,
     ) -> Result<(), String> {
@@ -103,7 +103,7 @@ impl HyperMeshBlockchainClient {
     /// Query asset execution history from blockchain
     pub async fn get_asset_execution_history(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> Result<Vec<ComputeExecutionRecord>, String> {
         let records = self.blockchain_manager
             .get_asset_records(asset_id)
@@ -128,7 +128,7 @@ impl HyperMeshBlockchainClient {
     /// Get current asset status from blockchain
     pub async fn get_asset_status(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> Result<Option<HyperMeshAssetRecord>, String> {
         self.blockchain_manager.get_asset_status(asset_id).await
     }
@@ -136,7 +136,7 @@ impl HyperMeshBlockchainClient {
     /// Validate asset ownership and permissions
     pub async fn validate_asset_access(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         required_privacy_level: PrivacyMode,
         consensus_proof: &ConsensusProof,
     ) -> Result<bool, String> {
@@ -160,7 +160,7 @@ impl HyperMeshBlockchainClient {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VMExecutionContext {
     /// Allocated compute asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Resource allocation details
     pub resource_allocation: ComputeResourceRequirements,
     /// Privacy level for this execution
@@ -185,7 +185,7 @@ pub struct ExecutionMetadata {
 
 impl VMExecutionContext {
     pub fn new(
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         resource_allocation: ComputeResourceRequirements,
         privacy_level: PrivacyMode,
         execution_metadata: ExecutionMetadata,
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_execution_context() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = AssetRegistration::new(AssetType::Cpu);
         let requirements = ComputeResourceRequirements {
             cpu_cores: 4,
             memory_mb: 8192,

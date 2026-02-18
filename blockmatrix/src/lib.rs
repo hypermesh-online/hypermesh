@@ -8,7 +8,7 @@
 //!
 //! Restoring the complete asset management system with:
 //! - Universal asset types (CPU, GPU, Memory, Storage)
-//! - AssetId blockchain registration system
+//! - AssetRegistration blockchain registration system
 //! - AssetAdapter pattern for specialized handling
 //! - Privacy-aware allocation types
 //! - Consensus proof validation (PoSpace + PoStake + PoWork + PoTime)
@@ -21,9 +21,7 @@ use anyhow::Result;
 use std::sync::Arc;
 
 /// Common types
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String) newtype, this uses type alias to String)
-pub type NodeId = String;
+pub use hypermesh_lib::NodeId;
 pub type ServiceId = String;
 
 /// Minimal configuration
@@ -215,7 +213,7 @@ pub mod dns;
 
 // Re-export main asset types for easy access
 pub use assets::core::{
-    AssetManager, AssetId, AssetType, AssetStatus, AssetState,
+    AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
     AssetAllocation, PrivacyLevel, AssetError, AssetResult,
     ConsensusProof, ConsensusRequirements,
 };
@@ -423,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_basic_types() {
-        let _node_id: NodeId = "node1".to_string();
+        let _node_id: NodeId = NodeId::from("node1");
         let _service_id: ServiceId = "service1".to_string();
         let config = HyperMeshConfig::default();
         assert!(!config.enabled);

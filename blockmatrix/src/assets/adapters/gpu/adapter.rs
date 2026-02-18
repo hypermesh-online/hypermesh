@@ -9,7 +9,7 @@ use std::time::SystemTime;
 use async_trait::async_trait;
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, GpuUsage,
@@ -87,7 +87,7 @@ impl AssetAdapter for GpuAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Gpu),
@@ -179,7 +179,7 @@ impl AssetAdapter for GpuAssetAdapter {
         })
     }
 
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         let allocation = {
             let mut allocations = self.allocations.write().await;
             allocations.remove(asset_id)
@@ -232,7 +232,7 @@ impl AssetAdapter for GpuAssetAdapter {
         Ok(())
     }
 
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -265,7 +265,7 @@ impl AssetAdapter for GpuAssetAdapter {
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -278,7 +278,7 @@ impl AssetAdapter for GpuAssetAdapter {
         Ok(())
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let proxy_address = Self::generate_proxy_address(asset_id).await;
 
         let proxy_mappings = self.proxy_mappings.read().await;
@@ -291,7 +291,7 @@ impl AssetAdapter for GpuAssetAdapter {
         Ok(proxy_address)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
         proxy_mappings.get(proxy_addr)
             .cloned()
@@ -300,7 +300,7 @@ impl AssetAdapter for GpuAssetAdapter {
             })
     }
 
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -336,7 +336,7 @@ impl AssetAdapter for GpuAssetAdapter {
         })
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         if let Some(gpu_limit) = limits.gpu_limit {
             tracing::info!(
                 "Set GPU limits for asset {}: max devices {}, max memory {} MB, max utilization {}%",

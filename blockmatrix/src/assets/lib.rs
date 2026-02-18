@@ -137,7 +137,7 @@ pub mod matrix_blockchain;
 // Main exports
 pub use core::{
     AssetManager, AssetError, AssetResult,
-    AssetId, AssetType,
+    AssetRegistration, AssetType,
     AssetStatus, AssetState,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     ConsensusRequirements, AssetStatistics,
@@ -352,7 +352,7 @@ mod integration_tests {
     
     #[test]
     fn test_asset_id_generation() {
-        let asset_id = AssetId::new(AssetType::Cpu);
+        let asset_id = AssetRegistration::new(AssetType::Cpu);
         
         // Test asset ID properties
         assert_eq!(asset_id.asset_type, AssetType::Cpu);

@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime};
 use sha2::{Sha256, Digest};
 use chrono::{DateTime, Utc};
 
-use crate::{AssetId, AssetPackage, AssetMetadata};
+use crate::{AssetRegistration, AssetPackage, AssetMetadata};
 use crate::registry::CatalogRegistry;
 use super::{PeerInfo, ConflictResolution};
 
@@ -68,7 +68,7 @@ pub struct SyncMetadata {
     /// Merkle root of package tree
     pub merkle_root: String,
     /// Package versions
-    pub package_versions: HashMap<AssetId, String>,
+    pub package_versions: HashMap<AssetRegistration, String>,
     /// Conflict count
     pub conflicts_resolved: u32,
     /// Bytes transferred
@@ -82,7 +82,7 @@ pub struct PackageDelta {
     pub additions: Vec<AssetPackage>,
     /// Packages to update
     pub updates: Vec<AssetPackage>,
-    /// Packages to remove (package names, not BlockMatrix AssetIds)
+    /// Packages to remove (package names, not BlockMatrix AssetRegistrations)
     pub deletions: Vec<String>,
     /// Conflicting packages
     pub conflicts: Vec<ConflictInfo>,
@@ -91,7 +91,7 @@ pub struct PackageDelta {
 /// Conflict information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConflictInfo {
-    /// Package ID with conflict (catalog package name, not BlockMatrix AssetId)
+    /// Package ID with conflict (catalog package name, not BlockMatrix AssetRegistration)
     pub asset_id: String,
     /// Local version
     pub local_version: String,
@@ -115,7 +115,7 @@ pub struct MerkleNode {
     /// Right child hash
     pub right: Option<String>,
     /// Package IDs in this node (for leaf nodes)
-    pub packages: Vec<AssetId>,
+    pub packages: Vec<AssetRegistration>,
 }
 
 /// Synchronization manager
@@ -517,15 +517,15 @@ impl SyncManager {
         let mut leaves = Vec::new();
         for (id, package) in packages.iter() {
             let hash = self.hash_package(package);
-            // Parse string ID to AssetId
-            let asset_id = AssetId::from_hex_string(id)
+            // Parse string ID to AssetRegistration
+            let asset_id = AssetRegistration::from_hex_string(id)
                 .unwrap_or_else(|_| {
                     // Fallback: create from package hash
                     let mut hash_bytes = [0u8; 32];
                     if let Ok(bytes) = hex::decode(&package.package_hash) {
                         hash_bytes[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
                     }
-                    AssetId::new_from_hash(&hash_bytes)
+                    AssetRegistration::new_from_hash(&hash_bytes)
                 });
             let node = MerkleNode {
                 hash: hash.clone(),

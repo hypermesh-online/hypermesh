@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use sysinfo::{System, CpuRefreshKind, RefreshKind};
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, CpuUsage,
@@ -35,7 +35,7 @@ use crate::os_integration::create_os_abstraction;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CpuAllocation {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Allocated CPU cores (list of core IDs)
     pub allocated_cores: Vec<u32>,
     /// CPU architecture (x86_64, arm64, etc.)
@@ -82,7 +82,7 @@ pub struct CpuCore {
     /// Current status
     pub status: CoreStatus,
     /// Current allocation asset ID
-    pub allocated_to: Option<AssetId>,
+    pub allocated_to: Option<AssetRegistration>,
     /// Temperature in Celsius
     pub temperature_celsius: Option<f32>,
 }
@@ -132,13 +132,13 @@ pub enum SchedulingAlgorithm {
 #[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct CpuAssetAdapter {
     /// Active CPU allocations by asset ID
-    allocations: Arc<RwLock<HashMap<AssetId, CpuAllocation>>>,
+    allocations: Arc<RwLock<HashMap<AssetRegistration, CpuAllocation>>>,
     /// CPU core information and status
     cpu_cores: Arc<RwLock<HashMap<u32, CpuCore>>>,
     /// Core allocation mapping (core_id -> asset_id)
-    core_allocations: Arc<RwLock<HashMap<u32, AssetId>>>,
+    core_allocations: Arc<RwLock<HashMap<u32, AssetRegistration>>>,
     /// Proxy address mappings
-    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
+    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     /// CPU scheduler
     scheduler: Arc<RwLock<CpuScheduler>>,
     /// Total CPU cores available
@@ -337,7 +337,7 @@ impl CpuAssetAdapter {
     async fn allocate_cpu_cores(
         &self,
         cpu_req: &CpuRequirements,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> AssetResult<Vec<u32>> {
         let mut cores = self.cpu_cores.write().await;
         let mut core_allocations = self.core_allocations.write().await;
@@ -391,7 +391,7 @@ impl CpuAssetAdapter {
     }
     
     /// Generate proxy address for CPU access
-    async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+    async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
@@ -403,7 +403,7 @@ impl CpuAssetAdapter {
     }
     
     /// Update CPU frequency for allocated cores
-    async fn set_cpu_frequency(&self, asset_id: &AssetId, frequency_mhz: u32) -> AssetResult<()> {
+    async fn set_cpu_frequency(&self, asset_id: &AssetRegistration, frequency_mhz: u32) -> AssetResult<()> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -423,7 +423,7 @@ impl CpuAssetAdapter {
     }
     
     /// Get current CPU utilization for an allocation
-    async fn get_cpu_utilization(&self, asset_id: &AssetId) -> AssetResult<f32> {
+    async fn get_cpu_utilization(&self, asset_id: &AssetRegistration) -> AssetResult<f32> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -561,7 +561,7 @@ impl AssetAdapter for CpuAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
@@ -649,7 +649,7 @@ impl AssetAdapter for CpuAssetAdapter {
         })
     }
     
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Get allocation record
         let allocation = {
             let mut allocations = self.allocations.write().await;
@@ -686,7 +686,7 @@ impl AssetAdapter for CpuAssetAdapter {
         Ok(())
     }
     
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -721,7 +721,7 @@ impl AssetAdapter for CpuAssetAdapter {
         })
     }
     
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -734,7 +734,7 @@ impl AssetAdapter for CpuAssetAdapter {
         Ok(())
     }
     
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let proxy_address = Self::generate_proxy_address(asset_id).await;
         
         // Store the proxy mapping
@@ -746,7 +746,7 @@ impl AssetAdapter for CpuAssetAdapter {
         Ok(proxy_address)
     }
     
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
         proxy_mappings.get(proxy_addr)
             .cloned()
@@ -755,7 +755,7 @@ impl AssetAdapter for CpuAssetAdapter {
             })
     }
     
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -789,7 +789,7 @@ impl AssetAdapter for CpuAssetAdapter {
         })
     }
     
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         if let Some(cpu_limit) = limits.cpu_limit {
             // Update CPU frequency if needed
             if let Some(max_freq) = cpu_limit.max_frequency_mhz {

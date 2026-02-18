@@ -579,8 +579,8 @@ mod tests {
         let policy = TierPolicy::private_p2p();
         let action = PolicyAction {
             action_type: ActionType::ShareResource,
-            actor: Some([1u8; 32]),
-            target: Some([2u8; 32]),
+            actor: Some(NodeId([1u8; 32])),
+            target: Some(NodeId([2u8; 32])),
             provided_validations: HashSet::new(),
             queries_identity: false,
             queries_location: false,
@@ -600,8 +600,8 @@ mod tests {
 
         let action = PolicyAction {
             action_type: ActionType::ShareResource,
-            actor: Some([1u8; 32]),
-            target: Some([2u8; 32]),
+            actor: Some(NodeId([1u8; 32])),
+            target: Some(NodeId([2u8; 32])),
             provided_validations: validations,
             queries_identity: false,
             queries_location: false,

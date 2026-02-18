@@ -12,7 +12,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 use super::trust_integration::{TrustChainIntegration, CertificateValidator};
 
 /// Trust level for proxy nodes
@@ -231,7 +231,7 @@ impl ProxySelector {
     /// Select proxy based on trust and proximity
     pub async fn select_proxy(
         &self,
-        target_asset: &AssetId,
+        target_asset: &AssetRegistration,
         required_trust_level: TrustLevel,
     ) -> AssetResult<ProxyNode> {
         // Check cache first
@@ -294,7 +294,7 @@ impl ProxySelector {
     }
 
     /// Discover available proxies for asset
-    async fn discover_proxies(&self, target_asset: &AssetId) -> AssetResult<Vec<ProxyNode>> {
+    async fn discover_proxies(&self, target_asset: &AssetRegistration) -> AssetResult<Vec<ProxyNode>> {
         let nodes = self.proxy_nodes.read().await;
 
         // Filter nodes that can handle this asset type
@@ -312,7 +312,7 @@ impl ProxySelector {
     }
 
     /// Check if node supports asset type
-    fn node_supports_asset(&self, node: &ProxyNode, _asset_id: &AssetId) -> bool {
+    fn node_supports_asset(&self, node: &ProxyNode, _asset_id: &AssetRegistration) -> bool {
         // For now, check if node has at least one forwarding capability
         node.capabilities.iter().any(|cap| matches!(cap,
             ProxyCapability::MemoryForwarding |

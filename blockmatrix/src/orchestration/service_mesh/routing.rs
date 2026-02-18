@@ -638,8 +638,8 @@ mod tests {
         
         // Setup test topology
         let mut nodes = HashMap::new();
-        nodes.insert("node1".to_string(), NetworkNode {
-            id: "node1".to_string(),
+        nodes.insert(NodeId::from("node1"), NetworkNode {
+            id: NodeId::from("node1"),
             location: GeographicLocation {
                 latitude: 37.7749,
                 longitude: -122.4194,
@@ -663,8 +663,8 @@ mod tests {
             },
         });
         
-        nodes.insert("node2".to_string(), NetworkNode {
-            id: "node2".to_string(),
+        nodes.insert(NodeId::from("node2"), NetworkNode {
+            id: NodeId::from("node2"),
             location: GeographicLocation {
                 latitude: 40.7128,
                 longitude: -74.0060,
@@ -689,7 +689,7 @@ mod tests {
         });
         
         let mut edges = HashMap::new();
-        edges.insert(("node1".to_string(), "node2".to_string()), EdgeMetrics {
+        edges.insert((NodeId::from("node1"), NodeId::from("node2")), EdgeMetrics {
             latency_us: 50000, // 50ms cross-country
             bandwidth_mbps: 1000.0,
             packet_loss: 0.001,

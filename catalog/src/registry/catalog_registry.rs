@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use blockmatrix::assets::{AssetId, ConsensusProof, PrivacyLevel};
+use blockmatrix::assets::{AssetRegistration, ConsensusProof, PrivacyLevel};
 use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
 use super::asset_type::AssetTypeDefinition;
@@ -24,10 +24,10 @@ use super::asset_type::AssetTypeDefinition;
 #[derive(Clone)]
 pub struct CatalogRegistry {
     /// Registry ID (this registry is an Asset)
-    registry_id: AssetId,
+    registry_id: AssetRegistration,
 
     /// Index of type names → asset IDs
-    index: Arc<RwLock<HashMap<String, AssetId>>>,
+    index: Arc<RwLock<HashMap<String, AssetRegistration>>>,
 
     /// Privacy level configuration
     privacy: PrivacyLevel,
@@ -100,13 +100,13 @@ impl Default for RegistryConfig {
 impl CatalogRegistry {
     /// Create a new registry
     pub fn new(privacy: PrivacyLevel, trust_policy: TrustPolicy, config: RegistryConfig) -> Self {
-        // Create registry AssetId from registry configuration
+        // Create registry AssetRegistration from registry configuration
         let asset_data = AssetData {
             config: format!("registry_{:?}", privacy).as_bytes().to_vec(),
             definition: b"catalog_registry".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let registry_id = AssetId::from_asset_data(
+        let registry_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Storage),
@@ -122,7 +122,7 @@ impl CatalogRegistry {
     }
 
     /// Register a new asset type definition
-    pub async fn register_type(&self, type_def: AssetTypeDefinition) -> Result<AssetId> {
+    pub async fn register_type(&self, type_def: AssetTypeDefinition) -> Result<AssetRegistration> {
         // Validate consensus proof if required
         if self.trust_policy.require_consensus_proof {
             self.validate_consensus_proof(&type_def.consensus_proof)?;
@@ -155,7 +155,7 @@ impl CatalogRegistry {
     }
 
     /// Find asset type by name
-    pub async fn find_type(&self, name: &str) -> Result<AssetId> {
+    pub async fn find_type(&self, name: &str) -> Result<AssetRegistration> {
         let index = self.index.read().await;
         index
             .get(name)
@@ -200,7 +200,7 @@ impl CatalogRegistry {
     }
 
     /// Resolve dependencies for a type
-    pub async fn resolve_dependencies(&self, _type_name: &str) -> Result<Vec<AssetId>> {
+    pub async fn resolve_dependencies(&self, _type_name: &str) -> Result<Vec<AssetRegistration>> {
         if !self.config.enable_dependency_resolution {
             return Ok(Vec::new());
         }
@@ -240,7 +240,7 @@ impl CatalogRegistry {
     }
 
     /// Get registry ID
-    pub fn registry_id(&self) -> &AssetId {
+    pub fn registry_id(&self) -> &AssetRegistration {
         &self.registry_id
     }
 
@@ -328,7 +328,7 @@ pub struct SearchResult {
     pub type_name: String,
 
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
 
     /// Relevance score (0.0 - 1.0)
     pub score: f64,

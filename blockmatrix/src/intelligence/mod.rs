@@ -112,7 +112,7 @@ use crate::assets::privacy::{
     CaesarRewardCalculator,
 };
 use crate::assets::core::{
-    PrivacyLevel, AssetId, NetworkScope, AssetCategory,
+    PrivacyLevel, AssetRegistration, NetworkScope, AssetCategory,
     BaseSystemType, AssetData,
 };
 
@@ -331,7 +331,7 @@ impl IntelligenceLayer {
 
         // Initialize multi-network coordinator
         let network_config = crate::assets::multi_node::MultiNetworkConfig::default();
-        let local_node_id = crate::transport::NodeId::from_name("intelligence-layer-node");
+        let local_node_id = crate::transport::PeerIdentity::from_name("intelligence-layer-node");
         let trustchain_client: Arc<dyn crate::assets::multi_node::network_membership::TrustChainClient> =
             Arc::new(inline_trustchain_stub::StubTrustChainClient::new());
         let network_coordinator = Arc::new(
@@ -483,7 +483,7 @@ impl IntelligenceLayer {
                 definition: vec![4, 5, 6],
                 metadata: vec![7, 8, 9],
             };
-            let asset_id = AssetId::from_asset_data(
+            let asset_id = AssetRegistration::from_asset_data(
                 &data,
                 NetworkScope::Global,
                 AssetCategory::BaseSystem(BaseSystemType::Storage),

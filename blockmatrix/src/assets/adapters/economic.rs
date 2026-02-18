@@ -11,7 +11,7 @@
 //! - Economic consensus validation
 
 use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetId, AssetStatus, AssetState,
+    AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetRegistration, AssetStatus, AssetState,
     ResourceUsage, ResourceLimits, PrivacyLevel, ProxyAddress,
     AdapterHealth, AdapterCapabilities, AssetType,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
@@ -72,7 +72,7 @@ pub struct EconomicUsage {
 /// Economic asset adapter for Caesar system integration
 pub struct EconomicAssetAdapter {
     /// Active economic assets (wallets, stakes, etc.)
-    assets: Arc<RwLock<HashMap<AssetId, EconomicAssetState>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, EconomicAssetState>>>,
     /// Asset capabilities and limits
     capabilities: AdapterCapabilities,
     /// Consensus validation requirements
@@ -84,7 +84,7 @@ pub struct EconomicAssetAdapter {
 #[allow(dead_code)] // Fields populated during asset lifecycle
 struct EconomicAssetState {
     /// Asset metadata
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     /// Current economic state
     usage: EconomicUsage,
     /// Resource limits
@@ -227,7 +227,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Economic),
@@ -336,7 +336,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         })
     }
 
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         let mut assets = self.assets.write().await;
 
         if let Some(_asset_state) = assets.remove(asset_id) {
@@ -350,7 +350,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let assets = self.assets.read().await;
 
         if let Some(asset_state) = assets.get(asset_id) {
@@ -362,7 +362,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let assets = self.assets.read().await;
 
         if let Some(_asset_state) = assets.get(asset_id) {
@@ -381,7 +381,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetId, _limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, _limits: ResourceLimits) -> AssetResult<()> {
         let assets = self.assets.read().await;
 
         if assets.contains_key(asset_id) {
@@ -396,7 +396,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy_level: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy_level: PrivacyLevel) -> AssetResult<()> {
         let mut assets = self.assets.write().await;
 
         if let Some(asset_state) = assets.get_mut(asset_id) {
@@ -410,7 +410,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let mut assets = self.assets.write().await;
 
         if let Some(asset_state) = assets.get_mut(asset_id) {
@@ -478,7 +478,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         Ok(true)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         // NAT-like proxy addressing for economic assets requires dedicated design (Phase 11).
         // Economic assets need proxy addressing for cross-chain operations.
         Err(AssetError::AdapterError {

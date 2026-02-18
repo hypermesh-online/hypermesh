@@ -280,8 +280,8 @@ impl IfrResourceManager {
         
         // Mock traditional lookup result
         Ok(vec![
-            "node-1".to_string(),
-            "node-2".to_string(),
+            NodeId::from("node-1"),
+            NodeId::from("node-2"),
         ])
     }
     

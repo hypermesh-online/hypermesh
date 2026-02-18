@@ -27,7 +27,7 @@ pub use operations::ConsensusOperation;
 pub use crate::consensus::validation::ConsensusValidator;
 pub use context::VMConsensusContext;
 
-use super::{ConsensusRequirements, AssetId};
+use super::{ConsensusRequirements, ExecutionId};
 
 /// VM-native consensus engine that treats proofs as language constructs
 pub struct ConsensusVM {
@@ -118,7 +118,7 @@ impl ConsensusVM {
     pub async fn create_consensus_operation(
         &mut self,
         operation_type: &str,
-        asset_id: AssetId,
+        asset_id: ExecutionId,
         consensus_proof: ConsensusProof,
     ) -> Result<ConsensusOperation> {
         // Validate proof meets VM requirements
@@ -291,9 +291,9 @@ impl ConsensusExecutionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConsensusVMPrimitive {
     /// Load data with space proof requirement
-    Load { asset_id: AssetId, space_proof: SpaceProof },
+    Load { asset_id: ExecutionId, space_proof: SpaceProof },
     /// Store data with stake proof requirement
-    Store { asset_id: AssetId, data: Vec<u8>, stake_proof: StakeProof },
+    Store { asset_id: ExecutionId, data: Vec<u8>, stake_proof: StakeProof },
     /// Compute with work proof requirement
     Compute { operation: String, input: Vec<u8>, work_proof: WorkProof },
     /// Synchronize with time proof requirement
@@ -301,7 +301,7 @@ pub enum ConsensusVMPrimitive {
     /// Combined operation requiring all four proofs
     FullConsensus { 
         operation: String, 
-        asset_id: AssetId, 
+        asset_id: ExecutionId, 
         data: Vec<u8>, 
         consensus_proof: ConsensusProof 
     },

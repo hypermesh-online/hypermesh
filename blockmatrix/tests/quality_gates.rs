@@ -28,7 +28,7 @@ use blockmatrix::network::{
     },
     isolation::{DefaultIsolationManager, IsolationManager, Packet, PacketId, zero_hash},
 };
-use blockmatrix::assets::core::{AssetId, AssetCategory, BaseSystemType, NetworkScope, AssetData};
+use blockmatrix::assets::core::{AssetRegistration, AssetCategory, BaseSystemType, NetworkScope, AssetData};
 use std::sync::Arc;
 use std::collections::HashMap;
 use anyhow::Result;
@@ -37,14 +37,14 @@ use tokio;
 use tracing::{info, warn};
 
 /// Helper: Create test asset
-fn create_test_asset() -> AssetId {
+fn create_test_asset() -> AssetRegistration {
     let asset_data = AssetData {
         config: vec![1, 2, 3],
         definition: vec![4, 5, 6],
         metadata: vec![7, 8, 9],
     };
 
-    AssetId::from_asset_data(
+    AssetRegistration::from_asset_data(
         &asset_data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Storage),

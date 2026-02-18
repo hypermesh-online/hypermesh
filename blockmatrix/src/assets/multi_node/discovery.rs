@@ -23,14 +23,14 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{AssetResult, AssetError};
-use super::{NodeId, NodeCapabilities};
+use super::{PeerIdentity, NodeCapabilities};
 
 /// Node discovery service
 pub struct NodeDiscovery {
     /// Local node ID
-    local_node: NodeId,
+    local_node: PeerIdentity,
     /// Discovered nodes
-    discovered_nodes: Arc<RwLock<HashMap<NodeId, DiscoveredNode>>>,
+    discovered_nodes: Arc<RwLock<HashMap<PeerIdentity, DiscoveredNode>>>,
     /// Service registry
     service_registry: Arc<RwLock<HashMap<String, Vec<ServiceAnnouncement>>>>,
     /// Discovery protocol
@@ -86,7 +86,7 @@ pub enum DiscoveryProtocol {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DiscoveredNode {
     /// Node ID
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// Network addresses
     pub addresses: Vec<SocketAddrV6>,
     /// Node capabilities
@@ -107,7 +107,7 @@ pub struct ServiceAnnouncement {
     /// Service version
     pub version: String,
     /// Provider node
-    pub provider: NodeId,
+    pub provider: PeerIdentity,
     /// Service endpoint
     pub endpoint: String,
     /// Service metadata
@@ -120,7 +120,7 @@ pub struct ServiceAnnouncement {
 
 impl NodeDiscovery {
     /// Create new node discovery service
-    pub fn new(local_node: NodeId, protocol: DiscoveryProtocol, config: DiscoveryConfig) -> Self {
+    pub fn new(local_node: PeerIdentity, protocol: DiscoveryProtocol, config: DiscoveryConfig) -> Self {
         Self {
             local_node,
             discovered_nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -209,7 +209,7 @@ impl NodeDiscovery {
         let now = SystemTime::now();
         let timeout = self.config.node_timeout;
 
-        let stale_nodes: Vec<NodeId> = nodes.iter()
+        let stale_nodes: Vec<PeerIdentity> = nodes.iter()
             .filter(|(_, node)| {
                 now.duration_since(node.last_seen)
                     .map(|d| d > timeout)

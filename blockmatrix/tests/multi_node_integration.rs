@@ -8,7 +8,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::{
-    AssetManager, AssetId, AssetType, ConsensusProof,
+    AssetManager, AssetRegistration, AssetType, ConsensusProof,
     MultiNodeCoordinator, NodeInfo, NodeCapabilities,
     ConsensusManager, NetworkTopology,
 };
@@ -104,7 +104,7 @@ async fn test_asset_migration() {
     let config = MigrationConfig::default();
     let migrator = AssetMigrator::new(config);
 
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     let source = create_test_node(1);
     let target = create_test_node(2);
 
@@ -355,7 +355,7 @@ async fn test_end_to_end_multi_node_flow() {
     coordinator.join_network().await.unwrap();
 
     // Allocate an asset
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     let decision = coordinator.allocate_asset(asset_id.clone()).await.unwrap();
 
     assert_eq!(decision.asset_id, asset_id);

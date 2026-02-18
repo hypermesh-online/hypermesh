@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use sha2::{Digest, Sha256};
 use libc::{mmap, munmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FAILED};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError, ProxyAddress};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ProxyAddress};
 use super::types::*;
 
 /// The main NAT translator for memory addressing
@@ -63,7 +63,7 @@ impl NATTranslator {
     pub async fn generate_global_address(
         &self,
         node_id: &str,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         service_port: u16,
     ) -> AssetResult<ProxyAddress> {
         let mut node_bytes = [0u8; 8];

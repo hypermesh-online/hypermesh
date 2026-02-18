@@ -7,10 +7,10 @@
 //! Handles shard placement calculations based on Block-MATRIX topology
 
 use crate::assets::core::ProxyAddress;
-use crate::assets::core::AssetId;
+use crate::assets::core::AssetRegistration;
 
 /// Generate proxy address for storage access
-pub async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+pub async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
     let mut node_id = [0u8; 8];
     node_id.copy_from_slice(&asset_id.content_hash[..8]);
     ProxyAddress::new(
@@ -33,7 +33,7 @@ mod tests {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Storage),

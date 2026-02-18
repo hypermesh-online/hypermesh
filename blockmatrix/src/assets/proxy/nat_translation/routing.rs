@@ -8,7 +8,7 @@ use std::net::{Ipv6Addr, SocketAddrV6};
 use std::time::SystemTime;
 use sha2::{Digest, Sha256};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 use super::types::{GlobalAddress, GlobalAddressType};
 
 impl GlobalAddress {
@@ -16,7 +16,7 @@ impl GlobalAddress {
     pub fn new(
         network_prefix: [u8; 8],
         node_id: [u8; 8],
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         service_port: u16,
         address_type: GlobalAddressType,
     ) -> Self {

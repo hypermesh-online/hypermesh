@@ -125,9 +125,7 @@ impl IntegrationManager {
 }
 
 // Common types for integration
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String) newtype, this uses type alias to String)
-pub type NodeId = String;
+pub use hypermesh_lib::NodeId;
 pub type ServiceId = String;
 
 pub use self::lifecycle::{

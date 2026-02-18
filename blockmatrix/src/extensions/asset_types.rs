@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetType, AssetId, AssetAllocation, PrivacyLevel, ConsensusProof};
+use crate::assets::core::{AssetType, AssetRegistration, AssetAllocation, PrivacyLevel, ConsensusProof};
 use super::types::ResourceUsageReport;
 
 /// Asset creation specification
@@ -20,7 +20,7 @@ pub struct AssetCreationSpec {
     pub privacy_level: PrivacyLevel,
     pub allocation: Option<AssetAllocation>,
     pub consensus_requirements: ConsensusRequirements,
-    pub parent_id: Option<AssetId>,
+    pub parent_id: Option<AssetRegistration>,
     pub tags: Vec<String>,
 }
 
@@ -42,7 +42,7 @@ pub struct AssetQuery {
     pub name_pattern: Option<String>,
     pub tags: Option<Vec<String>>,
     pub privacy_level: Option<PrivacyLevel>,
-    pub parent_id: Option<AssetId>,
+    pub parent_id: Option<AssetRegistration>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -50,7 +50,7 @@ pub struct AssetQuery {
 /// Asset metadata returned by extensions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetMetadata {
-    pub id: AssetId,
+    pub id: AssetRegistration,
     pub asset_type: AssetType,
     pub name: String,
     pub description: Option<String>,

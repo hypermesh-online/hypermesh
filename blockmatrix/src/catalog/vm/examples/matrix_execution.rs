@@ -21,7 +21,7 @@ use crate::catalog::vm::{
 };
 use crate::catalog::vm::execution::ExecutionContext;
 use crate::assets::core::{
-    AssetId, NetworkScope, AssetCategory,
+    AssetRegistration, NetworkScope, AssetCategory,
     BaseSystemType, AssetData,
 };
 use crate::assets::matrix_blockchain::{
@@ -64,7 +64,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
         definition: vec![4, 5, 6],
         metadata: vec![7, 8, 9],
     };
-    let vehicle_vin = AssetId::from_asset_data(
+    let vehicle_vin = AssetRegistration::from_asset_data(
         &data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Container),
@@ -240,7 +240,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
         definition: vec![4, 5, 6],
         metadata: vec![7, 8, 9],
     };
-    let patient_record_id = AssetId::from_asset_data(
+    let patient_record_id = AssetRegistration::from_asset_data(
         &data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Container),

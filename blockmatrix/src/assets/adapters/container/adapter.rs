@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits,
@@ -24,10 +24,10 @@ use super::types::*;
 /// Container Asset Adapter implementation
 #[allow(dead_code)]
 pub struct ContainerAssetAdapter {
-    allocations: Arc<RwLock<HashMap<AssetId, ContainerAllocation>>>,
+    allocations: Arc<RwLock<HashMap<AssetRegistration, ContainerAllocation>>>,
     runtime: Arc<ContainerRuntime>,
-    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
-    allocated_ports: Arc<RwLock<HashMap<u16, AssetId>>>,
+    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
+    allocated_ports: Arc<RwLock<HashMap<u16, AssetRegistration>>>,
     image_registry: Arc<RwLock<HashMap<String, ImageInfo>>>,
     usage_stats: Arc<RwLock<ContainerUsageStats>>,
 }
@@ -54,12 +54,12 @@ impl ContainerAssetAdapter {
         }
     }
 
-    async fn generate_container_name(&self, asset_id: &AssetId) -> String {
+    async fn generate_container_name(&self, asset_id: &AssetRegistration) -> String {
         format!("hypermesh-{}", &hex::encode(&asset_id.content_hash[..4]))
     }
 
     async fn create_container(
-        &self, container_req: &ContainerRequirements, asset_id: &AssetId,
+        &self, container_req: &ContainerRequirements, asset_id: &AssetRegistration,
     ) -> AssetResult<String> {
         let container_id = format!("container_{}", hex::encode(&asset_id.content_hash[..8]));
         tracing::info!(
@@ -70,7 +70,7 @@ impl ContainerAssetAdapter {
     }
 
     async fn allocate_ports(
-        &self, port_mappings: &[PortMapping], asset_id: &AssetId,
+        &self, port_mappings: &[PortMapping], asset_id: &AssetRegistration,
     ) -> AssetResult<Vec<ContainerPortMapping>> {
         let mut allocated_ports = self.allocated_ports.write().await;
         let mut container_ports = Vec::new();
@@ -116,7 +116,7 @@ impl ContainerAssetAdapter {
         }).collect()
     }
 
-    async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+    async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
@@ -185,7 +185,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         let data = AssetData {
             config: vec![1, 2, 3], definition: vec![4, 5, 6], metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data, NetworkScope::Global, AssetCategory::BaseSystem(BaseSystemType::Container),
         );
 
@@ -289,7 +289,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         })
     }
 
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         let allocation = {
             self.allocations.write().await.remove(asset_id)
                 .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?
@@ -314,7 +314,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         Ok(())
     }
 
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?;
@@ -351,7 +351,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?;
@@ -364,7 +364,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         Ok(())
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let proxy_address = Self::generate_proxy_address(asset_id).await;
         let proxy_mappings = self.proxy_mappings.read().await;
         for (proxy_addr, mapped_asset_id) in proxy_mappings.iter() {
@@ -373,13 +373,13 @@ impl AssetAdapter for ContainerAssetAdapter {
         Ok(proxy_address)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
         proxy_mappings.get(proxy_addr).cloned()
             .ok_or_else(|| AssetError::ProxyResolutionFailed { address: proxy_addr.clone() })
     }
 
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?;
@@ -414,7 +414,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         })
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         tracing::info!("Set resource limits for container asset {}: {:?}", asset_id, limits);
         Ok(())
     }

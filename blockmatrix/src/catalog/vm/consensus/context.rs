@@ -16,7 +16,7 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 use super::{ConsensusOperation, ConsensusExecutionResult};
-use crate::catalog::vm::AssetId;
+use crate::catalog::vm::ExecutionId;
 
 /// VM consensus context managing state across operations
 #[derive(Debug)]
@@ -28,7 +28,7 @@ pub struct VMConsensusContext {
     /// Execution history for temporal consistency
     execution_history: Arc<RwLock<VecDeque<ContextHistoryEntry>>>,
     /// Asset operation tracking
-    asset_operations: Arc<RwLock<HashMap<AssetId, Vec<String>>>>,
+    asset_operations: Arc<RwLock<HashMap<ExecutionId, Vec<String>>>>,
     /// Temporal state for time proof validation
     temporal_state: Arc<RwLock<TemporalState>>,
     /// Consensus metrics
@@ -42,7 +42,7 @@ pub struct VMConsensusContext {
 pub struct ContextHistoryEntry {
     pub operation_id: String,
     pub operation_type: String,
-    pub asset_id: AssetId,
+    pub asset_id: ExecutionId,
     pub execution_result: ConsensusExecutionResult,
     pub timestamp: SystemTime,
 }
@@ -283,7 +283,7 @@ impl VMConsensusContext {
     }
     
     /// Get operations for specific asset
-    pub fn get_asset_operations(&self, asset_id: AssetId) -> Vec<String> {
+    pub fn get_asset_operations(&self, asset_id: ExecutionId) -> Vec<String> {
         let asset_ops = self.asset_operations.read().unwrap();
         asset_ops.get(&asset_id).cloned().unwrap_or_default()
     }

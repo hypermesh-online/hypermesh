@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::{AssetId, AssetResult, AssetError};
+use super::{AssetRegistration, AssetResult, AssetError};
 pub use crate::assets::proxy::ProxyNetworkConfig;
 
 /// Remote proxy address for NAT-like addressing
@@ -199,10 +199,10 @@ pub enum ProxyAddressError {
 
 /// Proxy address resolver with NAT-like functionality
 pub struct ProxyAddressResolver {
-    /// Forward mapping: ProxyAddress -> AssetId
-    forward_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
-    /// Reverse mapping: AssetId -> ProxyAddress
-    reverse_mappings: Arc<RwLock<HashMap<AssetId, ProxyAddress>>>,
+    /// Forward mapping: ProxyAddress -> AssetRegistration
+    forward_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
+    /// Reverse mapping: AssetRegistration -> ProxyAddress
+    reverse_mappings: Arc<RwLock<HashMap<AssetRegistration, ProxyAddress>>>,
     /// Proxy node registry
     proxy_nodes: Arc<RwLock<HashMap<[u8; 8], ProxyNodeInfo>>>,
     /// Network configuration
@@ -259,7 +259,7 @@ impl ProxyAddressResolver {
     }
     
     /// Register proxy address mapping
-    pub async fn register_mapping(&self, proxy_addr: ProxyAddress, asset_id: AssetId) {
+    pub async fn register_mapping(&self, proxy_addr: ProxyAddress, asset_id: AssetRegistration) {
         let mut forward = self.forward_mappings.write().await;
         let mut reverse = self.reverse_mappings.write().await;
         
@@ -268,19 +268,19 @@ impl ProxyAddressResolver {
     }
     
     /// Resolve proxy address to asset ID
-    pub async fn resolve(&self, proxy_addr: &ProxyAddress) -> Option<AssetId> {
+    pub async fn resolve(&self, proxy_addr: &ProxyAddress) -> Option<AssetRegistration> {
         let forward = self.forward_mappings.read().await;
         forward.get(proxy_addr).cloned()
     }
     
     /// Get proxy address for asset ID
-    pub async fn get_proxy_address(&self, asset_id: &AssetId) -> Option<ProxyAddress> {
+    pub async fn get_proxy_address(&self, asset_id: &AssetRegistration) -> Option<ProxyAddress> {
         let reverse = self.reverse_mappings.read().await;
         reverse.get(asset_id).cloned()
     }
     
     /// Allocate new proxy address for asset
-    pub async fn allocate_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    pub async fn allocate_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         // Select best proxy node based on trust score
         let proxy_node = self.select_best_proxy_node().await?;
         
@@ -415,7 +415,7 @@ pub struct ProxyStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::AssetId;
+    use super::AssetRegistration;
     use crate::AssetType;
     use crate::test_utils::test_asset_id;
     

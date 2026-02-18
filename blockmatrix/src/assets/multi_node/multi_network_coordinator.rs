@@ -12,15 +12,15 @@
 //! - Matrix-based asset routing
 //! - Cross-network validation without bridging traffic
 //!
-//! Example: Car purchase validation across Bank→Dealer→Insurance→DMV
+//! Example: Car purchase validation across Bank->Dealer->Insurance->DMV
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use crate::assets::core::{AssetId, AssetResult, AssetError, ConsensusProof};
-use super::NodeId;
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ConsensusProof};
+use super::PeerIdentity;
 
 // Import network membership from our implementation
 pub use super::network_membership::{
@@ -32,7 +32,7 @@ pub use super::network_membership::{
 /// Multi-network coordinator - PRIMARY component for Sprint 2.3
 pub struct MultiNetworkCoordinator {
     /// Local node ID
-    local_node: NodeId,
+    local_node: PeerIdentity,
     /// Network membership manager (integrates with TrustChain)
     membership: Arc<MultiNetworkMembership>,
     /// STOQ isolation manager (protocol-level isolation)
@@ -123,11 +123,11 @@ pub struct NetworkAssetRouter {
     /// Network ID
     network_id: NetworkId,
     /// Assets visible in this network
-    visible_assets: HashSet<AssetId>,
+    visible_assets: HashSet<AssetRegistration>,
     /// Matrix positions for assets
-    asset_positions: HashMap<AssetId, IntegerMatrixPosition>,
+    asset_positions: HashMap<AssetRegistration, IntegerMatrixPosition>,
     /// Routing table
-    routing_table: HashMap<AssetId, Vec<IntegerMatrixPosition>>,
+    routing_table: HashMap<AssetRegistration, Vec<IntegerMatrixPosition>>,
 }
 
 /// Integer matrix position for asset routing within multi-network coordinator.
@@ -154,30 +154,30 @@ impl NetworkAssetRouter {
     }
 
     /// Add asset to network
-    pub fn add_asset(&mut self, asset_id: AssetId, position: IntegerMatrixPosition) {
+    pub fn add_asset(&mut self, asset_id: AssetRegistration, position: IntegerMatrixPosition) {
         self.visible_assets.insert(asset_id.clone());
         self.asset_positions.insert(asset_id, position);
     }
 
     /// Remove asset from network
-    pub fn remove_asset(&mut self, asset_id: &AssetId) {
+    pub fn remove_asset(&mut self, asset_id: &AssetRegistration) {
         self.visible_assets.remove(asset_id);
         self.asset_positions.remove(asset_id);
         self.routing_table.remove(asset_id);
     }
 
     /// Check if asset is visible
-    pub fn is_visible(&self, asset_id: &AssetId) -> bool {
+    pub fn is_visible(&self, asset_id: &AssetRegistration) -> bool {
         self.visible_assets.contains(asset_id)
     }
 
     /// Get matrix position for asset
-    pub fn get_position(&self, asset_id: &AssetId) -> Option<&IntegerMatrixPosition> {
+    pub fn get_position(&self, asset_id: &AssetRegistration) -> Option<&IntegerMatrixPosition> {
         self.asset_positions.get(asset_id)
     }
 
     /// Calculate route to asset (tensor-based pathfinding)
-    pub fn calculate_route(&self, from: &IntegerMatrixPosition, to_asset: &AssetId) -> Option<Vec<IntegerMatrixPosition>> {
+    pub fn calculate_route(&self, from: &IntegerMatrixPosition, to_asset: &AssetRegistration) -> Option<Vec<IntegerMatrixPosition>> {
         let to_position = self.asset_positions.get(to_asset)?;
 
         // Simple linear path (production would use A* with matrix operations)
@@ -199,14 +199,14 @@ impl NetworkAssetRouter {
 /// Cross-network validator - validates assets across networks using blockchain proofs
 pub struct CrossNetworkValidator {
     /// Validation cache
-    validation_cache: Arc<RwLock<HashMap<(NetworkId, AssetId), ValidationResult>>>,
+    validation_cache: Arc<RwLock<HashMap<(NetworkId, AssetRegistration), ValidationResult>>>,
 }
 
 /// Validation result
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidationResult {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Networks where validated
     pub validated_networks: Vec<NetworkId>,
     /// Consensus proof
@@ -227,7 +227,7 @@ impl CrossNetworkValidator {
     /// Validate asset across networks using blockchain proof
     pub async fn validate_cross_network(
         &self,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         source_network: NetworkId,
         target_network: NetworkId,
         proof: ConsensusProof,
@@ -269,7 +269,7 @@ impl CrossNetworkValidator {
     pub async fn get_validation(
         &self,
         network_id: NetworkId,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> Option<ValidationResult> {
         let cache = self.validation_cache.read().await;
         cache.get(&(network_id, asset_id.clone())).cloned()
@@ -283,7 +283,7 @@ pub struct EngagementMonitor {
 }
 
 /// Engagement metrics for a network
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkEngagementMetrics {
     /// Network ID
     pub network_id: NetworkId,
@@ -297,6 +297,19 @@ pub struct NetworkEngagementMetrics {
     pub active_time_seconds: u64,
     /// Last activity
     pub last_activity: Option<SystemTime>,
+}
+
+impl Default for NetworkEngagementMetrics {
+    fn default() -> Self {
+        Self {
+            network_id: NetworkId([0u8; 16]),
+            assets_used: 0,
+            transactions: 0,
+            data_transferred: 0,
+            active_time_seconds: 0,
+            last_activity: None,
+        }
+    }
 }
 
 impl EngagementMonitor {
@@ -377,7 +390,7 @@ impl Default for MultiNetworkConfig {
 impl MultiNetworkCoordinator {
     /// Create new multi-network coordinator
     pub fn new(
-        local_node: NodeId,
+        local_node: PeerIdentity,
         trustchain_client: Arc<dyn TrustChainClient>,
         config: MultiNetworkConfig,
     ) -> Self {
@@ -430,7 +443,7 @@ impl MultiNetworkCoordinator {
         tracing::info!(
             "Node {} joined network {} with privacy tier {:?}",
             hex::encode(&self.local_node.id[..8]),
-            hex::encode(&network_id),
+            network_id,
             privacy_tier
         );
 
@@ -452,7 +465,7 @@ impl MultiNetworkCoordinator {
         tracing::info!(
             "Node {} left network {}",
             hex::encode(&self.local_node.id[..8]),
-            hex::encode(&network_id)
+            network_id
         );
 
         Ok(())
@@ -462,7 +475,7 @@ impl MultiNetworkCoordinator {
     pub async fn add_asset_to_network(
         &self,
         network_id: NetworkId,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         matrix_position: IntegerMatrixPosition,
     ) -> AssetResult<()> {
         // Add to membership visibility
@@ -480,7 +493,7 @@ impl MultiNetworkCoordinator {
     /// Validate asset across networks
     pub async fn validate_asset_cross_network(
         &self,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         source_network: NetworkId,
         target_network: NetworkId,
         proof: ConsensusProof,
@@ -586,7 +599,7 @@ mod tests {
         async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
             Ok(vec![
                 NetworkDiscovery {
-                    network_id: [1u8; 16],
+                    network_id: NetworkId([1u8; 16]),
                     name: "Bank".to_string(),
                     description: "Bank network".to_string(),
                     entry_points: vec![],
@@ -602,7 +615,7 @@ mod tests {
                     is_public: true,
                 },
                 NetworkDiscovery {
-                    network_id: [2u8; 16],
+                    network_id: NetworkId([2u8; 16]),
                     name: "Dealer".to_string(),
                     description: "Dealer network".to_string(),
                     entry_points: vec![],
@@ -623,10 +636,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_join_multiple_networks() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
@@ -638,16 +651,16 @@ mod tests {
         );
 
         // Discover networks
-        coordinator.membership.discover_networks().await.unwrap();
+        coordinator.membership.discover_networks().await.expect("test: discover");
 
         // Join bank network
-        let bank_network = [1u8; 16];
-        coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
+        let bank_network = NetworkId([1u8; 16]);
+        coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("test: join bank");
 
         // Join dealer network
-        let dealer_network = [2u8; 16];
-        coordinator.membership.discover_networks().await.unwrap();
-        coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
+        let dealer_network = NetworkId([2u8; 16]);
+        coordinator.membership.discover_networks().await.expect("test: discover");
+        coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("test: join dealer");
 
         // Verify both active
         let active = coordinator.active_networks().await;
@@ -656,10 +669,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_asset_cross_network_validation() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
@@ -671,8 +684,8 @@ mod tests {
         );
 
         let asset_id = test_asset_id(AssetType::Storage);
-        let bank_network = [1u8; 16];
-        let dealer_network = [2u8; 16];
+        let bank_network = NetworkId([1u8; 16]);
+        let dealer_network = NetworkId([2u8; 16]);
 
         use crate::consensus::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
         use std::time::SystemTime;
@@ -715,17 +728,17 @@ mod tests {
             bank_network,
             dealer_network,
             proof,
-        ).await.unwrap();
+        ).await.expect("test: validate");
 
         assert!(valid);
     }
 
     #[tokio::test]
     async fn test_isolation_verification() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [0u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid ipv6"),
             pub_key: vec![],
         };
 
@@ -736,12 +749,12 @@ mod tests {
             MultiNetworkConfig::default(),
         );
 
-        coordinator.membership.discover_networks().await.unwrap();
-        let network1 = [1u8; 16];
-        coordinator.join_network(network1, PrivacyTier::PUBLIC).await.unwrap();
+        coordinator.membership.discover_networks().await.expect("test: discover");
+        let network1 = NetworkId([1u8; 16]);
+        coordinator.join_network(network1, PrivacyTier::PUBLIC).await.expect("test: join");
 
         // Get isolation report
-        let report = coordinator.verify_isolation().await.unwrap();
+        let report = coordinator.verify_isolation().await.expect("test: verify isolation");
         assert!(report.total_networks >= 1);
         assert_eq!(report.total_violations, 0); // No violations yet
     }

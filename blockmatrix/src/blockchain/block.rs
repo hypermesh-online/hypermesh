@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::assets::core::AssetId;
+use crate::assets::core::AssetRegistration;
 use crate::matrix::coordinate::MatrixCoordinate;
 use rand;
 
@@ -29,7 +29,7 @@ pub struct Block {
     pub timestamp: DateTime<Utc>,
 
     /// Assets contained in this block (Blocks MUST contain Assets)
-    pub assets: Vec<AssetId>,
+    pub assets: Vec<AssetRegistration>,
 
     /// Hash of the previous block in THIS node's chain
     pub previous_hash: String,
@@ -51,7 +51,7 @@ impl Block {
     /// Create a new block
     pub fn new(
         index: u64,
-        assets: Vec<AssetId>,
+        assets: Vec<AssetRegistration>,
         previous_hash: String,
         node_coordinate: MatrixCoordinate,
     ) -> Self {
@@ -83,8 +83,8 @@ impl Block {
 
     /// Create the genesis block for a node
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
-        // Create a genesis AssetId for this node
-        let genesis_asset = AssetId::genesis(node_coordinate.clone());
+        // Create a genesis AssetRegistration for this node
+        let genesis_asset = AssetRegistration::genesis(node_coordinate.clone());
 
         Block::new(
             0,
@@ -148,7 +148,7 @@ impl Block {
     pub fn size(&self) -> usize {
         8 + // index
         8 + // timestamp (approximate)
-        (self.assets.len() * 32) + // AssetId size estimate
+        (self.assets.len() * 32) + // AssetRegistration size estimate
         64 + // previous_hash (hex string)
         64 + // hash (hex string)
         12 + // node_coordinate (3 * i32)
@@ -157,7 +157,7 @@ impl Block {
     }
 
     /// Get the assets in this block
-    pub fn get_assets(&self) -> &[AssetId] {
+    pub fn get_assets(&self) -> &[AssetRegistration] {
         &self.assets
     }
 
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_genesis_block_creation() {
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
         let genesis = Block::genesis(coord.clone());
 
         assert_eq!(genesis.index, 0);
@@ -207,8 +207,8 @@ mod tests {
 
     #[test]
     fn test_block_creation() {
-        let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let asset = AssetId::genesis(coord.clone());
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coord");
+        let asset = AssetRegistration::genesis(coord.clone());
         let prev_hash = "abc123".to_string();
 
         let block = Block::new(1, vec![asset.clone()], prev_hash.clone(), coord.clone());
@@ -224,8 +224,8 @@ mod tests {
 
     #[test]
     fn test_hash_verification() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let asset = AssetId::genesis(coord.clone());
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let asset = AssetRegistration::genesis(coord.clone());
         let mut block = Block::new(
             1,
             vec![asset.clone()],
@@ -236,7 +236,7 @@ mod tests {
         assert!(block.verify_hash());
 
         // Tamper with assets
-        let tampered_asset = AssetId::genesis(MatrixCoordinate::new(1, 1, 1).unwrap());
+        let tampered_asset = AssetRegistration::genesis(MatrixCoordinate::new(1, 1, 1).expect("test: valid coord"));
         block.assets = vec![tampered_asset];
         assert!(!block.verify_hash());
 
@@ -247,8 +247,8 @@ mod tests {
 
     #[test]
     fn test_block_belongs_to_node() {
-        let coord1 = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let coord2 = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let coord1 = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
+        let coord2 = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
 
         let block = Block::genesis(coord1.clone());
 
@@ -258,10 +258,10 @@ mod tests {
 
     #[test]
     fn test_block_size() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
         // Create multiple assets to test size calculation
-        let assets: Vec<AssetId> = (0..10)
-            .map(|i| AssetId::genesis(MatrixCoordinate::new(i, i, i).unwrap()))
+        let assets: Vec<AssetRegistration> = (0..10)
+            .map(|i| AssetRegistration::genesis(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
             .collect();
 
         let block = Block::new(
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn test_block_display() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
         let block = Block::genesis(coord);
 
         let display = format!("{}", block);
@@ -288,8 +288,8 @@ mod tests {
 
     #[test]
     fn test_deterministic_hash() {
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let asset = AssetId::genesis(coord.clone());
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
+        let asset = AssetRegistration::genesis(coord.clone());
 
         // Create two blocks with same asset but let nonce be random
         let block1 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord.clone());
@@ -309,21 +309,21 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let coord = MatrixCoordinate::new(7, 8, 9).unwrap();
+        let coord = MatrixCoordinate::new(7, 8, 9).expect("test: valid coord");
         let block = Block::genesis(coord);
 
         // Serialize to JSON
-        let json = serde_json::to_string(&block).unwrap();
+        let json = serde_json::to_string(&block).expect("test: valid coord");
         assert!(json.contains("\"index\":0"));
 
         // Deserialize back
-        let decoded: Block = serde_json::from_str(&json).unwrap();
+        let decoded: Block = serde_json::from_str(&json).expect("test: valid coord");
         assert_eq!(block, decoded);
     }
 
     #[test]
     fn test_genesis_block_properties() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
         let genesis = Block::genesis(coord.clone());
 
         // Genesis block should have specific properties
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_block_must_have_assets() {
-        let coord = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
         let result = std::panic::catch_unwind(|| {
             Block::new(1, vec![], "prev".to_string(), coord)
         });
@@ -350,9 +350,9 @@ mod tests {
 
     #[test]
     fn test_asset_helpers() {
-        let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
-        let assets: Vec<AssetId> = (0..5)
-            .map(|i| AssetId::genesis(MatrixCoordinate::new(i, i, i).unwrap()))
+        let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
+        let assets: Vec<AssetRegistration> = (0..5)
+            .map(|i| AssetRegistration::genesis(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
             .collect();
 
         let block = Block::new(1, assets.clone(), "prev".to_string(), coord);

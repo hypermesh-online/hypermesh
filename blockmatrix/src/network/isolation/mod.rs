@@ -22,7 +22,8 @@ use chrono::{DateTime, Utc};
 use tracing::debug;
 
 // Import network types from parent module
-use super::trust::{NetworkId, NetworkType};
+use super::trust::NetworkType;
+pub use hypermesh_lib::NetworkId;
 
 pub mod default;
 #[cfg(test)]

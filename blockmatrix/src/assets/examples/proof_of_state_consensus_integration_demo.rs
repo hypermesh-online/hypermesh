@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 use hypermesh_assets::core::{
-    AssetManager, AssetAllocationRequest, AssetId, AssetType,
+    AssetManager, AssetAllocationRequest, AssetRegistration, AssetType,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     WorkloadType, WorkState, PrivacyLevel,
     ResourceRequirements, CpuRequirements, MemoryRequirements,
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Create asset allocation request with consensus proof
     println!("\n4. Creating asset allocation request with consensus proof...");
-    let asset_id = AssetId::new(AssetType::Cpu, "alice-cpu-001".to_string());
+    let asset_id = AssetRegistration::new(AssetType::Cpu, "alice-cpu-001".to_string());
     
     let allocation_request = AssetAllocationRequest {
         asset_id: asset_id.clone(),

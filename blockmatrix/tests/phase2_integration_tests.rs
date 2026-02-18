@@ -36,7 +36,7 @@ fn network_id(name: &str) -> NetworkId {
     let bytes = name.as_bytes();
     let len = bytes.len().min(16);
     id[..len].copy_from_slice(&bytes[..len]);
-    id
+    NetworkId(id)
 }
 
 /// Helper to create test asset

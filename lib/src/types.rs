@@ -43,6 +43,49 @@ impl From<&str> for AssetId {
     fn from(s: &str) -> Self { AssetId(s.to_string()) }
 }
 
+/// Unique network identifier (128-bit, compatible with UUID bytes)
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NetworkId(pub [u8; 16]);
+
+impl fmt::Display for NetworkId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in &self.0 {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+/// Content hash (256-bit SHA256 digest) used across blockchain operations
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ContentHash(pub [u8; 32]);
+
+impl ContentHash {
+    /// Create from raw bytes
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        ContentHash(bytes)
+    }
+
+    /// Get raw bytes
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Create zeroed hash (for defaults/tests)
+    pub fn zeroed() -> Self {
+        ContentHash([0u8; 32])
+    }
+}
+
+impl fmt::Display for ContentHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in &self.0[..8] {
+            write!(f, "{:02x}", byte)?;
+        }
+        write!(f, "...")
+    }
+}
+
 /// Whether participation is bounded (known group) or unbounded (open to all)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccessScope {

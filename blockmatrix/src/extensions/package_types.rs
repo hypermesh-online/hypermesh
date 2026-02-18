@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use semver::Version;
 
-use crate::assets::core::{AssetType, AssetId, ConsensusProof, ProxyAddress};
+use crate::assets::core::{AssetType, AssetRegistration, ConsensusProof, ProxyAddress};
 
 /// Asset package information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ pub struct InstallOptions {
 pub struct InstallResult {
     pub package_id: String,
     pub install_path: PathBuf,
-    pub installed_assets: Vec<AssetId>,
+    pub installed_assets: Vec<AssetRegistration>,
     pub install_time: Duration,
 }
 

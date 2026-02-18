@@ -23,18 +23,18 @@ use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
 
 use crate::assets::core::{
-    AssetId, AssetResult, AssetError,
+    AssetRegistration, AssetResult, AssetError,
     AssetState, ConsensusProof,
 };
 
-use super::NodeId;
+use super::PeerIdentity;
 
 /// Consensus manager for multi-node coordination
 pub struct ConsensusManager {
     /// Local node ID
-    local_node: NodeId,
+    local_node: PeerIdentity,
     /// Known nodes participating in consensus
-    consensus_nodes: Arc<RwLock<HashMap<NodeId, ConsensusNodeInfo>>>,
+    consensus_nodes: Arc<RwLock<HashMap<PeerIdentity, ConsensusNodeInfo>>>,
     /// Active voting rounds
     voting_rounds: Arc<RwLock<HashMap<String, VotingRound>>>,
     /// Consensus history
@@ -84,7 +84,7 @@ impl Default for ConsensusConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConsensusNodeInfo {
     /// Node ID
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// Node's voting weight
     pub voting_weight: f32,
     /// Node's reputation score
@@ -109,7 +109,7 @@ pub struct VotingRound {
     /// Current round number
     pub round_number: u32,
     /// Votes collected
-    pub votes: HashMap<NodeId, Vote>,
+    pub votes: HashMap<PeerIdentity, Vote>,
     /// Round started timestamp
     pub started_at: SystemTime,
     /// Round deadline
@@ -117,7 +117,7 @@ pub struct VotingRound {
     /// Round status
     pub status: RoundStatus,
     /// Leader for this round
-    pub leader: Option<NodeId>,
+    pub leader: Option<PeerIdentity>,
 }
 
 /// Consensus proposal
@@ -128,7 +128,7 @@ pub struct ConsensusProposal {
     /// Proposal type
     pub proposal_type: ProposalType,
     /// Proposer node
-    pub proposer: NodeId,
+    pub proposer: PeerIdentity,
     /// Proposal data
     pub data: ProposalData,
     /// Proposal timestamp
@@ -159,21 +159,21 @@ pub enum ProposalType {
 pub enum ProposalData {
     /// Asset allocation data
     Allocation {
-        asset_id: AssetId,
-        target_node: NodeId,
+        asset_id: AssetRegistration,
+        target_node: PeerIdentity,
         resource_requirements: Vec<u8>, // Serialized requirements
     },
     /// State update data
     StateUpdate {
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         new_state: AssetState,
         version: u64,
     },
     /// Migration data
     Migration {
-        asset_id: AssetId,
-        from_node: NodeId,
-        to_node: NodeId,
+        asset_id: AssetRegistration,
+        from_node: PeerIdentity,
+        to_node: PeerIdentity,
     },
     /// Configuration change data
     Configuration {
@@ -182,7 +182,7 @@ pub enum ProposalData {
     },
     /// Leader election data
     LeaderElection {
-        candidate: NodeId,
+        candidate: PeerIdentity,
         term: u64,
     },
 }
@@ -191,7 +191,7 @@ pub enum ProposalData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Vote {
     /// Voting node
-    pub voter: NodeId,
+    pub voter: PeerIdentity,
     /// Vote value
     pub value: VoteValue,
     /// Vote timestamp
@@ -238,7 +238,7 @@ pub struct ConsensusDecision {
     /// Decision outcome
     pub outcome: DecisionOutcome,
     /// Participating nodes
-    pub participants: Vec<NodeId>,
+    pub participants: Vec<PeerIdentity>,
     /// Decision timestamp
     pub timestamp: SystemTime,
     /// Decision proof
@@ -277,7 +277,7 @@ pub struct ConsensusMetrics {
 
 impl ConsensusManager {
     /// Create new consensus manager
-    pub fn new(local_node: NodeId, config: ConsensusConfig) -> Self {
+    pub fn new(local_node: PeerIdentity, config: ConsensusConfig) -> Self {
         Self {
             local_node,
             consensus_nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -483,7 +483,7 @@ impl ConsensusManager {
     }
 
     /// Elect new leader
-    pub async fn elect_leader(&self) -> AssetResult<NodeId> {
+    pub async fn elect_leader(&self) -> AssetResult<PeerIdentity> {
         let mut nodes = self.consensus_nodes.write().await;
 
         // Simple leader election: highest reputation * successful participations
@@ -510,7 +510,7 @@ impl ConsensusManager {
     }
 
     /// Get current leader
-    async fn get_current_leader(&self) -> Option<NodeId> {
+    async fn get_current_leader(&self) -> Option<PeerIdentity> {
         let nodes = self.consensus_nodes.read().await;
         nodes.iter()
             .find(|(_, info)| info.is_leader)
@@ -518,7 +518,7 @@ impl ConsensusManager {
     }
 
     /// Verify signature (placeholder)
-    async fn verify_signature(&self, signature: &[u8], node: &NodeId) -> bool {
+    async fn verify_signature(&self, signature: &[u8], node: &PeerIdentity) -> bool {
         // In production, this would verify using the node's public key
         !signature.is_empty() && !node.pub_key.is_empty()
     }
@@ -565,7 +565,7 @@ impl ConsensusManager {
     }
 
     /// Handle Byzantine behavior
-    pub async fn handle_byzantine_node(&self, node_id: &NodeId, evidence: Vec<u8>) -> AssetResult<()> {
+    pub async fn handle_byzantine_node(&self, node_id: &PeerIdentity, evidence: Vec<u8>) -> AssetResult<()> {
         let mut nodes = self.consensus_nodes.write().await;
 
         if let Some(info) = nodes.get_mut(node_id) {
@@ -597,8 +597,8 @@ impl ConsensusManager {
 mod tests {
     use super::*;
 
-    fn create_test_node() -> NodeId {
-        NodeId {
+    fn create_test_node() -> PeerIdentity {
+        PeerIdentity {
             name: "test-node".to_string(),
             id: [1u8; 32],
             address: "::1".parse().unwrap(),

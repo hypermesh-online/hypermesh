@@ -463,7 +463,7 @@ impl IntegrationValidator {
         }
 
         // Step 4: Network registration
-        let test_network: NetworkId = [0u8; 16];
+        let test_network: NetworkId = NetworkId([0u8; 16]);
         if let Err(e) = network.register_asset(
             test_network,
             processed.asset_id.clone(),

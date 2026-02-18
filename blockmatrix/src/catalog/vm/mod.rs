@@ -111,10 +111,9 @@ pub use matrix_integration::{
     CrossEntityValidation, EntityAssetRequest, MultiEntityWorkflow
 };
 
-/// Asset identifier for VM operations
-// TODO: Migrate to hypermesh_lib::AssetId once field compatibility is resolved
-// (lib uses AssetId(pub String), this uses type alias to Uuid)
-pub type AssetId = Uuid;
+/// Execution/operation identifier for VM operations
+/// (Not an asset identifier - this tracks VM execution sessions)
+pub type ExecutionId = Uuid;
 
 /// VM configuration with consensus requirements
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -606,7 +605,7 @@ mod tests {
     #[tokio::test]
     async fn test_matrix_integration_types() {
         use crate::assets::matrix_blockchain::{MatrixBlockchainManager, EntityType};
-        use crate::assets::core::{AssetType, asset_id::AssetId as RealAssetId};
+        use crate::assets::core::{AssetType, asset_id::AssetRegistration as RealAssetId};
         use crate::test_utils::test_asset_id;
 
         // Test CrossEntityValidation creation
@@ -662,7 +661,7 @@ mod tests {
         use crate::catalog::vm::execution::ExecutionContext;
         use crate::consensus::ConsensusProof;
         use uuid::Uuid;
-        use crate::assets::core::{AssetType, asset_id::AssetId as RealAssetId};
+        use crate::assets::core::{AssetType, asset_id::AssetRegistration as RealAssetId};
         
         // Create base execution context
         let base_context = ExecutionContext {

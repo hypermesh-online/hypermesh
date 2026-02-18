@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
-use crate::assets::core::asset_id::AssetId;
+use crate::assets::core::asset_id::AssetRegistration;
 use hypermesh_lib::PrivacyMode;
 pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType};
 use crate::consensus::ConsensusProof;
@@ -207,7 +207,7 @@ pub struct PrivacyPolicyConfig {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ValidationRequest {
     /// Asset identifier to validate
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Fields being requested for validation
     pub requested_fields: Vec<String>,
     /// Type of validation needed
@@ -444,7 +444,7 @@ impl EntityBlockchain {
     }
 
     /// Get public asset information that can be shared
-    pub fn get_public_asset_info(&self, asset_id: &AssetId) -> Option<HashMap<String, String>> {
+    pub fn get_public_asset_info(&self, asset_id: &AssetRegistration) -> Option<HashMap<String, String>> {
         for block in &self.chain {
             if let EntityBlockData::AssetRecord(record) = &block.data {
                 if record.asset_id == *asset_id {
@@ -541,7 +541,7 @@ impl MatrixBlockchainManager {
     /// Perform multi-entity validation (e.g., car buying scenario)
     pub async fn multi_entity_validation(
         &self,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         validation_chain: Vec<String>, // e.g., ["honda.hypermesh.online", "dealer.hypermesh.online", "bank.hypermesh.online"]
     ) -> Result<HashMap<String, PublicValidationResponse>, String> {
         let mut results = HashMap::new();

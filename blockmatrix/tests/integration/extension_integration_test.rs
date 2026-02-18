@@ -17,7 +17,7 @@ use blockmatrix::{
         AssetQuery, AssetMetadata, AssetOperation, OperationResult,
         manager::UnifiedExtensionManager,
     },
-    assets::core::{AssetManager, AssetId, PrivacyLevel, ConsensusProof},
+    assets::core::{AssetManager, AssetRegistration, PrivacyLevel, ConsensusProof},
 };
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
@@ -28,7 +28,7 @@ use semver::Version;
 /// Mock Catalog extension for testing
 struct MockCatalogExtension {
     initialized: bool,
-    assets: Arc<RwLock<HashMap<AssetId, AssetMetadata>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>,
 }
 
 impl MockCatalogExtension {
@@ -153,11 +153,11 @@ impl HyperMeshExtension for MockCatalogExtension {
 
 /// Mock asset handler for testing
 struct MockAssetHandler {
-    assets: Arc<RwLock<HashMap<AssetId, AssetMetadata>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>,
 }
 
 impl MockAssetHandler {
-    fn new(assets: Arc<RwLock<HashMap<AssetId, AssetMetadata>>>) -> Self {
+    fn new(assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>) -> Self {
         Self { assets }
     }
 }
@@ -168,8 +168,8 @@ impl AssetExtensionHandler for MockAssetHandler {
         AssetType::Library
     }
 
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        let id = AssetId::new();
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
+        let id = AssetRegistration::new();
         let metadata = AssetMetadata {
             id: id.clone(),
             asset_type: AssetType::Library,
@@ -194,7 +194,7 @@ impl AssetExtensionHandler for MockAssetHandler {
         Ok(id)
     }
 
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
         let mut assets = self.assets.write().await;
         if let Some(asset) = assets.get_mut(id) {
             if let Some(name) = update.name {
@@ -212,12 +212,12 @@ impl AssetExtensionHandler for MockAssetHandler {
         }
     }
 
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()> {
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         self.assets.write().await.remove(id);
         Ok(())
     }
 
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>> {
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>> {
         let assets = self.assets.read().await;
         let mut results = vec![];
 
@@ -244,7 +244,7 @@ impl AssetExtensionHandler for MockAssetHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         self.assets
             .read()
             .await
@@ -255,11 +255,11 @@ impl AssetExtensionHandler for MockAssetHandler {
             })
     }
 
-    async fn validate_asset(&self, _id: &AssetId, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, _id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
         Ok(true)
     }
 
-    async fn handle_operation(&self, _id: &AssetId, _operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(&self, _id: &AssetRegistration, _operation: AssetOperation) -> ExtensionResult<OperationResult> {
         Ok(OperationResult::Custom(serde_json::json!({
             "status": "success"
         })))

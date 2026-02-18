@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, StorageUsage,
@@ -41,15 +41,15 @@ use super::distribution::generate_proxy_address;
 #[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct StorageAssetAdapter {
     /// Active storage allocations by asset ID
-    allocations: Arc<RwLock<HashMap<AssetId, StorageAllocation>>>,
+    allocations: Arc<RwLock<HashMap<AssetRegistration, StorageAllocation>>>,
     /// Storage device information and status
     storage_devices: Arc<RwLock<HashMap<String, StorageDevice>>>,
     /// Device allocation mapping (device_id -> asset_id)
-    device_allocations: Arc<RwLock<HashMap<String, AssetId>>>,
+    device_allocations: Arc<RwLock<HashMap<String, AssetRegistration>>>,
     /// Storage pools for distributed management
     storage_pools: Arc<RwLock<HashMap<String, StoragePool>>>,
     /// Proxy address mappings
-    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
+    proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     /// Total storage capacity in bytes
     total_capacity: u64,
     /// Available storage capacity in bytes
@@ -157,7 +157,7 @@ impl AssetAdapter for StorageAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Storage),
@@ -264,7 +264,7 @@ impl AssetAdapter for StorageAssetAdapter {
         })
     }
 
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Get allocation record
         let allocation = {
             let mut allocations = self.allocations.write().await;
@@ -301,7 +301,7 @@ impl AssetAdapter for StorageAssetAdapter {
         Ok(())
     }
 
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -335,7 +335,7 @@ impl AssetAdapter for StorageAssetAdapter {
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -354,7 +354,7 @@ impl AssetAdapter for StorageAssetAdapter {
         Ok(())
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let proxy_address = generate_proxy_address(asset_id).await;
 
         // Find existing proxy address
@@ -368,7 +368,7 @@ impl AssetAdapter for StorageAssetAdapter {
         Ok(proxy_address)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
         proxy_mappings.get(proxy_addr)
             .cloned()
@@ -377,7 +377,7 @@ impl AssetAdapter for StorageAssetAdapter {
             })
     }
 
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -406,7 +406,7 @@ impl AssetAdapter for StorageAssetAdapter {
         })
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         if let Some(storage_limit) = limits.storage_limit {
             tracing::info!(
                 "Set storage limits for asset {}: max {} bytes, max {} IOPS, max {} MB/s",

@@ -21,13 +21,13 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetId, AssetResult};
-use super::NodeId;
+use crate::assets::core::{AssetRegistration, AssetResult};
+use super::PeerIdentity;
 
 /// Asset migrator for moving assets between nodes
 pub struct AssetMigrator {
     /// Active migration plans
-    active_migrations: Arc<RwLock<HashMap<AssetId, MigrationPlan>>>,
+    active_migrations: Arc<RwLock<HashMap<AssetRegistration, MigrationPlan>>>,
     /// Migration history
     migration_history: Arc<RwLock<Vec<MigrationStatus>>>,
     /// Configuration
@@ -65,11 +65,11 @@ impl Default for MigrationConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MigrationPlan {
     /// Asset being migrated
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Source node
-    pub source_node: NodeId,
+    pub source_node: PeerIdentity,
     /// Target node
-    pub target_node: NodeId,
+    pub target_node: PeerIdentity,
     /// Migration strategy
     pub strategy: MigrationStrategy,
     /// Estimated duration
@@ -149,9 +149,9 @@ impl AssetMigrator {
     /// Plan asset migration
     pub async fn plan_migration(
         &self,
-        asset_id: AssetId,
-        source: NodeId,
-        target: NodeId,
+        asset_id: AssetRegistration,
+        source: PeerIdentity,
+        target: PeerIdentity,
         priority: MigrationPriority,
     ) -> AssetResult<MigrationPlan> {
         let plan = MigrationPlan {
@@ -207,13 +207,13 @@ impl AssetMigrator {
     }
 
     /// Cancel migration
-    pub async fn cancel_migration(&self, asset_id: &AssetId) -> AssetResult<()> {
+    pub async fn cancel_migration(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         self.active_migrations.write().await.remove(asset_id);
         Ok(())
     }
 
     /// Get migration status
-    pub async fn get_status(&self, asset_id: &AssetId) -> Option<MigrationStatus> {
+    pub async fn get_status(&self, asset_id: &AssetRegistration) -> Option<MigrationStatus> {
         let history = self.migration_history.read().await;
         history.iter()
             .find(|s| s.plan.asset_id == *asset_id)

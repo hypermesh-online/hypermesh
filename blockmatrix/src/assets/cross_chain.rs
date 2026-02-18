@@ -14,7 +14,7 @@ use std::time::{SystemTime, Duration};
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
 
-use crate::assets::core::asset_id::AssetId;
+use crate::assets::core::asset_id::AssetRegistration;
 use super::matrix_blockchain::{
     MatrixBlockchainManager, EntityType, ValidationResult, ZKStatement, ProofRequirement
 };
@@ -26,7 +26,7 @@ pub struct CrossNetworkValidator {
     /// Source network performing validation
     pub source_network: String,
     /// Asset being validated across chains
-    pub asset_identifier: AssetId,
+    pub asset_identifier: AssetRegistration,
     /// Fields required for validation (without exposing values)
     pub required_fields: Vec<String>,
     /// Privacy-preserving validation rules
@@ -440,7 +440,7 @@ impl CrossChainValidationManager {
     pub async fn validate_business_workflow(
         &mut self,
         workflow_type: BusinessWorkflowType,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         participating_entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         match workflow_type {
@@ -465,7 +465,7 @@ impl CrossChainValidationManager {
     /// Vehicle purchase workflow validation (Honda→Dealer→Bank→Insurance→DMV)
     async fn validate_vehicle_purchase_workflow(
         &mut self,
-        vehicle_asset_id: AssetId,
+        vehicle_asset_id: AssetRegistration,
         _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         // Create validation chain for vehicle purchase
@@ -557,7 +557,7 @@ impl CrossChainValidationManager {
     /// Asset financing workflow validation
     async fn validate_asset_financing_workflow(
         &mut self,
-        _asset_id: AssetId,
+        _asset_id: AssetRegistration,
         _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         Err(CrossChainValidationError::NetworkValidationFailed {
@@ -569,7 +569,7 @@ impl CrossChainValidationManager {
     /// Insurance claim workflow validation
     async fn validate_insurance_claim_workflow(
         &mut self,
-        _asset_id: AssetId,
+        _asset_id: AssetRegistration,
         _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         Err(CrossChainValidationError::NetworkValidationFailed {
@@ -581,7 +581,7 @@ impl CrossChainValidationManager {
     /// Supply chain workflow validation
     async fn validate_supply_chain_workflow(
         &mut self,
-        _asset_id: AssetId,
+        _asset_id: AssetRegistration,
         _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         Err(CrossChainValidationError::NetworkValidationFailed {
@@ -594,7 +594,7 @@ impl CrossChainValidationManager {
     async fn validate_custom_workflow(
         &mut self,
         workflow_name: String,
-        _asset_id: AssetId,
+        _asset_id: AssetRegistration,
         _entities: Vec<String>,
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         Err(CrossChainValidationError::NetworkValidationFailed {
@@ -754,7 +754,7 @@ pub enum CrossChainValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::asset_id::{AssetId, AssetType};
+    use crate::assets::core::asset_id::{AssetRegistration, AssetType};
     use crate::test_utils::test_asset_id;
 
     #[test]

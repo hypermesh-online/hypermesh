@@ -9,13 +9,13 @@ use hypermesh_lib::{AccessScope, PrivacyMode};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// NodeId represents a unique identifier for a node in the network
-// TODO: Migrate to hypermesh_lib::NodeId once field compatibility is resolved
-// (lib uses NodeId(pub String), this uses type alias to [u8; 32])
-pub type NodeId = [u8; 32];
+/// NodeId in the privacy/tiers module is a 32-byte content hash used for
+/// peer identification and public-tier node identity. Re-exported from lib.
+pub use hypermesh_lib::ContentHash as NodeId;
 
-/// NetworkId represents a unique identifier for a federated network
-pub type NetworkId = [u8; 16];
+/// NetworkId represents a unique identifier for a federated network.
+/// Re-exported from lib (128-bit, compatible with UUID bytes).
+pub use hypermesh_lib::NetworkId;
 
 /// Trust level for federated networks
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -427,8 +427,8 @@ mod tests {
     #[test]
     fn test_private_p2p_tier_peer_management() {
         let mut tier = PrivateP2PTier::new(5);
-        let peer1 = [1u8; 32];
-        let peer2 = [2u8; 32];
+        let peer1 = NodeId([1u8; 32]);
+        let peer2 = NodeId([2u8; 32]);
 
         assert!(tier.add_peer(peer1).is_ok());
         assert!(tier.is_trusted(&peer1));
@@ -441,15 +441,15 @@ mod tests {
     #[test]
     fn test_private_p2p_tier_max_peers() {
         let mut tier = PrivateP2PTier::new(2);
-        assert!(tier.add_peer([1u8; 32]).is_ok());
-        assert!(tier.add_peer([2u8; 32]).is_ok());
-        assert!(tier.add_peer([3u8; 32]).is_err());
+        assert!(tier.add_peer(NodeId([1u8; 32])).is_ok());
+        assert!(tier.add_peer(NodeId([2u8; 32])).is_ok());
+        assert!(tier.add_peer(NodeId([3u8; 32])).is_err());
     }
 
     #[test]
     fn test_federated_tier_partner_management() {
         let mut tier = FederatedTier::new(10);
-        let network1 = [1u8; 16];
+        let network1 = NetworkId([1u8; 16]);
 
         assert!(tier.add_partner(network1, TrustLevel::Partner).is_ok());
         assert!(tier.meets_trust_requirement(&network1));
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn test_public_tier_reputation() {
-        let mut tier = PublicTier::new([0u8; 32]);
+        let mut tier = PublicTier::new(NodeId([0u8; 32]));
         assert_eq!(tier.reputation, 0.5);
 
         tier.update_reputation(true);
@@ -480,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_public_tier_caesar_bonus() {
-        let mut tier = PublicTier::new([0u8; 32]);
+        let mut tier = PublicTier::new(NodeId([0u8; 32]));
         tier.reputation = 1.0;
         assert_eq!(tier.caesar_bonus(), 1.5);
 

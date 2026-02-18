@@ -24,7 +24,7 @@ use super::trust::{
     FederatedNetworkHandler, PublicNetworkHandler,
 };
 use super::isolation::{IsolationManager, DefaultIsolationManager};
-use crate::assets::core::AssetId;
+use crate::assets::core::AssetRegistration;
 
 /// Configuration for joining a network
 #[derive(Debug, Clone)]
@@ -101,7 +101,7 @@ impl NetworkConfig {
 /// Asset visibility control
 pub struct AssetVisibilityControl {
     /// Asset ID -> Allowed network IDs
-    visibility_map: HashMap<AssetId, Vec<NetworkId>>,
+    visibility_map: HashMap<AssetRegistration, Vec<NetworkId>>,
 
     /// Default visibility policy for new assets
     default_policy: VisibilityPolicy,
@@ -115,25 +115,25 @@ impl AssetVisibilityControl {
         }
     }
 
-    pub fn set_visibility(&mut self, asset_id: AssetId, networks: Vec<NetworkId>) {
+    pub fn set_visibility(&mut self, asset_id: AssetRegistration, networks: Vec<NetworkId>) {
         self.visibility_map.insert(asset_id, networks);
     }
 
-    pub fn is_visible_to(&self, asset_id: &AssetId, network_id: &NetworkId) -> bool {
+    pub fn is_visible_to(&self, asset_id: &AssetRegistration, network_id: &NetworkId) -> bool {
         self.visibility_map
             .get(asset_id)
             .map(|networks| networks.contains(network_id))
             .unwrap_or(false)
     }
 
-    pub fn get_visible_networks(&self, asset_id: &AssetId) -> Vec<NetworkId> {
+    pub fn get_visible_networks(&self, asset_id: &AssetRegistration) -> Vec<NetworkId> {
         self.visibility_map
             .get(asset_id)
             .cloned()
             .unwrap_or_default()
     }
 
-    pub fn remove_visibility(&mut self, asset_id: &AssetId) {
+    pub fn remove_visibility(&mut self, asset_id: &AssetRegistration) {
         self.visibility_map.remove(asset_id);
     }
 
@@ -297,7 +297,7 @@ impl MultiNetworkCoordinator {
     /// Set asset visibility for specific networks
     pub async fn set_asset_visibility(
         &self,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         networks: Vec<NetworkId>,
     ) -> Result<()> {
         // Verify all networks are connected
@@ -316,7 +316,7 @@ impl MultiNetworkCoordinator {
     pub async fn handle_asset_request(
         &self,
         network_id: NetworkId,
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
     ) -> Result<AssetResponse> {
         // Check if asset is visible to this network
         let visibility = self.asset_visibility.read().await;
@@ -411,14 +411,14 @@ mod tests {
     };
     use std::time::SystemTime;
 
-    fn create_test_asset_id() -> AssetId {
+    fn create_test_asset_id() -> AssetRegistration {
         let asset_data = AssetData {
             config: vec![1, 2, 3],
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
 
-        AssetId::from_asset_data(
+        AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Storage),

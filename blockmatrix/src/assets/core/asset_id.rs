@@ -31,7 +31,7 @@ pub enum NetworkScope {
     /// Federated network group
     Federated(FederationId),
     /// Private node registry
-    Private(NodeId),
+    Private(NodeFingerprint),
 }
 
 /// Registry identifier (content hash of registry configuration)
@@ -42,12 +42,12 @@ pub struct RegistryId(pub [u8; 32]);
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FederationId(pub [u8; 32]);
 
-/// BlockMatrix's domain-specific node identifier (32-byte blockchain ID).
+/// BlockMatrix's domain-specific node fingerprint (32-byte blockchain ID).
 /// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries a
 /// cryptographic 32-byte identifier suitable for blockchain operations,
 /// consensus proof binding, and content-addressed lookups.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct NodeId(pub [u8; 32]);
+pub struct NodeFingerprint(pub [u8; 32]);
 
 /// Asset category for security boundary enforcement
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -179,11 +179,11 @@ impl fmt::Display for AssetType {
     }
 }
 
-/// BlockMatrix's domain-specific asset identifier. Unlike hypermesh_lib::AssetId
+/// BlockMatrix's domain-specific asset registration record. Unlike hypermesh_lib::AssetId
 /// (simple String wrapper), this is content-addressed with a cryptographic hash,
 /// network scope, asset category, and creation timestamp for blockchain registration.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AssetId {
+pub struct AssetRegistration {
     /// Content-based hash (derived from asset data, not UUID)
     pub content_hash: [u8; 32],
 
@@ -197,7 +197,7 @@ pub struct AssetId {
     pub creation_timestamp: SystemTime,
 }
 
-impl AssetId {
+impl AssetRegistration {
     /// Create new asset ID from asset data (content-based)
     pub fn from_asset_data(
         data: &AssetData,
@@ -426,7 +426,7 @@ impl AssetId {
                     })?;
                 let mut id = [0u8; 32];
                 id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
-                NetworkScope::Private(NodeId(id))
+                NetworkScope::Private(NodeFingerprint(id))
             }
             _ => NetworkScope::Global, // Default to global
         };
@@ -497,7 +497,7 @@ impl AssetId {
     }
 }
 
-impl fmt::Display for AssetId {
+impl fmt::Display for AssetRegistration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_hex_string())
     }
@@ -565,13 +565,13 @@ mod tests {
             metadata: vec![7, 8, 9],
         };
 
-        let id1 = AssetId::from_asset_data(
+        let id1 = AssetRegistration::from_asset_data(
             &data1,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
         );
 
-        let id2 = AssetId::from_asset_data(
+        let id2 = AssetRegistration::from_asset_data(
             &data2,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
@@ -589,13 +589,13 @@ mod tests {
             metadata: vec![7, 8, 9],
         };
 
-        let global_id = AssetId::from_asset_data(
+        let global_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
         );
 
-        let registry_id = AssetId::from_asset_data(
+        let registry_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Registry(RegistryId([1u8; 32])),
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
@@ -623,14 +623,14 @@ mod tests {
         };
 
         // Base system assets can exist in global or registry scope
-        let system_global = AssetId::from_asset_data(
+        let system_global = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
         );
         assert!(system_global.validate_security_boundary().is_ok());
 
-        let system_registry = AssetId::from_asset_data(
+        let system_registry = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Registry(RegistryId([1u8; 32])),
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
@@ -638,17 +638,17 @@ mod tests {
         assert!(system_registry.validate_security_boundary().is_ok());
 
         // Base system assets cannot exist in private scope
-        let system_private = AssetId::from_asset_data(
+        let system_private = AssetRegistration::from_asset_data(
             &data,
-            NetworkScope::Private(NodeId([1u8; 32])),
+            NetworkScope::Private(NodeFingerprint([1u8; 32])),
             AssetCategory::BaseSystem(BaseSystemType::Cpu),
         );
         assert!(system_private.validate_security_boundary().is_err());
 
         // Application assets can exist in any scope
-        let app_private = AssetId::from_asset_data(
+        let app_private = AssetRegistration::from_asset_data(
             &data,
-            NetworkScope::Private(NodeId([1u8; 32])),
+            NetworkScope::Private(NodeFingerprint([1u8; 32])),
             AssetCategory::Application(ApplicationDomain {
                 domain_name: "test".to_string(),
                 domain_hash: [0u8; 32],
@@ -665,7 +665,7 @@ mod tests {
             metadata: vec![7, 8, 9],
         };
 
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Memory),
@@ -690,7 +690,7 @@ mod tests {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Container),

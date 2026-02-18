@@ -4,7 +4,7 @@
 
 //! Type definitions for container asset adapter.
 
-use crate::assets::core::{AssetId, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, PrivacyLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -12,7 +12,7 @@ use std::time::SystemTime;
 /// Container allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContainerAllocation {
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     pub container_id: String,
     pub image: String,
     pub container_name: String,

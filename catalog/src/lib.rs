@@ -41,7 +41,7 @@ use std::sync::Arc;
 
 // Re-export key types from HyperMesh
 pub use blockmatrix::consensus::proof_of_state_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
-pub use blockmatrix::assets::core::{AssetId, AssetType};
+pub use blockmatrix::assets::core::{AssetRegistration, AssetType};
 
 // Define ExecutionResult locally (Catalog-specific)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -245,7 +245,7 @@ impl Catalog {
     /// Execute asset on HyperMesh infrastructure
     pub async fn execute_asset_on_hypermesh(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         package: &AssetPackage,
     ) -> Result<hypermesh_integration::CatalogExecutionContext> {
         let hypermesh_client = self.hypermesh_client.lock().await;

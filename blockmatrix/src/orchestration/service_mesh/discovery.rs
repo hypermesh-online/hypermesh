@@ -681,7 +681,7 @@ impl CpeServiceDiscovery {
     fn extract_node_id(&self, endpoint: &ServiceEndpoint) -> Option<NodeId> {
         // In a real implementation, this would extract the actual node ID
         // For now, use the IP address as a simple node identifier
-        Some(endpoint.address.ip().to_string())
+        Some(NodeId::from(endpoint.address.ip().to_string().as_str()))
     }
     
     // Cache management methods

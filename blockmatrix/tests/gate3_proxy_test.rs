@@ -14,14 +14,14 @@
 //! - ProxyRouter (trust-based routing)
 
 use blockmatrix::assets::proxy::*;
-use blockmatrix::assets::core::{AssetId, AssetType, PrivacyLevel};
+use blockmatrix::assets::core::{AssetRegistration, AssetType, PrivacyLevel};
 
 #[tokio::test]
 async fn test_gate3_global_addressing() {
     println!("\n=== Gate 3: Global Addressing Test ===");
 
     // Test IPv6-like global address creation
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     let global_addr = GlobalAddress::new(
         [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad], // HyperMesh prefix
         [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88], // Node ID
@@ -50,7 +50,7 @@ async fn test_gate3_nat_translation() {
 
     // Create NAT translator
     let translator = NATTranslator::new().await.unwrap();
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
 
     // Create global address
     let global_addr = GlobalAddress::new(
@@ -112,7 +112,7 @@ async fn test_gate3_memory_permissions() {
     println!("\n=== Gate 3: Memory Permissions Test ===");
 
     let translator = NATTranslator::new().await.unwrap();
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
 
     // Test read-only permissions
     let ro_addr = GlobalAddress::new(
@@ -243,7 +243,7 @@ async fn test_gate3_address_allocation() {
     println!("\n=== Gate 3: Address Allocation Test ===");
 
     let translator = NATTranslator::new().await.unwrap();
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
 
     // Allocate multiple addresses
     let mut addresses = Vec::new();

@@ -14,7 +14,7 @@ use super::super::{
     PrivacyAllocationResult, ResourceAllocationConfig, ConsensusRequirementConfig,
     ProxyConfiguration, allocation_types::PrivacyAllocationType,
 };
-use crate::assets::core::{AssetId, AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError, PrivacyLevel};
 use crate::consensus::proof::ConsensusProof;
 use crate::assets::proxy::RemoteProxyManager;
 
@@ -66,7 +66,7 @@ impl PrivacyManager {
     pub async fn allocate_privacy_controlled_access(
         &self,
         user_id: &str,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         requested_privacy_level: Option<PrivacyLevel>,
         consensus_proof: Option<ConsensusProof>,
     ) -> AssetResult<PrivacyAllocationResult> {
@@ -258,7 +258,7 @@ impl PrivacyManager {
         &self,
         user_config: &UserPrivacyConfiguration,
         _privacy_level: &PrivacyLevel,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
     ) -> AssetResult<ResourceAllocationConfig> {
         let asset_type = asset_id.asset_type()
             .map(|at| format!("{:?}", at).to_lowercase())
@@ -308,7 +308,7 @@ impl PrivacyManager {
         &self,
         _proxy_preferences: &ProxyPreferences,
         _privacy_level: &PrivacyLevel,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
     ) -> AssetResult<ProxyConfiguration> {
         Ok(ProxyConfiguration::default())
     }

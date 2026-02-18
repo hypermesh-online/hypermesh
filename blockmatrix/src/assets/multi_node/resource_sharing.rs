@@ -22,7 +22,7 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
 use crate::assets::core::{AssetType, AssetResult, AssetError, PrivacyLevel};
-use super::{NodeId, ResourceAmount, ServiceLevelAgreement};
+use super::{PeerIdentity, ResourceAmount, ServiceLevelAgreement};
 
 /// Resource sharing manager
 pub struct ResourceSharing {
@@ -104,9 +104,9 @@ pub struct SharingAgreement {
     /// Agreement ID
     pub agreement_id: String,
     /// Provider node
-    pub provider: NodeId,
+    pub provider: PeerIdentity,
     /// Consumer node
-    pub consumer: NodeId,
+    pub consumer: PeerIdentity,
     /// Resource type
     pub resource_type: AssetType,
     /// Resource amount
@@ -141,7 +141,7 @@ pub struct ResourceOffer {
     /// Offer ID
     pub offer_id: String,
     /// Provider node
-    pub provider: NodeId,
+    pub provider: PeerIdentity,
     /// Resource type
     pub resource_type: AssetType,
     /// Available amount
@@ -166,7 +166,7 @@ pub struct ResourceRequest {
     /// Request ID
     pub request_id: String,
     /// Consumer node
-    pub consumer: NodeId,
+    pub consumer: PeerIdentity,
     /// Resource type
     pub resource_type: AssetType,
     /// Requested amount

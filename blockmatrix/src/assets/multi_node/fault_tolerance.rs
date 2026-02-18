@@ -21,15 +21,15 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetId, AssetResult};
-use super::NodeId;
+use crate::assets::core::{AssetRegistration, AssetResult};
+use super::PeerIdentity;
 
 /// Byzantine behavior detector
 pub struct ByzantineDetector {
     /// Suspicious behavior tracking
-    suspicious_nodes: Arc<RwLock<HashMap<NodeId, SuspiciousBehavior>>>,
+    suspicious_nodes: Arc<RwLock<HashMap<PeerIdentity, SuspiciousBehavior>>>,
     /// Confirmed Byzantine nodes
-    byzantine_nodes: Arc<RwLock<HashSet<NodeId>>>,
+    byzantine_nodes: Arc<RwLock<HashSet<PeerIdentity>>>,
     /// Detection configuration
     config: ByzantineConfig,
 }
@@ -62,7 +62,7 @@ impl Default for ByzantineConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SuspiciousBehavior {
     /// Node ID
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// Suspicious events
     pub events: Vec<SuspiciousEvent>,
     /// Suspicion score
@@ -77,7 +77,7 @@ pub struct SuspiciousBehavior {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SuspiciousEvent {
     /// Inconsistent state reports
-    InconsistentState { asset_id: AssetId, discrepancy: String },
+    InconsistentState { asset_id: AssetRegistration, discrepancy: String },
     /// Invalid consensus votes
     InvalidVote { round_id: String, reason: String },
     /// Excessive failures
@@ -160,7 +160,7 @@ pub struct RecoveryAction {
     /// Strategy applied
     pub strategy: String,
     /// Affected nodes
-    pub affected_nodes: Vec<NodeId>,
+    pub affected_nodes: Vec<PeerIdentity>,
     /// Started timestamp
     pub started_at: SystemTime,
     /// Completed timestamp
@@ -174,9 +174,9 @@ pub struct RecoveryAction {
 /// Node health monitor
 pub struct NodeHealthMonitor {
     /// Health states
-    health_states: Arc<RwLock<HashMap<NodeId, HealthState>>>,
+    health_states: Arc<RwLock<HashMap<PeerIdentity, HealthState>>>,
     /// Health check results
-    health_checks: Arc<RwLock<HashMap<NodeId, Vec<HealthCheck>>>>,
+    health_checks: Arc<RwLock<HashMap<PeerIdentity, Vec<HealthCheck>>>>,
     /// Configuration
     config: HealthConfig,
 }
@@ -209,7 +209,7 @@ impl Default for HealthConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HealthState {
     /// Node ID
-    pub node_id: NodeId,
+    pub node_id: PeerIdentity,
     /// Health status
     pub status: HealthStatus,
     /// Consecutive failures
@@ -255,7 +255,7 @@ impl ByzantineDetector {
     }
 
     /// Report suspicious behavior
-    pub async fn report_suspicious_behavior(&self, node_id: NodeId, event: SuspiciousEvent) {
+    pub async fn report_suspicious_behavior(&self, node_id: PeerIdentity, event: SuspiciousEvent) {
         let mut suspicious = self.suspicious_nodes.write().await;
 
         let behavior = suspicious.entry(node_id.clone())
@@ -278,12 +278,12 @@ impl ByzantineDetector {
     }
 
     /// Check if node is Byzantine
-    pub async fn is_byzantine(&self, node_id: &NodeId) -> bool {
+    pub async fn is_byzantine(&self, node_id: &PeerIdentity) -> bool {
         self.byzantine_nodes.read().await.contains(node_id)
     }
 
     /// Get Byzantine nodes
-    pub async fn get_byzantine_nodes(&self) -> Vec<NodeId> {
+    pub async fn get_byzantine_nodes(&self) -> Vec<PeerIdentity> {
         self.byzantine_nodes.read().await.iter().cloned().collect()
     }
 }
@@ -307,7 +307,7 @@ impl FaultRecovery {
     }
 
     /// Handle fault
-    pub async fn handle_fault(&self, fault_type: FaultType, affected_nodes: Vec<NodeId>) -> AssetResult<()> {
+    pub async fn handle_fault(&self, fault_type: FaultType, affected_nodes: Vec<PeerIdentity>) -> AssetResult<()> {
         let strategy = self.strategies.get(&fault_type)
             .cloned()
             .unwrap_or(RecoveryStrategy::Manual);
@@ -356,7 +356,7 @@ impl NodeHealthMonitor {
     }
 
     /// Perform health check
-    pub async fn check_health(&self, node_id: &NodeId) -> HealthStatus {
+    pub async fn check_health(&self, node_id: &PeerIdentity) -> HealthStatus {
         // Simulate health check
         let check = HealthCheck {
             check_type: "ping".to_string(),
@@ -375,7 +375,7 @@ impl NodeHealthMonitor {
     }
 
     /// Get node health state
-    pub async fn get_health_state(&self, node_id: &NodeId) -> Option<HealthState> {
+    pub async fn get_health_state(&self, node_id: &PeerIdentity) -> Option<HealthState> {
         self.health_states.read().await.get(node_id).cloned()
     }
 }

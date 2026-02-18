@@ -21,7 +21,7 @@ use crate::container::{
 };
 use crate::container::runtime::ContainerHandle;
 use crate::assets::core::{
-    AssetManager, AssetId, AssetType, AssetAllocationRequest, AssetAllocation,
+    AssetManager, AssetRegistration, AssetType, AssetAllocationRequest, AssetAllocation,
     ConsensusProof, AssetStatus, WorkloadType,
     ResourceRequirements, PrivacyLevel,
 };
@@ -36,9 +36,9 @@ pub struct HyperMeshContainerOrchestrator {
     /// Consensus VM for validation
     consensus_vm: Arc<ConsensusProofVM>,
     /// Container-to-asset mapping
-    container_assets: Arc<RwLock<HashMap<ContainerId, Vec<AssetId>>>>,
+    container_assets: Arc<RwLock<HashMap<ContainerId, Vec<AssetRegistration>>>>,
     /// Asset-to-container mapping
-    asset_containers: Arc<RwLock<HashMap<AssetId, ContainerId>>>,
+    asset_containers: Arc<RwLock<HashMap<AssetRegistration, ContainerId>>>,
     /// Orchestration metrics
     metrics: Arc<Mutex<OrchestrationMetrics>>,
     /// Configuration
@@ -556,7 +556,7 @@ impl HyperMeshContainerOrchestrator {
         let mut container_assets = self.container_assets.write().await;
         let mut asset_containers = self.asset_containers.write().await;
         
-        let asset_ids: Vec<AssetId> = allocated_assets.values()
+        let asset_ids: Vec<AssetRegistration> = allocated_assets.values()
             .map(|allocation| allocation.asset_id.clone())
             .collect();
         

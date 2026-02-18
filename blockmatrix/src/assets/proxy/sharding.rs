@@ -16,7 +16,7 @@ use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
 use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
 
-use crate::assets::core::{AssetId, AssetResult, AssetError};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 
 /// Sharded data access handler
 pub struct ShardedDataAccess {
@@ -62,7 +62,7 @@ pub struct EncryptedShard {
     pub shard_key: String,
     
     /// Associated asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     
     /// Shard sequence number
     pub sequence_number: u32,
@@ -118,7 +118,7 @@ struct ShardSession {
     session_id: String,
     
     /// Associated asset ID
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     
     /// Requested shard keys
     requested_shards: Vec<String>,
@@ -259,7 +259,7 @@ impl ShardedDataAccess {
     }
     
     /// Get shard data for asset
-    pub async fn get_shard_data(&self, asset_id: &AssetId, shard_key: &str) -> AssetResult<Vec<u8>> {
+    pub async fn get_shard_data(&self, asset_id: &AssetRegistration, shard_key: &str) -> AssetResult<Vec<u8>> {
         // Create new shard session
         let session_id = self.create_shard_session(asset_id, vec![shard_key.to_string()]).await?;
         
@@ -274,7 +274,7 @@ impl ShardedDataAccess {
     }
     
     /// Create new shard access session
-    async fn create_shard_session(&self, asset_id: &AssetId, shard_keys: Vec<String>) -> AssetResult<String> {
+    async fn create_shard_session(&self, asset_id: &AssetRegistration, shard_keys: Vec<String>) -> AssetResult<String> {
         // Check concurrent session limit
         {
             let sessions = self.active_sessions.read().await;
@@ -426,7 +426,7 @@ impl ShardedDataAccess {
     }
     
     /// Generate session ID
-    fn generate_session_id(&self, asset_id: &AssetId) -> String {
+    fn generate_session_id(&self, asset_id: &AssetRegistration) -> String {
         let mut hasher = Sha256::new();
         hasher.update(&asset_id.content_hash[..16]);
 
@@ -521,7 +521,7 @@ impl ShardManager {
     /// Create encrypted shards from data
     pub async fn create_shards(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         data: &[u8],
     ) -> AssetResult<Vec<EncryptedShard>> {
         let target_shard_size = self.config.target_shard_size as usize;
@@ -693,7 +693,7 @@ impl ShardManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::{AssetId, AssetType};
+    use crate::assets::core::{AssetRegistration, AssetType};
     use crate::test_utils::test_asset_id;
 
     #[tokio::test]

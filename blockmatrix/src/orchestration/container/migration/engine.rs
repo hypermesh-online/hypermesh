@@ -49,7 +49,7 @@ impl ContainerMigrator {
 
         let decision = MigrationDecision {
             migration_id, container_id: container_id.clone(),
-            source_node: "source-node".to_string(), target_node: target_node.clone(),
+            source_node: NodeId::from("source-node"), target_node: target_node.clone(),
             reason, strategy, plan, expected_duration, confidence, timestamp: SystemTime::now(),
         };
         debug!("Migration planning completed in {:?}", planning_start.elapsed());
@@ -164,7 +164,7 @@ impl ContainerMigrator {
             resource_requirements: MigrationResourceRequirements { additional_cpu: 0.5, additional_memory: 1024 * 1024 * 1024, additional_storage: 5 * 1024 * 1024 * 1024, network_bandwidth: 100000000, duration: Duration::from_secs(180) },
             network_considerations: NetworkMigrationPlan {
                 dns_updates: vec![], firewall_changes: vec![],
-                load_balancer_updates: vec![LoadBalancerUpdate { lb_id: "lb-1".to_string(), update_type: LoadBalancerUpdateType::AddEndpoint, endpoints: vec![target_node.clone()] }],
+                load_balancer_updates: vec![LoadBalancerUpdate { lb_id: "lb-1".to_string(), update_type: LoadBalancerUpdateType::AddEndpoint, endpoints: vec![target_node.to_string()] }],
                 latency_impact: LatencyImpact { expected_increase_ms: 5.0, impact_duration: Duration::from_secs(60), mitigations: vec!["Use connection pooling".to_string()] },
             },
         })

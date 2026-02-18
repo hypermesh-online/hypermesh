@@ -76,7 +76,7 @@ pub struct CatalogExecutionContext {
     /// Execution ID
     pub execution_id: String,
     /// Asset ID being executed
-    pub asset_id: crate::AssetId,
+    pub asset_id: crate::AssetRegistration,
     /// Allocated HyperMesh resources
     pub allocated_resources: Vec<HyperMeshResource>,
     /// Execution status
@@ -159,7 +159,7 @@ impl HyperMeshClient {
     /// Execute asset on HyperMesh infrastructure
     pub async fn execute_asset(
         &self,
-        asset_id: &blockmatrix::assets::core::AssetId,
+        asset_id: &blockmatrix::assets::core::AssetRegistration,
         resource_requirements: Vec<HyperMeshResource>,
     ) -> Result<CatalogExecutionContext> {
         // Generate execution ID

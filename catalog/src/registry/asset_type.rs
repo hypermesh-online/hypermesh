@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 // Import BlockMatrix asset types directly
-use blockmatrix::assets::{AssetId, ConsensusProof};
+use blockmatrix::assets::{AssetRegistration, ConsensusProof};
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///
@@ -21,7 +21,7 @@ use blockmatrix::assets::{AssetId, ConsensusProof};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetTypeDefinition {
     /// Unique asset ID (this type definition is an asset)
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
 
     /// Type name (e.g., "Vehicle", "CarInsurance")
     pub type_name: String,
@@ -33,7 +33,7 @@ pub struct AssetTypeDefinition {
     pub validation_rules: Vec<ValidationRule>,
 
     /// Execution templates (references to contract/script assets)
-    pub execution_templates: Vec<AssetId>,
+    pub execution_templates: Vec<AssetRegistration>,
 
     /// Dependencies on other type definitions
     pub dependencies: Vec<String>,
@@ -109,13 +109,13 @@ impl AssetTypeDefinition {
         schema: JsonValue,
         consensus_proof: ConsensusProof,
     ) -> Self {
-        // Create AssetId from type definition data
+        // Create AssetRegistration from type definition data
         let asset_data = blockmatrix::assets::core::AssetData {
             config: type_name.as_bytes().to_vec(),
             definition: b"catalog_asset_type".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             blockmatrix::assets::core::NetworkScope::Global,
             blockmatrix::assets::core::AssetCategory::BaseSystem(
@@ -156,7 +156,7 @@ impl AssetTypeDefinition {
     }
 
     /// Add execution template
-    pub fn add_execution_template(&mut self, template_id: AssetId) {
+    pub fn add_execution_template(&mut self, template_id: AssetRegistration) {
         self.execution_templates.push(template_id);
         self.metadata.updated_at = chrono::Utc::now();
     }
@@ -299,7 +299,7 @@ mod tests {
         );
 
         assert_eq!(type_def.type_name, "Vehicle");
-        // asset_type is a method on AssetId, not a field
+        // asset_type is a method on AssetRegistration, not a field
         // We can't compare AssetType here without importing blockmatrix types
         // Just verify the asset_id exists
         assert!(!type_def.asset_id.to_string().is_empty());

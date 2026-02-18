@@ -12,12 +12,11 @@ use hypermesh_assets::blockchain::{
     AssetBlockchainManager,
 };
 use hypermesh_lib::PrivacyMode;
-use hypermesh_assets::core::asset_id::{AssetId, AssetType};
+use hypermesh_assets::core::asset_id::{AssetRegistration, AssetType};
 use crate::consensus::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     NetworkPosition, AccessPermissions, AccessLevel, Consensus, ConsensusConfig,
 };
-use crate::transport::NodeId;
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -28,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting ConsensusProof integration demonstration");
     
     // 1. Create a test asset
-    let asset_id = AssetId::new(AssetType::Cpu);
+    let asset_id = AssetRegistration::new(AssetType::Cpu);
     info!("Created asset ID: {}", asset_id.to_hex_string());
     
     // 2. Create all four consensus proofs following Proof of State patterns

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::assets::core::{
-    AssetId, AssetAllocationRequest,
+    AssetRegistration, AssetAllocationRequest,
     PrivacyLevel, AssetAllocation, AssetStatus, AssetState,
     ResourceUsage, ProxyAddress,
 };
@@ -21,7 +21,7 @@ use crate::assets::core::status::{AssetHealthStatus, AssetPerformanceMetrics};
 /// Create a standard AssetAllocation for adapter responses
 #[allow(dead_code)] // Public API for adapter implementations
 pub fn create_asset_allocation(
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     request: &AssetAllocationRequest,
     proxy_address: Option<ProxyAddress>,
     metadata: HashMap<String, String>,
@@ -89,7 +89,7 @@ pub fn create_asset_allocation(
 /// Create a standard AssetStatus for adapter responses
 #[allow(dead_code)] // Public API for adapter implementations
 pub fn create_asset_status(
-    asset_id: AssetId,
+    asset_id: AssetRegistration,
     state: AssetState,
     privacy_level: PrivacyLevel,
     certificate_fingerprint: String,

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use hypermesh_lib::PrivacyMode;
 
-use super::AssetId;
+use super::AssetRegistration;
 use super::status::AssetStatus;
 
 /// Backward-compatible alias: code that references `PrivacyLevel` keeps compiling.
@@ -89,7 +89,7 @@ pub fn supports_proxy_addressing(mode: &PrivacyMode) -> bool {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetAllocation {
     /// Allocated asset identifier
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Current asset status
     pub status: AssetStatus,
     /// Allocation configuration
@@ -374,7 +374,7 @@ impl Default for AuthRequirements {
 impl AssetAllocation {
     /// Create new asset allocation
     pub fn new(
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         status: AssetStatus,
         privacy_level: PrivacyLevel,
     ) -> Self {
@@ -459,7 +459,7 @@ impl AssetAllocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::AssetId;
+    use super::AssetRegistration;
     use crate::AssetType;
     use crate::assets::core::status::AssetStatus;
     use crate::test_utils::test_asset_id;

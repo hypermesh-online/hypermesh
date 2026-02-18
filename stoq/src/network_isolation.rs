@@ -23,8 +23,8 @@ use hypermesh_lib::PrivacyMode;
 
 use crate::transport::{StoqTransport, Connection};
 
-/// Network identifier (16 bytes, matches BlockMatrix NetworkId)
-pub type NetworkId = [u8; 16];
+/// Network identifier re-exported from hypermesh_lib (128-bit, UUID-compatible)
+pub use hypermesh_lib::NetworkId;
 
 /// Network isolation manager
 pub struct NetworkIsolationManager {
@@ -210,7 +210,7 @@ impl NetworkIsolationManager {
         tracing::info!(
             "Created isolated network stack for {} ({})",
             name,
-            hex::encode(&network_id)
+            network_id
         );
 
         Ok(())
@@ -227,7 +227,7 @@ impl NetworkIsolationManager {
 
             tracing::info!(
                 "Removed network stack for {}",
-                hex::encode(&network_id)
+                network_id
             );
             Ok(())
         } else {
@@ -275,8 +275,8 @@ impl NetworkIsolationManager {
 
         tracing::info!(
             "Created tunnel from {} to {}",
-            hex::encode(&from_network),
-            hex::encode(&to_network)
+            from_network,
+            to_network
         );
 
         Ok(())
@@ -323,8 +323,8 @@ impl NetworkIsolationManager {
             tracing::error!(
                 "ISOLATION VIOLATION: {:?} from {} to {}",
                 violation.violation_type,
-                hex::encode(&violation.source_network),
-                hex::encode(&violation.target_network)
+                violation.source_network,
+                violation.target_network
             );
         }
 
@@ -395,7 +395,7 @@ mod tests {
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         // Create bank network
-        let bank_network = [1u8; 16];
+        let bank_network = NetworkId([1u8; 16]);
         manager.create_network_stack(
             bank_network,
             "Bank Customer Portal".to_string(),
@@ -403,7 +403,7 @@ mod tests {
         ).await.unwrap();
 
         // Create employee network
-        let employee_network = [2u8; 16];
+        let employee_network = NetworkId([2u8; 16]);
         manager.create_network_stack(
             employee_network,
             "Employee VPN".to_string(),
@@ -420,8 +420,8 @@ mod tests {
         init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
-        let network1 = [1u8; 16];
-        let network2 = [2u8; 16];
+        let network1 = NetworkId([1u8; 16]);
+        let network2 = NetworkId([2u8; 16]);
 
         manager.create_network_stack(
             network1,
@@ -453,8 +453,8 @@ mod tests {
         init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
-        let network1 = [1u8; 16];
-        let network2 = [2u8; 16];
+        let network1 = NetworkId([1u8; 16]);
+        let network2 = NetworkId([2u8; 16]);
 
         manager.create_network_stack(
             network1,
@@ -490,7 +490,7 @@ mod tests {
         init_test_crypto();
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
-        let network1 = [1u8; 16];
+        let network1 = NetworkId([1u8; 16]);
         manager.create_network_stack(
             network1,
             "Network 1".to_string(),

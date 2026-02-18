@@ -18,21 +18,21 @@ use blockmatrix::extensions::{
     ResourceUsageReport,
 };
 
-use blockmatrix::assets::core::{AssetId, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain};
+use blockmatrix::assets::core::{AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain};
 use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
 use sha2::Digest;
 
 /// Handler for Virtual Machine assets (Lua, WASM, etc.)
 pub struct VirtualMachineHandler {
     /// VM instances registry
-    instances: Arc<RwLock<HashMap<AssetId, VMInstance>>>,
+    instances: Arc<RwLock<HashMap<AssetRegistration, VMInstance>>>,
 }
 
 /// VM instance information
 #[allow(dead_code)] // VM tracking fields populated during lifecycle
 #[derive(Debug, Clone)]
 struct VMInstance {
-    pub id: AssetId,
+    pub id: AssetRegistration,
     pub language: String,
     pub version: String,
     pub status: VMStatus,
@@ -71,14 +71,14 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         AssetType::VirtualMachine
     }
 
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        // Create AssetId from asset specification
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
+        // Create AssetRegistration from asset specification
         let asset_data = AssetData {
             config: spec.name.as_bytes().to_vec(),
             definition: b"catalog_vm".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
@@ -122,7 +122,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
         let mut instances = self.instances.write().await;
 
         let instance = instances.get_mut(id)
@@ -140,7 +140,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(())
     }
 
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()> {
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut instances = self.instances.write().await;
         instances.remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
@@ -150,7 +150,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(())
     }
 
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>> {
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>> {
         let instances = self.instances.read().await;
 
         let mut results = Vec::new();
@@ -175,7 +175,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let instances = self.instances.read().await;
 
         let instance = instances.get(id)
@@ -209,7 +209,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetId, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
         let instances = self.instances.read().await;
 
         // Check if instance exists
@@ -222,7 +222,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(true)
     }
 
-    async fn handle_operation(&self, id: &AssetId, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Execute(exec_spec) => {
                 // Execute code in VM
@@ -285,13 +285,13 @@ impl AssetExtensionHandler for VirtualMachineHandler {
 /// Handler for Library assets (packages, frameworks, dependencies)
 pub struct LibraryHandler {
     /// Library packages registry
-    packages: Arc<RwLock<HashMap<AssetId, LibraryPackage>>>,
+    packages: Arc<RwLock<HashMap<AssetRegistration, LibraryPackage>>>,
 }
 
 #[allow(dead_code)] // Package tracking fields
 #[derive(Debug, Clone)]
 struct LibraryPackage {
-    pub id: AssetId,
+    pub id: AssetRegistration,
     pub name: String,
     pub version: String,
     pub language: String,
@@ -313,14 +313,14 @@ impl AssetExtensionHandler for LibraryHandler {
         AssetType::Library
     }
 
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        // Create AssetId from library asset specification
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
+        // Create AssetRegistration from library asset specification
         let asset_data = AssetData {
             config: spec.name.as_bytes().to_vec(),
             definition: b"catalog_library".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
@@ -354,7 +354,7 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
         let mut packages = self.packages.write().await;
 
         let package = packages.get_mut(id)
@@ -375,7 +375,7 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(())
     }
 
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()> {
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut packages = self.packages.write().await;
         packages.remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
@@ -385,7 +385,7 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(())
     }
 
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>> {
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>> {
         let packages = self.packages.read().await;
 
         let mut results = Vec::new();
@@ -408,7 +408,7 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let packages = self.packages.read().await;
 
         let package = packages.get(id)
@@ -442,12 +442,12 @@ impl AssetExtensionHandler for LibraryHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetId, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
         let packages = self.packages.read().await;
         Ok(packages.contains_key(id))
     }
 
-    async fn handle_operation(&self, id: &AssetId, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Deploy(_) => {
                 // Libraries are deployed by installing them
@@ -479,13 +479,13 @@ impl AssetExtensionHandler for LibraryHandler {
 /// Handler for Dataset assets (ML datasets, scientific data)
 pub struct DatasetHandler {
     /// Datasets registry
-    datasets: Arc<RwLock<HashMap<AssetId, Dataset>>>,
+    datasets: Arc<RwLock<HashMap<AssetRegistration, Dataset>>>,
 }
 
 #[allow(dead_code)] // Dataset tracking fields
 #[derive(Debug, Clone)]
 struct Dataset {
-    pub id: AssetId,
+    pub id: AssetRegistration,
     pub name: String,
     pub format: String,
     pub size_bytes: u64,
@@ -506,14 +506,14 @@ impl AssetExtensionHandler for DatasetHandler {
         AssetType::Library
     }
 
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        // Create AssetId from dataset asset specification
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
+        // Create AssetRegistration from dataset asset specification
         let asset_data = AssetData {
             config: spec.name.as_bytes().to_vec(),
             definition: b"catalog_dataset".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
@@ -547,7 +547,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
         let mut datasets = self.datasets.write().await;
 
         let dataset = datasets.get_mut(id)
@@ -562,7 +562,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(())
     }
 
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()> {
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut datasets = self.datasets.write().await;
         datasets.remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
@@ -572,7 +572,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(())
     }
 
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>> {
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>> {
         let datasets = self.datasets.read().await;
 
         let mut results = Vec::new();
@@ -595,7 +595,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let datasets = self.datasets.read().await;
 
         let dataset = datasets.get(id)
@@ -629,12 +629,12 @@ impl AssetExtensionHandler for DatasetHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetId, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
         let datasets = self.datasets.read().await;
         Ok(datasets.contains_key(id))
     }
 
-    async fn handle_operation(&self, _id: &AssetId, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(&self, _id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Custom(value) => {
                 // Handle custom dataset operations
@@ -651,13 +651,13 @@ impl AssetExtensionHandler for DatasetHandler {
 /// Handler for Template assets (asset generation templates)
 pub struct TemplateHandler {
     /// Templates registry
-    templates: Arc<RwLock<HashMap<AssetId, Template>>>,
+    templates: Arc<RwLock<HashMap<AssetRegistration, Template>>>,
 }
 
 #[allow(dead_code)] // Template tracking fields
 #[derive(Debug, Clone)]
 struct Template {
-    pub id: AssetId,
+    pub id: AssetRegistration,
     pub name: String,
     pub template_type: String,
     pub language: String,
@@ -678,14 +678,14 @@ impl AssetExtensionHandler for TemplateHandler {
         AssetType::Container
     }
 
-    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetId> {
-        // Create AssetId from template asset specification
+    async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
+        // Create AssetRegistration from template asset specification
         let asset_data = AssetData {
             config: spec.name.as_bytes().to_vec(),
             definition: b"catalog_template".to_vec(),
             metadata: b"{}".to_vec(),
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
@@ -718,7 +718,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetId, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
         let mut templates = self.templates.write().await;
 
         let template = templates.get_mut(id)
@@ -733,7 +733,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(())
     }
 
-    async fn delete_asset(&self, id: &AssetId) -> ExtensionResult<()> {
+    async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut templates = self.templates.write().await;
         templates.remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
@@ -743,7 +743,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(())
     }
 
-    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetId>> {
+    async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>> {
         let templates = self.templates.read().await;
 
         let mut results = Vec::new();
@@ -766,7 +766,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetId) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let templates = self.templates.read().await;
 
         let template = templates.get(id)
@@ -801,12 +801,12 @@ impl AssetExtensionHandler for TemplateHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetId, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
         let templates = self.templates.read().await;
         Ok(templates.contains_key(id))
     }
 
-    async fn handle_operation(&self, _id: &AssetId, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(&self, _id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Custom(value) => {
                 // Handle template generation operations

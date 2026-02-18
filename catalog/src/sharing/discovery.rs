@@ -14,14 +14,14 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
 
-use crate::{AssetId, AssetPackage, AssetMetadata};
+use crate::{AssetRegistration, AssetPackage, AssetMetadata};
 use super::{PeerInfo, SharePermission};
 
 /// Asset index entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetIndex {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Asset metadata
     pub metadata: AssetMetadata,
     /// Nodes that have this asset
@@ -35,7 +35,7 @@ pub struct AssetIndex {
     /// Categories
     pub categories: Vec<String>,
     /// Dependencies
-    pub dependencies: Vec<AssetId>,
+    pub dependencies: Vec<AssetRegistration>,
     /// Usage statistics
     pub usage_stats: UsageStats,
 }
@@ -106,13 +106,13 @@ pub struct SearchResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recommendation {
     /// Recommended asset
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Recommendation score
     pub score: f64,
     /// Reason for recommendation
     pub reason: RecommendationReason,
     /// Related assets
-    pub related: Vec<AssetId>,
+    pub related: Vec<AssetRegistration>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +136,7 @@ pub enum RecommendationReason {
 #[derive(Debug, Clone)]
 struct IndexCache {
     /// Cached index entries
-    entries: HashMap<AssetId, AssetIndex>,
+    entries: HashMap<AssetRegistration, AssetIndex>,
     /// Cache timestamp
     cached_at: SystemTime,
     /// Cache validity duration
@@ -147,7 +147,7 @@ struct IndexCache {
 #[allow(dead_code)] // Discovery fields for search operations
 pub struct DiscoveryService {
     cache_ttl: Duration,
-    local_index: Arc<RwLock<HashMap<AssetId, AssetIndex>>>,
+    local_index: Arc<RwLock<HashMap<AssetRegistration, AssetIndex>>>,
     federated_cache: Arc<RwLock<IndexCache>>,
     search_capabilities: Arc<SearchCapabilities>,
     recommendation_engine: Arc<RwLock<RecommendationEngine>>,
@@ -177,13 +177,13 @@ struct IndexStats {
 /// Recommendation engine
 struct RecommendationEngine {
     /// User interaction history
-    user_history: HashMap<String, Vec<AssetId>>,
+    user_history: HashMap<String, Vec<AssetRegistration>>,
     /// Asset similarity matrix
-    similarity_matrix: HashMap<AssetId, Vec<(AssetId, f64)>>,
+    similarity_matrix: HashMap<AssetRegistration, Vec<(AssetRegistration, f64)>>,
     /// Trending packages
-    trending: Vec<AssetId>,
+    trending: Vec<AssetRegistration>,
     /// Category associations
-    category_associations: HashMap<String, Vec<AssetId>>,
+    category_associations: HashMap<String, Vec<AssetRegistration>>,
 }
 
 impl DiscoveryService {
@@ -211,7 +211,7 @@ impl DiscoveryService {
     /// Register package in local index
     pub async fn register_package(
         &self,
-        asset_id: &AssetId,
+        asset_id: &AssetRegistration,
         metadata: &AssetMetadata,
         permissions: SharePermission,
     ) -> Result<()> {
@@ -245,7 +245,7 @@ impl DiscoveryService {
     }
 
     /// Search local index
-    pub async fn search_local(&self, query: &str) -> Result<Vec<(AssetId, AssetMetadata)>> {
+    pub async fn search_local(&self, query: &str) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         let index = self.local_index.read().await;
         let mut results = Vec::new();
 
@@ -280,7 +280,7 @@ impl DiscoveryService {
         &self,
         query: &str,
         peers: &HashMap<String, PeerInfo>,
-    ) -> Result<Vec<(AssetId, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         // Check federated cache first
         if let Some(cached_results) = self.search_cache(query).await? {
             return Ok(cached_results);
@@ -325,20 +325,20 @@ impl DiscoveryService {
     }
 
     /// Get package from local index
-    pub async fn get_local_package(&self, _asset_id: &AssetId) -> Result<Option<AssetPackage>> {
+    pub async fn get_local_package(&self, _asset_id: &AssetRegistration) -> Result<Option<AssetPackage>> {
         // Would retrieve from local storage
         // This is a placeholder implementation
         Ok(None)
     }
 
     /// Check if package exists locally
-    pub async fn has_package(&self, asset_id: &AssetId) -> Result<bool> {
+    pub async fn has_package(&self, asset_id: &AssetRegistration) -> Result<bool> {
         let index = self.local_index.read().await;
         Ok(index.contains_key(asset_id))
     }
 
     /// Get popular packages
-    pub async fn get_popular_packages(&self, threshold: f64) -> Result<Vec<(AssetId, AssetMetadata)>> {
+    pub async fn get_popular_packages(&self, threshold: f64) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         let index = self.local_index.read().await;
         let mut popular = Vec::new();
 
@@ -569,12 +569,12 @@ impl DiscoveryService {
         download_score * 0.4 + weekly_score * 0.4 + star_score * 0.2
     }
 
-    fn get_cached_popularity(&self, _asset_id: &AssetId) -> f64 {
+    fn get_cached_popularity(&self, _asset_id: &AssetRegistration) -> f64 {
         // Would get from cache
         0.5
     }
 
-    async fn search_cache(&self, _query: &str) -> Result<Option<Vec<(AssetId, AssetMetadata)>>> {
+    async fn search_cache(&self, _query: &str) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
         // Would check cache
         Ok(None)
     }
@@ -582,7 +582,7 @@ impl DiscoveryService {
     async fn cache_search_results(
         &self,
         _query: &str,
-        _results: &[(AssetId, AssetMetadata)],
+        _results: &[(AssetRegistration, AssetMetadata)],
     ) -> Result<()> {
         // Would cache results
         Ok(())
@@ -590,8 +590,8 @@ impl DiscoveryService {
 
     fn deduplicate_results(
         &self,
-        mut results: Vec<(AssetId, AssetMetadata)>,
-    ) -> Vec<(AssetId, AssetMetadata)> {
+        mut results: Vec<(AssetRegistration, AssetMetadata)>,
+    ) -> Vec<(AssetRegistration, AssetMetadata)> {
         results.sort_by(|a, b| a.0.to_hex_string().cmp(&b.0.to_hex_string()));
         results.dedup_by(|a, b| a.0 == b.0);
         results
@@ -599,9 +599,9 @@ impl DiscoveryService {
 
     fn rank_results(
         &self,
-        mut results: Vec<(AssetId, AssetMetadata)>,
+        mut results: Vec<(AssetRegistration, AssetMetadata)>,
         query: &str,
-    ) -> Vec<(AssetId, AssetMetadata)> {
+    ) -> Vec<(AssetRegistration, AssetMetadata)> {
         results.sort_by(|a, b| {
             let rel_a = self.calculate_relevance(&a.1, query);
             let rel_b = self.calculate_relevance(&b.1, query);
@@ -686,7 +686,7 @@ impl DiscoveryService {
         _peer_id: &str,
         _peer_address: &str,
         _query: &str,
-    ) -> Result<Vec<(AssetId, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         // Would perform actual network search
         Ok(Vec::new())
     }
@@ -695,7 +695,7 @@ impl DiscoveryService {
         &self,
         _peer_id: &str,
         _peer_address: &str,
-    ) -> Result<HashMap<AssetId, AssetIndex>> {
+    ) -> Result<HashMap<AssetRegistration, AssetIndex>> {
         // Would request index from peer
         Ok(HashMap::new())
     }

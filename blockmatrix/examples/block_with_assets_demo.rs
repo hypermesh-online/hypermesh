@@ -16,7 +16,7 @@
 //! 4. Different asset types can coexist in blocks
 //! 5. Matrix coordinates tie blocks to physical/logical positions
 
-use blockmatrix::assets::core::{AssetId, AssetCategory, BaseSystemType, NetworkScope, AssetData};
+use blockmatrix::assets::core::{AssetRegistration, AssetCategory, BaseSystemType, NetworkScope, AssetData};
 use blockmatrix::blockchain::Block;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Storage, Network, Containers, etc.\n");
 
     // Asset 1: Genesis Asset (first asset for this node's blockchain)
-    let genesis_asset = AssetId::genesis(node_coord.clone());
+    let genesis_asset = AssetRegistration::genesis(node_coord.clone());
     println!("   ✅ Asset 1 (Genesis): {}", genesis_asset);
     println!("      → First asset in this node's independent blockchain");
     println!("      → Every node starts with a genesis asset\n");
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         definition: b"CPU_RESOURCE".to_vec(),
         metadata: b"8-core processor".to_vec(),
     };
-    let cpu_asset = AssetId::from_asset_data(
+    let cpu_asset = AssetRegistration::from_asset_data(
         &cpu_data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Cpu),
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         definition: b"MEMORY_RESOURCE".to_vec(),
         metadata: b"16GB RAM with NAT-like addressing".to_vec(),
     };
-    let memory_asset = AssetId::from_asset_data(
+    let memory_asset = AssetRegistration::from_asset_data(
         &memory_data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Memory),
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         definition: b"STORAGE_RESOURCE".to_vec(),
         metadata: b"1TB storage with sharding support".to_vec(),
     };
-    let storage_asset = AssetId::from_asset_data(
+    let storage_asset = AssetRegistration::from_asset_data(
         &storage_data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Storage),

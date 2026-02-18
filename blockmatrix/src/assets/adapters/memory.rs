@@ -23,7 +23,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetAdapter, AssetId, AssetType, AssetResult, AssetError,
+    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
     PrivacyLevel, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, MemoryUsage,
@@ -36,7 +36,7 @@ use crate::os_integration::create_os_abstraction;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryAllocation {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Local memory address
     pub local_address: usize,
     /// Size in bytes
@@ -77,7 +77,7 @@ pub struct MemoryPool {
     /// Pool privacy level
     pub privacy_level: PrivacyLevel,
     /// Active allocations
-    pub allocations: Vec<AssetId>,
+    pub allocations: Vec<AssetRegistration>,
 }
 
 /// Memory proxy address mapping for NAT-like system
@@ -86,7 +86,7 @@ pub struct MemoryProxyMapping {
     /// Remote proxy address (IPv6-like)
     pub proxy_address: ProxyAddress,
     /// Local asset ID
-    pub local_asset_id: AssetId,
+    pub local_asset_id: AssetRegistration,
     /// Local memory address
     pub local_address: usize,
     /// Size in bytes
@@ -115,13 +115,13 @@ pub struct MemoryPermissions {
 /// Memory Asset Adapter implementation
 pub struct MemoryAssetAdapter {
     /// Active memory allocations by asset ID
-    allocations: Arc<RwLock<HashMap<AssetId, MemoryAllocation>>>,
+    allocations: Arc<RwLock<HashMap<AssetRegistration, MemoryAllocation>>>,
     /// Memory pools for distributed management
     memory_pools: Arc<RwLock<HashMap<String, MemoryPool>>>,
     /// Proxy address mappings for NAT-like system
     proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, MemoryProxyMapping>>>,
     /// Reverse mapping from asset ID to proxy address
-    asset_to_proxy: Arc<RwLock<HashMap<AssetId, ProxyAddress>>>,
+    asset_to_proxy: Arc<RwLock<HashMap<AssetRegistration, ProxyAddress>>>,
     /// Total system memory in bytes
     total_memory: u64,
     /// Available memory in bytes
@@ -239,7 +239,7 @@ impl MemoryAssetAdapter {
     }
     
     /// Generate proxy address for NAT-like system
-    async fn generate_proxy_address(asset_id: &AssetId) -> ProxyAddress {
+    async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
@@ -435,7 +435,7 @@ impl AssetAdapter for MemoryAssetAdapter {
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Memory),
@@ -556,7 +556,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         })
     }
     
-    async fn deallocate_asset(&self, asset_id: &AssetId) -> AssetResult<()> {
+    async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Get allocation record
         let allocation = {
             let mut allocations = self.allocations.write().await;
@@ -593,7 +593,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         Ok(())
     }
     
-    async fn get_asset_status(&self, asset_id: &AssetId) -> AssetResult<AssetStatus> {
+    async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -626,7 +626,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         })
     }
     
-    async fn configure_privacy_level(&self, asset_id: &AssetId, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -647,7 +647,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         Ok(())
     }
     
-    async fn assign_proxy_address(&self, asset_id: &AssetId) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
         let asset_to_proxy = self.asset_to_proxy.read().await;
         asset_to_proxy.get(asset_id)
             .cloned()
@@ -656,7 +656,7 @@ impl AssetAdapter for MemoryAssetAdapter {
             })
     }
     
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetId> {
+    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
         let mappings = self.proxy_mappings.read().await;
         mappings.get(proxy_addr)
             .map(|mapping| mapping.local_asset_id.clone())
@@ -665,7 +665,7 @@ impl AssetAdapter for MemoryAssetAdapter {
             })
     }
     
-    async fn get_resource_usage(&self, asset_id: &AssetId) -> AssetResult<ResourceUsage> {
+    async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
         let allocation = allocations.get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -690,7 +690,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         })
     }
     
-    async fn set_resource_limits(&self, asset_id: &AssetId, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
         if let Some(memory_limit) = limits.memory_limit {
             // TODO: Implement memory limit enforcement
             tracing::info!(

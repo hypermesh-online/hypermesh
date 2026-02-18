@@ -20,7 +20,7 @@ use blockmatrix::extensions::{
     ResourceUsageReport, SecurityIssue,
 };
 
-use blockmatrix::assets::core::{AssetType, AssetId, AssetData, NetworkScope, AssetCategory};
+use blockmatrix::assets::core::{AssetType, AssetRegistration, AssetData, NetworkScope, AssetCategory};
 use blockmatrix::assets::core::ApplicationDomain;
 
 use super::types::CatalogExtension;
@@ -92,15 +92,15 @@ impl AssetLibraryExtension for CatalogExtension {
 
         let install_duration = start.elapsed();
 
-        let installed_asset_ids: Vec<AssetId> = vec![
-            AssetId::from_hex_string(package_id)
+        let installed_asset_ids: Vec<AssetRegistration> = vec![
+            AssetRegistration::from_hex_string(package_id)
                 .unwrap_or_else(|_| {
                     let asset_data = AssetData {
                         config: package_id.as_bytes().to_vec(),
                         definition: b"catalog_package".to_vec(),
                         metadata: b"{}".to_vec(),
                     };
-                    AssetId::from_asset_data(
+                    AssetRegistration::from_asset_data(
                         &asset_data,
                         NetworkScope::Global,
                         AssetCategory::Application(ApplicationDomain {

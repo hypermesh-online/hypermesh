@@ -12,7 +12,7 @@ use tokio;
 
 // Since we have dependency issues with the consensus module, we'll import the types directly
 use hypermesh_assets::core::{
-    AssetId, AssetType, PrivacyLevel,
+    AssetRegistration, AssetType, PrivacyLevel,
     ProxyAddress, ProxyNodeInfo, ProxyCapabilities,
     RemoteProxyManager, ProxyNetworkConfig,
     NATTranslator, GlobalAddress, GlobalAddressType,
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=============================================");
     
     // 1. Create a test asset
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     println!("📦 Created test memory asset: {}", asset_id);
     
     // 2. Register a proxy node

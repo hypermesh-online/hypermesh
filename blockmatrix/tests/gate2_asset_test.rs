@@ -11,7 +11,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::core::{
-    AssetManager, AssetId, AssetType, AssetStatus, AssetState,
+    AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
     PrivacyLevel, ConsensusRequirements,
 };
 
@@ -142,7 +142,7 @@ async fn test_gate2_asset_system_complete() {
     println!("✅ GATE 2 PASSED: Asset System Complete");
     println!("========================================");
     println!("\nAsset System Features Validated:");
-    println!("  ✓ Universal AssetId system");
+    println!("  ✓ Universal AssetRegistration system");
     println!("  ✓ AssetAdapter pattern (all 6 adapters)");
     println!("  ✓ Privacy-aware allocation (5 levels)");
     println!("  ✓ Proof of State Four-Proof consensus");

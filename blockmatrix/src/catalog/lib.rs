@@ -19,7 +19,7 @@ pub use blockchain::{
 };
 
 pub use vm::{
-    ConsensusProofVM, VMConfig, ConsensusRequirements, AssetId,
+    ConsensusProofVM, VMConfig, ConsensusRequirements, AssetRegistration,
     PrivacyLevel, ResourceSharingConfig, AssetAllocation,
 };
 

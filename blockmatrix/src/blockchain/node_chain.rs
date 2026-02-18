@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use tracing::{info, warn, error, debug};
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::assets::core::AssetId;
+use crate::assets::core::AssetRegistration;
 use super::block::Block;
 use super::validation::ChainValidator;
 use super::genesis_auth::{GenesisAuthManager, GenesisCredentials};
@@ -100,7 +100,7 @@ impl NodeBlockchain {
     }
 
     /// Add a new block to this node's chain
-    pub async fn add_block(&self, assets: Vec<AssetId>) -> Result<Block, String> {
+    pub async fn add_block(&self, assets: Vec<AssetRegistration>) -> Result<Block, String> {
         let head = self.head.read().await;
         let previous = head.as_ref()
             .ok_or_else(|| "No head block found".to_string())?;
@@ -147,7 +147,7 @@ impl NodeBlockchain {
             metadata: format!("Block data at {:?}", std::time::SystemTime::now()).into_bytes(),
         };
 
-        let asset_id = AssetId::from_asset_data(
+        let asset_id = AssetRegistration::from_asset_data(
             &asset_data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Container),

@@ -11,14 +11,14 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetId, PrivacyLevel, ProxyAddress,
+    AssetRegistration, PrivacyLevel, ProxyAddress,
 };
 
 /// GPU allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GpuAllocation {
     /// Asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Allocated GPU device IDs
     pub allocated_devices: Vec<u32>,
     /// GPU memory allocated in bytes
@@ -71,7 +71,7 @@ pub struct GpuDevice {
     /// Current status
     pub status: GpuStatus,
     /// Current allocation asset ID
-    pub allocated_to: Option<AssetId>,
+    pub allocated_to: Option<AssetRegistration>,
     /// Temperature in Celsius
     pub temperature_celsius: Option<f32>,
     /// Power consumption in watts
@@ -99,7 +99,7 @@ pub struct GpuContext {
     /// Context ID
     pub context_id: String,
     /// Associated asset ID
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Device ID
     pub device_id: u32,
     /// Memory allocated to context
@@ -115,15 +115,15 @@ pub struct GpuContext {
 /// GPU Asset Adapter implementation
 pub struct GpuAssetAdapter {
     /// Active GPU allocations by asset ID
-    pub(crate) allocations: Arc<RwLock<HashMap<AssetId, GpuAllocation>>>,
+    pub(crate) allocations: Arc<RwLock<HashMap<AssetRegistration, GpuAllocation>>>,
     /// GPU device information and status
     pub(crate) gpu_devices: Arc<RwLock<HashMap<u32, GpuDevice>>>,
     /// Device allocation mapping (device_id -> asset_id)
-    pub(crate) device_allocations: Arc<RwLock<HashMap<u32, AssetId>>>,
+    pub(crate) device_allocations: Arc<RwLock<HashMap<u32, AssetRegistration>>>,
     /// GPU compute contexts
     pub(crate) gpu_contexts: Arc<RwLock<HashMap<String, GpuContext>>>,
     /// Proxy address mappings
-    pub(crate) proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetId>>>,
+    pub(crate) proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     /// Total GPU devices available
     pub(crate) total_devices: u32,
     /// GPU usage statistics

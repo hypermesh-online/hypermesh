@@ -20,7 +20,7 @@ async fn test_complete_proxy_system_integration() {
     let nat_translator = NATTranslator::new().await.expect("Failed to create NAT translator");
     
     // 2. Create test asset
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     
     // 3. Generate global address
     let global_proxy_addr = nat_translator.generate_global_address(
@@ -163,7 +163,7 @@ async fn test_sharded_data_access() {
         .expect("Failed to create sharded access");
     
     // 2. Create test asset
-    let asset_id = AssetId::new(AssetType::Storage);
+    let asset_id = AssetRegistration::new(AssetType::Storage);
     
     // 3. Create and store test shard
     let shard_manager = ShardManager::new().await
@@ -321,7 +321,7 @@ async fn test_complete_proxy_manager_workflow() {
         .expect("Failed to register proxy node");
     
     // 4. Create test asset and allocate proxy address
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     
     let allocated_address = proxy_manager.allocate_proxy_address(
         &asset_id,
@@ -373,7 +373,7 @@ async fn test_global_address_functionality() {
     let _ = tracing_subscriber::fmt::try_init();
     
     // 1. Create test asset
-    let asset_id = AssetId::new(AssetType::Memory);
+    let asset_id = AssetRegistration::new(AssetType::Memory);
     
     // 2. Create global address
     let global_addr = GlobalAddress::new(

@@ -18,7 +18,11 @@ use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
 use crate::catalog::vm::consensus::ConsensusVM;
-use crate::assets::core::{AssetManager, AssetId, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
+use crate::assets::core::{AssetManager, AssetRegistration, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
+
+/// VM runtime uses the core AssetRegistration as its asset identifier for
+/// tracking execution resource handles, since the asset manager returns this type.
+type AssetId = AssetRegistration;
 use crate::assets::core::adapter::{StorageType, StorageRequirements};
 use super::context::ExecutionContext;
 use super::scheduler::{ExecutionScheduler, ExecutionPlan};

@@ -3,21 +3,21 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Car Purchase Scenario Example
-//! 
+//!
 //! This example demonstrates a more realistic car purchase workflow.
 //! It simulates a car purchase involving separate nodes for a buyer, a bank, a dealer, an insurance company, and the DMV.
 
 use blockmatrix::assets::multi_node::{
     MultiNetworkCoordinator, MultiNetworkConfig, TrustChainClient,
-    NetworkId, NetworkDiscovery, PrivacyTier, MembershipStatus,
-    NetworkMembership, EngagementEventType, IntegerMatrixPosition,
+    NetworkId, NetworkDiscovery, PrivacyTier,
+    IntegerMatrixPosition,
 };
 use blockmatrix::assets::multi_node::network_membership::{
     JoinRequirements, ApprovalProcess, NetworkCredentials,
 };
-use blockmatrix::assets::core::{AssetId, AssetType, AssetResult, ConsensusProof};
-use blockmatrix::transport::NodeId;
-use std::collections::{HashSet, HashMap};
+use blockmatrix::assets::core::{AssetRegistration, AssetType, AssetResult, ConsensusProof};
+use blockmatrix::transport::PeerIdentity;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use async_trait::async_trait;
@@ -34,7 +34,7 @@ impl MockTrustChainClient {
             available_networks: vec![
                 // Buyer's private network
                 NetworkDiscovery {
-                    network_id: [0u8; 16],
+                    network_id: NetworkId([0u8; 16]),
                     name: "Buyer Private Network".to_string(),
                     description: "Buyer's private network".to_string(),
                     entry_points: vec![],
@@ -51,7 +51,7 @@ impl MockTrustChainClient {
                 },
                 // Bank network
                 NetworkDiscovery {
-                    network_id: [1u8; 16],
+                    network_id: NetworkId([1u8; 16]),
                     name: "First National Bank".to_string(),
                     description: "Public banking services".to_string(),
                     entry_points: vec![],
@@ -68,7 +68,7 @@ impl MockTrustChainClient {
                 },
                 // Dealer network
                 NetworkDiscovery {
-                    network_id: [2u8; 16],
+                    network_id: NetworkId([2u8; 16]),
                     name: "AutoDealer Network".to_string(),
                     description: "Car dealership federation".to_string(),
                     entry_points: vec![],
@@ -85,7 +85,7 @@ impl MockTrustChainClient {
                 },
                 // Insurance network
                 NetworkDiscovery {
-                    network_id: [3u8; 16],
+                    network_id: NetworkId([3u8; 16]),
                     name: "Insurance Providers Network".to_string(),
                     description: "Insurance verification network".to_string(),
                     entry_points: vec![],
@@ -102,7 +102,7 @@ impl MockTrustChainClient {
                 },
                 // DMV network
                 NetworkDiscovery {
-                    network_id: [4u8; 16],
+                    network_id: NetworkId([4u8; 16]),
                     name: "State DMV Network".to_string(),
                     description: "Vehicle registration network".to_string(),
                     entry_points: vec![],
@@ -147,11 +147,11 @@ impl TrustChainClient for MockTrustChainClient {
     }
 }
 
-fn create_node(name: &str, id: [u8; 32]) -> NodeId {
-    NodeId {
+fn create_node(name: &str, id: [u8; 32]) -> PeerIdentity {
+    PeerIdentity {
         name: name.to_string(),
         id,
-        address: "::1".parse().unwrap(),
+        address: "::1".parse().expect("example: valid ipv6"),
         pub_key: vec![1, 2, 3, 4],
     }
 }
@@ -196,7 +196,7 @@ fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> ConsensusProo
 
 #[tokio::main]
 async fn main() {
-    // Real-world scenario: Buy car, validate across Bank→Dealer→Insurance→DMV
+    // Real-world scenario: Buy car, validate across Bank->Dealer->Insurance->DMV
     let client = Arc::new(MockTrustChainClient::new());
 
     // Create separate nodes for each entity
@@ -233,12 +233,12 @@ async fn main() {
     ));
 
     // Discover networks
-    buyer_coordinator.discover_networks().await.unwrap();
-    bank_coordinator.discover_networks().await.unwrap();
-    dealer_coordinator.discover_networks().await.unwrap();
-    insurance_coordinator.discover_networks().await.unwrap();
-    dmv_coordinator.discover_networks().await.unwrap();
-    let networks = client.discover_networks().await.unwrap();
+    buyer_coordinator.discover_networks().await.expect("example: buyer discover");
+    bank_coordinator.discover_networks().await.expect("example: bank discover");
+    dealer_coordinator.discover_networks().await.expect("example: dealer discover");
+    insurance_coordinator.discover_networks().await.expect("example: insurance discover");
+    dmv_coordinator.discover_networks().await.expect("example: dmv discover");
+    let networks = client.discover_networks().await.expect("example: client discover");
 
     // Network IDs
     let buyer_private_network = networks[0].network_id;
@@ -247,118 +247,118 @@ async fn main() {
     let insurance_network = networks[3].network_id;
     let dmv_network = networks[4].network_id;
 
-    println!("🚗 Car Purchase Scenario Starting...");
+    println!("Car Purchase Scenario Starting...");
 
     // Step 1: Entities join their primary networks
     println!("\n  1. Entities joining their primary networks...");
-    buyer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.unwrap();
-    bank_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
-    dealer_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
-    insurance_coordinator.join_network(insurance_network, PrivacyTier::PRIVATE).await.unwrap();
-    dmv_coordinator.join_network(dmv_network, PrivacyTier::PUBLIC).await.unwrap();
+    buyer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: buyer join");
+    bank_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("example: bank join");
+    dealer_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("example: dealer join");
+    insurance_coordinator.join_network(insurance_network, PrivacyTier::PRIVATE).await.expect("example: insurance join");
+    dmv_coordinator.join_network(dmv_network, PrivacyTier::PUBLIC).await.expect("example: dmv join");
     println!("     - All entities have joined their primary networks.");
 
     // Step 2: Buyer finds a car on the dealer's public network and initiates purchase
     println!("\n  2. Buyer initiates purchase on Dealer's public network...");
-    let car_for_sale_asset = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(dealer_network, car_for_sale_asset.clone(), IntegerMatrixPosition { x: 1, y: 1, z: 1 }).await.unwrap();
+    let car_for_sale_asset = AssetRegistration::new(AssetType::Storage);
+    dealer_coordinator.add_asset_to_network(dealer_network, car_for_sale_asset.clone(), IntegerMatrixPosition { x: 1, y: 1, z: 1 }).await.expect("example: dealer add asset");
     println!("     - Dealer lists Car for Sale Asset: {:?}", car_for_sale_asset);
 
     // 3. Buyer creates a 'Purchase Intent' asset on their private chain
     println!("\n  3. Buyer creates 'Purchase Intent' on their private chain...");
-    let purchase_intent = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, purchase_intent.clone(), IntegerMatrixPosition { x: 1, y: 2, z: 1 }).await.unwrap();
+    let purchase_intent = AssetRegistration::new(AssetType::Storage);
+    buyer_coordinator.add_asset_to_network(buyer_private_network, purchase_intent.clone(), IntegerMatrixPosition { x: 1, y: 2, z: 1 }).await.expect("example: buyer add intent");
     println!("     - Purchase Intent Asset: {:?}", purchase_intent);
 
     // 4. Dealer validates the 'Purchase Intent'
     println!("\n  4. Dealer validates Buyer's 'Purchase Intent'...");
-    dealer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.unwrap();
+    dealer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: dealer join buyer");
     let intent_proof = create_test_proof("buyer-node", "buyer-node");
     let intent_valid = dealer_coordinator.validate_asset_cross_network(
         purchase_intent.clone(),
         buyer_private_network,
         buyer_private_network,
         intent_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate intent");
     assert!(intent_valid);
     println!("     - Dealer validated Purchase Intent.");
 
     // 5. Dealer creates 'Sales Agreement' on its federated network, sharing with Bank
     println!("\n  5. Dealer creates 'Sales Agreement' and shares with Bank...");
-    let sales_agreement = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(dealer_network, sales_agreement.clone(), IntegerMatrixPosition { x: 2, y: 2, z: 2 }).await.unwrap();
+    let sales_agreement = AssetRegistration::new(AssetType::Storage);
+    dealer_coordinator.add_asset_to_network(dealer_network, sales_agreement.clone(), IntegerMatrixPosition { x: 2, y: 2, z: 2 }).await.expect("example: dealer add agreement");
     println!("     - Sales Agreement Asset: {:?}", sales_agreement);
 
     // 6. Bank validates 'Sales Agreement'
     println!("\n  6. Bank validates 'Sales Agreement'...");
-    bank_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.unwrap();
+    bank_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("example: bank join dealer");
     let sales_agreement_proof = create_test_proof("dealer-node", "dealer-node");
     let sales_agreement_valid = bank_coordinator.validate_asset_cross_network(
         sales_agreement.clone(),
         dealer_network,
         dealer_network,
         sales_agreement_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate agreement");
     assert!(sales_agreement_valid);
     println!("     - Bank validated Sales Agreement.");
 
     // 7. Bank provides 'Proof of Financing'
     println!("\n  7. Bank provides 'Proof of Financing'...");
-    let proof_of_financing = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(bank_network, proof_of_financing.clone(), IntegerMatrixPosition { x: 3, y: 3, z: 3 }).await.unwrap();
+    let proof_of_financing = AssetRegistration::new(AssetType::Storage);
+    bank_coordinator.add_asset_to_network(bank_network, proof_of_financing.clone(), IntegerMatrixPosition { x: 3, y: 3, z: 3 }).await.expect("example: bank add financing");
     println!("     - Proof of Financing Asset: {:?}", proof_of_financing);
 
     // 8. Dealer validates 'Proof of Financing' and transfers title
     println!("\n  8. Dealer validates 'Proof of Financing' and transfers Title...");
     let financing_proof = create_test_proof("bank-node", "bank-node");
-    dealer_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.unwrap();
+    dealer_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("example: dealer join bank");
     let financing_valid = dealer_coordinator.validate_asset_cross_network(
         proof_of_financing.clone(),
         bank_network,
         bank_network,
         financing_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate financing");
     assert!(financing_valid);
     println!("     - Dealer validated Proof of Financing.");
 
-    let car_title = AssetId::new(AssetType::Storage);
-    dealer_coordinator.add_asset_to_network(buyer_private_network, car_title.clone(), IntegerMatrixPosition { x: 1, y: 3, z: 1 }).await.unwrap();
+    let car_title = AssetRegistration::new(AssetType::Storage);
+    dealer_coordinator.add_asset_to_network(buyer_private_network, car_title.clone(), IntegerMatrixPosition { x: 1, y: 3, z: 1 }).await.expect("example: dealer transfer title");
     println!("     - Dealer transferred Car Title to Buyer's private chain: {:?}", car_title);
 
     // 9. Buyer gets insurance
     println!("\n  9. Buyer purchases insurance...");
-    insurance_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.unwrap();
+    insurance_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: insurance join buyer");
     let title_proof_for_insurance = create_test_proof("buyer-node", "buyer-node");
     let title_valid_for_insurance = insurance_coordinator.validate_asset_cross_network(
         car_title.clone(),
         buyer_private_network,
         buyer_private_network,
         title_proof_for_insurance,
-    ).await.unwrap();
+    ).await.expect("example: validate title for insurance");
     assert!(title_valid_for_insurance);
     println!("     - Insurance company validated Car Title.");
 
     // Buyer pays for insurance
-    let insurance_payment = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, insurance_payment.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 1 }).await.unwrap();
+    let insurance_payment = AssetRegistration::new(AssetType::Storage);
+    buyer_coordinator.add_asset_to_network(buyer_private_network, insurance_payment.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 1 }).await.expect("example: buyer add insurance payment");
     println!("     - Buyer creates 'Payment for Insurance' asset: {:?}", insurance_payment);
 
     // Bank validates payment
-    bank_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.unwrap();
+    bank_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: bank join buyer");
     let insurance_payment_proof = create_test_proof("buyer-node", "buyer-node");
     let insurance_payment_valid = bank_coordinator.validate_asset_cross_network(
         insurance_payment.clone(),
         buyer_private_network,
         buyer_private_network,
         insurance_payment_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate insurance payment");
     assert!(insurance_payment_valid);
     println!("     - Bank validated insurance payment.");
 
-    let insurance_payment_confirmation = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(buyer_private_network, insurance_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 2 }).await.unwrap();
+    let insurance_payment_confirmation = AssetRegistration::new(AssetType::Storage);
+    bank_coordinator.add_asset_to_network(buyer_private_network, insurance_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 2 }).await.expect("example: bank add payment confirmation");
     println!("     - Bank issues 'Payment Confirmation' asset: {:?}", insurance_payment_confirmation);
-    
+
     // Insurance company validates payment confirmation
     let insurance_payment_confirmation_proof = create_test_proof("bank-node", "bank-node");
     let insurance_payment_confirmation_valid = insurance_coordinator.validate_asset_cross_network(
@@ -366,40 +366,40 @@ async fn main() {
         buyer_private_network,
         buyer_private_network,
         insurance_payment_confirmation_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate payment confirmation");
     assert!(insurance_payment_confirmation_valid);
     println!("     - Insurance company validated payment confirmation.");
 
-    let proof_of_insurance = AssetId::new(AssetType::Storage);
-    insurance_coordinator.add_asset_to_network(buyer_private_network, proof_of_insurance.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 3 }).await.unwrap();
+    let proof_of_insurance = AssetRegistration::new(AssetType::Storage);
+    insurance_coordinator.add_asset_to_network(buyer_private_network, proof_of_insurance.clone(), IntegerMatrixPosition { x: 1, y: 4, z: 3 }).await.expect("example: insurance add proof");
     println!("     - Insurance company issued Proof of Insurance to Buyer's private chain: {:?}", proof_of_insurance);
 
     // 10. Buyer registers car with DMV
     println!("\n  10. Buyer registers car with DMV...");
-    dmv_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.unwrap();
+    dmv_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: dmv join buyer");
     let title_proof_for_dmv = create_test_proof("buyer-node", "buyer-node");
     let title_valid_for_dmv = dmv_coordinator.validate_asset_cross_network(
         car_title.clone(),
         buyer_private_network,
         buyer_private_network,
         title_proof_for_dmv,
-    ).await.unwrap();
+    ).await.expect("example: validate title for dmv");
     assert!(title_valid_for_dmv);
     println!("     - DMV validated Car Title.");
-    
+
     let insurance_proof_for_dmv = create_test_proof("buyer-node", "buyer-node");
     let insurance_valid_for_dmv = dmv_coordinator.validate_asset_cross_network(
         proof_of_insurance.clone(),
         buyer_private_network,
         buyer_private_network,
         insurance_proof_for_dmv,
-    ).await.unwrap();
+    ).await.expect("example: validate insurance for dmv");
     assert!(insurance_valid_for_dmv);
     println!("     - DMV validated Proof of Insurance.");
 
     // Buyer pays for registration
-    let dmv_payment = AssetId::new(AssetType::Storage);
-    buyer_coordinator.add_asset_to_network(buyer_private_network, dmv_payment.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 1 }).await.unwrap();
+    let dmv_payment = AssetRegistration::new(AssetType::Storage);
+    buyer_coordinator.add_asset_to_network(buyer_private_network, dmv_payment.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 1 }).await.expect("example: buyer add dmv payment");
     println!("     - Buyer creates 'Payment for Registration' asset: {:?}", dmv_payment);
 
     // Bank validates payment
@@ -409,12 +409,12 @@ async fn main() {
         buyer_private_network,
         buyer_private_network,
         dmv_payment_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate dmv payment");
     assert!(dmv_payment_valid);
     println!("     - Bank validated registration payment.");
 
-    let dmv_payment_confirmation = AssetId::new(AssetType::Storage);
-    bank_coordinator.add_asset_to_network(buyer_private_network, dmv_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 2 }).await.unwrap();
+    let dmv_payment_confirmation = AssetRegistration::new(AssetType::Storage);
+    bank_coordinator.add_asset_to_network(buyer_private_network, dmv_payment_confirmation.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 2 }).await.expect("example: bank add dmv payment confirmation");
     println!("     - Bank issues 'Payment Confirmation' asset: {:?}", dmv_payment_confirmation);
 
     // DMV validates payment confirmation
@@ -424,12 +424,12 @@ async fn main() {
         buyer_private_network,
         buyer_private_network,
         dmv_payment_confirmation_proof,
-    ).await.unwrap();
+    ).await.expect("example: validate dmv payment confirmation");
     assert!(dmv_payment_confirmation_valid);
     println!("     - DMV validated payment confirmation.");
 
-    let registered_title = AssetId::new(AssetType::Storage);
-    dmv_coordinator.add_asset_to_network(buyer_private_network, registered_title.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 3 }).await.unwrap();
+    let registered_title = AssetRegistration::new(AssetType::Storage);
+    dmv_coordinator.add_asset_to_network(buyer_private_network, registered_title.clone(), IntegerMatrixPosition { x: 1, y: 5, z: 3 }).await.expect("example: dmv add registered title");
     println!("     - DMV issued Registered Title to Buyer's private chain: {:?}", registered_title);
 
 
@@ -440,7 +440,7 @@ async fn main() {
     println!("Registered Title: {:?}", registered_title);
     println!("--------------------------");
 
-    println!("\n✅ Car purchase scenario completed successfully!");
+    println!("\nCar purchase scenario completed successfully!");
     println!("   - A clear chain of dependencies was established between the entities.");
     println!("   - Each entity validated the proofs from the previous entity in the chain.");
 }

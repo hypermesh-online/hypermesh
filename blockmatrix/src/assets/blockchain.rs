@@ -9,7 +9,7 @@
 
 use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
-use crate::assets::core::asset_id::{AssetId, AssetType};
+use crate::assets::core::asset_id::{AssetRegistration, AssetType};
 use crate::consensus::{
     ConsensusProof,
     AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
@@ -49,7 +49,7 @@ impl AssetRecordType {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct HyperMeshAssetRecord {
     /// Universal asset identifier
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Type of asset operation
     pub record_type: AssetRecordType,
     /// Operation timestamp
@@ -71,14 +71,14 @@ use hypermesh_lib::PrivacyMode;
 impl HyperMeshAssetRecord {
     /// Create new asset record with consensus validation
     pub fn new(
-        asset_id: AssetId,
+        asset_id: AssetRegistration,
         record_type: AssetRecordType,
         issuing_authority: String,
         data_payload: Vec<u8>,
         consensus_proofs: Vec<ConsensusProof>,
         privacy_level: PrivacyMode,
     ) -> Self {
-        // Get adapter type from AssetId
+        // Get adapter type from AssetRegistration
         let adapter_type = asset_id.asset_type().unwrap_or(AssetType::Container);
 
         Self {
@@ -266,7 +266,7 @@ impl AssetBlockchainManager {
     /// Query asset records by asset ID
     pub async fn get_asset_records(
         &self,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
     ) -> Result<Vec<HyperMeshAssetRecord>, String> {
         // TODO: Query blockchain for asset records
         // This would search the replicated log for all records matching the asset ID
@@ -277,7 +277,7 @@ impl AssetBlockchainManager {
     /// Get current asset status from blockchain
     pub async fn get_asset_status(
         &self,
-        _asset_id: &AssetId,
+        _asset_id: &AssetRegistration,
     ) -> Result<Option<HyperMeshAssetRecord>, String> {
         // TODO: Get latest asset record from blockchain
         // This would query the latest committed state for the asset
@@ -289,7 +289,7 @@ impl AssetBlockchainManager {
         &self,
         record: &HyperMeshAssetRecord,
     ) -> ConsensusResult<ConsensusProof> {
-        let node_id = crate::transport::NodeId::from_name(self.node_authority.clone());
+        let node_id = crate::transport::PeerIdentity::from_name(self.node_authority.clone());
         let operation_type = record.record_type.to_string();
         
         self.consensus.create_consensus_proof(
@@ -332,7 +332,7 @@ impl AssetBlockchainManager {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ComputeExecutionRecord {
     /// Asset ID of the compute resource
-    pub compute_asset_id: AssetId,
+    pub compute_asset_id: AssetRegistration,
     /// Code to execute
     pub code: String,
     /// Language for execution

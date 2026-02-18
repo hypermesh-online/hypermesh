@@ -45,7 +45,7 @@ pub use allocation_types::{
 
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use crate::assets::core::{AssetId, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, PrivacyLevel};
 
 // Type alias for compatibility
 pub type ResourceAllocation = ResourceAllocationConfig;
@@ -54,7 +54,7 @@ pub type ResourceAllocation = ResourceAllocationConfig;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacyAllocationResult {
     /// Asset being allocated
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     
     /// Privacy allocation type (from Proof of State patterns)
     pub allocation_type: PrivacyAllocationType,

@@ -11,9 +11,9 @@ use uuid::Uuid;
 use crate::assets::matrix_blockchain::{
     EntityType, PublicValidationResponse, PrivacyPolicyConfig,
 };
-use crate::assets::core::AssetId as CoreAssetId;
+use crate::assets::core::AssetRegistration as CoreAssetId;
 use super::super::{
-    ExecutionContext, ExecutionResult, PrivacyLevel, AssetId,
+    ExecutionContext, ExecutionResult, PrivacyLevel, ExecutionId,
     VMConfig,
 };
 
@@ -263,7 +263,7 @@ pub struct EntityInteraction {
     pub interaction_type: InteractionType,
     pub source_entity: String,
     pub target_entity: String,
-    pub asset_id: Option<AssetId>,
+    pub asset_id: Option<ExecutionId>,
     pub timestamp: std::time::SystemTime,
     pub privacy_level: PrivacyLevel,
 }

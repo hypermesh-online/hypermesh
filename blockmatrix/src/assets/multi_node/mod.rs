@@ -27,7 +27,7 @@ use async_trait::async_trait;
 
 #[cfg(feature = "multi-node")]
 use crate::assets::core::{
-    AssetId, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyLevel,
+    AssetRegistration, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyLevel,
 };
 
 #[cfg(feature = "multi-node")]
@@ -74,21 +74,21 @@ pub use multi_network_coordinator::{
     IsolationReport, EngagementEventType, NetworkEngagementMetrics,
 };
 
-// Use canonical NodeId from transport layer
-pub use crate::transport::NodeId;
+// Use canonical PeerIdentity from transport layer
+pub use crate::transport::PeerIdentity;
 
 #[cfg(feature = "multi-node")]
 /// Multi-node network topology
 #[derive(Clone, Debug)]
 pub struct NetworkTopology {
     /// All known nodes in the network
-    pub nodes: HashMap<NodeId, NodeInfo>,
+    pub nodes: HashMap<PeerIdentity, NodeInfo>,
     /// Network partitions (for handling split-brain)
     pub partitions: Vec<NetworkPartition>,
     /// Inter-node latency matrix (microseconds)
-    pub latency_matrix: HashMap<(NodeId, NodeId), u64>,
+    pub latency_matrix: HashMap<(PeerIdentity, PeerIdentity), u64>,
     /// Bandwidth matrix between nodes (Mbps)
-    pub bandwidth_matrix: HashMap<(NodeId, NodeId), u64>,
+    pub bandwidth_matrix: HashMap<(PeerIdentity, PeerIdentity), u64>,
     /// Last topology update
     pub last_updated: SystemTime,
 }
@@ -100,7 +100,7 @@ pub struct NetworkPartition {
     /// Partition identifier
     pub partition_id: String,
     /// Nodes in this partition
-    pub nodes: HashSet<NodeId>,
+    pub nodes: HashSet<PeerIdentity>,
     /// Partition creation time
     pub created_at: SystemTime,
     /// Whether partition is healed
@@ -112,13 +112,13 @@ pub struct NetworkPartition {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DistributedAssetState {
     /// Asset identifier
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Primary owner node
-    pub primary_node: NodeId,
+    pub primary_node: PeerIdentity,
     /// Replica nodes
-    pub replica_nodes: Vec<NodeId>,
+    pub replica_nodes: Vec<PeerIdentity>,
     /// Current state across nodes
-    pub node_states: HashMap<NodeId, AssetState>,
+    pub node_states: HashMap<PeerIdentity, AssetState>,
     /// Consensus proof for state
     pub consensus_proof: ConsensusProof,
     /// Version number for conflict resolution
@@ -132,15 +132,15 @@ pub struct DistributedAssetState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AllocationDecision {
     /// Asset to allocate
-    pub asset_id: AssetId,
+    pub asset_id: AssetRegistration,
     /// Selected node for allocation
-    pub target_node: NodeId,
+    pub target_node: PeerIdentity,
     /// Allocation score (higher is better)
     pub score: f64,
     /// Decision timestamp
     pub decided_at: SystemTime,
     /// Consensus participants
-    pub participants: Vec<NodeId>,
+    pub participants: Vec<PeerIdentity>,
     /// Consensus signatures
     pub signatures: Vec<Vec<u8>>,
 }
@@ -150,7 +150,7 @@ pub struct AllocationDecision {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceSharingRequest {
     /// Requesting node
-    pub requester: NodeId,
+    pub requester: PeerIdentity,
     /// Resource type needed
     pub resource_type: AssetType,
     /// Amount of resource needed
@@ -186,7 +186,7 @@ pub enum ResourceAmount {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceSharingOffer {
     /// Offering node
-    pub provider: NodeId,
+    pub provider: PeerIdentity,
     /// Resource type offered
     pub resource_type: AssetType,
     /// Amount available
@@ -238,23 +238,23 @@ pub enum DataLocalityRequirement {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MultiNodeEvent {
     /// Node joined the network
-    NodeJoined { node: NodeId, capabilities: NodeCapabilities },
+    NodeJoined { node: PeerIdentity, capabilities: NodeCapabilities },
     /// Node left the network
-    NodeLeft { node: NodeId, reason: String },
+    NodeLeft { node: PeerIdentity, reason: String },
     /// Node failure detected
-    NodeFailed { node: NodeId, detection_time: SystemTime },
+    NodeFailed { node: PeerIdentity, detection_time: SystemTime },
     /// Network partition detected
     PartitionDetected { partition: NetworkPartition },
     /// Network partition healed
     PartitionHealed { partition_id: String },
     /// Asset migration started
-    MigrationStarted { asset_id: AssetId, from: NodeId, to: NodeId },
+    MigrationStarted { asset_id: AssetRegistration, from: PeerIdentity, to: PeerIdentity },
     /// Asset migration completed
-    MigrationCompleted { asset_id: AssetId, new_node: NodeId },
+    MigrationCompleted { asset_id: AssetRegistration, new_node: PeerIdentity },
     /// Resource sharing negotiation
     SharingNegotiation { request: ResourceSharingRequest, offers: Vec<ResourceSharingOffer> },
     /// Byzantine behavior detected
-    ByzantineDetected { node: NodeId, evidence: Vec<u8> },
+    ByzantineDetected { node: PeerIdentity, evidence: Vec<u8> },
 }
 
 #[cfg(feature = "multi-node")]
@@ -262,7 +262,7 @@ pub enum MultiNodeEvent {
 #[async_trait]
 pub trait MultiNodeCoordinatorTrait: Send + Sync {
     /// Initialize coordinator with node information
-    async fn initialize(&mut self, local_node: NodeId) -> AssetResult<()>;
+    async fn initialize(&mut self, local_node: PeerIdentity) -> AssetResult<()>;
 
     /// Join the multi-node network
     async fn join_network(&self) -> AssetResult<()>;
@@ -271,19 +271,19 @@ pub trait MultiNodeCoordinatorTrait: Send + Sync {
     async fn leave_network(&self) -> AssetResult<()>;
 
     /// Allocate asset across multiple nodes
-    async fn allocate_asset(&self, asset_id: AssetId) -> AssetResult<AllocationDecision>;
+    async fn allocate_asset(&self, asset_id: AssetRegistration) -> AssetResult<AllocationDecision>;
 
     /// Migrate asset between nodes
-    async fn migrate_asset(&self, asset_id: AssetId, target_node: NodeId) -> AssetResult<()>;
+    async fn migrate_asset(&self, asset_id: AssetRegistration, target_node: PeerIdentity) -> AssetResult<()>;
 
     /// Handle node failure
-    async fn handle_node_failure(&self, failed_node: NodeId) -> AssetResult<()>;
+    async fn handle_node_failure(&self, failed_node: PeerIdentity) -> AssetResult<()>;
 
     /// Detect and handle Byzantine nodes
-    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<NodeId>>;
+    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>>;
 
     /// Synchronize asset state across nodes
-    async fn sync_asset_state(&self, asset_id: AssetId) -> AssetResult<DistributedAssetState>;
+    async fn sync_asset_state(&self, asset_id: AssetRegistration) -> AssetResult<DistributedAssetState>;
 
     /// Request resource sharing from other nodes
     async fn request_resources(&self, request: ResourceSharingRequest) -> AssetResult<Vec<ResourceSharingOffer>>;
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_node_id_creation() {
-        let node_id = NodeId {
+        let node_id = PeerIdentity {
             name: "test-node".to_string(),
             id: [1u8; 32],
             address: Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1),

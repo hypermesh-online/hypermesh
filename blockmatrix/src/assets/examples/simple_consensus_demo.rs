@@ -10,7 +10,7 @@ use hypermesh_assets::blockchain::{
     HyperMeshAssetRecord, AssetRecordType, HyperMeshBlockData,
 };
 use hypermesh_lib::PrivacyMode;
-use hypermesh_assets::core::asset_id::{AssetId, AssetType};
+use hypermesh_assets::core::asset_id::{AssetRegistration, AssetType};
 use crate::consensus::{
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     NetworkPosition, AccessPermissions, AccessLevel,
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("============================================");
     
     // 1. Create test asset
-    let asset_id = AssetId::new(AssetType::Cpu);
+    let asset_id = AssetRegistration::new(AssetType::Cpu);
     println!("✅ Created Asset ID: {}", asset_id.to_hex_string());
     
     // 2. Generate all four proofs (Proof of State pattern)

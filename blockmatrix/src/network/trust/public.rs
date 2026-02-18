@@ -21,9 +21,9 @@ use tokio::sync::RwLock;
 use tracing::{info, debug, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType, NetworkId,
+    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
     StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate,
-    ProofOfState,
+    ProofOfState, new_random_network_id,
 };
 
 /// Public network handler - BlockMatrix blockchain-registered certificates
@@ -241,7 +241,7 @@ impl NetworkHandler for PublicNetworkHandler {
         }
 
         let connection = NetworkConnection {
-            network_id: NetworkId::new_v4(),
+            network_id: new_random_network_id(),
             network_type: NetworkType::Public,
             stoq_transport: stoq,
             certificate: Some(blockchain_cert),

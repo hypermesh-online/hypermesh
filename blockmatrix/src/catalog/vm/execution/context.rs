@@ -13,7 +13,7 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 use crate::consensus::proof::ConsensusProof;
-use crate::catalog::vm::{AssetAllocation, PrivacyConfig, AssetId};
+use crate::catalog::vm::{AssetAllocation, PrivacyConfig, ExecutionId};
 
 /// Execution context containing all necessary state for consensus execution
 #[derive(Debug, Clone)]
@@ -237,7 +237,7 @@ impl ExecutionContext {
     }
     
     /// Get asset ID from consensus proof
-    pub fn asset_id(&self) -> AssetId {
+    pub fn asset_id(&self) -> ExecutionId {
         // In practice, this would be derived from the consensus proof or context
         Uuid::new_v4()
     }

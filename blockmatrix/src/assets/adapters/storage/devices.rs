@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{StorageType, AssetId};
+use crate::assets::core::{StorageType, AssetRegistration};
 use crate::os_integration::{create_os_abstraction, StorageType as OsStorageType};
 
 /// Storage device information
@@ -38,7 +38,7 @@ pub struct StorageDevice {
     /// Current status
     pub status: StorageStatus,
     /// Current allocation asset ID
-    pub allocated_to: Option<AssetId>,
+    pub allocated_to: Option<AssetRegistration>,
     /// Health metrics
     pub health_metrics: StorageHealthMetrics,
     /// SMART data
