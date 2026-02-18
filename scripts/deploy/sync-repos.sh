@@ -242,7 +242,7 @@ Universal asset management library with JuliaVM for secure remote code execution
 Catalog provides the asset management foundation for HyperMesh:
 - **Universal Asset Management**: Handle any digital asset type
 - **JuliaVM Integration**: Secure remote code execution in sandboxed environment
-- **Consensus Validation**: PoW/PoS consensus integration for asset operations
+- **Proof of State Validation**: PoS validation integration for asset operations
 - **Cross-Platform Assets**: Assets work across different HyperMesh nodes
 
 ## Status
@@ -408,7 +408,7 @@ create_trustchain_readme() {
     cat > "$1" << 'EOF'
 # TrustChain Certificate Authority
 
-CA/CT/DNS bootstrap foundation with Proof of State consensus validation.
+CA/CT/DNS bootstrap foundation with Proof of State validation.
 
 ## Overview
 

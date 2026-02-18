@@ -158,7 +158,43 @@ function parseTomlArray(arrayStr: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Code Metrics Collection
+// Project Type Detection
+// ---------------------------------------------------------------------------
+
+type ProjectType = "rust" | "typescript";
+
+function detectProjectType(crateDir: string): { type: ProjectType; srcDir: string } | null {
+  // Rust crate: has src/ directory
+  const rustSrc = join(crateDir, "src");
+  if (existsSync(rustSrc)) {
+    return { type: "rust", srcDir: rustSrc };
+  }
+
+  // TypeScript/JS project: has a subdirectory containing package.json
+  // (e.g., ui/frontend/package.json)
+  try {
+    const entries = readdirSync(crateDir);
+    for (const entry of entries) {
+      const subDir = join(crateDir, entry);
+      if (entry === "node_modules" || entry.startsWith(".")) continue;
+      try {
+        const stat = statSync(subDir);
+        if (stat.isDirectory() && existsSync(join(subDir, "package.json"))) {
+          return { type: "typescript", srcDir: subDir };
+        }
+      } catch {
+        // Skip inaccessible entries
+      }
+    }
+  } catch {
+    // Skip inaccessible directories
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Code Metrics Collection - Rust
 // ---------------------------------------------------------------------------
 
 function countRsFiles(srcDir: string): number {
@@ -176,7 +212,7 @@ function countRsFiles(srcDir: string): number {
   }
 }
 
-function countLinesOfCode(srcDir: string): number {
+function countRsLinesOfCode(srcDir: string): number {
   if (!existsSync(srcDir)) {
     return 0;
   }
@@ -191,7 +227,7 @@ function countLinesOfCode(srcDir: string): number {
   }
 }
 
-function countTests(srcDir: string): number {
+function countRsTests(srcDir: string): number {
   if (!existsSync(srcDir)) {
     return 0;
   }
@@ -206,13 +242,80 @@ function countTests(srcDir: string): number {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Code Metrics Collection - TypeScript/JavaScript
+// ---------------------------------------------------------------------------
+
+function countTsFiles(srcDir: string): number {
+  if (!existsSync(srcDir)) {
+    return 0;
+  }
+  try {
+    const output = execSync(
+      `find "${srcDir}" -not -path "*/node_modules/*" \\( -name "*.ts" -o -name "*.tsx" \\) | wc -l`,
+      { encoding: "utf-8" }
+    );
+    return parseInt(output.trim(), 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function countTsLinesOfCode(srcDir: string): number {
+  if (!existsSync(srcDir)) {
+    return 0;
+  }
+  try {
+    const output = execSync(
+      `find "${srcDir}" -not -path "*/node_modules/*" \\( -name "*.ts" -o -name "*.tsx" \\) -exec cat {} + 2>/dev/null | wc -l`,
+      { encoding: "utf-8" }
+    );
+    return parseInt(output.trim(), 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function countTsTests(srcDir: string): number {
+  if (!existsSync(srcDir)) {
+    return 0;
+  }
+  try {
+    // Count test files: *.test.ts(x), *.spec.ts(x), and files inside __tests__/
+    const output = execSync(
+      `find "${srcDir}" -not -path "*/node_modules/*" \\( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" \\) | wc -l`,
+      { encoding: "utf-8" }
+    );
+    return parseInt(output.trim(), 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unified Stats Collection
+// ---------------------------------------------------------------------------
+
 function collectCrateStats(crateDir: string, crateId: string): CrateStats {
-  const srcDir = join(crateDir, "src");
+  const project = detectProjectType(crateDir);
+  if (!project) {
+    return { id: crateId, files: 0, linesOfCode: 0, testCount: 0 };
+  }
+
+  if (project.type === "typescript") {
+    return {
+      id: crateId,
+      files: countTsFiles(project.srcDir),
+      linesOfCode: countTsLinesOfCode(project.srcDir),
+      testCount: countTsTests(project.srcDir),
+    };
+  }
+
   return {
     id: crateId,
-    files: countRsFiles(srcDir),
-    linesOfCode: countLinesOfCode(srcDir),
-    testCount: countTests(srcDir),
+    files: countRsFiles(project.srcDir),
+    linesOfCode: countRsLinesOfCode(project.srcDir),
+    testCount: countRsTests(project.srcDir),
   };
 }
 
@@ -408,10 +511,10 @@ function main(): void {
   for (const crateDir of crateDirs) {
     const dirName = crateDir.split("/").pop() ?? "";
     const tomlPath = join(crateDir, "crate-status.toml");
-    const srcDir = join(crateDir, "src");
 
-    // Skip directories without src/ (not crates)
-    if (!existsSync(srcDir)) {
+    // Skip directories that are not a recognized project (no src/ or package.json)
+    const project = detectProjectType(crateDir);
+    if (!project) {
       continue;
     }
 
@@ -476,9 +579,9 @@ function main(): void {
   console.log("--- Summary ---");
   console.log(`Crates with status: ${statuses.length}`);
   console.log(`Crates with stats:  ${stats.length}`);
-  console.log(`Total .rs files:    ${totalFiles}`);
+  console.log(`Total source files: ${totalFiles}`);
   console.log(`Total lines of code: ${totalLines}`);
-  console.log(`Total #[test] fns:  ${totalTests}`);
+  console.log(`Total tests:        ${totalTests}`);
 
   if (hasErrors) {
     console.error("\n[ERROR] Some crate-status.toml files had errors (see above)");

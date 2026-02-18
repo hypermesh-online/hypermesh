@@ -126,7 +126,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 - **Anonymous**: No identity tracking, privacy-first sharing
 - **Private**: Internal network only, no external access
 - **Federated**: Trusted network groups with selective sharing
-- **Public**: Cross-network accessible, full discovery with consensus validation
+- **Public**: Cross-network accessible, full discovery with Proof of State validation
 
 **Privacy Levels**:
 - `Private`: No public access
@@ -167,7 +167,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 **What EXISTS today**:
 - ✅ Single blockchain per node (local Device scope only)
 - ✅ Multi-network participation (Anonymous/P2P/Federated/Public networks via STOQ)
-- ✅ Basic Proof of State consensus (four proofs: PoSpace/PoStake/PoWork/PoTime)
+- ✅ Basic Proof of State validation (four proofs: PoSpace/PoStake/PoWork/PoTime)
 - ✅ Asset system with blockchain registration
 - ❌ Multi-blockchain-per-node capability (NOT implemented)
 - ❌ BlockchainScope abstraction (does NOT exist)
@@ -176,7 +176,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 
 **Key File Status**:
 - `/blockmatrix/src/blockchain/` - Single blockchain implementation (Device scope only)
-- `/blockmatrix/src/consensus/` - Basic PoS consensus, no scope awareness
+- `/blockmatrix/src/consensus/` - Basic PoS validation, no scope awareness
 - No `blockchain_scope.rs` or similar scope management files exist
 
 #### Target Multi-Scope Architecture (FUTURE VISION)

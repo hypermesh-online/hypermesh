@@ -112,7 +112,7 @@ This document defines the **separation of concerns** between three critical laye
 - `SeedInfo` - Seeding and mirroring metadata
 - Generic `ExtensionHeader` structure matches architecture specification
 
-**Certificate Validation**: `/stoq/src/transport/certificates.rs` includes references to "Proof of State consensus proof validation"
+**Certificate Validation**: `/stoq/src/transport/certificates.rs` includes references to "Proof of State proof validation"
 
 **Implication**: Phase 2 must **refactor** existing code, not create from scratch. The architecture defines the TARGET state and migration path from CURRENT state.
 
@@ -831,7 +831,7 @@ With proper separation, STOQ could become an IETF standard:
 ### 13.2 Certificate Validation Cleanup
 
 **File**: `/stoq/src/transport/certificates.rs`
-- **Issue**: Contains reference to "Proof of State consensus proof validation"
+- **Issue**: Contains reference to "Proof of State proof validation"
 - **Decision**: ⚠️ **REMOVE PoS** - Keep only generic certificate validation
 - **Action**:
   - Remove: PoS-specific validation logic

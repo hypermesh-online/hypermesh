@@ -1,7 +1,7 @@
 [crate]
 name = "Gateway"
 id = "gateway"
-description = "HTTP/3 gateway for trustchain.hypermesh.online and federated entry points"
+description = "HTTP/3 gateway for trust.hypermesh.online and federated entry points"
 phase = "planning"
 
 [features.working]

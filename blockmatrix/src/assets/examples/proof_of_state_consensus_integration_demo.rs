@@ -169,8 +169,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    println!("\n🎉 Proof of State Four-Proof Consensus Integration Complete!");
-    println!("   HyperMesh now uses the complete Proof of State consensus system for all asset operations.");
+    println!("\n🎉 Proof of State Four-Proof Validation Integration Complete!");
+    println!("   HyperMesh now uses the complete Proof of State validation system for all asset operations.");
     println!("   Every asset operation requires WHERE/WHO/WHAT/WHEN validation.");
     
     Ok(())

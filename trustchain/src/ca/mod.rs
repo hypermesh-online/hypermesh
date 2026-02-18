@@ -4,7 +4,7 @@
 
 //! Certificate Authority Implementation
 //! 
-//! TrustChain Certificate Authority with Proof of State consensus validation and mandatory security integration
+//! TrustChain Certificate Authority with Proof of State validation and mandatory security integration
 //! Supports both localhost testing and production deployment with IPv6-only networking
 
 use std::sync::Arc;

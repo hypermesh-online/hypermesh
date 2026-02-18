@@ -153,7 +153,7 @@ impl ServiceDiscovery {
                 name: "trustchain".to_string(),
                 address: Ipv6Addr::LOCALHOST,
                 port: 9293,
-                server_name: Some("trustchain.hypermesh.online".to_string()),
+                server_name: Some("trust.hypermesh.online".to_string()),
                 metadata: ServiceMetadata {
                     version: Some("1.0.0".to_string()),
                     capabilities: vec!["ca".to_string(), "verification".to_string()],

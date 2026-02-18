@@ -108,7 +108,7 @@ export const crateStatuses: CrateStatus[] = [
   {
     "id": "gateway",
     "name": "Gateway",
-    "description": "HTTP/3 gateway for trustchain.hypermesh.online and federated entry points",
+    "description": "HTTP/3 gateway for trust.hypermesh.online and federated entry points",
     "phase": "planning",
     "features": {
       "working": [
@@ -221,7 +221,7 @@ export const crateStatuses: CrateStatus[] = [
   {
     "id": "trustchain",
     "name": "TrustChain",
-    "description": "FALCON-1024 Certificate Authority with Proof of State consensus",
+    "description": "FALCON-1024 Certificate Authority with Proof of State validation",
     "phase": "alpha",
     "features": {
       "working": [
@@ -229,7 +229,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 post-quantum signing",
         "Kyber-1024 key encapsulation",
         "Certificate Transparency (Merkle logs, SCTs)",
-        "Proof of State four-proof consensus",
+        "Proof of State four-proof validation",
         "Security monitoring and Byzantine detection",
         "DNS resolver with STOQ transport",
         "STOQ-based API server"
@@ -247,5 +247,40 @@ export const crateStatuses: CrateStatus[] = [
       ]
     },
     "completion": 53
+  },
+  {
+    "id": "ui",
+    "name": "HyperMesh UI",
+    "description": "React dashboard for HyperMesh ecosystem monitoring and management",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "Dashboard home with ecosystem overview",
+        "Module pages (STOQ, TrustChain, Catalog, Caesar, NGauge, HyperMesh)",
+        "Component library (Radix UI primitives, Tailwind 4)",
+        "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
+        "TrustChain management (certificates, security, consensus, node config)",
+        "Asset management views (creation wizard, advanced management)",
+        "Proxy and NAT address management",
+        "API status monitoring and performance dashboards",
+        "Global search across ecosystem modules",
+        "Storybook component documentation (5 stories)",
+        "Accessibility wrappers and keyboard navigation",
+        "React Router page routing with sidebar navigation"
+      ],
+      "inDevelopment": [
+        "E2E test suite (Playwright, 2 specs)",
+        "STOQ native demo (WebAssembly integration)",
+        "Integration test harness page",
+        "Component unit tests (Vitest, 3 test files)"
+      ],
+      "planned": [
+        "Live STOQ WebSocket data connections",
+        "Real-time metrics streaming",
+        "Multi-node cluster topology visualization",
+        "Security monitoring with live alerts"
+      ]
+    },
+    "completion": 60
   }
 ];

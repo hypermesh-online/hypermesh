@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Comprehensive tests for Proof of State consensus validation
+//! Comprehensive tests for Proof of State validation
 //!
 //! Tests all four proofs (WHO, WHEN, WHERE, WHAT) and their integration
 //!

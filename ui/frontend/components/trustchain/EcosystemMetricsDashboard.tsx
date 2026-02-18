@@ -132,7 +132,7 @@ const defaultSystemStatuses: SystemStatus[] = [
       'Validators': '67',
       'Finality Time': '2.3s'
     },
-    description: 'Proof of State consensus with PoSp+PoSt+PoWk+PoTm validation'
+    description: 'Proof of State validation with PoSp+PoSt+PoWk+PoTm authentication'
   }
 ];
 
@@ -481,7 +481,7 @@ export function EcosystemMetricsDashboard({
             <CardHeader>
               <CardTitle className="text-white">Four-Proof Consensus</CardTitle>
               <CardDescription className="text-gray-400">
-                Proof of State protocol consensus validation status
+                Proof of State protocol validation status
               </CardDescription>
             </CardHeader>
             <CardContent>

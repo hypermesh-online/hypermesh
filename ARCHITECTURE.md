@@ -236,7 +236,7 @@ Userspace eBPF validation framework consumed by STOQ:
 
 **Crate**: `gateway/` | **1,438 lines** | **Phase**: planning
 
-HTTP/3 gateway for `trustchain.hypermesh.online` and federated entry points:
+HTTP/3 gateway for `trust.hypermesh.online` and federated entry points:
 - QUIC/HTTP3 server setup (quinn + h3)
 - Router with path-based backend selection
 - Circuit breaker and retry logic

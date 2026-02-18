@@ -1,0 +1,37 @@
+[crate]
+name = "HyperMesh UI"
+id = "ui"
+description = "React dashboard for HyperMesh ecosystem monitoring and management"
+phase = "alpha"
+
+[features.working]
+items = [
+    "Dashboard home with ecosystem overview",
+    "Module pages (STOQ, TrustChain, Catalog, Caesar, NGauge, HyperMesh)",
+    "Component library (Radix UI primitives, Tailwind 4)",
+    "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
+    "TrustChain management (certificates, security, consensus, node config)",
+    "Asset management views (creation wizard, advanced management)",
+    "Proxy and NAT address management",
+    "API status monitoring and performance dashboards",
+    "Global search across ecosystem modules",
+    "Storybook component documentation (5 stories)",
+    "Accessibility wrappers and keyboard navigation",
+    "React Router page routing with sidebar navigation",
+]
+
+[features.in_development]
+items = [
+    "E2E test suite (Playwright, 2 specs)",
+    "STOQ native demo (WebAssembly integration)",
+    "Integration test harness page",
+    "Component unit tests (Vitest, 3 test files)",
+]
+
+[features.planned]
+items = [
+    "Live STOQ WebSocket data connections",
+    "Real-time metrics streaming",
+    "Multi-node cluster topology visualization",
+    "Security monitoring with live alerts",
+]

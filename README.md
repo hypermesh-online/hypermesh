@@ -1,6 +1,6 @@
 # HyperMesh Core
 
-A sovereign distributed computing platform built on a six-layer stack with post-quantum cryptography, 3D matrix topology, and bilateral Proof of State consensus.
+A sovereign distributed computing platform built on a six-layer stack with post-quantum cryptography, 3D matrix topology, and bilateral Proof of State authentication.
 
 **8 crates** | **575 .rs files** | **208,787 lines** | **816 tests** | **0 compiler errors**
 

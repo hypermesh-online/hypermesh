@@ -1,7 +1,7 @@
 [crate]
 name = "TrustChain"
 id = "trustchain"
-description = "FALCON-1024 Certificate Authority with Proof of State consensus"
+description = "FALCON-1024 Certificate Authority with Proof of State validation"
 phase = "alpha"
 
 [features.working]
@@ -10,7 +10,7 @@ items = [
     "FALCON-1024 post-quantum signing",
     "Kyber-1024 key encapsulation",
     "Certificate Transparency (Merkle logs, SCTs)",
-    "Proof of State four-proof consensus",
+    "Proof of State four-proof validation",
     "Security monitoring and Byzantine detection",
     "DNS resolver with STOQ transport",
     "STOQ-based API server",

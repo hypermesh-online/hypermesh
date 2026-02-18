@@ -45,7 +45,7 @@ pub enum ComputeBlockType {
 - **Resource Sharing**: User-configurable privacy levels
 
 ### 3. Four-Proof Consensus Integration
-All operations require Proof of State's complete consensus validation:
+All operations require Proof of State's complete validation:
 - **PoSpace (WHERE)**: Storage/network location validation
 - **PoStake (WHO)**: Ownership and access rights verification  
 - **PoWork (WHAT/HOW)**: Computational resource commitment
@@ -210,7 +210,7 @@ let asset_allocations = self.calculate_asset_allocations().await?;
 ## 🛡️ Security Features
 
 ### Consensus-Level Security
-- **Four-Proof Validation**: All operations require complete Proof of State consensus
+- **Four-Proof Validation**: All operations require complete Proof of State validation
 - **Blockchain Integrity**: Cryptographic hashing of all compute blocks
 - **Byzantine Tolerance**: Reputation-based host reliability tracking
 

@@ -5,7 +5,7 @@
 //! Consensus Proof Validation for VM Operations
 //!
 //! This module implements the four-proof validation system for VM operations,
-//! ensuring every operation meets the Proof of State consensus requirements adapted
+//! ensuring every operation meets the Proof of State validation requirements adapted
 //! for HyperMesh's asset-aware execution model.
 
 use std::time::{SystemTime, Duration};

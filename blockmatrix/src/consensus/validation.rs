@@ -4,7 +4,7 @@
 
 //! Consensus validation module
 //!
-//! Provides real Proof of State consensus validation for HyperMesh operations.
+//! Provides real Proof of State validation for HyperMesh operations.
 //! Integrates with TrustChain's four-proof consensus system (WHO, WHEN, WHERE, WHAT).
 
 use anyhow::{Result, anyhow};

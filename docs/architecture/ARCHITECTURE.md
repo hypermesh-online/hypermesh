@@ -201,7 +201,7 @@ certificates:
 
 ### Phase 1: Self-Contained
 ```yaml
-# TrustChain with Proof of State consensus integration
+# TrustChain with Proof of State validation integration
 services:
   ca: "quic://[2001:db8::10]:8443/ca"
   ct: "quic://[2001:db8::10]:8443/ct" 
@@ -225,7 +225,7 @@ ct_logs:
 
 ### Phase 2: HyperMesh Integrated
 ```yaml
-# Proof of State consensus integration with HyperMesh
+# Proof of State validation integration with HyperMesh
 consensus:
   provider: "proof_of_state_consensus_proof"
   architecture: "block_matrix_o_log_n"

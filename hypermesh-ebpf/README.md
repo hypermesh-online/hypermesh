@@ -77,7 +77,7 @@ XDP packet filtering with HyperMesh intelligence:
 
 Implements HyperMesh-specific validation:
 
-- **Proof of State Validator**: Four-proof consensus validation
+- **Proof of State Validator**: Four-proof authentication validation
 - **Asset Hash Validator**: BLAKE3 hash verification
 - **Shard Set Validator**: Multi-part asset integrity
 

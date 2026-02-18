@@ -185,7 +185,7 @@ impl HyperMeshAssetRegistry {
         let consensus = if self.config.enable_consensus {
             consensus_proof.unwrap_or_else(|| {
                 // Create minimal consensus proof for testing
-                // In production, this would come from the Proof of State consensus system
+                // In production, this would come from the Proof of State validation system
                 ConsensusProof::default()
             })
         } else {

@@ -144,7 +144,7 @@ production_mode:
 ### Documentation Updates Required
 - Update all component documentation to reference TrustChain integration
 - Remove references to self-signed certificates for production use
-- Add Proof of State consensus requirements to all specifications
+- Add Proof of State validation requirements to all specifications
 - Update testing procedures for localhost vs production modes
 
 This specification serves as the authoritative source for certificate architecture across the entire Web3 ecosystem.

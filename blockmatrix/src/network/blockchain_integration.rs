@@ -5,7 +5,7 @@
 //! Blockchain Integration for Matrix Position Registration
 //!
 //! This module implements the integration between Matrix Foundation and TrustChain
-//! for validating matrix position claims using Proof of State consensus.
+//! for validating matrix position claims using Proof of State validation.
 //!
 //! Core Functionality:
 //! - Register matrix positions on blockchain as assets

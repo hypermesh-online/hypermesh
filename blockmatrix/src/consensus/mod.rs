@@ -4,8 +4,8 @@
 
 //! HyperMesh Consensus System
 //!
-//! This module re-exports the Proof of State consensus system from TrustChain.
-//! TrustChain implements the four-proof consensus (WHO, WHEN, WHERE, WHAT).
+//! This module re-exports the Proof of State validation system from TrustChain.
+//! TrustChain implements the four-proof validation (WHO, WHEN, WHERE, WHAT).
 //!
 //! For the full consensus implementation, see trustchain::consensus module.
 
