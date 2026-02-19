@@ -24,16 +24,16 @@ items = [
     "MatrixPosition using hypermesh_lib canonical type (f64)",
     "FalconTrustChainClient with real FALCON-1024 signature verification",
     "Tunnel traffic type enforcement in network isolation",
+    "AF_XDP zero-copy UMEM I/O (via hypermesh-ebpf kernel-attach)",
+    "Kernel eBPF program loading (via hypermesh-ebpf ebpf-loader)",
 ]
 
 [features.in_development]
 items = [
-    "AF_XDP zero-copy UMEM I/O (kernel-backed)",
 ]
 
 [features.planned]
 items = [
-    "Kernel eBPF program loading via STOQ",
     "Protocol-level PoS token validation at line rate",
     "Adaptive transport tiers",
     "Multi-path QUIC",

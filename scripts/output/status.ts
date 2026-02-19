@@ -235,19 +235,18 @@ export const crateStatuses: CrateStatus[] = [
         "Dynamic FALCON key_id in protocol frames",
         "MatrixPosition using hypermesh_lib canonical type (f64)",
         "FalconTrustChainClient with real FALCON-1024 signature verification",
-        "Tunnel traffic type enforcement in network isolation"
+        "Tunnel traffic type enforcement in network isolation",
+        "AF_XDP zero-copy UMEM I/O (via hypermesh-ebpf kernel-attach)",
+        "Kernel eBPF program loading (via hypermesh-ebpf ebpf-loader)"
       ],
-      "inDevelopment": [
-        "AF_XDP zero-copy UMEM I/O (kernel-backed)"
-      ],
+      "inDevelopment": [],
       "planned": [
-        "Kernel eBPF program loading via STOQ",
         "Protocol-level PoS token validation at line rate",
         "Adaptive transport tiers",
         "Multi-path QUIC"
       ]
     },
-    "completion": 78
+    "completion": 87
   },
   {
     "id": "trustchain",

@@ -95,14 +95,19 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Done | In Progress | TODO |
 |------|-------------|------|
-| QUIC transport over IPv6 | eBPF capability detection (wired up) | Kernel eBPF program loading |
-| Connection pool with health checks | XDP packet filtering (feature-gated) | Protocol-level PoS token validation |
-| FALCON-1024 key generation and signing | AF_XDP zero-copy sockets (feature-gated) | Adaptive transport tiers |
-| Certificate management (4 strategies) | PoS protocol-level validation stubs | Multi-path QUIC |
-| Network isolation (4 privacy tiers) | | |
+| QUIC transport over IPv6 | | Protocol-level PoS token validation at line rate |
+| Connection pool with health checks | | Adaptive transport tiers |
+| FALCON-1024 key generation and signing | | Multi-path QUIC |
+| Certificate management (4 strategies) | | |
+| Network isolation (PrivacyMode: Anonymous/Private/Public) | | |
 | Adaptive congestion control | | |
 | Transport metrics collection | | |
 | Protocol extension framework (packets/tokens/shards) | | |
+| eBPF transport integration with validation hooks | | |
+| AF_XDP zero-copy UMEM I/O (kernel-backed) | | |
+| PoS validation results fed to eBPF layer | | |
+| FalconTrustChainClient with real FALCON-1024 verification | | |
+| Tunnel traffic type enforcement | | |
 
 ### TrustChain — Identity & Certificates (alpha)
 
@@ -158,12 +163,19 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Done | In Progress | TODO |
 |------|-------------|------|
-| Userspace packet validation framework | XDP program loading via aya (feature-gated) | Kernel-space PoS validation |
-| PoS header parsing and validation | BPF map synchronization | AF_XDP zero-copy fast path |
-| Asset hash verification (BLAKE3) | Privacy tier header enforcement | Hardware offload support |
+| Unified HyperMeshEbpf orchestrator API | | Kernel-space PoS validation at line rate |
+| XDP program management and packet filtering | | Hardware offload support (smart NICs) |
+| AF_XDP zero-copy UMEM I/O (4-ring buffers, sendto/poll) | | Multi-queue AF_XDP load balancing |
+| eBPF program compiler and kernel loader | | |
+| Validation hooks (certificate, packet, extension) | | |
+| PoS header parsing and enhanced validation | | |
+| Asset hash verification (BLAKE3) | | |
 | Matrix routing path validation | | |
-| Policy map management | | |
-| Metrics collection framework | | |
+| Policy map management with BPF map sync | | |
+| Privacy tier eBPF enforcement | | |
+| C kernel XDP program (HyperMesh extension headers) | | |
+| Unified intelligence + transport metrics | | |
+| AF_XDP frame allocator with batch operations | | |
 
 ### Gateway — HTTP/3 Entry Point (planning)
 
