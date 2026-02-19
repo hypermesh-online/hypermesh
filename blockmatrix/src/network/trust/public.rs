@@ -230,10 +230,12 @@ impl NetworkHandler for PublicNetworkHandler {
         // Store certificate
         *self.blockchain_cert.write().await = Some(blockchain_cert.clone());
 
-        // Initialize LOCAL blockchain state
-        let mut state = self.blockchain_state.write().await;
-        state.join_block_height = 1; // Start from genesis on local blockchain
-        state.current_block_height = 1;
+        // Initialize LOCAL blockchain state — drop write guard before register_dns() which takes read lock
+        {
+            let mut state = self.blockchain_state.write().await;
+            state.join_block_height = 1; // Start from genesis on local blockchain
+            state.current_block_height = 1;
+        }
 
         // Register DNS-as-Asset on LOCAL blockchain if provided
         if let Some(dns_name) = config.dns_name {

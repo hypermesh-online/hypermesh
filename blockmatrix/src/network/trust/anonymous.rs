@@ -165,17 +165,19 @@ impl NetworkHandler for AnonymousNetworkHandler {
     async fn disconnect(&self) -> Result<()> {
         info!("Disconnecting from anonymous network");
 
-        // Log session stats
-        let metadata = self.session_metadata.read().await;
-        if let Some(start_time) = metadata.start_time {
-            let duration = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs() - start_time;
-            info!(
-                "Anonymous session ended - Duration: {}s, Requests: {}, Bytes: {}",
-                duration, metadata.request_count, metadata.bytes_transferred
-            );
+        // Log session stats — drop read guard before clear_session() which takes write lock
+        {
+            let metadata = self.session_metadata.read().await;
+            if let Some(start_time) = metadata.start_time {
+                let duration = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() - start_time;
+                info!(
+                    "Anonymous session ended - Duration: {}s, Requests: {}, Bytes: {}",
+                    duration, metadata.request_count, metadata.bytes_transferred
+                );
+            }
         }
 
         // Destroy all ephemeral data
