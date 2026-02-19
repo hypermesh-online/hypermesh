@@ -321,7 +321,8 @@ mod integration_tests {
         assert!(PrivacyMode::PUBLIC.allows_access_from(&PrivacyMode::PRIVATE));
         
         // Test CAESAR reward multipliers
-        assert_eq!(PrivacyMode::PRIVATE.caesar_reward_multiplier(), 0.0);
+        assert_eq!(PrivacyMode::ANONYMOUS.caesar_reward_multiplier(), 0.0);
+        assert_eq!(PrivacyMode::PRIVATE.caesar_reward_multiplier(), 0.5);
         assert_eq!(PrivacyMode::PUBLIC.caesar_reward_multiplier(), 1.0);
         assert!(PrivacyMode::PRIVATE.caesar_reward_multiplier() > 0.0);
         assert!(PrivacyMode::PRIVATE.caesar_reward_multiplier() < 1.0);

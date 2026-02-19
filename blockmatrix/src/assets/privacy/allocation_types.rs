@@ -78,7 +78,12 @@ impl PrivacyAllocationType {
         }
     }
     
-    /// Get base CAESAR reward multiplier
+    /// Get base CAESAR reward multiplier for resource allocation.
+    ///
+    /// Distinct from [`PrivacyMode::caesar_multiplier()`] which rewards identity transparency
+    /// (Public=1.0, Anonymous=0.0). This multiplier rewards resource-sharing generosity:
+    /// Anonymous shares most freely (0.5), Private shares nothing (0.0), and Verified (1.0)
+    /// is unique to allocation -- requiring identity verification for maximum rewards.
     pub fn base_reward_multiplier(&self) -> f32 {
         match self {
             PrivacyAllocationType::Private => 0.0, // No rewards for private allocation

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{AssetResult, AssetError, PrivacyMode};
 use super::super::PrivacyAllocationType;
+use crate::assets::privacy::core::PrivacyPreference;
 
 // Re-export sub-modules
 pub use super::data_management::{DataMinimizationSettings, RetentionPreferences};
@@ -72,19 +73,6 @@ pub struct PrivacySettings {
     
     /// Privacy dashboard preferences
     pub dashboard_preferences: DashboardPreferences,
-}
-
-/// Privacy preference options (user's desired privacy/functionality balance)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum PrivacyPreference {
-    /// Maximum privacy protection
-    MaximumPrivacy,
-    /// Balance privacy and functionality
-    Balanced,
-    /// Maximum functionality with minimal privacy
-    MaximumFunctionality,
-    /// Custom configuration
-    Custom,
 }
 
 impl UserPrivacyConfig {
@@ -192,8 +180,4 @@ impl Default for PrivacySettings {
     }
 }
 
-impl Default for PrivacyPreference {
-    fn default() -> Self {
-        PrivacyPreference::Balanced
-    }
-}
+// PrivacyPreference and its Default impl are imported from crate::assets::privacy::core

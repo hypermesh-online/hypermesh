@@ -848,25 +848,6 @@ impl IntelligenceLayer {
         }
     }
 }
-
-// Extension trait for PrivacyMode to determine replication factor
-#[allow(dead_code)] // Used for future shard replication strategy
-trait PrivacyModeExt {
-    fn replication_factor(&self) -> usize;
-}
-
-impl PrivacyModeExt for PrivacyMode {
-    fn replication_factor(&self) -> usize {
-        if *self == PrivacyMode::PUBLIC {
-            5  // High replication for public access
-        } else if *self == PrivacyMode::PRIVATE {
-            3  // Federated-level replication (higher value of collapsed pair)
-        } else {
-            1  // ANONYMOUS: minimal replication
-        }
-    }
-}
-
 // Extension trait for MatrixCoordinate to create endpoint
 #[allow(dead_code)] // Used for future matrix-to-network endpoint mapping
 trait MatrixCoordinateExt {

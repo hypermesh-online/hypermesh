@@ -146,7 +146,7 @@ export const crateStatuses: CrateStatus[] = [
         "Unified HyperMeshEbpf orchestrator API with real state management",
         "System capability detection (XDP, AF_XDP, kernel version)",
         "XDP program management and packet filtering",
-        "AF_XDP zero-copy socket management with kernel capability probing",
+        "AF_XDP zero-copy socket management with real UMEM I/O (sendto/poll/recvmsg syscalls)",
         "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
         "Validation hooks with STOQ+BlockMatrix implementations (certificate, packet, extension)",
         "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
@@ -161,6 +161,9 @@ export const crateStatuses: CrateStatus[] = [
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
         "FastValidationResult detailed PoS pre-validation",
         "STOQ send+receive path with persistent AF_XDP socket reuse",
+        "AF_XDP UMEM 4-ring buffer architecture (fill, completion, rx, tx)",
+        "AF_XDP frame allocator with batch operations and thread-safe free-list",
+        "AF_XDP kernel state management with mmap cleanup on Drop",
         "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)",
         "C kernel BPF maps (policy_map, pos_header_map, asset_hash_map, xsk_map)",
         "HyperMesh extension header parsing at XDP level (PoS, asset, matrix, privacy)",
@@ -178,7 +181,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 90
+    "completion": 91
   },
   {
     "id": "hypermesh-lib",
