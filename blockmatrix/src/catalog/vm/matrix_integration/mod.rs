@@ -33,11 +33,10 @@ mod tests {
     use crate::assets::matrix_blockchain::{
         MatrixBlockchainManager, EntityType, PrivacyPolicyConfig,
     };
-    use hypermesh_lib::PrivacyMode;
     use std::sync::Arc;
     use std::collections::HashMap;
     use std::time::Duration;
-    use super::super::PrivacyLevel;
+    use super::super::PrivacyMode;
 
     #[tokio::test]
     async fn test_matrix_aware_vm_creation() {
@@ -69,7 +68,7 @@ mod tests {
             asset_id,
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
         };
 
         assert_eq!(validation.entity_domain, "honda.hypermesh.online");
@@ -109,8 +108,8 @@ mod tests {
                 }
             ],
             workflow_privacy: WorkflowPrivacyPolicy {
-                intermediate_privacy: PrivacyLevel::PRIVATE,
-                final_privacy: PrivacyLevel::PUBLIC,
+                intermediate_privacy: PrivacyMode::PRIVATE,
+                final_privacy: PrivacyMode::PUBLIC,
                 intermediate_access: vec!["dealer.hypermesh.online".to_string()],
                 data_sharing_rules: HashMap::new(),
             },

@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::assets::core::{AssetResult, PrivacyLevel};
+use crate::assets::core::{AssetResult, PrivacyMode};
 use crate::assets::privacy::{
     CaesarRewardConfig, ResourceAllocationConfig, PayoutFrequency,
 };
@@ -30,7 +30,7 @@ impl CaesarRewardCalculator {
     /// Calculate reward configuration for allocation
     pub async fn calculate_reward_config(
         &self,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
         resource_config: &ResourceAllocationConfig,
         user_preferences: &super::super::manager::CaesarRewardPreferences,
     ) -> AssetResult<CaesarRewardConfig> {
@@ -67,7 +67,7 @@ impl CaesarRewardCalculator {
         &self,
         allocation_duration: Duration,
         resource_utilization: &HashMap<String, f32>,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
         performance_metrics: &HashMap<String, f32>,
         user_tier: &str,
     ) -> AssetResult<RewardCalculationResult> {
@@ -123,7 +123,7 @@ impl CaesarRewardCalculator {
     // Helper methods (implementation details)
     async fn calculate_base_reward_rate(
         &self,
-        _privacy_level: &PrivacyLevel,
+        _privacy_level: &PrivacyMode,
         resource_config: &ResourceAllocationConfig,
     ) -> AssetResult<f32> {
         let base = self.base_config.base_reward_rate;
@@ -140,7 +140,7 @@ impl CaesarRewardCalculator {
         Ok(base * resource_factor)
     }
 
-    async fn calculate_privacy_multiplier(&self, privacy_level: &PrivacyLevel) -> AssetResult<f32> {
+    async fn calculate_privacy_multiplier(&self, privacy_level: &PrivacyMode) -> AssetResult<f32> {
         Ok(crate::assets::core::privacy::caesar_reward_multiplier(privacy_level))
     }
 

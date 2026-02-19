@@ -25,7 +25,7 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 
 use super::consensus::{ConsensusVM, ConsensusExecutionResult};
-use super::{AssetManagementConfig, PrivacyLevel};
+use super::{AssetManagementConfig, PrivacyMode};
 // Already imported above, no need to import again
 
 /// Main VM executor with consensus-native execution
@@ -113,7 +113,7 @@ pub struct StorageOperation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyComplianceReport {
     /// Privacy level used during execution
-    pub privacy_level_used: PrivacyLevel,
+    pub privacy_level_used: PrivacyMode,
     /// Data anonymization applied
     pub anonymization_applied: bool,
     /// External data sharing events
@@ -132,7 +132,7 @@ pub struct DataSharingEvent {
     /// Data size shared (bytes)
     pub data_size: u64,
     /// Privacy level at time of sharing
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Timestamp of sharing
     pub timestamp: SystemTime,
 }

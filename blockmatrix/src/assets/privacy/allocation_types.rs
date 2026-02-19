@@ -9,7 +9,7 @@
 
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use crate::assets::core::{AssetResult, PrivacyLevel};
+use crate::assets::core::{AssetResult, PrivacyMode};
 
 /// Privacy allocation types from Proof of State patterns
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,22 +59,22 @@ impl PrivacyAllocationType {
     }
     
     /// Get minimum required privacy level
-    pub fn minimum_privacy_level(&self) -> PrivacyLevel {
+    pub fn minimum_privacy_level(&self) -> PrivacyMode {
         match self {
-            PrivacyAllocationType::Private => PrivacyLevel::PRIVATE,
-            PrivacyAllocationType::Public => PrivacyLevel::PUBLIC,
-            PrivacyAllocationType::Anonymous => PrivacyLevel::PRIVATE,
-            PrivacyAllocationType::Verified => PrivacyLevel::PUBLIC,
+            PrivacyAllocationType::Private => PrivacyMode::PRIVATE,
+            PrivacyAllocationType::Public => PrivacyMode::PUBLIC,
+            PrivacyAllocationType::Anonymous => PrivacyMode::PRIVATE,
+            PrivacyAllocationType::Verified => PrivacyMode::PUBLIC,
         }
     }
     
     /// Get maximum allowed privacy level
-    pub fn maximum_privacy_level(&self) -> PrivacyLevel {
+    pub fn maximum_privacy_level(&self) -> PrivacyMode {
         match self {
-            PrivacyAllocationType::Private => PrivacyLevel::PRIVATE,
-            PrivacyAllocationType::Public => PrivacyLevel::PUBLIC,
-            PrivacyAllocationType::Anonymous => PrivacyLevel::PUBLIC,
-            PrivacyAllocationType::Verified => PrivacyLevel::PUBLIC,
+            PrivacyAllocationType::Private => PrivacyMode::PRIVATE,
+            PrivacyAllocationType::Public => PrivacyMode::PUBLIC,
+            PrivacyAllocationType::Anonymous => PrivacyMode::PUBLIC,
+            PrivacyAllocationType::Verified => PrivacyMode::PUBLIC,
         }
     }
     

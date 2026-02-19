@@ -25,7 +25,7 @@ use super::PeerIdentity;
 // Import network membership from our implementation
 pub use super::network_membership::{
     NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
-    PrivacyTier, NetworkDiscovery, MembershipStatus, NetworkCredentials,
+    PrivacyMode, NetworkDiscovery, MembershipStatus, NetworkCredentials,
     JoinRequirements, ApprovalProcess,
 };
 
@@ -59,7 +59,7 @@ pub struct IsolationStack {
     /// Network ID
     pub network_id: NetworkId,
     /// Privacy tier
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
     /// Packet filter active
     pub filter_active: bool,
     /// Violations detected
@@ -74,7 +74,7 @@ impl StoqIsolationManager {
     }
 
     /// Create isolated stack for network
-    pub async fn create_stack(&self, network_id: NetworkId, privacy_tier: PrivacyTier) -> AssetResult<()> {
+    pub async fn create_stack(&self, network_id: NetworkId, privacy_tier: PrivacyMode) -> AssetResult<()> {
         let mut stacks = self.isolation_stacks.write().await;
 
         let stack = IsolationStack {
@@ -419,7 +419,7 @@ impl MultiNetworkCoordinator {
     pub async fn join_network(
         &self,
         network_id: NetworkId,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
     ) -> AssetResult<()> {
         // Check network limit
         let active = self.membership.active_memberships().await;
@@ -610,7 +610,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PUBLIC,
+                    privacy_tier: PrivacyMode::PUBLIC,
                     member_count: 100,
                     is_public: true,
                 },
@@ -626,7 +626,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PRIVATE,
+                    privacy_tier: PrivacyMode::PRIVATE,
                     member_count: 50,
                     is_public: false,
                 },
@@ -655,12 +655,12 @@ mod tests {
 
         // Join bank network
         let bank_network = NetworkId([1u8; 16]);
-        coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("test: join bank");
+        coordinator.join_network(bank_network, PrivacyMode::PUBLIC).await.expect("test: join bank");
 
         // Join dealer network
         let dealer_network = NetworkId([2u8; 16]);
         coordinator.membership.discover_networks().await.expect("test: discover");
-        coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("test: join dealer");
+        coordinator.join_network(dealer_network, PrivacyMode::PRIVATE).await.expect("test: join dealer");
 
         // Verify both active
         let active = coordinator.active_networks().await;
@@ -751,7 +751,7 @@ mod tests {
 
         coordinator.membership.discover_networks().await.expect("test: discover");
         let network1 = NetworkId([1u8; 16]);
-        coordinator.join_network(network1, PrivacyTier::PUBLIC).await.expect("test: join");
+        coordinator.join_network(network1, PrivacyMode::PUBLIC).await.expect("test: join");
 
         // Get isolation report
         let report = coordinator.verify_isolation().await.expect("test: verify isolation");

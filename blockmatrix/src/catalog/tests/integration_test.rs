@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use hypermesh_catalog::{
     BlockchainNativeCompute, ComputeAsset, ComputeAssetType, ComputeRequest,
-    P2PHost, PrivacyLevel, VMConfig, ConsensusRequirements,
+    P2PHost, PrivacyMode, VMConfig, ConsensusRequirements,
 };
 
 use hypermesh_catalog::blockchain::{

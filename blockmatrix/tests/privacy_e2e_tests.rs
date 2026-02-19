@@ -9,7 +9,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
-    PrivacySystem, PrivacyConfig, PrivacyTier,
+    PrivacySystem, PrivacyConfig, PrivacyMode,
     PrivacyFlexibilityMatrix, TierSwitcher,
     PolicyAction, ActionType, ValidationType,
     PrivacyEbpfBridge, TransitionResult,
@@ -26,21 +26,21 @@ fn test_e2e_node_lifecycle_with_tier_transitions() {
     let mut system = PrivacySystem::new();
 
     // Stage 1: Start as Anonymous
-    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
     assert_eq!(system.caesar_multiplier(), 0.0); // No rewards
 
     // Stage 2: Build trust, move to Private
     thread::sleep(Duration::from_millis(10)); // Simulate time passing
-    system.switch_tier(PrivacyTier::PRIVATE).unwrap();
+    system.switch_tier(PrivacyMode::PRIVATE).unwrap();
     assert_eq!(system.caesar_multiplier(), 0.5); // Medium rewards
 
     // Stage 3: Go fully public for maximum rewards
     thread::sleep(Duration::from_millis(10));
-    system.switch_tier(PrivacyTier::PUBLIC).unwrap();
+    system.switch_tier(PrivacyMode::PUBLIC).unwrap();
     assert_eq!(system.caesar_multiplier(), 1.0); // Maximum rewards
 
     // Verify final state
-    assert_eq!(system.current_tier(), PrivacyTier::PUBLIC);
+    assert_eq!(system.current_tier(), PrivacyMode::PUBLIC);
 }
 
 #[test]
@@ -53,24 +53,24 @@ fn test_e2e_mixed_privacy_network() {
     // Create 3 anonymous nodes
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+        node.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
         anonymous_nodes.push(node);
     }
 
     // Create 3 public nodes
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::PUBLIC).unwrap();
+        node.switch_tier(PrivacyMode::PUBLIC).unwrap();
         public_nodes.push(node);
     }
 
     // Create 3 hybrid nodes (anonymous network, public assets)
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
-        node.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+        node.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
         let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyTier::ANONYMOUS,
-            PrivacyTier::PUBLIC
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PUBLIC
         );
         node.update_flexibility_matrix(matrix).unwrap();
         hybrid_nodes.push(node);
@@ -87,8 +87,8 @@ fn test_e2e_policy_enforcement_workflow() {
     let bridge = PrivacyEbpfBridge::new().unwrap();
 
     // Workflow 1: Anonymous user trying to access restricted resource
-    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
-    bridge.update_ebpf_for_tier(PrivacyTier::ANONYMOUS, 1000);
+    system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
+    bridge.update_ebpf_for_tier(PrivacyMode::ANONYMOUS, 1000);
 
     let restricted_action = PolicyAction {
         action_type: ActionType::AccessResource,
@@ -103,8 +103,8 @@ fn test_e2e_policy_enforcement_workflow() {
     assert!(system.enforce_policy(restricted_action).is_err());
 
     // Workflow 2: Public node with full validation
-    system.switch_tier(PrivacyTier::PUBLIC).unwrap();
-    bridge.update_ebpf_for_tier(PrivacyTier::PUBLIC, 1001);
+    system.switch_tier(PrivacyMode::PUBLIC).unwrap();
+    bridge.update_ebpf_for_tier(PrivacyMode::PUBLIC, 1001);
 
     let mut validations = HashSet::new();
     validations.insert(ValidationType::FullIdentity);
@@ -131,23 +131,23 @@ fn test_e2e_private_group_setup() {
     // Simulate setting up a private group network
     let mut coordinator = PrivacySystem::new();
     // Default is already PRIVATE, but switch explicitly for clarity
-    coordinator.switch_tier(PrivacyTier::PRIVATE).unwrap();
+    coordinator.switch_tier(PrivacyMode::PRIVATE).unwrap();
 
     let mut members = Vec::new();
     for _i in 0..5 {
         let mut member = PrivacySystem::new();
-        member.switch_tier(PrivacyTier::PRIVATE).unwrap();
+        member.switch_tier(PrivacyMode::PRIVATE).unwrap();
         members.push(member);
     }
 
     // All private group members should have same mode
     for member in &members {
-        assert_eq!(member.current_tier(), PrivacyTier::PRIVATE);
+        assert_eq!(member.current_tier(), PrivacyMode::PRIVATE);
         assert_eq!(member.caesar_multiplier(), 0.5);
     }
 
     // Verify private validation requirements
-    let req = validation_requirements_for(&PrivacyTier::PRIVATE);
+    let req = validation_requirements_for(&PrivacyMode::PRIVATE);
     assert!(req.peer_validation);
     assert!(!req.proof_of_stake); // PRIVATE uses peer validation, not full PoS
 }
@@ -159,13 +159,13 @@ fn test_e2e_privacy_tier_daily_limits() {
     let mut system = PrivacySystem::with_config(config);
 
     // First switch - OK
-    assert!(system.switch_tier(PrivacyTier::ANONYMOUS).is_ok());
+    assert!(system.switch_tier(PrivacyMode::ANONYMOUS).is_ok());
 
     // Second switch - OK
-    assert!(system.switch_tier(PrivacyTier::PUBLIC).is_ok());
+    assert!(system.switch_tier(PrivacyMode::PUBLIC).is_ok());
 
     // Third switch - Should fail (daily limit)
-    assert!(system.switch_tier(PrivacyTier::PRIVATE).is_err());
+    assert!(system.switch_tier(PrivacyMode::PRIVATE).is_err());
 }
 
 #[test]
@@ -173,18 +173,18 @@ fn test_e2e_asset_privacy_independence() {
     let mut system = PrivacySystem::new();
 
     // Set network to anonymous but assets to public
-    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
     let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::ANONYMOUS,
-        PrivacyTier::PUBLIC
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PUBLIC
     );
     system.update_flexibility_matrix(matrix.clone()).unwrap();
 
     // Network should be anonymous
-    assert_eq!(system.current_tier(), PrivacyTier::ANONYMOUS);
+    assert_eq!(system.current_tier(), PrivacyMode::ANONYMOUS);
 
     // But assets should be public (check via matrix)
-    assert_eq!(matrix.asset_tier, PrivacyTier::PUBLIC);
+    assert_eq!(matrix.asset_tier, PrivacyMode::PUBLIC);
     assert!(matrix.is_anonymous_public());
 
     // Should get bonus CAESAR rewards for this configuration
@@ -193,7 +193,7 @@ fn test_e2e_asset_privacy_independence() {
 
 #[test]
 fn test_e2e_transition_with_active_connections() {
-    let mut switcher = TierSwitcher::new(PrivacyTier::PRIVATE);
+    let mut switcher = TierSwitcher::new(PrivacyMode::PRIVATE);
 
     // Simulate active private connections
     if let Some(tier) = &mut switcher.private_tier {
@@ -203,10 +203,10 @@ fn test_e2e_transition_with_active_connections() {
     }
 
     // Transition to Public while maintaining connections
-    match switcher.switch_tier(PrivacyTier::PUBLIC) {
+    match switcher.switch_tier(PrivacyMode::PUBLIC) {
         Ok(TransitionResult::Success(record)) => {
-            assert_eq!(record.from, PrivacyTier::PRIVATE);
-            assert_eq!(record.to, PrivacyTier::PUBLIC);
+            assert_eq!(record.from, PrivacyMode::PRIVATE);
+            assert_eq!(record.to, PrivacyMode::PUBLIC);
             assert!(record.success);
         }
         _ => panic!("Transition should succeed"),
@@ -222,9 +222,9 @@ fn test_e2e_ebpf_policy_sync() {
 
     // Set policies for multiple connections with different modes
     let connections = vec![
-        (100, PrivacyTier::ANONYMOUS),
-        (101, PrivacyTier::PRIVATE),
-        (103, PrivacyTier::PUBLIC),
+        (100, PrivacyMode::ANONYMOUS),
+        (101, PrivacyMode::PRIVATE),
+        (103, PrivacyMode::PUBLIC),
     ];
 
     for (conn_id, tier) in &connections {
@@ -287,7 +287,7 @@ fn test_e2e_multi_tier_resource_sharing() {
     let mut nodes = Vec::new();
 
     // Create nodes in each mode
-    for tier in &[PrivacyTier::ANONYMOUS, PrivacyTier::PRIVATE, PrivacyTier::PUBLIC] {
+    for tier in &[PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
         let mut node = PrivacySystem::new();
         node.switch_tier(*tier).unwrap();
         nodes.push((*tier, node));
@@ -298,9 +298,9 @@ fn test_e2e_multi_tier_resource_sharing() {
         let mut validations = HashSet::new();
 
         // Add validations based on mode
-        if *tier == PrivacyTier::ANONYMOUS {
+        if *tier == PrivacyMode::ANONYMOUS {
             // No validations needed
-        } else if *tier == PrivacyTier::PRIVATE {
+        } else if *tier == PrivacyMode::PRIVATE {
             validations.insert(ValidationType::PeerIdentity);
             validations.insert(ValidationType::PeerTrust);
             validations.insert(ValidationType::NetworkIdentity);
@@ -322,7 +322,7 @@ fn test_e2e_multi_tier_resource_sharing() {
         };
 
         // Anonymous mode doesn't allow resource sharing
-        if *tier == PrivacyTier::ANONYMOUS {
+        if *tier == PrivacyMode::ANONYMOUS {
             continue; // Skip anonymous as it has limited permissions
         }
 
@@ -338,9 +338,9 @@ fn test_e2e_privacy_score_impact() {
 
     // Create systems with different privacy scores (3 modes, not 4)
     let configs = vec![
-        (PrivacyTier::ANONYMOUS, PrivacyTier::ANONYMOUS),   // Score: 1.0
-        (PrivacyTier::PRIVATE, PrivacyTier::PRIVATE),       // Score: 0.7
-        (PrivacyTier::PUBLIC, PrivacyTier::PUBLIC),          // Score: 0.0
+        (PrivacyMode::ANONYMOUS, PrivacyMode::ANONYMOUS),   // Score: 1.0
+        (PrivacyMode::PRIVATE, PrivacyMode::PRIVATE),       // Score: 0.7
+        (PrivacyMode::PUBLIC, PrivacyMode::PUBLIC),          // Score: 0.0
     ];
 
     for (network_tier, asset_tier) in configs {

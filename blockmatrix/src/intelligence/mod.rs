@@ -103,7 +103,7 @@ use crate::matrix::MatrixCoordinate;
 // Import Sprint 2.1: STOQ Protocol Intelligence
 use stoq::{
     StoqTransport, Connection, Endpoint,
-    NetworkIsolationManager, StoqPrivacyTier
+    NetworkIsolationManager,
 };
 
 // Import Sprint 2.2: Privacy Tiers
@@ -112,14 +112,14 @@ use crate::assets::privacy::{
     CaesarRewardCalculator,
 };
 use crate::assets::core::{
-    PrivacyLevel, AssetRegistration, NetworkScope, AssetCategory,
+    PrivacyMode, AssetRegistration, NetworkScope, AssetCategory,
     BaseSystemType, AssetData,
 };
 
 // Import Sprint 2.3: Multi-Network Participation
 use crate::assets::multi_node::{
     MultiNetworkCoordinator, NetworkId,
-    PrivacyTier, CrossNetworkValidator,
+    CrossNetworkValidator,
 };
 
 // Import Sprint 2.4: Asset Pipeline
@@ -146,7 +146,7 @@ pub struct AssetHandle {
     pub content_address: ContentAddress,
 
     /// Privacy tier used for processing
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
 
     /// Networks where asset is available
     pub networks: Vec<NetworkId>,
@@ -418,7 +418,7 @@ impl IntelligenceLayer {
     pub async fn process_asset(
         &self,
         asset: Asset,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
         networks: Vec<NetworkId>,
     ) -> Result<AssetHandle> {
         let start = Instant::now();
@@ -715,23 +715,22 @@ impl IntelligenceLayer {
     }
 
     /// Map privacy tier to privacy level
-    fn map_privacy_tier_to_level(&self, tier: &PrivacyTier) -> PrivacyLevel {
-        if *tier == PrivacyTier::PUBLIC {
-            PrivacyLevel::PUBLIC
-        } else if *tier == PrivacyTier::PRIVATE {
-            PrivacyLevel::PUBLIC
+    fn map_privacy_tier_to_level(&self, tier: &PrivacyMode) -> PrivacyMode {
+        if *tier == PrivacyMode::PUBLIC {
+            PrivacyMode::PUBLIC
+        } else if *tier == PrivacyMode::PRIVATE {
+            PrivacyMode::PUBLIC
         } else {
             // ANONYMOUS
-            PrivacyLevel::PRIVATE
+            PrivacyMode::PRIVATE
         }
     }
 
-    /// Map privacy tier to STOQ privacy tier (StoqPrivacyTier = PrivacyMode)
+    /// Map privacy mode to STOQ-compatible PrivacyMode (identity mapping).
     ///
-    /// Since PrivacyTier is now an alias for PrivacyMode (same as StoqPrivacyTier),
-    /// this is an identity mapping. Kept for API stability.
+    /// Kept for API stability — both crates use the canonical `PrivacyMode` type.
     #[allow(dead_code)] // Used for future STOQ protocol integration
-    fn map_privacy_tier_to_stoq(&self, tier: &PrivacyTier) -> StoqPrivacyTier {
+    fn map_privacy_tier_to_stoq(&self, tier: &PrivacyMode) -> PrivacyMode {
         *tier
     }
 
@@ -739,14 +738,14 @@ impl IntelligenceLayer {
     fn configure_pipeline_for_privacy(
         &self,
         config: &mut crate::assets::pipeline::PipelineConfig,
-        tier: &PrivacyTier,
+        tier: &PrivacyMode,
     ) {
-        if *tier == PrivacyTier::PUBLIC {
+        if *tier == PrivacyMode::PUBLIC {
             // Maximum security for public tier
             config.encryption.quantum_resistant = true;
             config.compression.level = 6;
             config.sharding.parity_shards = 4;
-        } else if *tier == PrivacyTier::PRIVATE {
+        } else if *tier == PrivacyMode::PRIVATE {
             // Federated-level config (more secure of the collapsed pair)
             config.encryption.quantum_resistant = true;
             config.compression.level = 4;
@@ -763,7 +762,7 @@ impl IntelligenceLayer {
     async fn calculate_optimal_positions(
         &self,
         processed: &ProcessedAsset,
-        _privacy_tier: PrivacyTier,
+        _privacy_tier: PrivacyMode,
         network_count: usize,
     ) -> Result<Vec<MatrixCoordinate>> {
         // MatrixFoundation doesn't have calculate_shard_positions
@@ -788,7 +787,7 @@ impl IntelligenceLayer {
         &self,
         _connection: Connection,
         _shard_id: String,
-        _privacy_tier: &PrivacyTier,
+        _privacy_tier: &PrivacyMode,
     ) -> Result<Vec<u8>> {
         // Simplified shard retrieval - in production this would use actual STOQ protocol
         // For now, return placeholder data
@@ -799,7 +798,7 @@ impl IntelligenceLayer {
     async fn update_processing_metrics(
         &self,
         processing_time: Duration,
-        privacy_tier: &PrivacyTier,
+        privacy_tier: &PrivacyMode,
         dedup_results: &[DeduplicationResult],
     ) {
         let mut metrics = self.metrics.write().await;
@@ -850,17 +849,17 @@ impl IntelligenceLayer {
     }
 }
 
-// Extension trait for PrivacyTier to get replication factor
+// Extension trait for PrivacyMode to determine replication factor
 #[allow(dead_code)] // Used for future shard replication strategy
-trait PrivacyTierExt {
+trait PrivacyModeExt {
     fn replication_factor(&self) -> usize;
 }
 
-impl PrivacyTierExt for PrivacyTier {
+impl PrivacyModeExt for PrivacyMode {
     fn replication_factor(&self) -> usize {
-        if *self == PrivacyTier::PUBLIC {
+        if *self == PrivacyMode::PUBLIC {
             5  // High replication for public access
-        } else if *self == PrivacyTier::PRIVATE {
+        } else if *self == PrivacyMode::PRIVATE {
             3  // Federated-level replication (higher value of collapsed pair)
         } else {
             1  // ANONYMOUS: minimal replication

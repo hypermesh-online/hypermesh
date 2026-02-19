@@ -12,7 +12,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::{AssetRegistration, ConsensusProof};
-use super::privacy::PrivacyLevel;
+use hypermesh_lib::PrivacyMode;
 use super::proxy::ProxyAddress;
 use super::adapter::ResourceUsage;
 
@@ -30,7 +30,7 @@ pub struct AssetStatus {
     /// Current resource usage metrics
     pub resource_usage: ResourceUsage,
     /// Privacy level configuration
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Remote proxy address if assigned
     pub proxy_address: Option<ProxyAddress>,
     /// Valid consensus proofs for this asset
@@ -206,7 +206,7 @@ impl AssetStatus {
     pub fn new(
         asset_id: AssetRegistration,
         owner_certificate_fingerprint: String,
-        privacy_level: PrivacyLevel,
+        privacy_level: PrivacyMode,
     ) -> Self {
         let now = SystemTime::now();
         
@@ -404,7 +404,7 @@ mod tests {
     use super::*;
     use super::AssetRegistration;
     use crate::AssetType;
-    use crate::assets::core::privacy::PrivacyLevel;
+    use hypermesh_lib::PrivacyMode;
     use crate::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
     // Test helper to create AssetRegistration from AssetType
@@ -442,12 +442,12 @@ mod tests {
         let status = AssetStatus::new(
             asset_id.clone(),
             "test-cert-fingerprint".to_string(),
-            PrivacyLevel::PRIVATE,
+            PrivacyMode::PRIVATE,
         );
         
         assert_eq!(status.asset_id, asset_id);
         assert_eq!(status.state, AssetState::Available);
-        assert_eq!(status.privacy_level, PrivacyLevel::PRIVATE);
+        assert_eq!(status.privacy_level, PrivacyMode::PRIVATE);
         assert_eq!(status.health_status.health_score, 1.0);
     }
     
@@ -471,7 +471,7 @@ mod tests {
         let mut status = AssetStatus::new(
             asset_id,
             "test-cert".to_string(),
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
         );
         
         // Add critical alert

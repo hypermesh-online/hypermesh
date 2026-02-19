@@ -46,7 +46,7 @@ impl AssetRegistry {
     /// Create new asset registry (DEPRECATED)
     pub async fn new(config: RegistryConfig) -> Result<Self> {
         let catalog_registry = CatalogRegistry::new(
-            blockmatrix::assets::PrivacyLevel::PUBLIC,
+            hypermesh_lib::PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             config,
         );

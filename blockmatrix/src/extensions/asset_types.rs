@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetType, AssetRegistration, AssetAllocation, PrivacyLevel, ConsensusProof};
+use crate::assets::core::{AssetType, AssetRegistration, AssetAllocation, PrivacyMode, ConsensusProof};
 use super::types::ResourceUsageReport;
 
 /// Asset creation specification
@@ -17,7 +17,7 @@ pub struct AssetCreationSpec {
     pub name: String,
     pub description: Option<String>,
     pub metadata: HashMap<String, serde_json::Value>,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub allocation: Option<AssetAllocation>,
     pub consensus_requirements: ConsensusRequirements,
     pub parent_id: Option<AssetRegistration>,
@@ -30,7 +30,7 @@ pub struct AssetUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub metadata: Option<HashMap<String, serde_json::Value>>,
-    pub privacy_level: Option<PrivacyLevel>,
+    pub privacy_level: Option<PrivacyMode>,
     pub allocation: Option<AssetAllocation>,
     pub tags: Option<Vec<String>>,
 }
@@ -41,7 +41,7 @@ pub struct AssetQuery {
     pub asset_type: Option<AssetType>,
     pub name_pattern: Option<String>,
     pub tags: Option<Vec<String>>,
-    pub privacy_level: Option<PrivacyLevel>,
+    pub privacy_level: Option<PrivacyMode>,
     pub parent_id: Option<AssetRegistration>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
@@ -58,7 +58,7 @@ pub struct AssetMetadata {
     pub updated_at: SystemTime,
     pub size_bytes: u64,
     pub metadata: HashMap<String, serde_json::Value>,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub allocation: Option<AssetAllocation>,
     pub consensus_status: ConsensusStatus,
     pub tags: Vec<String>,

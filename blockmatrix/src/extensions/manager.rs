@@ -20,7 +20,7 @@ use super::{
     AssetExtensionHandler, AssetLibraryExtension,
 };
 
-use crate::assets::core::{AssetManager, AssetType, PrivacyLevel};
+use crate::assets::core::{AssetManager, AssetType, PrivacyMode};
 
 /// Unified extension management system for HyperMesh
 pub struct UnifiedExtensionManager {
@@ -235,7 +235,7 @@ pub struct ExtensionContext {
     pub capabilities: HashSet<ExtensionCapability>,
 
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 }
 
 impl UnifiedExtensionManager {
@@ -681,7 +681,7 @@ impl UnifiedExtensionManager {
             settings: serde_json::Value::Null,
             resource_limits: self.config.global_limits.clone(),
             granted_capabilities,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             debug_mode: false,
         })
     }

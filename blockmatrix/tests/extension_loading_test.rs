@@ -10,7 +10,7 @@
 //! Gated: references `hypermesh` crate which does not exist.
 #![cfg(feature = "future-tests")]
 
-use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyLevel};
+use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyMode};
 use blockmatrix::extensions::{
     ExtensionCapability, ExtensionConfig, ExtensionManager, ExtensionManagerConfig,
     ExtensionMetadata, ResourceLimits,

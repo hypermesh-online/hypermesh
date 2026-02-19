@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use std::collections::HashMap;
 
 use hypermesh_assets::core::{
-    AssetType, AssetAllocationRequest, PrivacyLevel, ResourceRequirements,
+    AssetType, AssetAllocationRequest, PrivacyMode, ResourceRequirements,
     CpuRequirements, GpuRequirements, MemoryRequirements, StorageRequirements, StorageType,
 };
 use hypermesh_assets::core::consensus::proof::{
@@ -61,7 +61,7 @@ fn create_cpu_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         consensus_proof: create_test_consensus_proof("cpu", 50, 16, 2), // CPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -82,7 +82,7 @@ fn create_gpu_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         consensus_proof: create_test_consensus_proof("gpu", 200, 20, 8 * 1024 * 1024 * 1024), // GPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -103,7 +103,7 @@ fn create_memory_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         consensus_proof: create_test_consensus_proof("memory", 100, 12, 1024 * 1024 * 1024), // Memory requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -125,7 +125,7 @@ fn create_storage_allocation_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         consensus_proof: create_test_consensus_proof("storage", 75, 14, 10 * 1024 * 1024 * 1024), // Storage requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
@@ -357,8 +357,8 @@ async fn test_adapter_capabilities() {
         assert!(!capabilities.features.is_empty(), "All adapters should have feature list");
         
         // Check privacy level support
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PRIVATE));
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PUBLIC));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PRIVATE));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PUBLIC));
     }
 }
 
@@ -370,7 +370,7 @@ async fn test_privacy_level_configuration() {
     let allocation = adapter.allocate_asset(&request).await.unwrap();
     
     // Test privacy level changes
-    for privacy_level in vec![PrivacyLevel::PRIVATE, PrivacyLevel::PRIVATE, PrivacyLevel::PUBLIC] {
+    for privacy_level in vec![PrivacyMode::PRIVATE, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
         let result = adapter.configure_privacy_level(&allocation.asset_id, privacy_level.clone()).await;
         assert!(result.is_ok(), "Privacy level configuration should succeed for {:?}", privacy_level);
     }

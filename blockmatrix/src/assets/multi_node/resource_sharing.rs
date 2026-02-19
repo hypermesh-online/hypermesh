@@ -21,7 +21,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetType, AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetType, AssetResult, AssetError, PrivacyMode};
 use super::{PeerIdentity, ResourceAmount, ServiceLevelAgreement};
 
 /// Resource sharing manager
@@ -120,7 +120,7 @@ pub struct SharingAgreement {
     /// Agreement duration
     pub duration: Duration,
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Agreement status
     pub status: AgreementStatus,
 }
@@ -157,7 +157,7 @@ pub struct ResourceOffer {
     /// Offer expiry
     pub expires_at: SystemTime,
     /// Privacy requirements
-    pub privacy_requirements: PrivacyLevel,
+    pub privacy_requirements: PrivacyMode,
 }
 
 /// Resource request from consumer
@@ -180,7 +180,7 @@ pub struct ResourceRequest {
     /// Request expiry
     pub expires_at: SystemTime,
     /// Privacy requirements
-    pub privacy_requirements: PrivacyLevel,
+    pub privacy_requirements: PrivacyMode,
 }
 
 /// Resource usage tracking

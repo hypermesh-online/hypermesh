@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetRegistration, AssetError, AssetResult, PrivacyLevel, StorageRequirements, StorageType,
+    AssetRegistration, AssetError, AssetResult, PrivacyMode, StorageRequirements, StorageType,
 };
 use super::sharding::ShardingConfig;
 use super::devices::{StorageDevice, StorageStatus};
@@ -42,7 +42,7 @@ pub struct StorageAllocation {
     /// Sharding configuration
     pub sharding_config: ShardingConfig,
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Mount path for access
     pub mount_path: Option<String>,
     /// Allocation timestamp
@@ -67,7 +67,7 @@ pub struct StoragePool {
     /// Storage type in pool
     pub storage_type: StorageType,
     /// Pool privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Devices in pool
     pub devices: Vec<String>,
     /// Active allocations
@@ -267,7 +267,7 @@ pub fn initialize_default_pool(
         total_capacity,
         available_capacity: total_capacity,
         storage_type: StorageType::Ssd, // Default assumption
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         devices: device_ids,
         allocations: Vec::new(),
         health_status: PoolHealthStatus::Healthy,

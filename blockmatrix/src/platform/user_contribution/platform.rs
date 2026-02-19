@@ -310,7 +310,7 @@ impl UserContributionPlatform {
                 container: None,
                 economic: None,
             },
-            privacy_level: crate::assets::core::PrivacyLevel::PRIVATE,
+            privacy_level: crate::assets::core::PrivacyMode::PRIVATE,
             consensus_proof: consensus_proof.clone(),
             certificate_fingerprint: String::new(),
             duration_limit: Some(resource_settings.max_session_duration),

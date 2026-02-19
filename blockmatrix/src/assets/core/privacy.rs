@@ -7,7 +7,7 @@
 //! User-configurable privacy levels for resource sharing with
 //! appropriate access controls and economic incentives.
 //!
-//! Migrated from old 5-variant PrivacyLevel enum to hypermesh_lib::PrivacyMode.
+//! Uses hypermesh_lib::PrivacyMode directly (no type alias).
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -18,11 +18,8 @@ use hypermesh_lib::PrivacyMode;
 use super::AssetRegistration;
 use super::status::AssetStatus;
 
-/// Backward-compatible alias: code that references `PrivacyLevel` keeps compiling.
-pub type PrivacyLevel = PrivacyMode;
-
 // ---------------------------------------------------------------------------
-// Free functions replacing the old PrivacyLevel methods
+// Free functions operating on PrivacyMode
 // ---------------------------------------------------------------------------
 
 /// Get privacy priority (lower is more restrictive, higher is more open).
@@ -106,7 +103,7 @@ pub struct AssetAllocation {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AllocationConfig {
     /// Privacy level for this allocation
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Resource allocation percentages (0-100% per resource type)
     pub resource_allocation: ResourceAllocationConfig,
     /// Concurrent usage limits
@@ -235,9 +232,9 @@ pub struct AuthRequirements {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserPrivacyConfig {
     /// User's default privacy level
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
     /// Per-resource type privacy settings
-    pub resource_privacy: HashMap<String, PrivacyLevel>,
+    pub resource_privacy: HashMap<String, PrivacyMode>,
     /// CAESAR token earning preferences
     pub caesar_preferences: CaesarPreferences,
     /// Remote proxy preferences
@@ -376,7 +373,7 @@ impl AssetAllocation {
     pub fn new(
         asset_id: AssetRegistration,
         status: AssetStatus,
-        privacy_level: PrivacyLevel,
+        privacy_level: PrivacyMode,
     ) -> Self {
         let allocation_config = AllocationConfig {
             privacy_level,

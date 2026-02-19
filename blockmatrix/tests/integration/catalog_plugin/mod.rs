@@ -8,7 +8,7 @@
 //! the Catalog extension implementation which does not currently exist in BlockMatrix.
 //! These tests are prepared for when Catalog is implemented.
 
-use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyLevel, AssetRegistration};
+use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyMode, AssetRegistration};
 use blockmatrix::extensions::{
     ExtensionCapability, ExtensionConfig, ExtensionManager, ExtensionManagerConfig,
     ExtensionMetadata, ExtensionRequest, ExtensionResponse, ResourceLimits,

@@ -19,7 +19,8 @@ use catalog::{
     AssetDiscovery, AssetRegistry,
     registry::{SearchQuery, SortCriteria, AssetFilters},
 };
-use blockmatrix::assets::core::{AssetManager, PrivacyLevel};
+use blockmatrix::assets::core::AssetManager;
+use hypermesh_lib::PrivacyMode;
 use std::sync::Arc;
 use anyhow::Result;
 
@@ -32,7 +33,7 @@ async fn test_hypermesh_bridge_creation() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false, // Disable for testing
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::PRIVATE,
+        default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 1000,
     };
@@ -68,7 +69,7 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false,
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::PRIVATE,
+        default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 1000,
     };
@@ -120,7 +121,7 @@ async fn test_performance_without_network_calls() -> Result<()> {
     let bridge_config = BridgeConfig {
         enable_consensus: false, // Skip for performance test
         minimum_stake: 0,
-        default_privacy: PrivacyLevel::PRIVATE,
+        default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,
         catalog_cache_size: 10000,
     };

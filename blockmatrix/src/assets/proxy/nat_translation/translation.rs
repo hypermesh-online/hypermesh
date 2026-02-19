@@ -201,13 +201,13 @@ impl NATTranslator {
             });
         }
 
-        if privacy.level == PrivacyLevel::PRIVATE {
+        if privacy.level == PrivacyMode::PRIVATE {
             if !privacy.allowed_networks.is_empty() || !privacy.allowed_peers.is_empty() {
                 return Err(AssetError::AdapterError {
                     message: "Private level should not have allowed networks or peers".to_string()
                 });
             }
-        } else if privacy.level == PrivacyLevel::ANONYMOUS {
+        } else if privacy.level == PrivacyMode::ANONYMOUS {
             // Anonymous level: no special restrictions
         }
         // PUBLIC: no restrictions

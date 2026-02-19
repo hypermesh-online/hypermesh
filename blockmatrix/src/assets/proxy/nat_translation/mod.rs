@@ -173,7 +173,7 @@ mod tests {
         };
 
         let privacy_config = PrivacyConfig {
-            level: PrivacyLevel::PRIVATE,
+            level: PrivacyMode::PRIVATE,
             allowed_networks: vec![],
             allowed_peers: vec![],
             max_concurrent_access: 5,
@@ -189,7 +189,7 @@ mod tests {
 
         assert!(mapping.privacy_config.is_some());
         let attached_privacy = mapping.privacy_config.expect("test");
-        assert_eq!(attached_privacy.level, PrivacyLevel::PRIVATE);
+        assert_eq!(attached_privacy.level, PrivacyMode::PRIVATE);
         assert_eq!(attached_privacy.max_concurrent_access, 5);
 
         translator.remove_translation(&global_addr).await.expect("test");
@@ -219,7 +219,7 @@ mod tests {
 
         // PRIVATE level should not have allowed networks or peers
         let invalid_privacy = PrivacyConfig {
-            level: PrivacyLevel::PRIVATE,
+            level: PrivacyMode::PRIVATE,
             allowed_networks: vec!["some-net".to_string()],
             allowed_peers: vec![],
             max_concurrent_access: 1,

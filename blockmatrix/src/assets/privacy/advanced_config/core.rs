@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetResult, AssetError, PrivacyMode};
 use super::super::PrivacyAllocationType;
 
 // Re-export sub-modules
@@ -56,7 +56,7 @@ pub struct UserPrivacyConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacySettings {
     /// Default privacy level
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
     
     /// Default allocation type
     pub default_allocation_type: PrivacyAllocationType,
@@ -182,7 +182,7 @@ impl Default for UserPrivacyConfig {
 impl Default for PrivacySettings {
     fn default() -> Self {
         Self {
-            default_privacy_level: PrivacyLevel::PRIVATE,
+            default_privacy_level: PrivacyMode::PRIVATE,
             default_allocation_type: PrivacyAllocationType::Private,
             privacy_preference: PrivacyPreference::Balanced,
             data_minimization: DataMinimizationSettings::default(),

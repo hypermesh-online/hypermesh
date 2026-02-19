@@ -20,7 +20,7 @@ pub use blockchain::{
 
 pub use vm::{
     ConsensusProofVM, VMConfig, ConsensusRequirements, AssetRegistration,
-    PrivacyLevel, ResourceSharingConfig, AssetAllocation,
+    PrivacyMode, ResourceSharingConfig, AssetAllocation,
 };
 
 pub use integration::{

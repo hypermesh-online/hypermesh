@@ -74,12 +74,12 @@ fn test_resource_type_enum() {
 
 #[test]
 fn test_privacy_levels_ordering() {
-    use blockmatrix::PrivacyLevel;
+    use blockmatrix::PrivacyMode;
 
     let levels = [
-        PrivacyLevel::ANONYMOUS,
-        PrivacyLevel::PRIVATE,
-        PrivacyLevel::PUBLIC,
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
     ];
 
     // Test that all 3 privacy levels are distinct

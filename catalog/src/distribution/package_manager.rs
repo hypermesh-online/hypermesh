@@ -516,7 +516,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
     use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
-    use blockmatrix::assets::PrivacyLevel;
+    use hypermesh_lib::PrivacyMode;
 
     #[tokio::test]
     async fn test_package_manager() {
@@ -525,7 +525,7 @@ mod tests {
 
         // Create mock registry
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

@@ -13,7 +13,7 @@ use crate::assets::matrix_blockchain::{
 };
 use crate::assets::core::AssetRegistration as CoreAssetId;
 use super::super::{
-    ExecutionContext, ExecutionResult, PrivacyLevel, ExecutionId,
+    ExecutionContext, ExecutionResult, PrivacyMode, ExecutionId,
     VMConfig,
 };
 
@@ -46,7 +46,7 @@ pub struct CrossEntityValidation {
     /// Required validation type
     pub validation_type: ValidationRequirementType,
     /// Privacy level for validation
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 }
 
 /// Types of validation requirements
@@ -90,7 +90,7 @@ pub struct EntityPrivacyConstraints {
     /// Allowed operations on this entity's resources
     pub allowed_operations: Vec<String>,
     /// Privacy level for resource sharing
-    pub resource_privacy_level: PrivacyLevel,
+    pub resource_privacy_level: PrivacyMode,
     /// Duration limits for resource usage
     pub max_duration_seconds: u64,
 }
@@ -138,9 +138,9 @@ pub enum SyncType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowPrivacyPolicy {
     /// Privacy level for intermediate results
-    pub intermediate_privacy: PrivacyLevel,
+    pub intermediate_privacy: PrivacyMode,
     /// Privacy level for final results
-    pub final_privacy: PrivacyLevel,
+    pub final_privacy: PrivacyMode,
     /// Entities that can see intermediate results
     pub intermediate_access: Vec<String>,
     /// Cross-entity data sharing rules
@@ -244,7 +244,7 @@ pub struct EntityAssetAllocation {
     pub asset_type: String,
     pub allocated_capacity: u64,
     pub total_capacity: u64,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub expires_at: std::time::SystemTime,
 }
 
@@ -254,7 +254,7 @@ pub struct AssetAllocationSummary {
     pub entity_domain: String,
     pub asset_type: String,
     pub allocated_capacity: u64,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 }
 
 /// Entity interaction record
@@ -265,7 +265,7 @@ pub struct EntityInteraction {
     pub target_entity: String,
     pub asset_id: Option<ExecutionId>,
     pub timestamp: std::time::SystemTime,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 }
 
 /// Types of entity interactions

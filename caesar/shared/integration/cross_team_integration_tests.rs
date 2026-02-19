@@ -193,7 +193,7 @@ impl CrossTeamIntegrationTestSuite {
         }
         
         // Test privacy-aware resource allocation
-        let privacy_level = PrivacyLevel::PUBLIC;
+        let privacy_level = PrivacyMode::PUBLIC;
         let computational_resources = ComputationalResources {
             cpu_cores: 4,
             gpu_compute_units: 2,
@@ -417,7 +417,7 @@ impl CrossTeamIntegrationTestSuite {
                     write_permission: true,
                     execute_permission: true,
                     delegate_permission: false,
-                    privacy_level: PrivacyLevel::PUBLIC,
+                    privacy_level: PrivacyMode::PUBLIC,
                 },
                 economic_commitment: EconomicCommitment {
                     staked_tokens: 1000,

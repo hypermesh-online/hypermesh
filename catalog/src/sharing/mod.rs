@@ -611,10 +611,10 @@ mod tests {
     #[tokio::test]
     async fn test_sharing_manager_creation() {
         use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
-        use blockmatrix::assets::PrivacyLevel;
+        use hypermesh_lib::PrivacyMode;
 
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));
@@ -627,10 +627,10 @@ mod tests {
     #[tokio::test]
     async fn test_peer_connection() {
         use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
-        use blockmatrix::assets::PrivacyLevel;
+        use hypermesh_lib::PrivacyMode;
 
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

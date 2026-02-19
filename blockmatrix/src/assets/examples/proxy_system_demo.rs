@@ -12,7 +12,7 @@ use tokio;
 
 // Since we have dependency issues with the consensus module, we'll import the types directly
 use hypermesh_assets::core::{
-    AssetRegistration, AssetType, PrivacyLevel,
+    AssetRegistration, AssetType, PrivacyMode,
     ProxyAddress, ProxyNodeInfo, ProxyCapabilities,
     RemoteProxyManager, ProxyNetworkConfig,
     NATTranslator, GlobalAddress, GlobalAddressType,
@@ -121,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Allocate proxy address for asset
     let allocated_proxy_addr = proxy_manager.allocate_proxy_address(
         &asset_id,
-        PrivacyLevel::PRIVATE,
+        PrivacyMode::PRIVATE,
         &["HTTP".to_string(), "SOCKS5".to_string()],
     ).await?;
     println!("📍 Allocated proxy address for asset: {}", allocated_proxy_addr);

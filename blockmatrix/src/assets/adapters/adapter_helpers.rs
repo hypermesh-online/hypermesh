@@ -12,7 +12,7 @@ use std::time::SystemTime;
 
 use crate::assets::core::{
     AssetRegistration, AssetAllocationRequest,
-    PrivacyLevel, AssetAllocation, AssetStatus, AssetState,
+    PrivacyMode, AssetAllocation, AssetStatus, AssetState,
     ResourceUsage, ProxyAddress,
 };
 use crate::assets::core::privacy::{AllocationConfig, AccessConfig, ResourceAllocationConfig, ConcurrencyLimits, DurationConfig, ConsensusRequirements, AccessPermissions, RateLimits, AuthRequirements};
@@ -91,7 +91,7 @@ pub fn create_asset_allocation(
 pub fn create_asset_status(
     asset_id: AssetRegistration,
     state: AssetState,
-    privacy_level: PrivacyLevel,
+    privacy_level: PrivacyMode,
     certificate_fingerprint: String,
     resource_usage: Option<ResourceUsage>,
     proxy_address: Option<ProxyAddress>,
@@ -126,12 +126,12 @@ pub fn create_asset_status(
 
 /// Get supported privacy levels for all adapters
 #[allow(dead_code)] // Public API for adapter implementations
-pub fn get_supported_privacy_levels() -> Vec<PrivacyLevel> {
+pub fn get_supported_privacy_levels() -> Vec<PrivacyMode> {
     vec![
-        PrivacyLevel::PRIVATE,
-        PrivacyLevel::PRIVATE,
-        PrivacyLevel::PRIVATE,
-        PrivacyLevel::PUBLIC,
-        PrivacyLevel::PUBLIC,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
+        PrivacyMode::PUBLIC,
     ]
 }

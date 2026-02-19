@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::PrivacyLevel;
+use crate::assets::core::PrivacyMode;
 
 /// Trigger conditions for automated responses
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,8 +63,8 @@ pub enum EnforcementAction {
         allocation_id: String,
     },
     /// Reduce privacy level
-    ReducePrivacyLevel {
-        new_level: PrivacyLevel,
+    ReducePrivacyMode {
+        new_level: PrivacyMode,
     },
     /// Require reauth
     RequireReauthentication,

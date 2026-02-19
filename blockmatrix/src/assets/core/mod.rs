@@ -47,7 +47,8 @@ pub use adapter::{
     EconomicRequirements, AssetPriority
 };
 pub use status::{AssetStatus, AssetState};
-pub use privacy::{PrivacyLevel, AssetAllocation};
+pub use privacy::AssetAllocation;
+pub use hypermesh_lib::PrivacyMode;
 pub use proxy::{
     ProxyAddress, ProxyType, ProxyAddressResolver, ProxyNodeInfo, ProxyCapabilities, ProxyStatistics,
     // CRITICAL Remote Proxy/NAT system exports
@@ -73,7 +74,7 @@ pub enum AssetError {
     
     /// Invalid privacy level configuration
     #[error("Invalid privacy level: {level:?}")]
-    InvalidPrivacyLevel { level: PrivacyLevel },
+    InvalidPrivacyLevel { level: PrivacyMode },
     
     /// Resource allocation failed
     #[error("Resource allocation failed: {reason}")]
@@ -300,7 +301,7 @@ impl AssetManager {
     pub async fn configure_privacy(
         &self,
         asset_id: &AssetRegistration,
-        privacy_level: PrivacyLevel,
+        privacy_level: PrivacyMode,
     ) -> AssetResult<()> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 

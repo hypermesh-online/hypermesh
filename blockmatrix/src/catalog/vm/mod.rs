@@ -44,7 +44,7 @@
 //!                 asset_id: vehicle_vin,
 //!                 validation_fields: vec!["registration_status".to_string()],
 //!                 validation_type: ValidationRequirementType::AssetExists,
-//!                 privacy_level: PrivacyLevel::PRIVATE,
+//!                 privacy_level: PrivacyMode::PRIVATE,
 //!             }
 //!         ],
 //!         entity_asset_requests: vec![
@@ -262,21 +262,21 @@ impl Default for BlockchainConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyConfig {
     /// Default privacy level for resources
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
     /// User-configurable resource sharing settings
     pub resource_sharing: HashMap<String, ResourceSharingConfig>,
     /// Anonymization settings
     pub anonymization_enabled: bool,
 }
 
-// Re-export blockmatrix's canonical PrivacyLevel for sub-modules.
-pub use crate::assets::core::PrivacyLevel;
+// Re-export blockmatrix's canonical PrivacyMode for sub-modules.
+pub use crate::assets::core::PrivacyMode;
 
 /// Resource sharing configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceSharingConfig {
     /// Privacy level for this resource
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Percentage of resource to share (0-100)
     pub share_percentage: f64,
     /// Maximum concurrent usage
@@ -293,7 +293,7 @@ impl Default for PrivacyConfig {
         
         // Conservative defaults following Proof of State patterns
         resource_sharing.insert("cpu".to_string(), ResourceSharingConfig {
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             share_percentage: 25.0,
             max_concurrent_usage: 2,
             rewards_enabled: true,
@@ -301,7 +301,7 @@ impl Default for PrivacyConfig {
         });
         
         resource_sharing.insert("memory".to_string(), ResourceSharingConfig {
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             share_percentage: 10.0,
             max_concurrent_usage: 1,
             rewards_enabled: false,
@@ -309,7 +309,7 @@ impl Default for PrivacyConfig {
         });
         
         Self {
-            default_privacy_level: PrivacyLevel::PRIVATE,
+            default_privacy_level: PrivacyMode::PRIVATE,
             resource_sharing,
             anonymization_enabled: true,
         }
@@ -533,7 +533,7 @@ pub struct AssetAllocation {
     /// Capacity available for sharing
     pub shared_capacity: u64,
     /// Privacy level for sharing
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Maximum concurrent usage
     pub max_concurrent_usage: u32,
 }
@@ -552,7 +552,7 @@ pub struct AssetAvailability {
 impl Default for ResourceSharingConfig {
     fn default() -> Self {
         Self {
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             share_percentage: 0.0,
             max_concurrent_usage: 1,
             rewards_enabled: false,
@@ -598,7 +598,7 @@ mod tests {
         // Test privacy settings
         assert!(matches!(
             config.privacy_config.default_privacy_level,
-            PrivacyLevel::PRIVATE
+            PrivacyMode::PRIVATE
         ));
     }
     
@@ -614,7 +614,7 @@ mod tests {
             asset_id: test_asset_id(AssetType::Container),
             validation_fields: vec!["vin".to_string(), "model".to_string()],
             validation_type: ValidationRequirementType::AssetExists,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
         };
         
         assert_eq!(validation.entity_domain, "honda.hypermesh.online");
@@ -645,15 +645,15 @@ mod tests {
             data_flow: std::collections::HashMap::new(),
             sync_requirements: vec![],
             workflow_privacy: WorkflowPrivacyPolicy {
-                intermediate_privacy: PrivacyLevel::PRIVATE,
-                final_privacy: PrivacyLevel::PUBLIC,
+                intermediate_privacy: PrivacyMode::PRIVATE,
+                final_privacy: PrivacyMode::PUBLIC,
                 intermediate_access: vec!["dealer.hypermesh.online".to_string()],
                 data_sharing_rules: std::collections::HashMap::new(),
             },
         };
         
         assert_eq!(workflow.entity_sequence.len(), 3);
-        assert!(matches!(workflow.workflow_privacy.intermediate_privacy, PrivacyLevel::PRIVATE));
+        assert!(matches!(workflow.workflow_privacy.intermediate_privacy, PrivacyMode::PRIVATE));
     }
     
     #[tokio::test]
@@ -713,7 +713,7 @@ mod tests {
                     asset_id: test_asset_id(AssetType::Container),
                     validation_fields: vec!["registration_status".to_string()],
                     validation_type: ValidationRequirementType::AssetExists,
-                    privacy_level: PrivacyLevel::PRIVATE,
+                    privacy_level: PrivacyMode::PRIVATE,
                 }
             ],
             entity_privacy_policies: std::collections::HashMap::new(),

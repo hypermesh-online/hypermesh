@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use uuid::Uuid;
 
-use super::super::PrivacyLevel;
+use super::super::PrivacyMode;
 use super::types::*;
 
 /// Entity asset allocation coordinator
@@ -46,7 +46,7 @@ impl EntityAssetCoordinator {
                 entity_domain: entity_domain.to_string(),
                 max_compute_allocation: config.max_external_allocation.clone(),
                 allowed_operations: vec![],
-                resource_privacy_level: PrivacyLevel::PRIVATE,
+                resource_privacy_level: PrivacyMode::PRIVATE,
                 max_duration_seconds: 3600,
             },
         };

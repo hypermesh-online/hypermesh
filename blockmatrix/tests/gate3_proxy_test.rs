@@ -14,7 +14,7 @@
 //! - ProxyRouter (trust-based routing)
 
 use blockmatrix::assets::proxy::*;
-use blockmatrix::assets::core::{AssetRegistration, AssetType, PrivacyLevel};
+use blockmatrix::assets::core::{AssetRegistration, AssetType, PrivacyMode};
 
 #[tokio::test]
 async fn test_gate3_global_addressing() {
@@ -226,9 +226,9 @@ async fn test_gate3_privacy_aware_routing() {
     let router = ProxyRouter::new().await.unwrap();
 
     // Test privacy level compatibility
-    assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PRIVATE));
-    assert!(router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PRIVATE));
-    assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PUBLIC));
+    assert!(router.privacy_levels_compatible(&PrivacyMode::PUBLIC, &PrivacyMode::PRIVATE));
+    assert!(router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PRIVATE));
+    assert!(!router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PUBLIC));
 
     println!("Privacy level compatibility:");
     println!("  ✓ PUBLIC compatible with PRIVATE: OK");

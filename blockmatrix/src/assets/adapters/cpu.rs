@@ -23,7 +23,7 @@ use sysinfo::{System, CpuRefreshKind, RefreshKind};
 use crate::assets::core::{
     AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyLevel, AssetAllocation, ProxyAddress,
+    PrivacyMode, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, CpuUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     CpuRequirements,
@@ -47,7 +47,7 @@ pub struct CpuAllocation {
     /// NUMA node affinity
     pub numa_node: Option<u32>,
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Process isolation enabled
     pub isolation_enabled: bool,
     /// CPU time slice duration
@@ -622,7 +622,7 @@ impl AssetAdapter for CpuAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -721,7 +721,7 @@ impl AssetAdapter for CpuAssetAdapter {
         })
     }
     
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -838,11 +838,11 @@ impl AssetAdapter for CpuAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Cpu,
             supported_privacy_levels: vec![
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PUBLIC,
-                PrivacyLevel::PUBLIC,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PUBLIC,
+                PrivacyMode::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,
@@ -881,7 +881,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             // Use default test proofs that pass validation (proper hash generation)
             consensus_proof: ConsensusProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),

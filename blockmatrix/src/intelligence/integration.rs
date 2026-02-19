@@ -17,10 +17,11 @@ use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
 
 use crate::assets::pipeline::{Shard, ShardingConfig, EncryptionConfig};
-use crate::assets::multi_node::{NetworkId, PrivacyTier, MultiNetworkCoordinator};
+use crate::assets::multi_node::{NetworkId, MultiNetworkCoordinator};
 use crate::assets::storage::{ContentAddressedStorage, ContentAddress, DeduplicationResult};
 use crate::matrix::MatrixCoordinate;
-use stoq::{StoqTransport, StoqPrivacyTier};
+use stoq::StoqTransport;
+use hypermesh_lib::PrivacyMode;
 
 /// Configuration for component integration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -133,7 +134,7 @@ pub enum IntegrationEvent {
     /// Asset processing started
     ProcessingStarted {
         asset_id: String,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
         timestamp: SystemTime,
     },
 
@@ -168,8 +169,8 @@ pub enum IntegrationEvent {
     /// Privacy tier transition
     PrivacyTransition {
         asset_id: String,
-        from_tier: PrivacyTier,
-        to_tier: PrivacyTier,
+        from_tier: PrivacyMode,
+        to_tier: PrivacyMode,
     },
 }
 
@@ -220,14 +221,14 @@ impl ComponentIntegration {
     #[instrument(skip(self, pipeline))]
     pub async fn integrate_privacy_pipeline(
         &self,
-        privacy_tier: &PrivacyTier,
+        privacy_tier: &PrivacyMode,
         pipeline: &mut crate::assets::pipeline::PipelineConfig,
     ) -> Result<()> {
         let start = Instant::now();
         debug!("Integrating privacy tier {:?} with pipeline", privacy_tier);
 
         // Adjust pipeline configuration based on privacy tier
-        if *privacy_tier == PrivacyTier::PUBLIC {
+        if *privacy_tier == PrivacyMode::PUBLIC {
             // Maximum security and redundancy for public tier
             pipeline.encryption = EncryptionConfig {
                 quantum_resistant: true,
@@ -240,7 +241,7 @@ impl ComponentIntegration {
                 target_shard_size: 1024 * 1024,
             };
             pipeline.compression.level = 6;
-        } else if *privacy_tier == PrivacyTier::PRIVATE {
+        } else if *privacy_tier == PrivacyMode::PRIVATE {
             // Federated-level config (more secure of the collapsed pair)
             pipeline.encryption = EncryptionConfig {
                 quantum_resistant: true,
@@ -328,7 +329,7 @@ impl ComponentIntegration {
         stoq: &StoqTransport,
         source: MatrixCoordinate,
         destination: MatrixCoordinate,
-        privacy_tier: &PrivacyTier,
+        privacy_tier: &PrivacyMode,
     ) -> Result<stoq::Connection> {
         let start = Instant::now();
         debug!("Integrating STOQ with matrix routing from {:?} to {:?}", source, destination);
@@ -336,8 +337,8 @@ impl ComponentIntegration {
         // Calculate path between coordinates
         let path = vec![source, destination]; // Simple direct path
 
-        // PrivacyTier is now an alias for PrivacyMode (same as StoqPrivacyTier)
-        let stoq_tier: StoqPrivacyTier = *privacy_tier;
+        // PrivacyMode is the canonical type used across all crates (same as PrivacyMode)
+        let stoq_tier: PrivacyMode = *privacy_tier;
 
         // Establish STOQ connection with matrix-aware routing
         let endpoint = stoq::Endpoint {
@@ -598,7 +599,7 @@ trait ContentAddressedStorageExt {
 #[allow(dead_code)] // Configuration struct for network-specific operations
 struct NetworkConfig {
     network_id: NetworkId,
-    privacy_tier: PrivacyTier,
+    privacy_tier: PrivacyMode,
 }
 
 /// Extension methods for MultiNetworkCoordinator
@@ -608,7 +609,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
         // Placeholder implementation
         Ok(NetworkConfig {
             network_id: network.clone(),
-            privacy_tier: PrivacyTier::PUBLIC,
+            privacy_tier: PrivacyMode::PUBLIC,
         })
     }
 
@@ -640,7 +641,7 @@ impl StoqTransportExt for StoqTransport {
     async fn connect_with_routing(
         &self,
         endpoint: &stoq::Endpoint,
-        _tier: StoqPrivacyTier,
+        _tier: PrivacyMode,
         _path: Vec<MatrixCoordinate>,
     ) -> Result<stoq::Connection> {
         // Placeholder implementation - would use path for routing hints
@@ -655,7 +656,7 @@ trait StoqTransportExt {
     async fn connect_with_routing(
         &self,
         endpoint: &stoq::Endpoint,
-        tier: StoqPrivacyTier,
+        tier: PrivacyMode,
         path: Vec<MatrixCoordinate>,
     ) -> Result<stoq::Connection>;
 }
@@ -681,7 +682,7 @@ mod tests {
         let mut pipeline_config = crate::assets::pipeline::PipelineConfig::default();
 
         integration
-            .integrate_privacy_pipeline(&PrivacyTier::PUBLIC, &mut pipeline_config)
+            .integrate_privacy_pipeline(&PrivacyMode::PUBLIC, &mut pipeline_config)
             .await
             .unwrap();
 

@@ -239,7 +239,7 @@ impl RustAdapter {
                 storage_operations: vec![], network_bandwidth_used: 0,
             },
             privacy_compliance: vm_execution::PrivacyComplianceReport {
-                privacy_level_used: crate::catalog::vm::PrivacyLevel::PRIVATE,
+                privacy_level_used: crate::catalog::vm::PrivacyMode::PRIVATE,
                 anonymization_applied: false, data_sharing_events: vec![], violations: vec![],
             },
             metadata: vm_execution::ExecutionMetadata {

@@ -219,7 +219,7 @@ export const crateStatuses: CrateStatus[] = [
         "Connection pool with health checks",
         "FALCON-1024 key generation and signing",
         "Certificate management (4 strategies)",
-        "Network isolation (4 privacy tiers) with eBPF policy push",
+        "Network isolation (PrivacyMode: Anonymous/Private/Public) with eBPF policy push",
         "Adaptive congestion control",
         "Transport metrics collection",
         "Protocol extension framework (packets/tokens/shards)",

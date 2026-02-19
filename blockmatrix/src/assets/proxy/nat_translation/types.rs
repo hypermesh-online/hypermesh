@@ -8,8 +8,8 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 
-// Re-export PrivacyLevel from core module
-pub use crate::assets::core::PrivacyLevel;
+// Re-export PrivacyMode from hypermesh_lib via core
+pub use crate::assets::core::PrivacyMode;
 
 /// Global address in HyperMesh ecosystem (IPv6-like addressing)
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -83,7 +83,7 @@ pub struct MemoryPermissions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacyConfig {
     /// Privacy level
-    pub level: PrivacyLevel,
+    pub level: PrivacyMode,
     /// Allowed network IDs
     pub allowed_networks: Vec<String>,
     /// Allowed peer IDs

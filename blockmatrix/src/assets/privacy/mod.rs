@@ -45,7 +45,7 @@ pub use allocation_types::{
 
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use crate::assets::core::{AssetRegistration, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, PrivacyMode};
 
 // Type alias for compatibility
 pub type ResourceAllocation = ResourceAllocationConfig;
@@ -60,7 +60,7 @@ pub struct PrivacyAllocationResult {
     pub allocation_type: PrivacyAllocationType,
     
     /// Privacy level assigned
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     
     /// Resource allocation configuration
     pub resource_config: ResourceAllocationConfig,

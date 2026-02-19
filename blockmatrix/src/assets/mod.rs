@@ -22,7 +22,7 @@ pub mod storage;
 pub use core::{
     AssetManager, AssetRegistration, AssetType, AssetAllocation,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState, PrivacyLevel, AssetStatistics, AssetAdapter, AssetError,
+    WorkloadType, WorkState, PrivacyMode, AssetStatistics, AssetAdapter, AssetError,
 };
 
 pub use adapters::{

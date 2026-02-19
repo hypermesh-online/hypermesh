@@ -298,7 +298,7 @@ impl ExtensionLoader {
             settings: serde_json::Value::Null,
             resource_limits: context.limits.clone(),
             granted_capabilities: context.capabilities.iter().cloned().collect(),
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             debug_mode: false,
         };
 

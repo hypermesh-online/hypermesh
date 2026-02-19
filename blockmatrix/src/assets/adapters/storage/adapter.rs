@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyLevel, AssetAllocation, ProxyAddress,
+    PrivacyMode, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, StorageUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
@@ -175,7 +175,7 @@ impl AssetAdapter for StorageAssetAdapter {
         let proxy_address = generate_proxy_address(&asset_id).await;
 
         // Create encryption key for quantum security
-        let encryption_key_id = if request.privacy_level == PrivacyLevel::PRIVATE {
+        let encryption_key_id = if request.privacy_level == PrivacyMode::PRIVATE {
             Some(create_kyber_encryption_key().await)
         } else {
             None
@@ -237,7 +237,7 @@ impl AssetAdapter for StorageAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -335,7 +335,7 @@ impl AssetAdapter for StorageAssetAdapter {
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -345,7 +345,7 @@ impl AssetAdapter for StorageAssetAdapter {
         allocation.privacy_level = privacy.clone();
 
         // Update encryption based on privacy level
-        if privacy == PrivacyLevel::PRIVATE && allocation.encryption_key_id.is_none() {
+        if privacy == PrivacyMode::PRIVATE && allocation.encryption_key_id.is_none() {
             allocation.encryption_key_id = Some(create_kyber_encryption_key().await);
             allocation.encryption_enabled = true;
         }
@@ -460,11 +460,11 @@ impl AssetAdapter for StorageAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Storage,
             supported_privacy_levels: vec![
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PUBLIC,
-                PrivacyLevel::PUBLIC,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PUBLIC,
+                PrivacyMode::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,

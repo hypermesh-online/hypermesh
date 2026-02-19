@@ -17,7 +17,7 @@ use async_trait::async_trait;
 
 use crate::assets::pipeline::{Asset, AssetPipeline};
 use crate::assets::privacy::PrivacyManager;
-use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId, PrivacyTier};
+use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId, PrivacyMode};
 use crate::assets::storage::ContentAddressedStorage;
 use crate::matrix::MatrixCoordinate;
 use stoq::StoqTransport;
@@ -335,7 +335,7 @@ impl IntegrationValidator {
 
         // Test privacy tier validation
         let test_asset_id = "test_asset";
-        let test_level = crate::assets::core::PrivacyLevel::PUBLIC;
+        let test_level = crate::assets::core::PrivacyMode::PUBLIC;
 
         match privacy.check_access(test_asset_id, &test_level).await {
             Ok(_) => ValidationResult::Passed {
@@ -438,7 +438,7 @@ impl IntegrationValidator {
         };
 
         // Step 1: Privacy check
-        let _privacy_level = crate::assets::core::PrivacyLevel::PRIVATE;
+        let _privacy_level = crate::assets::core::PrivacyMode::PRIVATE;
         // PrivacyManager validation is tested separately, skip detailed access check in cross-component test
         // Focus on data flow integration instead
 
@@ -467,7 +467,7 @@ impl IntegrationValidator {
         if let Err(e) = network.register_asset(
             test_network,
             processed.asset_id.clone(),
-            PrivacyTier::PRIVATE,
+            PrivacyMode::PRIVATE,
             vec![],
         ).await {
             return ValidationResult::Failed {
@@ -612,7 +612,7 @@ trait PrivacyManagerExt {
     async fn check_access(
         &self,
         asset_id: &str,
-        level: &crate::assets::core::PrivacyLevel,
+        level: &crate::assets::core::PrivacyMode,
     ) -> Result<crate::assets::privacy::AccessControlResult>;
 
     async fn validate_retrieval(
@@ -627,7 +627,7 @@ impl PrivacyManagerExt for PrivacyManager {
     async fn check_access(
         &self,
         _asset_id: &str,
-        _level: &crate::assets::core::PrivacyLevel,
+        _level: &crate::assets::core::PrivacyMode,
     ) -> Result<crate::assets::privacy::AccessControlResult> {
         // Placeholder implementation
         Ok(crate::assets::privacy::AccessControlResult {
@@ -663,7 +663,7 @@ trait MultiNetworkCoordinatorExt {
         &self,
         network: NetworkId,
         asset_id: String,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
         positions: Vec<MatrixCoordinate>,
     ) -> Result<()>;
 }
@@ -679,7 +679,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
         &self,
         _network: NetworkId,
         _asset_id: String,
-        _privacy_tier: PrivacyTier,
+        _privacy_tier: PrivacyMode,
         _positions: Vec<MatrixCoordinate>,
     ) -> Result<()> {
         // Placeholder implementation

@@ -23,7 +23,7 @@ use crate::container::runtime::ContainerHandle;
 use crate::assets::core::{
     AssetManager, AssetRegistration, AssetType, AssetAllocationRequest, AssetAllocation,
     ConsensusProof, AssetStatus, WorkloadType,
-    ResourceRequirements, PrivacyLevel,
+    ResourceRequirements, PrivacyMode,
 };
 use crate::catalog::vm::ConsensusProofVM;
 
@@ -53,7 +53,7 @@ pub struct HyperMeshIntegrationConfig {
     /// Enable consensus validation for container operations
     pub enable_consensus_validation: bool,
     /// Default privacy level for container assets
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
     /// Resource allocation strategy
     pub resource_allocation_strategy: ResourceAllocationStrategy,
     /// Maximum containers per node
@@ -69,7 +69,7 @@ impl Default for HyperMeshIntegrationConfig {
         Self {
             auto_asset_allocation: true,
             enable_consensus_validation: true,
-            default_privacy_level: PrivacyLevel::PRIVATE,
+            default_privacy_level: PrivacyMode::PRIVATE,
             resource_allocation_strategy: ResourceAllocationStrategy::Balanced,
             max_containers_per_node: 100,
             reallocation_threshold: 0.8,
@@ -165,11 +165,11 @@ pub struct QoSRequirements {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyRequirements {
     /// Privacy level for container execution
-    pub execution_privacy: PrivacyLevel,
+    pub execution_privacy: PrivacyMode,
     /// Privacy level for data storage
-    pub storage_privacy: PrivacyLevel,
+    pub storage_privacy: PrivacyMode,
     /// Privacy level for network communication
-    pub network_privacy: PrivacyLevel,
+    pub network_privacy: PrivacyMode,
     /// Data encryption requirements
     pub encryption_requirements: EncryptionRequirements,
     /// Access control requirements
@@ -179,9 +179,9 @@ pub struct PrivacyRequirements {
 impl Default for PrivacyRequirements {
     fn default() -> Self {
         Self {
-            execution_privacy: PrivacyLevel::PRIVATE,
-            storage_privacy: PrivacyLevel::PRIVATE,
-            network_privacy: PrivacyLevel::PRIVATE,
+            execution_privacy: PrivacyMode::PRIVATE,
+            storage_privacy: PrivacyMode::PRIVATE,
+            network_privacy: PrivacyMode::PRIVATE,
             encryption_requirements: EncryptionRequirements::default(),
             access_control: AccessControlRequirements::default(),
         }
@@ -473,7 +473,7 @@ impl HyperMeshContainerOrchestrator {
                     container: None,
                     economic: None,
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 consensus_proof: consensus_proof.clone(),
                 certificate_fingerprint: String::new(),
                 duration_limit: Some(requirements.duration),

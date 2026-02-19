@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 // Re-export ProxyAddress from core
-pub use crate::assets::core::{ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyLevel};
+pub use crate::assets::core::{ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyMode};
 
 /// Global proxy network configuration
 #[derive(Clone, Debug)]

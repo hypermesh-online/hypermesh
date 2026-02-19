@@ -8,7 +8,7 @@
 
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
-use crate::assets::core::PrivacyLevel;
+use crate::assets::core::PrivacyMode;
 
 use super::PrivacyAllocationType;
 
@@ -53,7 +53,7 @@ pub struct UserPrivacyConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacySettings {
     /// Default privacy level
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
     
     /// Default allocation type
     pub default_allocation_type: PrivacyAllocationType,

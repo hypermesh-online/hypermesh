@@ -57,8 +57,6 @@ pub use network_isolation::{
     NetworkIsolationManager, NetworkStack, IsolationConfig,
     NetworkTunnel, TrafficType, IsolationViolation
 };
-/// Legacy alias — prefer `hypermesh_lib::PrivacyMode` directly
-pub type StoqPrivacyTier = hypermesh_lib::PrivacyMode;
 
 // Backward compatibility: re-export modules for tests
 pub use transport::metrics as performance_monitor;

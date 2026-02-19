@@ -21,7 +21,7 @@ use super::{
 use super::forwarding::{ForwardingRule, ForwardingRuleType};
 
 use crate::assets::core::{
-    ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyLevel,
+    ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyMode,
     ProxyNodeInfo
 };
 
@@ -77,7 +77,7 @@ struct ProxyMapping {
     local_address: String,
     
     /// Privacy level for access control
-    privacy_level: PrivacyLevel,
+    privacy_level: PrivacyMode,
     
     /// Forwarding rules
     forwarding_rules: Vec<ForwardingRule>,
@@ -226,7 +226,7 @@ impl RemoteProxyManager {
     pub async fn allocate_proxy_address(
         &self,
         asset_id: &AssetRegistration,
-        privacy_level: PrivacyLevel,
+        privacy_level: PrivacyMode,
         capabilities_required: &[String],
     ) -> AssetResult<ProxyAddress> {
         
@@ -506,12 +506,12 @@ impl RemoteProxyManager {
     /// Create forwarding rules based on privacy level
     async fn create_forwarding_rules(
         &self,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
         _asset_type: &str,
     ) -> AssetResult<Vec<ForwardingRule>> {
         let mut rules = Vec::new();
         
-        if *privacy_level == PrivacyLevel::PRIVATE {
+        if *privacy_level == PrivacyMode::PRIVATE {
             // Only direct memory access for private assets
             rules.push(ForwardingRule {
                 source_pattern: "local".to_string(),
@@ -541,7 +541,7 @@ impl RemoteProxyManager {
                 auth_required: false,
             });
 
-            if *privacy_level == PrivacyLevel::PUBLIC {
+            if *privacy_level == PrivacyMode::PUBLIC {
                 rules.push(ForwardingRule {
                     source_pattern: "*".to_string(),
                     destination: "forwarded".to_string(),
@@ -557,8 +557,8 @@ impl RemoteProxyManager {
     }
     
     /// Create access permissions based on privacy level
-    async fn create_access_permissions(&self, privacy_level: &PrivacyLevel) -> AssetResult<AccessPermissions> {
-        let perms = if *privacy_level == PrivacyLevel::PRIVATE {
+    async fn create_access_permissions(&self, privacy_level: &PrivacyMode) -> AssetResult<AccessPermissions> {
+        let perms = if *privacy_level == PrivacyMode::PRIVATE {
             AccessPermissions {
                 http_proxy: false,
                 socks5_proxy: false,
@@ -567,7 +567,7 @@ impl RemoteProxyManager {
                 memory_access: true,
                 sharded_access: false,
             }
-        } else if *privacy_level == PrivacyLevel::ANONYMOUS {
+        } else if *privacy_level == PrivacyMode::ANONYMOUS {
             AccessPermissions {
                 http_proxy: true,
                 socks5_proxy: true,
@@ -593,7 +593,7 @@ impl RemoteProxyManager {
     /// Check privacy level access for request type
     async fn check_privacy_access(
         &self,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
         request_type: &ForwardingRuleType,
     ) -> AssetResult<bool> {
         let permissions = self.create_access_permissions(privacy_level).await?;

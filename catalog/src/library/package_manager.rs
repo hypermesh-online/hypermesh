@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 
 // Import Asset Registry
 use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
-use blockmatrix::assets::PrivacyLevel;
+use hypermesh_lib::PrivacyMode;
 
 /// Package operation results
 #[derive(Debug, Clone)]
@@ -119,7 +119,7 @@ impl AssetPackageManager {
 
         // Initialize registry with default configuration
         let registry = Arc::new(CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         ));

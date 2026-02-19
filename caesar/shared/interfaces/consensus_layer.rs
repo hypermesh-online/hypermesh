@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::result::Result;
 use std::time::{Duration, SystemTime};
 
-pub use hypermesh_lib::PrivacyMode as PrivacyLevel;
+pub use hypermesh_lib::PrivacyMode;
 
 /// Raw 32-byte asset hash. Distinct from hypermesh_lib::AssetId (string identifier).
 pub type RawAssetId = [u8; 32];
@@ -95,7 +95,7 @@ pub struct AccessRights {
     pub write_permission: bool,
     pub execute_permission: bool,
     pub delegate_permission: bool,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 }
 
 /// Economic commitment for stake proof
@@ -242,7 +242,7 @@ pub trait ConsensusLayer {
     fn resolve_asset_memory_address(&self, asset_id: RawAssetId) -> Result<[u8; 32], ConsensusError>;
     
     /// Privacy-aware resource allocation (Team 2 → Team 3)
-    fn allocate_privacy_resources(&self, privacy_level: PrivacyLevel, resources: ComputationalResources) -> Result<AllocationResult, ConsensusError>;
+    fn allocate_privacy_resources(&self, privacy_level: PrivacyMode, resources: ComputationalResources) -> Result<AllocationResult, ConsensusError>;
 }
 
 /// VM execution result with asset integration

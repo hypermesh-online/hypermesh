@@ -14,7 +14,7 @@ use hypermesh_assets::adapters::{
     CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
 };
 use hypermesh_assets::core::{
-    AssetType, AssetAllocationRequest, PrivacyLevel, ResourceRequirements,
+    AssetType, AssetAllocationRequest, PrivacyMode, ResourceRequirements,
     CpuRequirements, GpuRequirements, MemoryRequirements, StorageRequirements, StorageType,
     AssetAdapter, AdapterCapabilities,
 };
@@ -36,7 +36,7 @@ async fn test_cpu_adapter_basic() {
     let capabilities = adapter.get_capabilities();
     assert_eq!(capabilities.asset_type, AssetType::Cpu);
     assert!(capabilities.supports_proxy_addressing);
-    assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PRIVATE));
+    assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PRIVATE));
     assert!(capabilities.features.contains(&"multi_core".to_string()));
     
     let health = adapter.health_check().await.unwrap();
@@ -105,9 +105,9 @@ async fn test_adapter_privacy_levels() {
         let capabilities = adapter.get_capabilities();
         
         // All adapters should support core privacy levels
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PRIVATE));
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PRIVATE));
-        assert!(capabilities.supported_privacy_levels.contains(&PrivacyLevel::PUBLIC));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PRIVATE));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PRIVATE));
+        assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PUBLIC));
         
         // All should support proxy addressing (NAT-like system)
         assert!(capabilities.supports_proxy_addressing);

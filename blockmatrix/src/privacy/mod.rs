@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 // Privacy module for Block-MATRIX
-// Uses hypermesh_lib::PrivacyMode as canonical type (re-exported as PrivacyTier)
+// Uses hypermesh_lib::PrivacyMode as canonical type
 
 pub mod tiers;
 pub mod flexibility_matrix;
@@ -17,10 +17,6 @@ pub use tiers::{
     PeerValidator, FederationValidator, ProofOfStateValidator,
     validation_requirements_for,
 };
-
-/// Re-export PrivacyMode under the domain name PrivacyTier for callers that
-/// treat network-privacy tiers and PrivacyMode interchangeably.
-pub use hypermesh_lib::PrivacyMode as PrivacyTier;
 
 pub use flexibility_matrix::{
     PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,

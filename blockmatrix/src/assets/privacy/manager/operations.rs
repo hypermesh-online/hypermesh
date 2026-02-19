@@ -14,7 +14,7 @@ use super::super::{
     PrivacyAllocationResult, ResourceAllocationConfig, ConsensusRequirementConfig,
     ProxyConfiguration, allocation_types::PrivacyAllocationType,
 };
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetError, PrivacyMode};
 use crate::consensus::proof::ConsensusProof;
 use crate::assets::proxy::RemoteProxyManager;
 
@@ -67,7 +67,7 @@ impl PrivacyManager {
         &self,
         user_id: &str,
         asset_id: &AssetRegistration,
-        requested_privacy_level: Option<PrivacyLevel>,
+        requested_privacy_level: Option<PrivacyMode>,
         consensus_proof: Option<ConsensusProof>,
     ) -> AssetResult<PrivacyAllocationResult> {
         // Get user configuration
@@ -238,12 +238,12 @@ impl PrivacyManager {
     // Helper methods (implementation details)
     async fn determine_allocation_type(
         &self,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
         privacy_history: &PrivacyHistory,
     ) -> AssetResult<PrivacyAllocationType> {
-        if *privacy_level == PrivacyLevel::PRIVATE {
+        if *privacy_level == PrivacyMode::PRIVATE {
             Ok(PrivacyAllocationType::Private)
-        } else if *privacy_level == PrivacyLevel::PUBLIC {
+        } else if *privacy_level == PrivacyMode::PUBLIC {
             if privacy_history.violations.is_empty() {
                 Ok(PrivacyAllocationType::Verified)
             } else {
@@ -257,7 +257,7 @@ impl PrivacyManager {
     async fn create_resource_config(
         &self,
         user_config: &UserPrivacyConfiguration,
-        _privacy_level: &PrivacyLevel,
+        _privacy_level: &PrivacyMode,
         asset_id: &AssetRegistration,
     ) -> AssetResult<ResourceAllocationConfig> {
         let asset_type = asset_id.asset_type()
@@ -284,14 +284,14 @@ impl PrivacyManager {
     async fn merge_consensus_requirements(
         &self,
         user_requirements: &ConsensusRequirementConfig,
-        privacy_level: &PrivacyLevel,
+        privacy_level: &PrivacyMode,
     ) -> AssetResult<ConsensusRequirementConfig> {
         let mut merged = user_requirements.clone();
 
-        if *privacy_level == PrivacyLevel::PRIVATE {
+        if *privacy_level == PrivacyMode::PRIVATE {
             merged.require_proof_of_work = false;
             merged.minimum_stake = 0;
-        } else if *privacy_level == PrivacyLevel::PUBLIC {
+        } else if *privacy_level == PrivacyMode::PUBLIC {
             merged.require_proof_of_space = true;
             merged.require_proof_of_stake = true;
             merged.require_proof_of_work = true;
@@ -307,7 +307,7 @@ impl PrivacyManager {
     async fn create_proxy_config(
         &self,
         _proxy_preferences: &ProxyPreferences,
-        _privacy_level: &PrivacyLevel,
+        _privacy_level: &PrivacyMode,
         _asset_id: &AssetRegistration,
     ) -> AssetResult<ProxyConfiguration> {
         Ok(ProxyConfiguration::default())
@@ -349,7 +349,7 @@ impl ResourcePrivacyConfig {
     fn default_for_type(resource_type: &str) -> Self {
         Self {
             resource_type: resource_type.to_string(),
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             allocation_percentage: 0.5, // 50% default allocation
             max_concurrent_access: 5,
             duration_limits: super::super::DurationLimits::default(),

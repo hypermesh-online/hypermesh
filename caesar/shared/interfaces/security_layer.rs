@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::result::Result;
 use std::time::{Duration, SystemTime};
 
-use hypermesh_lib::PrivacyMode as PrivacyLevel;
+use hypermesh_lib::PrivacyMode;
 
 /// Raw 32-byte asset hash. Distinct from hypermesh_lib::AssetId (string identifier).
 pub type RawAssetId = [u8; 32];
@@ -42,7 +42,7 @@ pub struct Certificate {
 pub struct CertificateExtensions {
     pub key_usage: KeyUsage,
     pub asset_permissions: Vec<AssetPermission>,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub quantum_resistant: bool,
 }
 
@@ -329,7 +329,7 @@ pub trait SecurityLayer {
     fn validate_security_compliance(&self, component: &str) -> Result<SecurityValidationResult, SecurityError>;
     
     /// Implement privacy-aware access control (Team 3 → Team 2)
-    fn enforce_privacy_access_control(&self, asset_id: RawAssetId, privacy_level: PrivacyLevel) -> Result<bool, SecurityError>;
+    fn enforce_privacy_access_control(&self, asset_id: RawAssetId, privacy_level: PrivacyMode) -> Result<bool, SecurityError>;
 }
 
 /// Implementation requirements for Team 3

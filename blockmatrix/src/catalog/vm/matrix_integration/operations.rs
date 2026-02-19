@@ -14,7 +14,7 @@ use crate::assets::matrix_blockchain::{
 };
 use super::super::{
     ConsensusProofVM, ExecutionResult, ExecutionContext,
-    PrivacyLevel, AssetAllocation,
+    PrivacyMode, AssetAllocation,
 };
 use super::types::*;
 use super::coordinator::EntityAssetCoordinator;
@@ -263,7 +263,7 @@ impl MatrixAwareVM {
                 target_entity: request.entity_domain.clone(),
                 asset_id: None,
                 timestamp: std::time::SystemTime::now(),
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
             });
         }
 

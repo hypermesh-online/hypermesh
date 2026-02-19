@@ -57,7 +57,7 @@
 //! ## Basic Asset Allocation
 //!
 //! ```rust,no_run
-//! use hypermesh_assets::{AssetManager, AssetAllocationRequest, AssetType, PrivacyLevel};
+//! use hypermesh_assets::{AssetManager, AssetAllocationRequest, AssetType, PrivacyMode};
 //! use hypermesh_assets::core::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 //!
 //! # #[tokio::main]
@@ -74,7 +74,7 @@
 //!
 //! let request = AssetAllocationRequest {
 //!     asset_type: AssetType::Cpu,
-//!     privacy_level: PrivacyLevel::PRIVATE,
+//!     privacy_level: PrivacyMode::PRIVATE,
 //!     consensus_proof,
 //!     certificate_fingerprint: "cert-fingerprint".to_string(),
 //!     // ... other fields
@@ -89,11 +89,11 @@
 //! ## Privacy Configuration
 //!
 //! ```rust,no_run
-//! use hypermesh_assets::core::privacy::{PrivacyLevel, UserPrivacyConfig};
+//! use hypermesh_assets::core::privacy::{PrivacyMode, UserPrivacyConfig};
 //!
 //! // Configure user privacy preferences
 //! let privacy_config = UserPrivacyConfig {
-//!     default_privacy_level: PrivacyLevel::PRIVATE,
+//!     default_privacy_level: PrivacyMode::PRIVATE,
 //!     // Private: No sharing, no rewards
 //!     // PrivateNetwork: Trusted groups only  
 //!     // P2P: Verified peers
@@ -154,7 +154,7 @@ pub use core::adapter::{
 
 // Privacy system exports
 pub use core::privacy::{
-    PrivacyLevel, AssetAllocation, AllocationConfig,
+    PrivacyMode, AssetAllocation, AllocationConfig,
     AccessConfig, AccessPermissions, RateLimits,
     UserPrivacyConfig, CaesarPreferences,
 };
@@ -316,15 +316,15 @@ mod integration_tests {
     #[test]
     fn test_privacy_level_hierarchy() {
         // Test privacy level access control hierarchy
-        assert!(!PrivacyLevel::PRIVATE.allows_access_from(&PrivacyLevel::PUBLIC));
-        assert!(PrivacyLevel::PUBLIC.allows_access_from(&PrivacyLevel::PRIVATE));
-        assert!(PrivacyLevel::PUBLIC.allows_access_from(&PrivacyLevel::PRIVATE));
+        assert!(!PrivacyMode::PRIVATE.allows_access_from(&PrivacyMode::PUBLIC));
+        assert!(PrivacyMode::PUBLIC.allows_access_from(&PrivacyMode::PRIVATE));
+        assert!(PrivacyMode::PUBLIC.allows_access_from(&PrivacyMode::PRIVATE));
         
         // Test CAESAR reward multipliers
-        assert_eq!(PrivacyLevel::PRIVATE.caesar_reward_multiplier(), 0.0);
-        assert_eq!(PrivacyLevel::PUBLIC.caesar_reward_multiplier(), 1.0);
-        assert!(PrivacyLevel::PRIVATE.caesar_reward_multiplier() > 0.0);
-        assert!(PrivacyLevel::PRIVATE.caesar_reward_multiplier() < 1.0);
+        assert_eq!(PrivacyMode::PRIVATE.caesar_reward_multiplier(), 0.0);
+        assert_eq!(PrivacyMode::PUBLIC.caesar_reward_multiplier(), 1.0);
+        assert!(PrivacyMode::PRIVATE.caesar_reward_multiplier() > 0.0);
+        assert!(PrivacyMode::PRIVATE.caesar_reward_multiplier() < 1.0);
     }
     
     #[test]

@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetRegistration, PrivacyLevel, ProxyAddress,
+    AssetRegistration, PrivacyMode, ProxyAddress,
 };
 
 /// GPU allocation record
@@ -28,7 +28,7 @@ pub struct GpuAllocation {
     /// Nova engine features enabled (Vulkan compute, Ray tracing, etc.)
     pub enabled_features: Vec<String>,
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Process isolation enabled
     pub isolation_enabled: bool,
     /// GPU compute priority (0-255)

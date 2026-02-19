@@ -196,7 +196,7 @@ where
 mod tests {
     use super::*;
     use crate::consensus::validation::DefaultConsensusValidator;
-    use crate::assets::core::privacy::PrivacyLevel;
+    use hypermesh_lib::PrivacyMode;
 
     #[tokio::test]
     async fn test_distribution_with_eligible_nodes() {

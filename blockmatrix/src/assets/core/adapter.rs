@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{AssetRegistration, AssetType, AssetResult, ConsensusProof};
 use super::status::AssetStatus;
-use super::privacy::{PrivacyLevel, AssetAllocation};
+use super::privacy::AssetAllocation;
+use hypermesh_lib::PrivacyMode;
 use super::proxy::ProxyAddress;
 
 /// Universal asset adapter trait
@@ -38,7 +39,7 @@ pub trait AssetAdapter: Send + Sync {
     async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus>;
     
     /// Configure privacy level for asset sharing
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()>;
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()>;
     
     /// Assign remote proxy address (NAT-like system)
     async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress>;
@@ -67,7 +68,7 @@ pub struct AssetAllocationRequest {
     /// Requested resource specifications
     pub requested_resources: ResourceRequirements,
     /// Privacy level configuration
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Consensus proof validation (ALL FOUR PROOFS REQUIRED)
     pub consensus_proof: ConsensusProof,
     /// Certificate fingerprint for authorization
@@ -406,7 +407,7 @@ pub struct AdapterCapabilities {
     /// Asset type handled
     pub asset_type: AssetType,
     /// Supported privacy levels
-    pub supported_privacy_levels: Vec<PrivacyLevel>,
+    pub supported_privacy_levels: Vec<PrivacyMode>,
     /// Supports remote proxy addressing
     pub supports_proxy_addressing: bool,
     /// Supports resource monitoring

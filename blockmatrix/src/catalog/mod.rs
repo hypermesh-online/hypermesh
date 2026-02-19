@@ -13,7 +13,7 @@ pub mod integration;
 // Re-exports for convenience
 pub use vm::{
     ConsensusProofVM, VMConfig, ConsensusRequirements,
-    PrivacyLevel, ResourceSharingConfig,
+    PrivacyMode, ResourceSharingConfig,
 };
 
 pub use integration::{

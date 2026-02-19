@@ -9,7 +9,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
-    PrivacySystem, PrivacyConfig, PrivacyTier, TrustLevel,
+    PrivacySystem, PrivacyConfig, PrivacyMode, TrustLevel,
     PrivacyFlexibilityMatrix, TierSwitcher, PolicyManager,
     PolicyAction, PolicyDecision, ActionType, ValidationType,
     PrivacyEbpfBridge, PrivacyEbpfMetrics, EbpfEventType,
@@ -45,53 +45,53 @@ fn test_all_four_privacy_tiers() {
 #[test]
 fn test_privacy_flexibility_matrix_configurations() {
     // Test uniform configuration
-    let uniform = PrivacyFlexibilityMatrix::uniform(PrivacyTier::PUBLIC);
-    assert_eq!(uniform.network_tier, PrivacyTier::PUBLIC);
-    assert_eq!(uniform.asset_tier, PrivacyTier::PUBLIC);
+    let uniform = PrivacyFlexibilityMatrix::uniform(PrivacyMode::PUBLIC);
+    assert_eq!(uniform.network_tier, PrivacyMode::PUBLIC);
+    assert_eq!(uniform.asset_tier, PrivacyMode::PUBLIC);
     assert_eq!(uniform.caesar_multiplier(), 1.0);
 
     // Test anonymous network with public assets
     let anon_public = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::ANONYMOUS,
-        PrivacyTier::PUBLIC
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PUBLIC
     );
     assert!(anon_public.is_anonymous_public());
     assert!(anon_public.caesar_multiplier() > 0.5); // Gets bonus
 
     // Test privacy-focused configuration
     let private_config = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::PRIVATE,
-        PrivacyTier::PRIVATE
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PRIVATE
     );
     assert!(private_config.is_privacy_focused());
     assert_eq!(private_config.privacy_score(), 0.7);
 
     // Test asset overrides
-    let mut matrix = PrivacyFlexibilityMatrix::uniform(PrivacyTier::PRIVATE);
+    let mut matrix = PrivacyFlexibilityMatrix::uniform(PrivacyMode::PRIVATE);
     let asset_id = [42u8; 32];
-    matrix.set_asset_override(asset_id, PrivacyTier::ANONYMOUS);
-    assert_eq!(matrix.get_asset_tier(&asset_id), PrivacyTier::ANONYMOUS);
+    matrix.set_asset_override(asset_id, PrivacyMode::ANONYMOUS);
+    assert_eq!(matrix.get_asset_tier(&asset_id), PrivacyMode::ANONYMOUS);
 }
 
 #[test]
 fn test_seamless_tier_switching() {
-    let mut switcher = TierSwitcher::new(PrivacyTier::ANONYMOUS);
+    let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
     // Test switching from Anonymous to Public
-    let result = switcher.switch_tier(PrivacyTier::PUBLIC);
+    let result = switcher.switch_tier(PrivacyMode::PUBLIC);
     assert!(result.is_ok());
-    assert_eq!(switcher.current_tier(), PrivacyTier::PUBLIC);
+    assert_eq!(switcher.current_tier(), PrivacyMode::PUBLIC);
 
     // Test switching to Private
-    let result = switcher.switch_tier(PrivacyTier::PRIVATE);
+    let result = switcher.switch_tier(PrivacyMode::PRIVATE);
     assert!(result.is_ok());
-    assert_eq!(switcher.current_tier(), PrivacyTier::PRIVATE);
+    assert_eq!(switcher.current_tier(), PrivacyMode::PRIVATE);
 
     // Check transition history
     let history = switcher.transition_history();
     assert_eq!(history.len(), 2);
-    assert_eq!(history[0].from, PrivacyTier::ANONYMOUS);
-    assert_eq!(history[0].to, PrivacyTier::PUBLIC);
+    assert_eq!(history[0].from, PrivacyMode::ANONYMOUS);
+    assert_eq!(history[0].to, PrivacyMode::PUBLIC);
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn test_tier_specific_policies() {
         queries_location: false,
         high_value: false,
     };
-    assert!(manager.enforce(PrivacyTier::ANONYMOUS, anon_action).is_ok());
+    assert!(manager.enforce(PrivacyMode::ANONYMOUS, anon_action).is_ok());
 
     // Test Public mode policy - requires full validation
     validations.insert(ValidationType::FullIdentity);
@@ -127,7 +127,7 @@ fn test_tier_specific_policies() {
         queries_location: false,
         high_value: true,
     };
-    assert!(manager.enforce(PrivacyTier::PUBLIC, public_action).is_ok());
+    assert!(manager.enforce(PrivacyMode::PUBLIC, public_action).is_ok());
 }
 
 #[test]
@@ -135,17 +135,17 @@ fn test_ebpf_integration_with_privacy_tiers() {
     let bridge = PrivacyEbpfBridge::new().unwrap();
 
     // Test setting policies for each mode
-    bridge.update_ebpf_for_tier(PrivacyTier::ANONYMOUS, 100);
+    bridge.update_ebpf_for_tier(PrivacyMode::ANONYMOUS, 100);
     let policy = bridge.get_ebpf_policy(100);
     assert_eq!(policy.privacy_tier, 0);
     assert!(!policy.requires_pos);
 
-    bridge.update_ebpf_for_tier(PrivacyTier::PRIVATE, 101);
+    bridge.update_ebpf_for_tier(PrivacyMode::PRIVATE, 101);
     let policy = bridge.get_ebpf_policy(101);
     assert_eq!(policy.privacy_tier, 2); // PRIVATE maps to ebpf u8 = 2
     assert!(policy.requires_pos);
 
-    bridge.update_ebpf_for_tier(PrivacyTier::PUBLIC, 103);
+    bridge.update_ebpf_for_tier(PrivacyMode::PUBLIC, 103);
     let policy = bridge.get_ebpf_policy(103);
     assert_eq!(policy.privacy_tier, 3);
     assert!(policy.requires_pos);
@@ -158,16 +158,16 @@ fn test_privacy_system_end_to_end() {
     let mut system = PrivacySystem::new();
 
     // Start in default mode (PRIVATE)
-    assert_eq!(system.current_tier(), PrivacyTier::PRIVATE);
+    assert_eq!(system.current_tier(), PrivacyMode::PRIVATE);
 
     // Switch to Anonymous
-    assert!(system.switch_tier(PrivacyTier::ANONYMOUS).is_ok());
-    assert_eq!(system.current_tier(), PrivacyTier::ANONYMOUS);
+    assert!(system.switch_tier(PrivacyMode::ANONYMOUS).is_ok());
+    assert_eq!(system.current_tier(), PrivacyMode::ANONYMOUS);
 
     // Update flexibility matrix
     let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::ANONYMOUS,
-        PrivacyTier::PUBLIC
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PUBLIC
     );
     assert!(system.update_flexibility_matrix(matrix).is_ok());
 
@@ -195,20 +195,20 @@ fn test_privacy_system_end_to_end() {
 fn test_privacy_presets() {
     // Test maximum privacy preset
     let max_privacy = PrivacyPresets::maximum_privacy();
-    assert_eq!(max_privacy.network_tier, PrivacyTier::ANONYMOUS);
-    assert_eq!(max_privacy.asset_tier, PrivacyTier::ANONYMOUS);
+    assert_eq!(max_privacy.network_tier, PrivacyMode::ANONYMOUS);
+    assert_eq!(max_privacy.asset_tier, PrivacyMode::ANONYMOUS);
     assert_eq!(max_privacy.privacy_score(), 1.0);
 
     // Test maximum rewards preset
     let max_rewards = PrivacyPresets::maximum_rewards();
-    assert_eq!(max_rewards.network_tier, PrivacyTier::PUBLIC);
-    assert_eq!(max_rewards.asset_tier, PrivacyTier::PUBLIC);
+    assert_eq!(max_rewards.network_tier, PrivacyMode::PUBLIC);
+    assert_eq!(max_rewards.asset_tier, PrivacyMode::PUBLIC);
     assert_eq!(max_rewards.caesar_multiplier(), 1.0);
 
     // Test balanced preset
     let balanced = PrivacyPresets::balanced();
-    assert_eq!(balanced.network_tier, PrivacyTier::PRIVATE);
-    assert_eq!(balanced.asset_tier, PrivacyTier::PRIVATE);
+    assert_eq!(balanced.network_tier, PrivacyMode::PRIVATE);
+    assert_eq!(balanced.asset_tier, PrivacyMode::PRIVATE);
 
     // Test anonymous contributor preset
     let anon_contrib = PrivacyPresets::anonymous_contributor();
@@ -247,19 +247,19 @@ fn test_privacy_metrics_tracking() {
 #[test]
 fn test_validation_requirements_per_tier() {
     // Anonymous - no requirements
-    let anon_req = validation_requirements_for(&PrivacyTier::ANONYMOUS);
+    let anon_req = validation_requirements_for(&PrivacyMode::ANONYMOUS);
     assert!(!anon_req.proof_of_space);
     assert!(!anon_req.proof_of_stake);
     assert!(!anon_req.proof_of_work);
     assert!(!anon_req.proof_of_time);
 
     // Private - peer validation only
-    let private_req = validation_requirements_for(&PrivacyTier::PRIVATE);
+    let private_req = validation_requirements_for(&PrivacyMode::PRIVATE);
     assert!(private_req.peer_validation);
     assert!(!private_req.proof_of_stake);
 
     // Public - full validation
-    let pub_req = validation_requirements_for(&PrivacyTier::PUBLIC);
+    let pub_req = validation_requirements_for(&PrivacyMode::PUBLIC);
     assert!(pub_req.proof_of_space);
     assert!(pub_req.proof_of_stake);
     assert!(pub_req.proof_of_work);
@@ -269,14 +269,14 @@ fn test_validation_requirements_per_tier() {
 #[test]
 fn test_caesar_rewards_calculation() {
     // Test each mode's base multiplier
-    assert_eq!(PrivacyTier::ANONYMOUS.caesar_multiplier(), 0.0);
-    assert_eq!(PrivacyTier::PRIVATE.caesar_multiplier(), 0.5);
-    assert_eq!(PrivacyTier::PUBLIC.caesar_multiplier(), 1.0);
+    assert_eq!(PrivacyMode::ANONYMOUS.caesar_multiplier(), 0.0);
+    assert_eq!(PrivacyMode::PRIVATE.caesar_multiplier(), 0.5);
+    assert_eq!(PrivacyMode::PUBLIC.caesar_multiplier(), 1.0);
 
     // Test flexibility matrix combined multiplier
     let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyTier::ANONYMOUS,
-        PrivacyTier::PUBLIC
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PUBLIC
     );
     // Should get bonus for contributing publicly while anonymous
     // (0.0 + 1.0) / 2.0 * 1.2 = 0.6
@@ -285,7 +285,7 @@ fn test_caesar_rewards_calculation() {
 
 #[test]
 fn test_connection_migration_during_switch() {
-    let mut switcher = TierSwitcher::new(PrivacyTier::PRIVATE);
+    let mut switcher = TierSwitcher::new(PrivacyMode::PRIVATE);
 
     // Add some peers to private tier
     if let Some(tier) = &mut switcher.private_tier {
@@ -294,7 +294,7 @@ fn test_connection_migration_during_switch() {
     }
 
     // Switch to Public
-    let result = switcher.switch_tier(PrivacyTier::PUBLIC);
+    let result = switcher.switch_tier(PrivacyMode::PUBLIC);
     assert!(result.is_ok());
 
     // Check that migration state has connections
@@ -311,11 +311,11 @@ fn test_multi_tier_network_simulation() {
     nodes.push(PrivacySystem::new()); // PRIVATE (default)
 
     let mut anon_node = PrivacySystem::new();
-    anon_node.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    anon_node.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
     nodes.push(anon_node);
 
     let mut public_node = PrivacySystem::new();
-    public_node.switch_tier(PrivacyTier::PUBLIC).unwrap();
+    public_node.switch_tier(PrivacyMode::PUBLIC).unwrap();
     nodes.push(public_node);
 
     // Verify different CAESAR multipliers
@@ -345,11 +345,11 @@ fn test_policy_enforcement_across_tiers() {
     };
 
     // Should fail in Anonymous mode (no validation)
-    system.switch_tier(PrivacyTier::ANONYMOUS).unwrap();
+    system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
     assert!(system.enforce_policy(action.clone()).is_err());
 
     // Should fail in Private mode (peer validation only)
-    system.switch_tier(PrivacyTier::PRIVATE).unwrap();
+    system.switch_tier(PrivacyMode::PRIVATE).unwrap();
     assert!(system.enforce_policy(action.clone()).is_err());
 
     // Add more validations for Public mode
@@ -370,6 +370,6 @@ fn test_policy_enforcement_across_tiers() {
     };
 
     // Should succeed in Public mode with full validation
-    system.switch_tier(PrivacyTier::PUBLIC).unwrap();
+    system.switch_tier(PrivacyMode::PUBLIC).unwrap();
     assert!(system.enforce_policy(public_action).is_ok());
 }

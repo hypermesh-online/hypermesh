@@ -472,7 +472,7 @@ impl CatalogAssetIntegration {
                     name: asset.name.clone(),
                     asset_type: asset.asset_type.clone(),
                     metadata: asset.metadata.clone(),
-                    privacy_level: PrivacyLevel::Private,
+                    privacy_level: PrivacyMode::PRIVATE,
                     consensus_requirements: ConsensusRequirements::default(),
                 }
             ).await?;

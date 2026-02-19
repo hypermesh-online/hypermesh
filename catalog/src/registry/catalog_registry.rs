@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use blockmatrix::assets::{AssetRegistration, ConsensusProof, PrivacyLevel};
+use blockmatrix::assets::{AssetRegistration, ConsensusProof};
+use hypermesh_lib::PrivacyMode;
 use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
 use super::asset_type::AssetTypeDefinition;
@@ -30,7 +31,7 @@ pub struct CatalogRegistry {
     index: Arc<RwLock<HashMap<String, AssetRegistration>>>,
 
     /// Privacy level configuration
-    privacy: PrivacyLevel,
+    privacy: PrivacyMode,
 
     /// Trust policy
     trust_policy: TrustPolicy,
@@ -99,7 +100,7 @@ impl Default for RegistryConfig {
 
 impl CatalogRegistry {
     /// Create a new registry
-    pub fn new(privacy: PrivacyLevel, trust_policy: TrustPolicy, config: RegistryConfig) -> Self {
+    pub fn new(privacy: PrivacyMode, trust_policy: TrustPolicy, config: RegistryConfig) -> Self {
         // Create registry AssetRegistration from registry configuration
         let asset_data = AssetData {
             config: format!("registry_{:?}", privacy).as_bytes().to_vec(),
@@ -245,7 +246,7 @@ impl CatalogRegistry {
     }
 
     /// Get privacy level
-    pub fn privacy_level(&self) -> &PrivacyLevel {
+    pub fn privacy_level(&self) -> &PrivacyMode {
         &self.privacy
     }
 }
@@ -401,7 +402,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_and_find_type() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );
@@ -429,7 +430,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_types() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );
@@ -459,7 +460,7 @@ mod tests {
     #[tokio::test]
     async fn test_registry_statistics() {
         let registry = CatalogRegistry::new(
-            PrivacyLevel::PUBLIC,
+            PrivacyMode::PUBLIC,
             TrustPolicy::default(),
             RegistryConfig::default(),
         );

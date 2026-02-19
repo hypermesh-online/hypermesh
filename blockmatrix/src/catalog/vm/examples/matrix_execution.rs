@@ -15,7 +15,7 @@ use anyhow::Result;
 use crate::catalog::vm::{
     ConsensusProofVM, VMConfig, MatrixAwareVM, MatrixExecutionContext,
     CrossEntityValidation, EntityAssetRequest, MultiEntityWorkflow,
-    ValidationRequirementType, AssetRequestPriority, PrivacyLevel,
+    ValidationRequirementType, AssetRequestPriority, PrivacyMode,
     EntitySyncRequirement, SyncType, WorkflowPrivacyPolicy,
     ValidationConstraint
 };
@@ -29,7 +29,6 @@ use crate::assets::matrix_blockchain::{
     EntityType, BlockchainMatrixCoordinate, GeographicDimension,
     OrganizationalDimension, AccessLevel, PrivacyPolicyConfig,
 };
-use hypermesh_lib::PrivacyMode;
 use crate::consensus::ConsensusProof;
 
 /// Example: Vehicle Purchase Cross-Entity Workflow
@@ -100,8 +99,8 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
             },
         ],
         workflow_privacy: WorkflowPrivacyPolicy {
-            intermediate_privacy: PrivacyLevel::PRIVATE,
-            final_privacy: PrivacyLevel::PRIVATE,
+            intermediate_privacy: PrivacyMode::PRIVATE,
+            final_privacy: PrivacyMode::PRIVATE,
             intermediate_access: vec![
                 "dealer.hypermesh.online".to_string(),
                 "bank.hypermesh.online".to_string(),
@@ -134,7 +133,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
                     field: "warranty_status".to_string(),
                     constraint: ValidationConstraint::Equal("active".to_string()),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
             },
             // Validate registration with DMV
             CrossEntityValidation {
@@ -149,7 +148,7 @@ pub async fn vehicle_purchase_workflow_example() -> Result<()> {
                     field: "title_status".to_string(),
                     constraint: ValidationConstraint::Equal("clear".to_string()),
                 },
-                privacy_level: PrivacyLevel::PUBLIC,
+                privacy_level: PrivacyMode::PUBLIC,
             },
         ],
         entity_privacy_policies: HashMap::new(),
@@ -259,7 +258,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
                     statement: "coverage_validation".to_string(),
                     proof_type: "zk_snark".to_string(),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
             },
         ],
         entity_privacy_policies: {
@@ -273,7 +272,7 @@ pub async fn medical_data_processing_example() -> Result<()> {
                         alloc
                     },
                     allowed_operations: vec!["read_anonymized".to_string()],
-                    resource_privacy_level: PrivacyLevel::PRIVATE,
+                    resource_privacy_level: PrivacyMode::PRIVATE,
                     max_duration_seconds: 300, // 5 minutes max
                 });
             policies
@@ -331,8 +330,8 @@ pub async fn iot_device_coordination_example() -> Result<()> {
             },
         ],
         workflow_privacy: WorkflowPrivacyPolicy {
-            intermediate_privacy: PrivacyLevel::PRIVATE,
-            final_privacy: PrivacyLevel::PUBLIC,
+            intermediate_privacy: PrivacyMode::PRIVATE,
+            final_privacy: PrivacyMode::PUBLIC,
             intermediate_access: vec!["edge-processor.hypermesh.online".to_string()],
             data_sharing_rules: HashMap::new(),
         },

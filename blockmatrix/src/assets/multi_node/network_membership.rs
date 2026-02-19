@@ -38,7 +38,7 @@ pub struct NetworkMembership {
     /// Network-specific credentials (from TrustChain)
     pub credentials: NetworkCredentials,
     /// Privacy tier for this network
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
     /// Assets visible in this network
     pub visible_assets: HashSet<AssetRegistration>,
     /// Role in this network
@@ -88,15 +88,8 @@ pub struct SessionToken {
     pub permissions: HashSet<String>,
 }
 
-/// Backward-compatible alias: network_membership code that references
-/// `PrivacyTier` keeps compiling against the canonical `PrivacyMode`.
-///
-/// Variant mapping (old enum -> PrivacyMode constant):
-///   Anonymous  -> PrivacyMode::ANONYMOUS
-///   PrivateP2P -> PrivacyMode::PRIVATE
-///   Federated  -> PrivacyMode::PRIVATE
-///   Public     -> PrivacyMode::PUBLIC
-pub type PrivacyTier = hypermesh_lib::PrivacyMode;
+/// Re-export canonical PrivacyMode from hypermesh-lib.
+pub use hypermesh_lib::PrivacyMode;
 
 /// Network role
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -127,7 +120,7 @@ pub struct NetworkDiscovery {
     /// Requirements for joining
     pub requirements: JoinRequirements,
     /// Privacy tier
-    pub privacy_tier: PrivacyTier,
+    pub privacy_tier: PrivacyMode,
     /// Number of active members
     pub member_count: u64,
     /// Whether network is public
@@ -244,7 +237,7 @@ impl MultiNetworkMembership {
     pub async fn join_network(
         &self,
         network_id: NetworkId,
-        privacy_tier: PrivacyTier,
+        privacy_tier: PrivacyMode,
     ) -> AssetResult<()> {
         // Check if already member
         {
@@ -411,7 +404,7 @@ mod tests {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PUBLIC,
+                    privacy_tier: PrivacyMode::PUBLIC,
                     member_count: 1000,
                     is_public: true,
                 },
@@ -453,7 +446,7 @@ mod tests {
         let network_id = networks[0].network_id;
 
         // Join network
-        membership.join_network(network_id, PrivacyTier::PUBLIC).await.expect("test: join");
+        membership.join_network(network_id, PrivacyMode::PUBLIC).await.expect("test: join");
 
         // Leave network
         membership.leave_network(network_id).await.expect("test: leave");
@@ -474,7 +467,7 @@ mod tests {
         // Discover and join network
         let networks = membership.discover_networks().await.expect("test: discover");
         let network_id = networks[0].network_id;
-        membership.join_network(network_id, PrivacyTier::PUBLIC).await.expect("test: join");
+        membership.join_network(network_id, PrivacyMode::PUBLIC).await.expect("test: join");
 
         // Add asset to network
         use crate::assets::core::AssetType;

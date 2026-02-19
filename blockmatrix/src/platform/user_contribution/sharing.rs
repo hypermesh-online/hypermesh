@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::assets::core::{AssetType, PrivacyLevel};
+use crate::assets::core::{AssetType, PrivacyMode};
 use super::hardware::HardwareConfiguration;
 use super::pricing::PricingConfiguration;
 use super::notifications::NotificationPreferences;
@@ -17,7 +17,7 @@ use super::notifications::NotificationPreferences;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharingPreferences {
     pub resource_settings: HashMap<AssetType, ResourceSharingSettings>,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub operating_hours: OperatingHours,
     pub performance_preferences: PerformancePreferences,
     pub pricing_config: PricingConfiguration,
@@ -29,7 +29,7 @@ pub struct SharingPreferences {
 pub struct ResourceSharingSettings {
     pub enabled: bool,
     pub share_percentage: f64,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub max_concurrent_users: u32,
     pub max_session_duration: Duration,
     pub min_price_per_unit: f64,
@@ -242,7 +242,7 @@ impl SharingPreferences {
         resource_settings.insert(AssetType::Cpu, ResourceSharingSettings {
             enabled: true,
             share_percentage: 25.0,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             max_concurrent_users: 2,
             max_session_duration: Duration::from_secs(3600),
             min_price_per_unit: 0.10,
@@ -262,7 +262,7 @@ impl SharingPreferences {
         resource_settings.insert(AssetType::Memory, ResourceSharingSettings {
             enabled: false,
             share_percentage: 10.0,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             max_concurrent_users: 1,
             max_session_duration: Duration::from_secs(1800),
             min_price_per_unit: 0.01,
@@ -282,7 +282,7 @@ impl SharingPreferences {
             resource_settings.insert(AssetType::Gpu, ResourceSharingSettings {
                 enabled: false,
                 share_percentage: 50.0,
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 max_concurrent_users: 1,
                 max_session_duration: Duration::from_secs(7200),
                 min_price_per_unit: 1.00,
@@ -302,7 +302,7 @@ impl SharingPreferences {
 
         Self {
             resource_settings,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             operating_hours: OperatingHours::default_24_7(),
             performance_preferences: PerformancePreferences::conservative(),
             pricing_config: PricingConfiguration::default(),

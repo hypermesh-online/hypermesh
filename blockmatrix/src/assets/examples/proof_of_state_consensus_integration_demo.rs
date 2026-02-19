@@ -17,7 +17,7 @@ use std::time::Duration;
 use hypermesh_assets::core::{
     AssetManager, AssetAllocationRequest, AssetRegistration, AssetType,
     ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState, PrivacyLevel,
+    WorkloadType, WorkState, PrivacyMode,
     ResourceRequirements, CpuRequirements, MemoryRequirements,
 };
 
@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         asset_id: asset_id.clone(),
         asset_type: AssetType::Cpu,
         consensus_proof,
-        privacy_level: PrivacyLevel::Network, // Network-level privacy
+        privacy_level: PrivacyMode::PRIVATE, // Network-level privacy maps to PRIVATE
         resource_requirements: ResourceRequirements {
             cpu: Some(CpuRequirements {
                 cores: 4,

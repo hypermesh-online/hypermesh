@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::assets::core::{
     AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyLevel, AssetAllocation, ProxyAddress,
+    PrivacyMode, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, MemoryUsage,
     AdapterHealth, AdapterCapabilities, ConsensusProof,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
@@ -48,7 +48,7 @@ pub struct MemoryAllocation {
     /// NUMA node
     pub numa_node: Option<u32>,
     /// Privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Remote proxy address for NAT-like access
     pub proxy_address: Option<ProxyAddress>,
     /// Allocation timestamp
@@ -75,7 +75,7 @@ pub struct MemoryPool {
     /// NUMA node affinity
     pub numa_node: Option<u32>,
     /// Pool privacy level
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Active allocations
     pub allocations: Vec<AssetRegistration>,
 }
@@ -165,7 +165,7 @@ impl MemoryAssetAdapter {
             available_size: total_memory,
             memory_type: "DDR4".to_string(), // Default assumption
             numa_node: None,
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             allocations: Vec::new(),
         });
         
@@ -482,7 +482,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                 read: true,
                 write: true,
                 execute: false, // No execute by default
-                share: request.privacy_level == PrivacyLevel::PUBLIC,
+                share: request.privacy_level == PrivacyMode::PUBLIC,
             },
             expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour default
             access_signature: Vec::new(), // Will be filled by create_access_signature
@@ -529,7 +529,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: Some(proxy_address.clone()),
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -626,7 +626,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         })
     }
     
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -639,7 +639,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         if let Some(proxy_addr) = &allocation.proxy_address {
             let mut mappings = self.proxy_mappings.write().await;
             if let Some(mapping) = mappings.get_mut(proxy_addr) {
-                mapping.permissions.share = privacy == PrivacyLevel::PUBLIC;
+                mapping.permissions.share = privacy == PrivacyMode::PUBLIC;
             }
         }
         
@@ -734,11 +734,11 @@ impl AssetAdapter for MemoryAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Memory,
             supported_privacy_levels: vec![
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PUBLIC,
-                PrivacyLevel::PUBLIC,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PUBLIC,
+                PrivacyMode::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,
@@ -777,7 +777,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             // Use default test proofs that pass validation (proper hash generation)
             consensus_proof: ConsensusProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),

@@ -18,7 +18,7 @@ mod tests {
     use super::*;
     use crate::assets::core::{
         AssetAdapter, AssetType, AssetAllocationRequest, ConsensusProof,
-        PrivacyLevel, AssetCategory, BaseSystemType,
+        PrivacyMode, AssetCategory, BaseSystemType,
         SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState,
         ContainerRequirements, VolumeMount, PortMapping,
     };
@@ -49,7 +49,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             consensus_proof: ConsensusProof::new(
                 StakeProof {
                     stake_holder: "test-holder".to_string(),

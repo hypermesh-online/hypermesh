@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use crate::assets::core::{
     AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
     AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyLevel, AssetAllocation, ProxyAddress,
+    PrivacyMode, AssetAllocation, ProxyAddress,
     ResourceUsage, ResourceLimits, GpuUsage,
     AdapterHealth, AdapterCapabilities,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
@@ -152,7 +152,7 @@ impl AssetAdapter for GpuAssetAdapter {
                     network_usage: None,
                     measurement_timestamp: SystemTime::now(),
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
@@ -265,7 +265,7 @@ impl AssetAdapter for GpuAssetAdapter {
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
         let allocation = allocations.get_mut(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
@@ -385,11 +385,11 @@ impl AssetAdapter for GpuAssetAdapter {
         AdapterCapabilities {
             asset_type: AssetType::Gpu,
             supported_privacy_levels: vec![
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PRIVATE,
-                PrivacyLevel::PUBLIC,
-                PrivacyLevel::PUBLIC,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PRIVATE,
+                PrivacyMode::PUBLIC,
+                PrivacyMode::PUBLIC,
             ],
             supports_proxy_addressing: true,
             supports_resource_monitoring: true,

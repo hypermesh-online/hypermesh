@@ -137,7 +137,7 @@ let reassembled = extensions.reassemble_from_matrix(shards)?;
 let mut packet = StoqPacket::new(data.into());
 packet.pos_token = Some(pos_token);
 packet.matrix_coords = Some((x, y, z));
-packet.privacy_tier = PrivacyTier::Federated;
+packet.privacy_tier = PrivacyMode::PRIVATE;
 
 // Asset hash verification
 packet.asset_hash = extensions.compute_asset_hash(data);

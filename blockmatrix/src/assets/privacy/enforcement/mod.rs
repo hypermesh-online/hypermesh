@@ -9,7 +9,7 @@
 
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetResult, PrivacyLevel};
+use crate::assets::core::{AssetResult, PrivacyMode};
 use super::{PrivacyAllocationResult, allocation_types::PrivacyAllocationType};
 
 // Module declarations
@@ -170,7 +170,7 @@ impl PrivacyEnforcer {
 
         // Apply privacy level restrictions
         match allocation.privacy_level {
-            PrivacyLevel::PRIVATE => {
+            PrivacyMode::PRIVATE => {
                 // Only allow local access
                 if !self.is_local_access(requester_id).await? {
                     return Ok(AccessControlResult {
@@ -182,7 +182,7 @@ impl PrivacyEnforcer {
                     });
                 }
             },
-            PrivacyLevel::PUBLIC => {
+            PrivacyMode::PUBLIC => {
                 // Require consensus proof validation
                 if allocation.allocation_type == PrivacyAllocationType::Verified {
                     // Check for valid consensus proof

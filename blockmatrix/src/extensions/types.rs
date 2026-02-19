@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use semver::Version;
 
-use crate::assets::core::{AssetType, PrivacyLevel, ConsensusProof};
+use crate::assets::core::{AssetType, PrivacyMode, ConsensusProof};
 
 /// Extension system errors
 #[derive(Debug, thiserror::Error)]
@@ -125,7 +125,7 @@ pub struct ExtensionConfig {
     pub settings: serde_json::Value,
     pub resource_limits: ResourceLimits,
     pub granted_capabilities: HashSet<ExtensionCapability>,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub debug_mode: bool,
 }
 

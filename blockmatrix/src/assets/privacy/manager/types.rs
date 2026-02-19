@@ -14,14 +14,14 @@ use super::super::{
     PrivacyAllocationResult, ResourceAllocationConfig, ConsensusRequirementConfig,
     CaesarRewardConfig,
 };
-use crate::assets::core::PrivacyLevel;
+use crate::assets::core::PrivacyMode;
 use crate::assets::proxy::RemoteProxyManager;
 
 /// Main privacy manager configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacyManagerConfig {
     /// Default privacy level for new users
-    pub default_privacy_level: PrivacyLevel,
+    pub default_privacy_level: PrivacyMode,
 
     /// Default resource allocation percentages
     pub default_resource_allocation: ResourceAllocationConfig,
@@ -75,7 +75,7 @@ pub struct AuditLoggingConfig {
 impl Default for PrivacyManagerConfig {
     fn default() -> Self {
         Self {
-            default_privacy_level: PrivacyLevel::PRIVATE,
+            default_privacy_level: PrivacyMode::PRIVATE,
             default_resource_allocation: ResourceAllocationConfig::default(),
             global_consensus_requirements: ConsensusRequirementConfig::default(),
             base_reward_config: CaesarRewardConfig::default(),
@@ -155,7 +155,7 @@ pub struct UserPrivacyConfiguration {
     pub user_id: String,
 
     /// User's preferred privacy level
-    pub preferred_privacy_level: PrivacyLevel,
+    pub preferred_privacy_level: PrivacyMode,
 
     /// Per-resource privacy settings
     pub resource_privacy_settings: HashMap<String, ResourcePrivacyConfig>,
@@ -183,7 +183,7 @@ pub struct ResourcePrivacyConfig {
     pub resource_type: String,
 
     /// Privacy level for this resource
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
 
     /// Allocation percentage (0.0 - 1.0)
     pub allocation_percentage: f32,

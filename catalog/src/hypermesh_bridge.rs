@@ -27,9 +27,10 @@ use crate::registry::{
 
 use anyhow::Result;
 use blockmatrix::assets::core::{
-    AssetManager, AssetType, PrivacyLevel,
+    AssetManager, AssetType,
     AssetAllocationRequest, ConsensusProof, ResourceRequirements,
 };
+use hypermesh_lib::PrivacyMode;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -56,7 +57,7 @@ pub struct BridgeConfig {
     /// Minimum stake required for asset operations
     pub minimum_stake: u64,
     /// Default privacy level for new assets
-    pub default_privacy: PrivacyLevel,
+    pub default_privacy: PrivacyMode,
     /// Enable zero-copy optimizations
     pub enable_zero_copy: bool,
     /// Cache size for catalog metadata
@@ -68,7 +69,7 @@ impl Default for BridgeConfig {
         Self {
             enable_consensus: true,
             minimum_stake: 1000,
-            default_privacy: PrivacyLevel::PRIVATE,
+            default_privacy: PrivacyMode::PRIVATE,
             enable_zero_copy: true,
             catalog_cache_size: 10000,
         }

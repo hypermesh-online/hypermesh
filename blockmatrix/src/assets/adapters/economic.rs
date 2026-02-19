@@ -12,7 +12,7 @@
 
 use crate::assets::core::{
     AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetRegistration, AssetStatus, AssetState,
-    ResourceUsage, ResourceLimits, PrivacyLevel, ProxyAddress,
+    ResourceUsage, ResourceLimits, PrivacyMode, ProxyAddress,
     AdapterHealth, AdapterCapabilities, AssetType,
     NetworkScope, AssetCategory, BaseSystemType, AssetData,
 };
@@ -129,11 +129,11 @@ impl EconomicAssetAdapter {
             capabilities: AdapterCapabilities {
                 asset_type: AssetType::Economic,
                 supported_privacy_levels: vec![
-                    PrivacyLevel::PRIVATE,
-                    PrivacyLevel::PRIVATE,
-                    PrivacyLevel::PRIVATE,
-                    PrivacyLevel::PUBLIC,
-                    PrivacyLevel::PUBLIC,
+                    PrivacyMode::PRIVATE,
+                    PrivacyMode::PRIVATE,
+                    PrivacyMode::PRIVATE,
+                    PrivacyMode::PUBLIC,
+                    PrivacyMode::PUBLIC,
                 ],
                 supports_proxy_addressing: true,
                 supports_resource_monitoring: true,
@@ -196,10 +196,10 @@ impl EconomicAssetAdapter {
     }
 
     /// Convert privacy level to economic privacy
-    fn map_privacy_level(privacy: PrivacyLevel) -> EconomicPrivacy {
-        if privacy == PrivacyLevel::PRIVATE {
+    fn map_privacy_level(privacy: PrivacyMode) -> EconomicPrivacy {
+        if privacy == PrivacyMode::PRIVATE {
             EconomicPrivacy::Private
-        } else if privacy == PrivacyLevel::ANONYMOUS {
+        } else if privacy == PrivacyMode::ANONYMOUS {
             EconomicPrivacy::P2P
         } else {
             // PUBLIC
@@ -279,7 +279,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             asset_id: asset_id.clone(),
             status: asset_state.status,
             allocation_config: AllocationConfig {
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 resource_allocation: ResourceAllocationConfig {
                     cpu_allocation: 1.0,
                     gpu_allocation: 0.0,
@@ -396,7 +396,7 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy_level: PrivacyLevel) -> AssetResult<()> {
+    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy_level: PrivacyMode) -> AssetResult<()> {
         let mut assets = self.assets.write().await;
 
         if let Some(asset_state) = assets.get_mut(asset_id) {

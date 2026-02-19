@@ -4,7 +4,7 @@
 
 //! Type definitions for container asset adapter.
 
-use crate::assets::core::{AssetRegistration, PrivacyLevel};
+use crate::assets::core::{AssetRegistration, PrivacyMode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -24,7 +24,7 @@ pub struct ContainerAllocation {
     pub command: Option<Vec<String>>,
     pub working_directory: Option<String>,
     pub container_status: ContainerStatus,
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     pub security_config: ContainerSecurityConfig,
     pub allocated_at: SystemTime,
     pub last_accessed: SystemTime,

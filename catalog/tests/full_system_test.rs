@@ -20,7 +20,8 @@ use catalog::{
     CatalogExtension, CatalogConfig, AssetLibrary, Package, PackageVersion,
     DistributionConfig, P2PNode, SecurityConfig, ValidationReport,
 };
-use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyLevel, AssetId};
+use blockmatrix::assets::core::{AssetManager, AssetType, AssetId};
+use hypermesh_lib::PrivacyMode;
 use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
 use blockmatrix::consensus::{ConsensusProof, ProofType};
 use stoq::transport::{QuicTransport, TransportConfig};

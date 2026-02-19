@@ -214,7 +214,7 @@ pub mod dns;
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
-    AssetAllocation, PrivacyLevel, AssetError, AssetResult,
+    AssetAllocation, PrivacyMode, AssetError, AssetResult,
     ConsensusProof, ConsensusRequirements,
 };
 
@@ -248,7 +248,7 @@ pub use persistence::{
 
 // Re-export privacy types for easy access
 pub use privacy::{
-    PrivacySystem, PrivacyConfig, PrivacyTier, TrustLevel,
+    PrivacySystem, PrivacyConfig, TrustLevel,
     PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,
     TierSwitcher, PolicyManager, PolicyAction, PolicyDecision,
     ValidationRequirements, PrivacyPresets,
@@ -356,11 +356,11 @@ mod tests {
     #[test]
     fn test_privacy_levels() {
         // Verify privacy allocation types
-        let _private = PrivacyLevel::PRIVATE;
-        let _private_network = PrivacyLevel::PRIVATE;
-        let _p2p = PrivacyLevel::PRIVATE;
-        let _public_network = PrivacyLevel::PUBLIC;
-        let _full_public = PrivacyLevel::PUBLIC;
+        let _private = PrivacyMode::PRIVATE;
+        let _private_network = PrivacyMode::PRIVATE;
+        let _p2p = PrivacyMode::PRIVATE;
+        let _public_network = PrivacyMode::PUBLIC;
+        let _full_public = PrivacyMode::PUBLIC;
 
         println!("✅ All privacy levels defined");
     }

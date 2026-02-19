@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::core::{
-    AssetResult, AssetError, ProxyNodeInfo, PrivacyLevel
+    AssetResult, AssetError, ProxyNodeInfo, PrivacyMode
 };
 
 /// Type alias for routing table
@@ -54,7 +54,7 @@ pub struct ProxyRoute {
     pub min_trust_level: f32,
     
     /// Privacy level compatibility
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     
     /// Route capabilities
     pub capabilities: Vec<String>,
@@ -220,7 +220,7 @@ pub struct RouteRequest {
     pub required_capabilities: Vec<String>,
     
     /// Privacy level requirements
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     
     /// Performance requirements
     pub performance_requirements: PerformanceRequirements,
@@ -568,7 +568,7 @@ impl ProxyRouter {
     }
     
     /// Check if privacy levels are compatible
-    fn privacy_levels_compatible(&self, route_privacy: &PrivacyLevel, request_privacy: &PrivacyLevel) -> bool {
+    fn privacy_levels_compatible(&self, route_privacy: &PrivacyMode, request_privacy: &PrivacyMode) -> bool {
         // A route can serve a request if the route's privacy is at least as open.
         // Openness order: PRIVATE < ANONYMOUS < PUBLIC
         use crate::assets::core::privacy::privacy_priority;
@@ -667,18 +667,18 @@ mod tests {
         let router = create_test_router().await;
 
         // PUBLIC route can serve any request
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PRIVATE));
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::ANONYMOUS));
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::PUBLIC, &PrivacyLevel::PUBLIC));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::PUBLIC, &PrivacyMode::PRIVATE));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::PUBLIC, &PrivacyMode::ANONYMOUS));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::PUBLIC, &PrivacyMode::PUBLIC));
 
         // PRIVATE route can only serve PRIVATE requests
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PRIVATE));
-        assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::ANONYMOUS));
-        assert!(!router.privacy_levels_compatible(&PrivacyLevel::PRIVATE, &PrivacyLevel::PUBLIC));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PRIVATE));
+        assert!(!router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::ANONYMOUS));
+        assert!(!router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PUBLIC));
 
         // ANONYMOUS route can serve PRIVATE and ANONYMOUS, but not PUBLIC
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::PRIVATE));
-        assert!(router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::ANONYMOUS));
-        assert!(!router.privacy_levels_compatible(&PrivacyLevel::ANONYMOUS, &PrivacyLevel::PUBLIC));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::ANONYMOUS, &PrivacyMode::PRIVATE));
+        assert!(router.privacy_levels_compatible(&PrivacyMode::ANONYMOUS, &PrivacyMode::ANONYMOUS));
+        assert!(!router.privacy_levels_compatible(&PrivacyMode::ANONYMOUS, &PrivacyMode::PUBLIC));
     }
 }

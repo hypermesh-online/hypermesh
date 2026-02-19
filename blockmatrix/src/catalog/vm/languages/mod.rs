@@ -38,7 +38,7 @@ use crate::consensus::proof::ConsensusProof;
 use super::consensus::ConsensusVM;
 use super::execution::{ExecutionContext, ExecutionResult};
 pub use consensus_bridge::ConsensusBridge;
-use super::PrivacyLevel;
+use super::PrivacyMode;
 
 /// Supported programming languages based on Proof of State analysis
 const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
@@ -94,7 +94,7 @@ pub struct LanguageSpecificConfig {
     /// Allowed asset types
     pub allowed_asset_types: Vec<String>,
     /// Privacy restrictions
-    pub privacy_level: Option<PrivacyLevel>,
+    pub privacy_level: Option<PrivacyMode>,
 }
 
 /// Consensus requirements for language execution
@@ -642,7 +642,7 @@ impl Default for LanguageSpecificConfig {
                 "memory".to_string(),
                 "storage".to_string(),
             ],
-            privacy_level: Some(PrivacyLevel::PRIVATE),
+            privacy_level: Some(PrivacyMode::PRIVATE),
         }
     }
 }

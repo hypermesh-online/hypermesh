@@ -325,7 +325,7 @@ async fn test_complete_proxy_manager_workflow() {
     
     let allocated_address = proxy_manager.allocate_proxy_address(
         &asset_id,
-        PrivacyLevel::PRIVATE,
+        PrivacyMode::PRIVATE,
         &["HTTP".to_string(), "SOCKS5".to_string()],
     ).await.expect("Failed to allocate proxy address");
     

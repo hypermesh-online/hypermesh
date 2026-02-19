@@ -18,7 +18,7 @@ use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
 use crate::catalog::vm::consensus::ConsensusVM;
-use crate::assets::core::{AssetManager, AssetRegistration, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyLevel};
+use crate::assets::core::{AssetManager, AssetRegistration, AssetType, AssetAllocationRequest, ResourceRequirements, PrivacyMode};
 
 /// VM runtime uses the core AssetRegistration as its asset identifier for
 /// tracking execution resource handles, since the asset manager returns this type.
@@ -389,7 +389,7 @@ impl ConsensusRuntime {
                     container: None,
                     economic: None,
                 },
-                privacy_level: PrivacyLevel::PRIVATE,
+                privacy_level: PrivacyMode::PRIVATE,
                 consensus_proof: self.create_allocation_consensus_proof().await?,
                 certificate_fingerprint: String::new(),
                 duration_limit: Some(Duration::from_secs(3600)), // 1 hour default

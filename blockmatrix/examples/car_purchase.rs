@@ -9,7 +9,7 @@
 
 use blockmatrix::assets::multi_node::{
     MultiNetworkCoordinator, MultiNetworkConfig, TrustChainClient,
-    NetworkId, NetworkDiscovery, PrivacyTier,
+    NetworkId, NetworkDiscovery, PrivacyMode,
     IntegerMatrixPosition,
 };
 use blockmatrix::assets::multi_node::network_membership::{
@@ -45,7 +45,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::ManualAdmin,
                     },
-                    privacy_tier: PrivacyTier::PRIVATE,
+                    privacy_tier: PrivacyMode::PRIVATE,
                     member_count: 1,
                     is_public: false,
                 },
@@ -62,7 +62,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PUBLIC,
+                    privacy_tier: PrivacyMode::PUBLIC,
                     member_count: 1000,
                     is_public: true,
                 },
@@ -79,7 +79,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PRIVATE,
+                    privacy_tier: PrivacyMode::PRIVATE,
                     member_count: 500,
                     is_public: false,
                 },
@@ -96,7 +96,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PRIVATE,
+                    privacy_tier: PrivacyMode::PRIVATE,
                     member_count: 300,
                     is_public: false,
                 },
@@ -113,7 +113,7 @@ impl MockTrustChainClient {
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
                     },
-                    privacy_tier: PrivacyTier::PUBLIC,
+                    privacy_tier: PrivacyMode::PUBLIC,
                     member_count: 200,
                     is_public: true,
                 },
@@ -251,11 +251,11 @@ async fn main() {
 
     // Step 1: Entities join their primary networks
     println!("\n  1. Entities joining their primary networks...");
-    buyer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: buyer join");
-    bank_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("example: bank join");
-    dealer_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("example: dealer join");
-    insurance_coordinator.join_network(insurance_network, PrivacyTier::PRIVATE).await.expect("example: insurance join");
-    dmv_coordinator.join_network(dmv_network, PrivacyTier::PUBLIC).await.expect("example: dmv join");
+    buyer_coordinator.join_network(buyer_private_network, PrivacyMode::PRIVATE).await.expect("example: buyer join");
+    bank_coordinator.join_network(bank_network, PrivacyMode::PUBLIC).await.expect("example: bank join");
+    dealer_coordinator.join_network(dealer_network, PrivacyMode::PRIVATE).await.expect("example: dealer join");
+    insurance_coordinator.join_network(insurance_network, PrivacyMode::PRIVATE).await.expect("example: insurance join");
+    dmv_coordinator.join_network(dmv_network, PrivacyMode::PUBLIC).await.expect("example: dmv join");
     println!("     - All entities have joined their primary networks.");
 
     // Step 2: Buyer finds a car on the dealer's public network and initiates purchase
@@ -272,7 +272,7 @@ async fn main() {
 
     // 4. Dealer validates the 'Purchase Intent'
     println!("\n  4. Dealer validates Buyer's 'Purchase Intent'...");
-    dealer_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: dealer join buyer");
+    dealer_coordinator.join_network(buyer_private_network, PrivacyMode::PRIVATE).await.expect("example: dealer join buyer");
     let intent_proof = create_test_proof("buyer-node", "buyer-node");
     let intent_valid = dealer_coordinator.validate_asset_cross_network(
         purchase_intent.clone(),
@@ -291,7 +291,7 @@ async fn main() {
 
     // 6. Bank validates 'Sales Agreement'
     println!("\n  6. Bank validates 'Sales Agreement'...");
-    bank_coordinator.join_network(dealer_network, PrivacyTier::PRIVATE).await.expect("example: bank join dealer");
+    bank_coordinator.join_network(dealer_network, PrivacyMode::PRIVATE).await.expect("example: bank join dealer");
     let sales_agreement_proof = create_test_proof("dealer-node", "dealer-node");
     let sales_agreement_valid = bank_coordinator.validate_asset_cross_network(
         sales_agreement.clone(),
@@ -311,7 +311,7 @@ async fn main() {
     // 8. Dealer validates 'Proof of Financing' and transfers title
     println!("\n  8. Dealer validates 'Proof of Financing' and transfers Title...");
     let financing_proof = create_test_proof("bank-node", "bank-node");
-    dealer_coordinator.join_network(bank_network, PrivacyTier::PUBLIC).await.expect("example: dealer join bank");
+    dealer_coordinator.join_network(bank_network, PrivacyMode::PUBLIC).await.expect("example: dealer join bank");
     let financing_valid = dealer_coordinator.validate_asset_cross_network(
         proof_of_financing.clone(),
         bank_network,
@@ -327,7 +327,7 @@ async fn main() {
 
     // 9. Buyer gets insurance
     println!("\n  9. Buyer purchases insurance...");
-    insurance_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: insurance join buyer");
+    insurance_coordinator.join_network(buyer_private_network, PrivacyMode::PRIVATE).await.expect("example: insurance join buyer");
     let title_proof_for_insurance = create_test_proof("buyer-node", "buyer-node");
     let title_valid_for_insurance = insurance_coordinator.validate_asset_cross_network(
         car_title.clone(),
@@ -344,7 +344,7 @@ async fn main() {
     println!("     - Buyer creates 'Payment for Insurance' asset: {:?}", insurance_payment);
 
     // Bank validates payment
-    bank_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: bank join buyer");
+    bank_coordinator.join_network(buyer_private_network, PrivacyMode::PRIVATE).await.expect("example: bank join buyer");
     let insurance_payment_proof = create_test_proof("buyer-node", "buyer-node");
     let insurance_payment_valid = bank_coordinator.validate_asset_cross_network(
         insurance_payment.clone(),
@@ -376,7 +376,7 @@ async fn main() {
 
     // 10. Buyer registers car with DMV
     println!("\n  10. Buyer registers car with DMV...");
-    dmv_coordinator.join_network(buyer_private_network, PrivacyTier::PRIVATE).await.expect("example: dmv join buyer");
+    dmv_coordinator.join_network(buyer_private_network, PrivacyMode::PRIVATE).await.expect("example: dmv join buyer");
     let title_proof_for_dmv = create_test_proof("buyer-node", "buyer-node");
     let title_valid_for_dmv = dmv_coordinator.validate_asset_cross_network(
         car_title.clone(),

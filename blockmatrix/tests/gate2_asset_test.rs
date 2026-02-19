@@ -12,7 +12,7 @@
 
 use blockmatrix::assets::core::{
     AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
-    PrivacyLevel, ConsensusRequirements,
+    PrivacyMode, ConsensusRequirements,
 };
 
 use blockmatrix::assets::adapters::{
@@ -64,9 +64,9 @@ async fn test_gate2_asset_system_complete() {
     // 4. Test Privacy Levels
     println!("\n✓ Testing Privacy Allocation Types...");
     let privacy_levels = vec![
-        PrivacyLevel::ANONYMOUS,
-        PrivacyLevel::PRIVATE,
-        PrivacyLevel::PUBLIC,
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
     ];
 
     for level in &privacy_levels {

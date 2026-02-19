@@ -33,7 +33,7 @@ mod tests {
     use std::collections::HashMap;
     use super::*;
     use crate::assets::core::{
-        AssetType, AssetAllocationRequest, PrivacyLevel, StorageRequirements, StorageType,
+        AssetType, AssetAllocationRequest, PrivacyMode, StorageRequirements, StorageType,
         SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState, ConsensusProof,
     };
     use std::time::{Duration, SystemTime};
@@ -68,7 +68,7 @@ mod tests {
                 }),
                 ..Default::default()
             },
-            privacy_level: PrivacyLevel::PRIVATE,
+            privacy_level: PrivacyMode::PRIVATE,
             // ConsensusProof::new expects: (stake, time, space, work)
             consensus_proof: ConsensusProof::new(
                 StakeProof {

@@ -17,7 +17,7 @@ use blockmatrix::{
         AssetQuery, AssetMetadata, AssetOperation, OperationResult,
         manager::UnifiedExtensionManager,
     },
-    assets::core::{AssetManager, AssetRegistration, PrivacyLevel, ConsensusProof},
+    assets::core::{AssetManager, AssetRegistration, PrivacyMode, ConsensusProof},
 };
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
@@ -306,7 +306,7 @@ async fn test_extension_asset_handler() {
         name: "test-library".to_string(),
         description: Some("Test library asset".to_string()),
         metadata: HashMap::new(),
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         allocation: None,
         consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
         parent_id: None,
@@ -457,7 +457,7 @@ async fn test_catalog_extension_integration() {
             ("language".to_string(), serde_json::json!("python")),
             ("version".to_string(), serde_json::json!("1.0.0")),
         ]),
-        privacy_level: PrivacyLevel::PUBLIC,
+        privacy_level: PrivacyMode::PUBLIC,
         allocation: None,
         consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
         parent_id: None,

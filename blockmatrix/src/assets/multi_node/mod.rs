@@ -27,7 +27,7 @@ use async_trait::async_trait;
 
 #[cfg(feature = "multi-node")]
 use crate::assets::core::{
-    AssetRegistration, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyLevel,
+    AssetRegistration, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyMode,
 };
 
 #[cfg(feature = "multi-node")]
@@ -65,7 +65,7 @@ pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
 // Multi-Network Participation (Revolutionary Concept #4)
 pub use network_membership::{
     NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
-    PrivacyTier, NetworkDiscovery, MembershipStatus, NetworkRole,
+    PrivacyMode, NetworkDiscovery, MembershipStatus, NetworkRole,
     NetworkCredentials, JoinRequirements, ApprovalProcess,
 };
 pub use multi_network_coordinator::{
@@ -156,7 +156,7 @@ pub struct ResourceSharingRequest {
     /// Amount of resource needed
     pub amount: ResourceAmount,
     /// Privacy requirements
-    pub privacy_level: PrivacyLevel,
+    pub privacy_level: PrivacyMode,
     /// Maximum price willing to pay
     pub max_price: f64,
     /// Duration of resource need

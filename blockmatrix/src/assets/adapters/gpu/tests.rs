@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::assets::core::{
-    AssetAdapter, AssetType, AssetAllocationRequest, PrivacyLevel,
+    AssetAdapter, AssetType, AssetAllocationRequest, PrivacyMode,
     GpuRequirements, ConsensusProof,
 };
 use std::time::Duration;
@@ -24,7 +24,7 @@ fn create_test_gpu_request() -> AssetAllocationRequest {
             }),
             ..Default::default()
         },
-        privacy_level: PrivacyLevel::PRIVATE,
+        privacy_level: PrivacyMode::PRIVATE,
         // Use default test proofs that pass validation (proper hash generation)
         consensus_proof: ConsensusProof::new_for_testing(),
         certificate_fingerprint: "test-cert".to_string(),
