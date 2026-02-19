@@ -195,6 +195,24 @@ impl NetworkIsolationManager {
 
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
+        // Push the privacy tier to the eBPF policy layer so the XDP program
+        // enforces the correct validation policy for this network's packets.
+        if let Some(ref ebpf) = transport.ebpf_transport {
+            if let Err(e) = ebpf.read().inner().set_privacy_tier(network_id, privacy_tier) {
+                tracing::warn!(
+                    "Failed to set eBPF privacy tier for network {}: {}",
+                    network_id,
+                    e
+                );
+            } else {
+                tracing::debug!(
+                    "eBPF privacy tier set for network {} ({})",
+                    network_id,
+                    privacy_tier
+                );
+            }
+        }
+
         let stack = NetworkStack {
             network_id,
             name: name.clone(),

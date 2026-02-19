@@ -64,10 +64,12 @@ async fn test_ebpf_metrics_collection() -> Result<()> {
             println!("eBPF Metrics:");
             println!("{}", metrics);
 
-            // Verify metrics structure
-            assert!(metrics.packet_metrics.total_packets >= 0);
-            assert!(metrics.connection_metrics.active_connections >= 0);
-            assert!(metrics.latency_metrics.min_us >= 0);
+            // Verify metrics structure matches HyperMeshMetrics fields
+            assert_eq!(metrics.pos_metrics.total_validations, 0);
+            assert_eq!(metrics.asset_metrics.total_validations, 0);
+            assert_eq!(metrics.routing_metrics.total_validations, 0);
+            assert_eq!(metrics.privacy_metrics.total_checks, 0);
+            assert_eq!(metrics.transport_metrics.total_packets, 0);
         } else {
             println!("eBPF metrics not available");
         }

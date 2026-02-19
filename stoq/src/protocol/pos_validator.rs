@@ -373,16 +373,27 @@ impl PosTokenValidator {
     }
 
     /// Validate Proof of Work component
+    ///
+    /// Verifies that the work hash has at least `difficulty` leading zero bits,
+    /// matching the same algorithm used by `hypermesh_ebpf::validation::count_leading_zero_bits`.
     fn validate_proof_of_work(&self, pow: &ProofOfWork) -> bool {
         // Check work hash is not empty
         if pow.work_hash.is_empty() {
             return false;
         }
 
-        // Verify work meets difficulty target
-        // In production, this would validate the actual work proof
-        // For now, we just check basic structure
+        // Difficulty must be non-zero
         if pow.difficulty == 0 {
+            return false;
+        }
+
+        // Count leading zero bits in the work hash and verify against difficulty
+        let leading_zeros = count_leading_zero_bits(&pow.work_hash);
+        if leading_zeros < pow.difficulty {
+            debug!(
+                "PoW failed: hash has {} leading zero bits, need {}",
+                leading_zeros, pow.difficulty
+            );
             return false;
         }
 
@@ -410,17 +421,26 @@ impl PosTokenValidator {
         true
     }
 
-    /// Serialize token for signature verification
+    /// Serialize token for signature verification using canonical length-prefixed format.
+    ///
+    /// Each field is encoded as a u32 LE length prefix followed by the field bytes.
+    /// This prevents ambiguity from variable-length field concatenation.
     fn serialize_token_for_signing(&self, token: &PosToken) -> Vec<u8> {
-        // In production, this would use a canonical serialization format
-        // For now, we concatenate the key fields
-        let mut data = Vec::new();
-        data.extend_from_slice(&token.id);
-        data.extend_from_slice(&token.proof_of_space.commitment_hash);
-        data.extend_from_slice(&token.proof_of_stake.owner_pubkey);
-        data.extend_from_slice(&token.proof_of_work.work_hash);
-        data.extend_from_slice(&token.proof_of_time.prev_hash);
-        data
+        let mut buf = Vec::new();
+
+        // Helper closure: write u32 LE length prefix then field bytes
+        let mut write_field = |field: &[u8]| {
+            buf.extend_from_slice(&(field.len() as u32).to_le_bytes());
+            buf.extend_from_slice(field);
+        };
+
+        write_field(&token.id);
+        write_field(&token.proof_of_space.commitment_hash);
+        write_field(&token.proof_of_stake.owner_pubkey);
+        write_field(&token.proof_of_work.work_hash);
+        write_field(&token.proof_of_time.prev_hash);
+
+        buf
     }
 
     /// Clear the validation cache
@@ -440,6 +460,23 @@ impl PosTokenValidator {
             cache_size: self.validation_cache.len(),
         }
     }
+}
+
+/// Count leading zero bits in a byte slice.
+///
+/// Mirrors the algorithm in `hypermesh_ebpf::validation::count_leading_zero_bits`.
+/// A hash with N leading zero bits meets difficulty N.
+fn count_leading_zero_bits(data: &[u8]) -> u32 {
+    let mut count: u32 = 0;
+    for &byte in data {
+        if byte == 0 {
+            count += 8;
+        } else {
+            count += byte.leading_zeros();
+            break;
+        }
+    }
+    count
 }
 
 /// Validation statistics
@@ -472,9 +509,10 @@ mod tests {
                 staked_until: SystemTime::now() + Duration::from_secs(3600),
             },
             proof_of_work: ProofOfWork {
+                // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
                 difficulty: 10,
                 nonce: 12345,
-                work_hash: vec![13, 14, 15, 16],
+                work_hash: vec![0, 0, 0x0F, 0xFF],
             },
             proof_of_time: ProofOfTime {
                 timestamp: SystemTime::now(),

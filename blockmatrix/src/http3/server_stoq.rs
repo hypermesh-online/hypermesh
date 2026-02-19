@@ -71,6 +71,7 @@ impl Http3StoqServer {
             falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,
             health_check_interval: 30,       // 30 seconds between health checks
             connection_idle_timeout: 120,    // 120 seconds idle timeout
+            ebpf_interface: None,
         };
 
         // Initialize STOQ transport

@@ -3,6 +3,20 @@
 // See the LICENSE file in the repository root for full license text.
 
 // Linux OS Abstraction - Implementation using /proc, /sys, libbpf, XDP, TC
+//
+// NOTE ON eBPF: The eBPF methods on this trait (load_ebpf_program,
+// attach_ebpf_monitor, read_ebpf_metrics, unload_ebpf_program) are
+// OS-level abstractions with SIMULATED bytecode management.  They do NOT
+// delegate to the real hypermesh-ebpf orchestrator (HyperMeshEbpf).
+//
+// For production HyperMesh eBPF operations (packet validation, privacy
+// tier enforcement, asset hash registration, PoS validation), use
+// `crate::security::ebpf::EBPFSecurityManager` which delegates to the
+// unified `hypermesh_ebpf::HyperMeshEbpf` crate.
+//
+// This simulation exists to satisfy the OsAbstraction trait interface
+// for eBPF capability detection and basic program lifecycle testing
+// without requiring the full HyperMesh eBPF stack.
 
 #![allow(unsafe_code)]
 
@@ -463,6 +477,9 @@ impl OsAbstraction for LinuxAbstraction {
         self.get_current_resource_usage()
     }
 
+    /// SIMULATION ONLY -- does not load real eBPF bytecode into the kernel.
+    /// For production eBPF, use `EBPFSecurityManager` which delegates to
+    /// `hypermesh_ebpf::HyperMeshEbpf`.
     fn load_ebpf_program(&self, program: &[u8]) -> Result<EbpfHandle> {
         // Check eBPF support
         if !self.kernel_supports_ebpf() {
@@ -512,6 +529,8 @@ impl OsAbstraction for LinuxAbstraction {
         Ok(handle)
     }
 
+    /// SIMULATION ONLY -- does not attach to real kernel hooks.
+    /// For production eBPF, use `EBPFSecurityManager`.
     fn attach_ebpf_monitor(&self, handle: EbpfHandle, attach_type: EbpfAttachType) -> Result<()> {
         // Validate handle
         let mut programs = self.ebpf_programs.lock().unwrap();
@@ -562,6 +581,8 @@ impl OsAbstraction for LinuxAbstraction {
         Ok(())
     }
 
+    /// SIMULATION ONLY -- returns synthetic metrics, not real kernel data.
+    /// For production eBPF, use `EBPFSecurityManager`.
     fn read_ebpf_metrics(&self, handle: EbpfHandle) -> Result<EbpfMetrics> {
         let mut programs = self.ebpf_programs.lock().unwrap();
         let state = programs
@@ -625,6 +646,8 @@ impl OsAbstraction for LinuxAbstraction {
         })
     }
 
+    /// SIMULATION ONLY -- removes local state but does not unload kernel programs.
+    /// For production eBPF, use `EBPFSecurityManager`.
     fn unload_ebpf_program(&self, handle: EbpfHandle) -> Result<()> {
         let mut programs = self.ebpf_programs.lock().unwrap();
 

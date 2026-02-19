@@ -29,30 +29,32 @@ impl From<&NetworkType> for PrivacyMode {
     }
 }
 
-/// Matrix position for shard addressing
-// TODO: Migrate to hypermesh_lib::MatrixPosition once field compatibility is resolved
-// (lib uses f64 coordinates, this uses i64 coordinates and has methods)
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MatrixPosition {
-    pub x: i64,
-    pub y: i64,
-    pub z: i64,
+/// Matrix position for shard addressing — canonical from hypermesh_lib (f64 coordinates).
+pub use hypermesh_lib::MatrixPosition;
+
+/// Extension methods for MatrixPosition used by STOQ shard placement.
+pub trait MatrixPositionExt {
+    /// Create a new position from integer coordinates (convenience for shard math).
+    fn from_i64(x: i64, y: i64, z: i64) -> MatrixPosition;
+    /// Origin position (0,0,0).
+    fn origin() -> MatrixPosition;
+    /// Calculate euclidean distance to another position.
+    fn distance_to(&self, other: &MatrixPosition) -> f64;
 }
 
-impl MatrixPosition {
-    pub fn new(x: i64, y: i64, z: i64) -> Self {
-        Self { x, y, z }
+impl MatrixPositionExt for MatrixPosition {
+    fn from_i64(x: i64, y: i64, z: i64) -> MatrixPosition {
+        MatrixPosition { x: x as f64, y: y as f64, z: z as f64 }
     }
 
-    pub fn origin() -> Self {
-        Self { x: 0, y: 0, z: 0 }
+    fn origin() -> MatrixPosition {
+        MatrixPosition { x: 0.0, y: 0.0, z: 0.0 }
     }
 
-    /// Calculate euclidean distance to another position
-    pub fn distance_to(&self, other: &MatrixPosition) -> f64 {
-        let dx = (self.x - other.x) as f64;
-        let dy = (self.y - other.y) as f64;
-        let dz = (self.z - other.z) as f64;
+    fn distance_to(&self, other: &MatrixPosition) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 }
@@ -296,7 +298,7 @@ impl StoqPosIntegration {
         self.shard_registry.insert(shard_id, address);
 
         debug!(
-            "Registered shard {} at matrix position ({}, {}, {})",
+            "Registered shard {} at matrix position ({:.0}, {:.0}, {:.0})",
             shard_id,
             position.x,
             position.y,
@@ -334,11 +336,11 @@ impl StoqPosIntegration {
             // Map to matrix coordinates with configurable distance
             let radius = min_distance + (max_distance - min_distance) * t;
 
-            let x = origin.x + (radius * inclination.sin() * azimuth.cos()).round() as i64;
-            let y = origin.y + (radius * inclination.sin() * azimuth.sin()).round() as i64;
-            let z = origin.z + (radius * inclination.cos()).round() as i64;
+            let x = origin.x + (radius * inclination.sin() * azimuth.cos()).round();
+            let y = origin.y + (radius * inclination.sin() * azimuth.sin()).round();
+            let z = origin.z + (radius * inclination.cos()).round();
 
-            positions.push(MatrixPosition::new(x, y, z));
+            positions.push(MatrixPosition { x, y, z });
         }
 
         debug!(
@@ -515,9 +517,10 @@ mod tests {
                 staked_until: SystemTime::now() + Duration::from_secs(3600),
             },
             proof_of_work: ProofOfWork {
+                // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
                 difficulty: 10,
                 nonce: 12345,
-                work_hash: vec![13, 14, 15, 16],
+                work_hash: vec![0, 0, 0x0F, 0xFF],
             },
             proof_of_time: ProofOfTime {
                 timestamp: SystemTime::now(),
@@ -611,14 +614,14 @@ mod tests {
 
         integration.register_shard_address(
             1,
-            MatrixPosition::new(10, 20, 30),
+            MatrixPosition { x: 10.0, y: 20.0, z: 30.0 },
             "network1".to_string(),
             Some("node1".to_string()),
         );
 
         integration.register_shard_address(
             2,
-            MatrixPosition::new(50, 60, 70),
+            MatrixPosition { x: 50.0, y: 60.0, z: 70.0 },
             "network2".to_string(),
             None,
         );
@@ -631,6 +634,8 @@ mod tests {
 
     #[test]
     fn test_shard_position_calculation() {
+        use super::super::pos_integration::MatrixPositionExt;
+
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
         let positions = integration.calculate_shard_positions(

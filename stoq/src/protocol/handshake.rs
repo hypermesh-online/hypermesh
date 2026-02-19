@@ -232,30 +232,53 @@ impl StoqHandshakeExtension {
         Ok(result)
     }
 
-    /// Add PoS token validation to handshake flow
+    /// Add PoS token validation to handshake flow.
+    ///
+    /// Returns `Ok(true)` when the handshake passes all checks, `Ok(false)` when
+    /// a validation check fails gracefully (caller should reject the connection),
+    /// and `Err` only on internal/unexpected failures.
     pub fn process_handshake_with_pos(
         &self,
-        _handshake_data: &[u8],
+        handshake_data: &[u8],
         pos_token: Option<&PosToken>,
     ) -> Result<bool> {
-        // First, do traditional handshake validation
-        // (This would be implemented based on QUIC requirements)
-
-        // Then validate PoS token if provided
+        // 1. Validate PoS token if provided
         if let Some(token) = pos_token {
             let validation_result = self.validate_pos_token(token)?;
 
             if !validation_result.is_valid {
-                return Err(anyhow!(
-                    "PoS token validation failed: {:?}",
+                warn!(
+                    "PoS token validation failed during handshake: {:?}",
                     validation_result.errors
-                ));
+                );
+                return Ok(false);
             }
         }
 
-        // Finally, verify FALCON signature if required
+        // 2. Verify FALCON signature if required
         if self.require_falcon {
-            // FALCON validation logic already exists
+            if let Some(falcon) = &self.falcon_transport {
+                let falcon_guard = falcon.read();
+
+                // Sign the handshake data and verify the round-trip to confirm
+                // the local FALCON key is operational
+                let signature = falcon_guard.sign_handshake_data(handshake_data)?;
+                if let Some(pubkey) = falcon_guard.get_local_public_key() {
+                    let engine = crate::transport::falcon::FalconEngine::new(pubkey.variant);
+                    let valid = engine.verify(pubkey, &signature, handshake_data)?;
+                    if !valid {
+                        warn!("FALCON self-verification failed during handshake");
+                        return Ok(false);
+                    }
+                    debug!("FALCON handshake verification succeeded");
+                } else {
+                    warn!("FALCON required but no local public key available");
+                    return Ok(false);
+                }
+            } else {
+                warn!("FALCON required but transport not configured");
+                return Ok(false);
+            }
         }
 
         Ok(true)

@@ -10,18 +10,24 @@ items = [
     "Connection pool with health checks",
     "FALCON-1024 key generation and signing",
     "Certificate management (4 strategies)",
-    "Network isolation (4 privacy tiers)",
+    "Network isolation (4 privacy tiers) with eBPF policy push",
     "Adaptive congestion control",
     "Transport metrics collection",
     "Protocol extension framework (packets/tokens/shards)",
-    "eBPF transport integration (thin consumer of hypermesh-ebpf)",
-    "AF_XDP socket reuse in send path",
+    "eBPF transport integration with validation hooks (CertificateValidator, PacketValidator)",
+    "AF_XDP socket reuse in send+receive path",
+    "PoS validation results fed to eBPF layer",
+    "Configurable eBPF interface resolution",
+    "PoW hash-meets-difficulty validation",
+    "Canonical length-prefixed token serialization",
+    "Dynamic FALCON key_id in protocol frames",
+    "MatrixPosition using hypermesh_lib canonical type (f64)",
 ]
 
 [features.in_development]
 items = [
-    "XDP packet filtering (feature-gated)",
-    "AF_XDP zero-copy sockets (feature-gated)",
+    "TrustChainClient wiring for signature verification",
+    "AF_XDP zero-copy UMEM I/O (kernel-backed)",
 ]
 
 [features.planned]

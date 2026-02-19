@@ -142,6 +142,10 @@ pub struct TransportConfig {
     pub enable_falcon_crypto: bool,
     /// FALCON variant to use
     pub falcon_variant: FalconVariant,
+    /// Network interface for eBPF XDP attachment.
+    /// When `None`, automatically resolved from `bind_address`
+    /// (localhost -> "lo", unspecified/other -> system default).
+    pub ebpf_interface: Option<String>,
 }
 
 impl Default for TransportConfig {
@@ -177,6 +181,7 @@ impl Default for TransportConfig {
             enable_large_send_offload: true, // LSO for large transfers
             enable_falcon_crypto: true, // Quantum-resistant FALCON cryptography
             falcon_variant: FalconVariant::Falcon1024, // Maximum security level
+            ebpf_interface: None, // Auto-detect from bind_address
         }
     }
 }

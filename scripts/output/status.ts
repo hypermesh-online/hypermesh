@@ -35,7 +35,10 @@ export const crateStatuses: CrateStatus[] = [
         "Asset pipeline reorder (Compress-Encrypt-Shard)",
         "Kyber-1024 for asset encryption",
         "Instruction-based retrieval system",
-        "OS integration layer (Linux/macOS/Windows)"
+        "OS integration layer (Linux/macOS/Windows)",
+        "eBPF security manager with XDP attachment and policy enforcement",
+        "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)",
+        "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)"
       ],
       "planned": [
         "Multi-scope blockchain (User/Group/Org/Public)",
@@ -44,7 +47,7 @@ export const crateStatuses: CrateStatus[] = [
         "Dynamic shard rebalancing"
       ]
     },
-    "completion": 50
+    "completion": 42
   },
   {
     "id": "caesar",
@@ -144,7 +147,7 @@ export const crateStatuses: CrateStatus[] = [
         "XDP program management and packet filtering",
         "AF_XDP zero-copy socket management with kernel capability probing",
         "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
-        "Validation hooks (certificate, packet, extension)",
+        "Validation hooks with STOQ+BlockMatrix implementations (certificate, packet, extension)",
         "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
         "Asset hash verification (BLAKE3)",
         "Matrix routing path validation (IPv6 + matrix position)",
@@ -156,7 +159,8 @@ export const crateStatuses: CrateStatus[] = [
         "Orchestrator routing rules, asset hash, and PoS validation state storage",
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
         "FastValidationResult detailed PoS pre-validation",
-        "STOQ send path with persistent AF_XDP socket reuse"
+        "STOQ send+receive path with persistent AF_XDP socket reuse",
+        "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)"
       ],
       "inDevelopment": [
         "Kernel-space XDP program attachment (feature-gated, compile-verified)"
@@ -167,7 +171,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 82
+    "completion": 83
   },
   {
     "id": "hypermesh-lib",
@@ -208,16 +212,22 @@ export const crateStatuses: CrateStatus[] = [
         "Connection pool with health checks",
         "FALCON-1024 key generation and signing",
         "Certificate management (4 strategies)",
-        "Network isolation (4 privacy tiers)",
+        "Network isolation (4 privacy tiers) with eBPF policy push",
         "Adaptive congestion control",
         "Transport metrics collection",
         "Protocol extension framework (packets/tokens/shards)",
-        "eBPF transport integration (thin consumer of hypermesh-ebpf)",
-        "AF_XDP socket reuse in send path"
+        "eBPF transport integration with validation hooks (CertificateValidator, PacketValidator)",
+        "AF_XDP socket reuse in send+receive path",
+        "PoS validation results fed to eBPF layer",
+        "Configurable eBPF interface resolution",
+        "PoW hash-meets-difficulty validation",
+        "Canonical length-prefixed token serialization",
+        "Dynamic FALCON key_id in protocol frames",
+        "MatrixPosition using hypermesh_lib canonical type (f64)"
       ],
       "inDevelopment": [
-        "XDP packet filtering (feature-gated)",
-        "AF_XDP zero-copy sockets (feature-gated)"
+        "TrustChainClient wiring for signature verification",
+        "AF_XDP zero-copy UMEM I/O (kernel-backed)"
       ],
       "planned": [
         "Kernel eBPF program loading via STOQ",
@@ -226,7 +236,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-path QUIC"
       ]
     },
-    "completion": 63
+    "completion": 73
   },
   {
     "id": "trustchain",

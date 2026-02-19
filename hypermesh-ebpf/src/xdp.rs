@@ -323,6 +323,12 @@ impl XdpManager {
     ///
     /// This is the userspace validation path. With kernel-attach, the XDP
     /// program handles this at kernel level; this function serves as fallback.
+    ///
+    /// Enforces all policy flags:
+    /// - `max_packet_size`: Drop oversized packets
+    /// - `requires_pos`: Parse and validate PoS header from packet
+    /// - `validate_asset_hash`: Check asset hash header in packet
+    /// - `check_matrix_routing`: Verify matrix routing header in packet
     pub fn validate_packet(
         &self,
         connection_id: u64,
@@ -339,6 +345,118 @@ impl XdpManager {
                     policy.max_packet_size
                 ),
             };
+        }
+
+        // Enforce PoS validation when required by policy
+        if policy.requires_pos {
+            if packet_data.len() < ProofOfStateHeader::SIZE {
+                return PacketDecision::Drop {
+                    reason: format!(
+                        "Packet too short for PoS header: {} < {}",
+                        packet_data.len(),
+                        ProofOfStateHeader::SIZE
+                    ),
+                };
+            }
+
+            match ProofOfStateHeader::from_bytes(packet_data) {
+                Some(header) => {
+                    let result = self.pos_validator.validate_fast(&header);
+                    if !result.all_ok() {
+                        return PacketDecision::Drop {
+                            reason: format!(
+                                "PoS validation failed: timestamp={}, stake={}, work={}, space={}",
+                                result.timestamp_ok, result.stake_ok,
+                                result.work_ok, result.space_ok
+                            ),
+                        };
+                    }
+                }
+                None => {
+                    return PacketDecision::Drop {
+                        reason: "Failed to parse PoS header".to_string(),
+                    };
+                }
+            }
+        }
+
+        // Enforce asset hash validation when required by policy
+        if policy.validate_asset_hash {
+            // Asset hash header follows PoS header (or starts at offset 0
+            // if PoS is not required).
+            let offset = if policy.requires_pos {
+                ProofOfStateHeader::SIZE
+            } else {
+                0
+            };
+
+            if packet_data.len() < offset + AssetHashHeader::SIZE {
+                return PacketDecision::Drop {
+                    reason: format!(
+                        "Packet too short for asset hash header at offset {}: {} < {}",
+                        offset,
+                        packet_data.len(),
+                        offset + AssetHashHeader::SIZE
+                    ),
+                };
+            }
+
+            match AssetHashHeader::from_bytes(&packet_data[offset..]) {
+                Some(header) => {
+                    if !header.validate_shard_indices() {
+                        return PacketDecision::Drop {
+                            reason: format!(
+                                "Invalid shard indices: {}/{}",
+                                header.shard_index, header.shard_count
+                            ),
+                        };
+                    }
+                }
+                None => {
+                    return PacketDecision::Drop {
+                        reason: "Failed to parse asset hash header".to_string(),
+                    };
+                }
+            }
+        }
+
+        // Enforce matrix routing validation when required by policy
+        if policy.check_matrix_routing {
+            // Routing header follows PoS + asset hash headers
+            let mut offset = 0;
+            if policy.requires_pos {
+                offset += ProofOfStateHeader::SIZE;
+            }
+            if policy.validate_asset_hash {
+                offset += AssetHashHeader::SIZE;
+            }
+
+            if packet_data.len() < offset + MatrixRoutingHeader::MIN_SIZE {
+                return PacketDecision::Drop {
+                    reason: format!(
+                        "Packet too short for routing header at offset {}: {} < {}",
+                        offset,
+                        packet_data.len(),
+                        offset + MatrixRoutingHeader::MIN_SIZE
+                    ),
+                };
+            }
+
+            match MatrixRoutingHeader::from_bytes(&packet_data[offset..]) {
+                Some(routing) => {
+                    // Use u16::MAX as matrix size bound (permissive)
+                    if !routing.validate_path(u16::MAX) {
+                        return PacketDecision::Drop {
+                            reason: "Matrix routing path validation failed".to_string(),
+                        };
+                    }
+                }
+                None => {
+                    return PacketDecision::Drop {
+                        reason: "Failed to parse matrix routing header".to_string(),
+                    };
+                }
+            }
         }
 
         // Default: pass to userspace for processing
@@ -735,5 +853,258 @@ mod tests {
         assert_eq!(max_pkt, 9000);
         let rate = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
         assert_eq!(rate, 100);
+    }
+
+    // -------------------------------------------------------------------
+    // Policy enforcement tests (validate_packet with policy flags)
+    // -------------------------------------------------------------------
+
+    /// Build a valid PoS header as raw bytes.
+    fn valid_pos_bytes() -> Vec<u8> {
+        let header = ProofOfStateHeader {
+            who: valid_who(),
+            what: valid_what(),
+            when: now_micros(),
+            where_: valid_where(),
+        };
+        header.to_bytes()
+    }
+
+    /// Build a valid asset hash header as raw bytes.
+    fn valid_asset_hash_bytes() -> Vec<u8> {
+        let header = AssetHashHeader {
+            asset_id: [0x01; 32],
+            hash: [0x02; 32],
+            shard_count: 10,
+            shard_index: 3,
+        };
+        header.to_bytes()
+    }
+
+    /// Build a valid matrix routing header as raw bytes.
+    fn valid_routing_bytes() -> Vec<u8> {
+        let header = MatrixRoutingHeader {
+            source: MatrixCoordinate { x: 0, y: 0, z: 0 },
+            destination: MatrixCoordinate { x: 5, y: 5, z: 0 },
+            path: vec![],
+        };
+        header.to_bytes()
+    }
+
+    #[test]
+    fn test_policy_pos_required_drops_short_packet() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.requires_pos = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Too short for PoS header (88 bytes needed)
+        let packet = vec![0u8; 50];
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("too short for PoS"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_policy_pos_required_passes_valid_packet() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.requires_pos = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = valid_pos_bytes();
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_policy_pos_required_drops_invalid_proof() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.requires_pos = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Build a PoS header with invalid who (bad algorithm indicator)
+        let mut bad_who = [0xFF; 32];
+        bad_who[0] = 0x99; // invalid algorithm
+        let header = ProofOfStateHeader {
+            who: bad_who,
+            what: valid_what(),
+            when: now_micros(),
+            where_: valid_where(),
+        };
+        let packet = header.to_bytes();
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("PoS validation failed"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_policy_asset_hash_required_drops_short_packet() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.validate_asset_hash = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Too short for asset hash header (72 bytes needed, 0 offset)
+        let packet = vec![0u8; 50];
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("too short for asset hash"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_policy_asset_hash_required_passes_valid() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.validate_asset_hash = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = valid_asset_hash_bytes();
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_policy_asset_hash_drops_invalid_shard() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.validate_asset_hash = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let bad_header = AssetHashHeader {
+            asset_id: [0x01; 32],
+            hash: [0x02; 32],
+            shard_count: 10,
+            shard_index: 10, // >= shard_count
+        };
+        let packet = bad_header.to_bytes();
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("Invalid shard indices"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_policy_routing_required_drops_short_packet() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.check_matrix_routing = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = vec![0u8; 5];
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("too short for routing"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_policy_routing_required_passes_valid() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.check_matrix_routing = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let packet = valid_routing_bytes();
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_policy_all_flags_combined() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_default_policy(ValidationPolicy::strict());
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Build combined packet: PoS (88) + AssetHash (72) + Routing (12+)
+        let mut packet = valid_pos_bytes();
+        packet.extend_from_slice(&valid_asset_hash_bytes());
+        packet.extend_from_slice(&valid_routing_bytes());
+
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_policy_all_flags_drops_when_pos_invalid() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_default_policy(ValidationPolicy::strict());
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Build combined packet with bad PoS
+        let mut bad_who = [0xFF; 32];
+        bad_who[0] = 0x99;
+        let bad_pos = ProofOfStateHeader {
+            who: bad_who,
+            what: valid_what(),
+            when: now_micros(),
+            where_: valid_where(),
+        };
+        let mut packet = bad_pos.to_bytes();
+        packet.extend_from_slice(&valid_asset_hash_bytes());
+        packet.extend_from_slice(&valid_routing_bytes());
+
+        let decision = mgr.validate_packet(0, &packet);
+        match decision {
+            PacketDecision::Drop { reason } => {
+                assert!(reason.contains("PoS validation failed"));
+            }
+            other => unreachable!("test: expected Drop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_permissive_policy_skips_all_checks() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_default_policy(ValidationPolicy::permissive());
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Small garbage packet passes with permissive policy
+        let packet = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    #[test]
+    fn test_pos_offset_for_asset_hash_check() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut policy = ValidationPolicy::permissive();
+        policy.requires_pos = true;
+        policy.validate_asset_hash = true;
+        pm.set_default_policy(policy);
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // PoS header (88 bytes) + Asset hash header (72 bytes) = 160 bytes needed
+        let mut packet = valid_pos_bytes();
+        packet.extend_from_slice(&valid_asset_hash_bytes());
+        let decision = mgr.validate_packet(0, &packet);
+        assert_eq!(decision, PacketDecision::Pass);
     }
 }

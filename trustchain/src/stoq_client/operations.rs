@@ -63,6 +63,7 @@ impl TrustChainStoqClient {
             cert_rotation_interval: Duration::from_secs(24 * 60 * 60),
             enable_falcon_crypto: true,
             falcon_variant: stoq::FalconVariant::Falcon1024,
+            ebpf_interface: None,
         };
 
         let transport = Arc::new(StoqTransport::new(transport_config).await

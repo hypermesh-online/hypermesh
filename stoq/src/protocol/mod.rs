@@ -29,7 +29,7 @@ pub use pos_validator::{
 
 // Re-export integration types
 pub use pos_integration::{
-    StoqPosIntegration, MatrixPosition, ShardAddress,
+    StoqPosIntegration, MatrixPosition, MatrixPositionExt, ShardAddress,
     AssetVerification, ConnectionStats, IntegrationStats,
 };
 
@@ -114,6 +114,9 @@ pub struct StoqProtocolHandler {
     /// Whether extensions are enabled
     extensions_enabled: bool,
 
+    /// FALCON key identifier used in signature frames (defaults to "local")
+    falcon_key_id: String,
+
     /// Shard storage for reassembly (shard_id -> ShardStorage)
     shard_storage: Arc<parking_lot::RwLock<HashMap<u32, ShardStorage>>>,
 
@@ -125,7 +128,10 @@ pub struct StoqProtocolHandler {
 }
 
 impl StoqProtocolHandler {
-    /// Create a new protocol handler
+    /// Create a new protocol handler.
+    ///
+    /// The FALCON `key_id` defaults to `"local"`.  Call [`set_falcon_key_id`]
+    /// to change it after construction.
     pub fn new(
         extensions: Arc<dyn StoqProtocolExtension + Send + Sync>,
         falcon_transport: Option<Arc<parking_lot::RwLock<crate::transport::falcon::FalconTransport>>>,
@@ -136,10 +142,16 @@ impl StoqProtocolHandler {
             falcon_transport,
             max_shard_size,
             extensions_enabled: true,
+            falcon_key_id: "local".to_string(),
             shard_storage: Arc::new(parking_lot::RwLock::new(HashMap::new())),
             connection_states: Arc::new(parking_lot::RwLock::new(HashMap::new())),
             token_cache: Arc::new(parking_lot::RwLock::new(HashMap::new())),
         }
+    }
+
+    /// Set the FALCON key identifier used in outgoing signature frames.
+    pub fn set_falcon_key_id(&mut self, key_id: String) {
+        self.falcon_key_id = key_id;
     }
 
     /// Encode a STOQ token frame
@@ -223,8 +235,8 @@ impl StoqProtocolHandler {
 
             let frame = StoqFrame::FalconSignature(FalconSigFrame {
                 signature_data: exported,
-                key_id: "local".to_string(), // TODO: Use actual key ID
-                signed_frames: vec![frame_types::STOQ_TOKEN], // TODO: Track actual signed frames
+                key_id: self.falcon_key_id.clone(),
+                signed_frames: vec![frame_types::STOQ_TOKEN],
             });
 
             frame.encode()

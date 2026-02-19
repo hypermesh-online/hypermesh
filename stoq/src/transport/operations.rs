@@ -135,6 +135,23 @@ impl StoqTransport {
 
     /// Receive data with zero-copy optimization for performance
     pub async fn receive(&self, conn: &Connection) -> Result<Bytes> {
+        // Try eBPF AF_XDP zero-copy receive first (fastest path).
+        // Mirrors the send() path: uses the pre-created AF_XDP socket.
+        // Only attempts receive when the socket has real kernel backing;
+        // otherwise falls through to QUIC without extra overhead.
+        if let Some(ref socket) = self.af_xdp_socket {
+            if socket.is_kernel_backed() {
+                match socket.receive().await {
+                    Ok(data) if !data.is_empty() => {
+                        self.metrics.record_bytes_received(data.len());
+                        self.performance_stats.read().record_zero_copy();
+                        return Ok(data);
+                    }
+                    _ => {} // Fall through to QUIC
+                }
+            }
+        }
+
         if self.config.enable_zero_copy {
             // Try datagram receive first for maximum performance
             if let Ok(datagram) = conn.inner.read_datagram().await {

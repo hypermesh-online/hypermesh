@@ -235,49 +235,47 @@ async fn monitor_ebpf_metrics(transport: &StoqTransport) -> Result<()> {
             print!("\x1B[2J\x1B[1;1H");
             println!("=== eBPF Real-time Metrics ===\n");
 
-            // Packet metrics
-            println!("📊 Packet Metrics:");
-            println!("  Total packets: {}", metrics.packet_metrics.total_packets);
-            println!("  Packets/sec: {:.2}", metrics.packet_metrics.packets_per_second);
-            println!("  Throughput: {:.2} Gbps",
-                metrics.packet_metrics.bytes_per_second * 8.0 / 1_000_000_000.0);
-            println!("  Kernel drops: {}", metrics.packet_metrics.kernel_drops);
+            // Proof of State metrics
+            println!("Proof of State:");
+            println!("  Total validations: {}", metrics.pos_metrics.total_validations);
+            println!("  Successful: {}", metrics.pos_metrics.successful);
+            println!("  Failed: {}", metrics.pos_metrics.failed);
+            println!("  Success rate: {:.2}%", metrics.pos_metrics.success_rate());
 
-            // Size distribution
-            println!("\n📏 Packet Size Distribution:");
-            println!("  <64B: {}", metrics.packet_metrics.size_distribution.tiny);
-            println!("  64-256B: {}", metrics.packet_metrics.size_distribution.small);
-            println!("  256-1KB: {}", metrics.packet_metrics.size_distribution.medium);
-            println!("  1-1.5KB: {}", metrics.packet_metrics.size_distribution.large);
-            println!("  >1.5KB: {}", metrics.packet_metrics.size_distribution.jumbo);
+            // Asset hash metrics
+            println!("\nAsset Hash:");
+            println!("  Total validations: {}", metrics.asset_metrics.total_validations);
+            println!("  Successful: {}", metrics.asset_metrics.successful);
+            println!("  Hash mismatches: {}", metrics.asset_metrics.hash_mismatches);
+            println!("  Shard failures: {}", metrics.asset_metrics.shard_failures);
 
-            // Connection metrics
-            println!("\n🔗 Connection Metrics:");
-            println!("  Active: {}", metrics.connection_metrics.active_connections);
-            println!("  New/sec: {:.2}", metrics.connection_metrics.new_connections_per_sec);
+            // Matrix routing metrics
+            println!("\nMatrix Routing:");
+            println!("  Total validations: {}", metrics.routing_metrics.total_validations);
+            println!("  Successful: {}", metrics.routing_metrics.successful);
+            println!("  Path failures: {}", metrics.routing_metrics.path_failures);
+            println!("  Avg path length: {:.1}", metrics.routing_metrics.avg_path_length);
 
-            // Latency metrics
-            println!("\n⏱ Latency Metrics:");
-            println!("  Min: {} µs", metrics.latency_metrics.min_us);
-            println!("  Avg: {} µs", metrics.latency_metrics.avg_us);
-            println!("  p50: {} µs", metrics.latency_metrics.p50_us);
-            println!("  p95: {} µs", metrics.latency_metrics.p95_us);
-            println!("  p99: {} µs", metrics.latency_metrics.p99_us);
-            println!("  Max: {} µs", metrics.latency_metrics.max_us);
+            // Privacy tier metrics
+            println!("\nPrivacy Tiers:");
+            println!("  Anonymous: {}", metrics.privacy_metrics.anonymous_connections);
+            println!("  Private: {}", metrics.privacy_metrics.private_connections);
+            println!("  Public: {}", metrics.privacy_metrics.public_connections);
+            println!("  Violations: {}", metrics.privacy_metrics.tier_violations);
 
-            // CPU metrics
-            println!("\n💻 CPU Metrics:");
-            println!("  Active cores: {}", metrics.cpu_metrics.cores_active);
-            println!("  Utilization: {:.1}%", metrics.cpu_metrics.avg_utilization);
-
-            // Memory metrics
-            println!("\n💾 Memory Metrics:");
-            println!("  UMEM pages: {}/{}",
-                metrics.memory_metrics.umem_pages_used,
-                metrics.memory_metrics.umem_pages);
-            println!("  Ring utilization: {:.1}%", metrics.memory_metrics.ring_utilization);
-            println!("  Zero-copy ops: {}", metrics.memory_metrics.zero_copy_ops);
-            println!("  Memcpy ops: {}", metrics.memory_metrics.memcpy_ops);
+            // Transport metrics
+            println!("\nTransport:");
+            println!("  Total packets: {}", metrics.transport_metrics.total_packets);
+            println!("  Packets/sec: {:.2}", metrics.transport_metrics.packets_per_second);
+            println!("  Throughput: {:.2} Gbps", metrics.transport_metrics.throughput_gbps());
+            println!("  Kernel drops: {}", metrics.transport_metrics.kernel_drops);
+            println!("  AF_XDP redirects: {}", metrics.transport_metrics.af_xdp_redirects);
+            println!("  Zero-copy ops: {}", metrics.transport_metrics.zero_copy_ops);
+            println!("  Memcpy ops: {}", metrics.transport_metrics.memcpy_ops);
+            println!("  Latency: min={} avg={} max={} us",
+                metrics.transport_metrics.latency_min_us,
+                metrics.transport_metrics.latency_avg_us,
+                metrics.transport_metrics.latency_max_us);
 
             println!("\nPress Ctrl+C to stop monitoring...");
         } else {

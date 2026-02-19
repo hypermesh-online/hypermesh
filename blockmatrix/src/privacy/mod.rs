@@ -81,6 +81,11 @@ pub struct PrivacySystem {
     pub flexibility_matrix: PrivacyFlexibilityMatrix,
     /// Policy manager for enforcement
     pub policy_manager: PolicyManager,
+    /// Optional eBPF bridge for kernel-level privacy enforcement.
+    /// When set, tier changes are automatically pushed to the eBPF layer.
+    ebpf_bridge: Option<PrivacyEbpfBridge>,
+    /// Connection ID counter for eBPF policy tracking
+    next_connection_id: u64,
 }
 
 impl PrivacySystem {
@@ -92,10 +97,20 @@ impl PrivacySystem {
 
     /// Create with specific configuration
     pub fn with_config(config: PrivacyConfig) -> Self {
+        // Try to create the eBPF bridge; fall back gracefully if unavailable
+        let ebpf_bridge = PrivacyEbpfBridge::new().ok();
+        if ebpf_bridge.is_some() {
+            tracing::info!("Privacy eBPF bridge initialized");
+        } else {
+            tracing::debug!("Privacy eBPF bridge unavailable (non-critical)");
+        }
+
         Self {
             tier_switcher: TierSwitcher::new(config.default_tier),
             flexibility_matrix: PrivacyFlexibilityMatrix::uniform(config.default_tier),
             policy_manager: PolicyManager::new(),
+            ebpf_bridge,
+            next_connection_id: 0,
             config,
         }
     }
@@ -105,7 +120,11 @@ impl PrivacySystem {
         self.tier_switcher.current_tier()
     }
 
-    /// Switch to a new privacy mode
+    /// Switch to a new privacy mode.
+    ///
+    /// When an eBPF bridge is available, this also pushes the new tier
+    /// to the kernel-level eBPF policy layer via
+    /// [`PrivacyEbpfBridge::update_ebpf_for_tier`].
     pub fn switch_tier(&mut self, new_tier: PrivacyMode) -> Result<TransitionResult, TransitionError> {
         if !self.config.allow_switching {
             return Err(TransitionError::InvalidTransition("Tier switching disabled".into()));
@@ -136,14 +155,42 @@ impl PrivacySystem {
         // Update flexibility matrix network tier
         self.flexibility_matrix.network_tier = new_tier;
 
+        // Push tier change to eBPF layer if bridge is available
+        if let Some(ref bridge) = self.ebpf_bridge {
+            let conn_id = self.next_connection_id;
+            self.next_connection_id = self.next_connection_id.wrapping_add(1);
+            bridge.update_ebpf_for_tier(new_tier, conn_id);
+            bridge.set_default_ebpf_tier(new_tier);
+            tracing::debug!(
+                "eBPF tier updated: mode={:?}, connection_id={}",
+                new_tier, conn_id
+            );
+        }
+
         Ok(result)
     }
 
-    /// Update privacy flexibility matrix
+    /// Update privacy flexibility matrix.
+    ///
+    /// When an eBPF bridge is available, also pushes the matrix
+    /// configuration to the kernel-level policy layer.
     pub fn update_flexibility_matrix(&mut self, matrix: PrivacyFlexibilityMatrix) -> Result<(), ValidationError> {
         matrix.validate_configuration()?;
+
+        // Push matrix to eBPF layer if bridge is available
+        if let Some(ref bridge) = self.ebpf_bridge {
+            let conn_id = self.next_connection_id;
+            self.next_connection_id = self.next_connection_id.wrapping_add(1);
+            bridge.update_ebpf_for_matrix(&matrix, conn_id);
+        }
+
         self.flexibility_matrix = matrix;
         Ok(())
+    }
+
+    /// Get a reference to the eBPF bridge, if available.
+    pub fn ebpf_bridge(&self) -> Option<&PrivacyEbpfBridge> {
+        self.ebpf_bridge.as_ref()
     }
 
     /// Enforce policy for an action

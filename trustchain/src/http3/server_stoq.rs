@@ -71,6 +71,7 @@ impl Http3StoqServer {
             enable_large_send_offload: true,
             enable_falcon_crypto: false,
             falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,
+            ebpf_interface: None,
         };
 
         // Initialize STOQ transport

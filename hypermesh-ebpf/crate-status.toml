@@ -11,7 +11,7 @@ items = [
     "XDP program management and packet filtering",
     "AF_XDP zero-copy socket management with kernel capability probing",
     "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
-    "Validation hooks (certificate, packet, extension)",
+    "Validation hooks with STOQ+BlockMatrix implementations (certificate, packet, extension)",
     "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
     "Asset hash verification (BLAKE3)",
     "Matrix routing path validation (IPv6 + matrix position)",
@@ -23,7 +23,8 @@ items = [
     "Orchestrator routing rules, asset hash, and PoS validation state storage",
     "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
     "FastValidationResult detailed PoS pre-validation",
-    "STOQ send path with persistent AF_XDP socket reuse",
+    "STOQ send+receive path with persistent AF_XDP socket reuse",
+    "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)",
 ]
 
 [features.in_development]

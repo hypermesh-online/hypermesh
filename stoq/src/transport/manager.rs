@@ -33,6 +33,34 @@ use super::ebpf::StoqEbpfTransport;
 // Global initialization for crypto provider
 static CRYPTO_INIT: std::sync::Once = std::sync::Once::new();
 
+/// Resolve the network interface name for eBPF XDP attachment.
+///
+/// Priority:
+/// 1. Explicit `config.ebpf_interface` override (if set)
+/// 2. "lo" when bind_address is localhost or unspecified
+/// 3. "eth0" as a fallback for non-localhost addresses
+///
+/// In production with real routing tables, this would query the system
+/// for the outbound interface matching the bind address.
+fn resolve_ebpf_interface(config: &TransportConfig) -> String {
+    // Explicit override takes priority
+    if let Some(ref iface) = config.ebpf_interface {
+        return iface.clone();
+    }
+
+    // Localhost and unspecified addresses use loopback
+    if config.bind_address == Ipv6Addr::LOCALHOST
+        || config.bind_address == Ipv6Addr::UNSPECIFIED
+    {
+        return "lo".to_string();
+    }
+
+    // For non-localhost addresses, default to eth0.
+    // A future enhancement could probe the routing table to find the
+    // correct interface for the bind address.
+    "eth0".to_string()
+}
+
 /// STOQ transport implementation using QUIC over IPv6
 pub struct StoqTransport {
     pub(crate) config: TransportConfig,
@@ -273,25 +301,29 @@ impl StoqTransport {
         // Create STOQ + PoS integration with 5-minute cache TTL
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
+        // Resolve the network interface for eBPF XDP attachment.
+        // Localhost always uses "lo"; other addresses attempt to detect the
+        // outbound interface by inspecting the bind address.
+        let ebpf_interface = resolve_ebpf_interface(&config);
+        info!("eBPF interface resolved to: {}", ebpf_interface);
+
         // Initialize eBPF transport acceleration (delegates to hypermesh-ebpf)
         let (ebpf_transport, af_xdp_socket) = match StoqEbpfTransport::new() {
             Ok(mut ebpf) => {
                 if ebpf.is_available() {
                     info!("eBPF transport acceleration available");
 
-                    // Try to attach XDP to loopback for testing
-                    if config.bind_address == Ipv6Addr::LOCALHOST {
-                        if let Err(e) = ebpf.attach_xdp("lo") {
-                            warn!("Failed to attach XDP to loopback: {}", e);
-                        }
+                    // Attach XDP program to the resolved interface
+                    if let Err(e) = ebpf.attach_xdp(&ebpf_interface) {
+                        warn!("Failed to attach XDP to {}: {}", ebpf_interface, e);
                     }
 
                     // Create a single AF_XDP socket during init and reuse it.
                     // This avoids the "duplicate socket key" error that occurs
                     // when create_af_xdp_socket is called on every send().
-                    let socket = match ebpf.create_af_xdp_socket("lo", 0) {
+                    let socket = match ebpf.create_af_xdp_socket(&ebpf_interface, 0) {
                         Ok(s) => {
-                            info!("AF_XDP zero-copy socket created for lo:0");
+                            info!("AF_XDP zero-copy socket created for {}:0", ebpf_interface);
                             Some(Arc::new(s))
                         }
                         Err(e) => {
@@ -636,13 +668,39 @@ impl StoqTransport {
     }
 
     /// Validate connection with PoS token (for public networks)
+    ///
+    /// After successful PoS validation, feeds the result to the eBPF layer
+    /// so the XDP program can fast-path validated connections at kernel level.
     pub async fn validate_connection_with_pos(
         &self,
         connection_id: String,
         network_type: &NetworkType,
         pos_token: Option<&crate::protocol::PosToken>,
     ) -> Result<bool> {
-        self.pos_integration.validate_connection(connection_id, network_type, pos_token).await
+        let is_valid = self.pos_integration
+            .validate_connection(connection_id.clone(), network_type, pos_token)
+            .await?;
+
+        // Feed PoS validation result to eBPF so the XDP program can
+        // cache the decision and fast-path future packets.
+        if let Some(ref ebpf) = self.ebpf_transport {
+            // Derive a content hash from the connection ID for eBPF keying.
+            // In production this would use the PoS token's cryptographic hash.
+            use sha2::{Sha256, Digest};
+            let mut hasher = Sha256::new();
+            hasher.update(connection_id.as_bytes());
+            if let Some(token) = pos_token {
+                hasher.update(&token.id);
+            }
+            let hash_bytes: [u8; 32] = hasher.finalize().into();
+            let content_hash = hypermesh_lib::ContentHash::from_bytes(hash_bytes);
+
+            if let Err(e) = ebpf.read().inner().set_pos_validation(content_hash, is_valid) {
+                warn!("Failed to feed PoS validation to eBPF: {}", e);
+            }
+        }
+
+        Ok(is_valid)
     }
 
     /// Register shard address for matrix-aware distribution
@@ -688,10 +746,30 @@ impl StoqTransport {
         self.pos_integration.get_stats()
     }
 
-    /// Cleanup expired connections and assets (call periodically)
+    /// Cleanup expired connections and assets (call periodically).
+    ///
+    /// Also logs a note about eBPF stale state. The HyperMeshEbpf orchestrator
+    /// currently has no bulk-clear API for PoS validations, so stale entries
+    /// persist until overwritten. When a cleanup method is added to
+    /// hypermesh-ebpf, call it here to evict entries whose connections expired.
     pub fn cleanup_expired(&self) {
+        let conn_count_before = self.pos_integration.get_stats().total_connections;
+
         self.pos_integration.cleanup_expired_connections();
         self.pos_integration.cleanup_expired_assets(Duration::from_secs(3600)); // 1 hour TTL
+
+        let conn_count_after = self.pos_integration.get_stats().total_connections;
+        let removed = conn_count_before.saturating_sub(conn_count_after);
+
+        if removed > 0 {
+            if self.ebpf_transport.is_some() {
+                debug!(
+                    "Cleaned up {} expired connections; eBPF PoS cache entries \
+                     may be stale until overwritten",
+                    removed
+                );
+            }
+        }
     }
 }
 
