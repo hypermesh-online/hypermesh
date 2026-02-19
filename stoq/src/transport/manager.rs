@@ -57,6 +57,8 @@ pub struct StoqTransport {
     pub(crate) adaptive_connections: Arc<DashMap<String, Arc<AdaptiveConnection>>>,
     /// eBPF transport acceleration (delegates to hypermesh-ebpf)
     pub(crate) ebpf_transport: Option<Arc<RwLock<StoqEbpfTransport>>>,
+    /// Pre-created AF_XDP socket for zero-copy send/receive (created once during init)
+    pub(crate) af_xdp_socket: Option<Arc<super::ebpf::AfXdpSocket>>,
     /// STOQ + PoS protocol integration
     pub(crate) pos_integration: Arc<StoqPosIntegration>,
 }
@@ -272,7 +274,7 @@ impl StoqTransport {
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
         // Initialize eBPF transport acceleration (delegates to hypermesh-ebpf)
-        let ebpf_transport = match StoqEbpfTransport::new() {
+        let (ebpf_transport, af_xdp_socket) = match StoqEbpfTransport::new() {
             Ok(mut ebpf) => {
                 if ebpf.is_available() {
                     info!("eBPF transport acceleration available");
@@ -284,15 +286,29 @@ impl StoqTransport {
                         }
                     }
 
-                    Some(Arc::new(RwLock::new(ebpf)))
+                    // Create a single AF_XDP socket during init and reuse it.
+                    // This avoids the "duplicate socket key" error that occurs
+                    // when create_af_xdp_socket is called on every send().
+                    let socket = match ebpf.create_af_xdp_socket("lo", 0) {
+                        Ok(s) => {
+                            info!("AF_XDP zero-copy socket created for lo:0");
+                            Some(Arc::new(s))
+                        }
+                        Err(e) => {
+                            debug!("AF_XDP socket not available (will use standard I/O): {}", e);
+                            None
+                        }
+                    };
+
+                    (Some(Arc::new(RwLock::new(ebpf))), socket)
                 } else {
                     info!("eBPF not available, using standard transport");
-                    None
+                    (None, None)
                 }
             }
             Err(e) => {
                 warn!("Failed to initialize eBPF: {}", e);
-                None
+                (None, None)
             }
         };
 
@@ -313,6 +329,7 @@ impl StoqTransport {
             adaptation_manager,
             adaptive_connections: Arc::new(DashMap::new()),
             ebpf_transport,
+            af_xdp_socket,
             pos_integration,
         })
     }
@@ -716,6 +733,7 @@ impl Clone for StoqTransport {
             adaptation_manager: self.adaptation_manager.clone(),
             adaptive_connections: self.adaptive_connections.clone(),
             ebpf_transport: self.ebpf_transport.clone(),
+            af_xdp_socket: self.af_xdp_socket.clone(),
             pos_integration: self.pos_integration.clone(),
         }
     }

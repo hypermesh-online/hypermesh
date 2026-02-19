@@ -14,20 +14,20 @@ items = [
     "Adaptive congestion control",
     "Transport metrics collection",
     "Protocol extension framework (packets/tokens/shards)",
+    "eBPF transport integration (thin consumer of hypermesh-ebpf)",
+    "AF_XDP socket reuse in send path",
 ]
 
 [features.in_development]
 items = [
-    "eBPF capability detection (wired up)",
     "XDP packet filtering (feature-gated)",
     "AF_XDP zero-copy sockets (feature-gated)",
-    "PoS protocol-level validation stubs",
 ]
 
 [features.planned]
 items = [
-    "Kernel eBPF program loading",
-    "Protocol-level PoS token validation",
+    "Kernel eBPF program loading via STOQ",
+    "Protocol-level PoS token validation at line rate",
     "Adaptive transport tiers",
     "Multi-path QUIC",
 ]

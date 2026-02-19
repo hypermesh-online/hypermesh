@@ -41,16 +41,19 @@ thiserror = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
+# System calls (AF_XDP socket probing behind kernel-attach)
+libc = { version = "0.2", optional = true }
+
 # Data structures
 parking_lot = { workspace = true }
 
 [build-dependencies]
-# No build dependencies currently needed
+# No external build deps needed; build.rs uses only std + Command
 
 [features]
 default = []
 # Feature for enabling actual eBPF program loading and XDP attachment (requires privileges)
-kernel-attach = []
+kernel-attach = ["libc"]
 # Feature for compiling eBPF programs from C source (requires clang)
 ebpf-loader = []
 

@@ -62,8 +62,15 @@ pub use hypermesh_headers::{
     EXT_MATRIX_ROUTING,
     EXT_PRIVACY_TIER,
 };
-pub use validation::{ProofOfStateValidator, AssetHashValidator};
+pub use validation::{
+    ProofOfStateValidator, AssetHashValidator, FastValidationResult,
+    ALG_FALCON_1024, ALG_ED25519, ALG_ECDSA,
+};
 pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
 
 use hypermesh_lib::{NetworkId, MatrixPosition, ContentHash, PrivacyMode};
 
@@ -128,6 +135,25 @@ pub struct ShardMetadata {
     pub position: MatrixPosition,
 }
 
+/// Discretized matrix position key for HashMap lookups.
+///
+/// Converts floating-point MatrixPosition coordinates to integer keys
+/// by truncating to i64, enabling use as HashMap keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MatrixPositionKey(pub i64, pub i64, pub i64);
+
+impl From<&MatrixPosition> for MatrixPositionKey {
+    fn from(pos: &MatrixPosition) -> Self {
+        Self(pos.x as i64, pos.y as i64, pos.z as i64)
+    }
+}
+
+impl From<MatrixPosition> for MatrixPositionKey {
+    fn from(pos: MatrixPosition) -> Self {
+        Self::from(&pos)
+    }
+}
+
 // -----------------------------------------------------------------------
 // HyperMeshEbpf - the unified orchestrator
 // -----------------------------------------------------------------------
@@ -155,6 +181,12 @@ pub struct HyperMeshEbpf {
     validation_hooks: ValidationHooks,
     /// eBPF program loader
     loader: EbpfLoader,
+    /// Routing rules: destination matrix position -> next-hop matrix position
+    routing_rules: Arc<RwLock<HashMap<MatrixPositionKey, MatrixPosition>>>,
+    /// Registered asset hashes with shard metadata
+    asset_hashes: Arc<RwLock<HashMap<[u8; 32], ShardMetadata>>>,
+    /// PoS validation status per content hash (true = valid)
+    pos_validations: Arc<RwLock<HashMap<[u8; 32], bool>>>,
 }
 
 impl HyperMeshEbpf {
@@ -188,6 +220,9 @@ impl HyperMeshEbpf {
             metrics_collector,
             validation_hooks: ValidationHooks::new(),
             loader,
+            routing_rules: Arc::new(RwLock::new(HashMap::new())),
+            asset_hashes: Arc::new(RwLock::new(HashMap::new())),
+            pos_validations: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -225,15 +260,20 @@ impl HyperMeshEbpf {
         Ok(())
     }
 
-    /// Set a routing rule for matrix topology forwarding
-    #[allow(unused_variables)]
+    /// Set a routing rule for matrix topology forwarding.
+    ///
+    /// Stores the destination -> next-hop mapping so that `validate_packet()`
+    /// can return `Forward` decisions when a packet's destination matches.
+    /// In production with kernel-attach, this would also update a
+    /// BPF_MAP_TYPE_HASH map for kernel-level forwarding.
     pub fn set_routing_rule(
         &self,
         dest: MatrixPosition,
         next_hop: MatrixPosition,
     ) -> Result<(), EbpfError> {
-        // In production, this would update a BPF_MAP_TYPE_HASH map
-        // mapping destination matrix positions to next-hop positions.
+        let key = MatrixPositionKey::from(&dest);
+        self.routing_rules.write().insert(key, next_hop);
+
         tracing::debug!(
             "Routing rule set: dest=({},{},{}) -> next_hop=({},{},{})",
             dest.x, dest.y, dest.z,
@@ -242,15 +282,18 @@ impl HyperMeshEbpf {
         Ok(())
     }
 
-    /// Register an asset hash for validation
-    #[allow(unused_variables)]
+    /// Register an asset hash for validation.
+    ///
+    /// Stores the hash -> shard metadata mapping for userspace validation.
+    /// In production with kernel-attach, this would also insert into a BPF
+    /// hash map so the XDP program can validate asset hashes at kernel level.
     pub fn register_asset_hash(
         &self,
         hash: ContentHash,
         metadata: ShardMetadata,
     ) -> Result<(), EbpfError> {
-        // In production, this would insert into a BPF hash map so the
-        // XDP program can validate asset hashes at kernel level.
+        self.asset_hashes.write().insert(hash.0, metadata.clone());
+
         tracing::debug!(
             "Asset hash registered: shard {}/{}",
             metadata.shard_index,
@@ -259,13 +302,18 @@ impl HyperMeshEbpf {
         Ok(())
     }
 
-    /// Set PoS validation status for a content hash
-    #[allow(unused_variables)]
+    /// Set PoS validation status for a content hash.
+    ///
+    /// Stores the hash -> validation status for userspace lookups.
+    /// In production with kernel-attach, this would also update a BPF
+    /// hash map for kernel-level PoS validation.
     pub fn set_pos_validation(
         &self,
         hash: ContentHash,
         valid: bool,
     ) -> Result<(), EbpfError> {
+        self.pos_validations.write().insert(hash.0, valid);
+
         tracing::debug!(
             "PoS validation status set: valid={}",
             valid
@@ -389,6 +437,47 @@ impl HyperMeshEbpf {
     pub fn policy_manager_mut(&mut self) -> &mut PolicyManager {
         &mut self.policy_manager
     }
+
+    // -------------------------------------------------------------------
+    // State accessors (routing rules, asset hashes, PoS validations)
+    // -------------------------------------------------------------------
+
+    /// Look up the next-hop for a destination matrix position.
+    ///
+    /// Returns `Some(next_hop)` if a routing rule exists for the
+    /// discretized destination coordinates.
+    pub fn get_routing_rule(&self, dest: &MatrixPosition) -> Option<MatrixPosition> {
+        let key = MatrixPositionKey::from(dest);
+        self.routing_rules.read().get(&key).copied()
+    }
+
+    /// Get the number of stored routing rules.
+    pub fn routing_rule_count(&self) -> usize {
+        self.routing_rules.read().len()
+    }
+
+    /// Look up shard metadata for a registered asset hash.
+    pub fn get_asset_hash(&self, hash: &ContentHash) -> Option<ShardMetadata> {
+        self.asset_hashes.read().get(&hash.0).cloned()
+    }
+
+    /// Get the number of registered asset hashes.
+    pub fn asset_hash_count(&self) -> usize {
+        self.asset_hashes.read().len()
+    }
+
+    /// Look up PoS validation status for a content hash.
+    ///
+    /// Returns `Some(true)` if validated, `Some(false)` if invalidated,
+    /// `None` if not registered.
+    pub fn get_pos_validation(&self, hash: &ContentHash) -> Option<bool> {
+        self.pos_validations.read().get(&hash.0).copied()
+    }
+
+    /// Get the number of stored PoS validation entries.
+    pub fn pos_validation_count(&self) -> usize {
+        self.pos_validations.read().len()
+    }
 }
 
 impl Default for HyperMeshEbpf {
@@ -431,6 +520,27 @@ mod tests {
         assert_eq!(decision, PacketDecision::Pass);
     }
 
+    /// Build valid `who`: FALCON-1024 algorithm + 8 non-zero prefix bytes.
+    fn test_valid_who() -> [u8; 32] {
+        let mut who = [0xABu8; 32];
+        who[0] = ALG_FALCON_1024;
+        who
+    }
+
+    /// Build valid `what`: first byte zero (8 leading zero bits).
+    fn test_valid_what() -> [u8; 32] {
+        let mut what = [0xFFu8; 32];
+        what[0] = 0x00;
+        what
+    }
+
+    /// Build valid `where_`: IPv6 global unicast prefix.
+    fn test_valid_where() -> [u8; 16] {
+        let mut w = [0x01u8; 16];
+        w[0] = 0x20;
+        w
+    }
+
     #[test]
     fn test_pos_header_validation() {
         let ebpf = HyperMeshEbpf::default();
@@ -441,18 +551,18 @@ mod tests {
             .as_micros() as u64;
 
         let valid = ProofOfStateHeader {
-            who: [1u8; 32],
-            what: [2u8; 32],
+            who: test_valid_who(),
+            what: test_valid_what(),
             when: now,
-            where_: [3u8; 16],
+            where_: test_valid_where(),
         };
         assert!(ebpf.validate_pos_header(&valid));
 
         let future = ProofOfStateHeader {
-            who: [1u8; 32],
-            what: [2u8; 32],
+            who: test_valid_who(),
+            what: test_valid_what(),
             when: now + 10 * 60 * 1_000_000,
-            where_: [3u8; 16],
+            where_: test_valid_where(),
         };
         assert!(!ebpf.validate_pos_header(&future));
     }
@@ -514,5 +624,117 @@ mod tests {
         };
         let result = ebpf.register_asset_hash(hash, metadata);
         assert!(result.is_ok());
+    }
+
+    // -------------------------------------------------------------------
+    // State storage and retrieval tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_routing_rule_stores_and_retrieves() {
+        let ebpf = HyperMeshEbpf::default();
+        let dest = MatrixPosition { x: 10.0, y: 20.0, z: 30.0 };
+        let next_hop = MatrixPosition { x: 11.0, y: 21.0, z: 31.0 };
+
+        assert_eq!(ebpf.routing_rule_count(), 0);
+
+        ebpf.set_routing_rule(dest, next_hop)
+            .expect("test: set routing rule");
+
+        assert_eq!(ebpf.routing_rule_count(), 1);
+
+        let retrieved = ebpf.get_routing_rule(&dest);
+        assert!(retrieved.is_some(), "routing rule should be retrievable");
+
+        let hop = retrieved.expect("test: unwrap routing rule");
+        assert_eq!(hop.x, 11.0);
+        assert_eq!(hop.y, 21.0);
+        assert_eq!(hop.z, 31.0);
+
+        // Non-existent destination returns None
+        let missing = MatrixPosition { x: 99.0, y: 99.0, z: 99.0 };
+        assert!(ebpf.get_routing_rule(&missing).is_none());
+    }
+
+    #[test]
+    fn test_routing_rule_overwrites() {
+        let ebpf = HyperMeshEbpf::default();
+        let dest = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
+        let hop_a = MatrixPosition { x: 4.0, y: 5.0, z: 6.0 };
+        let hop_b = MatrixPosition { x: 7.0, y: 8.0, z: 9.0 };
+
+        ebpf.set_routing_rule(dest, hop_a).expect("test: set first rule");
+        ebpf.set_routing_rule(dest, hop_b).expect("test: set second rule");
+
+        assert_eq!(ebpf.routing_rule_count(), 1);
+        let hop = ebpf.get_routing_rule(&dest).expect("test: get overwritten rule");
+        assert_eq!(hop.x, 7.0);
+    }
+
+    #[test]
+    fn test_asset_hash_stores_and_retrieves() {
+        let ebpf = HyperMeshEbpf::default();
+        let hash = ContentHash::from_bytes([0xABu8; 32]);
+        let metadata = ShardMetadata {
+            shard_index: 3,
+            shard_count: 14,
+            position: MatrixPosition { x: 5.0, y: 6.0, z: 7.0 },
+        };
+
+        assert_eq!(ebpf.asset_hash_count(), 0);
+
+        ebpf.register_asset_hash(hash, metadata)
+            .expect("test: register asset hash");
+
+        assert_eq!(ebpf.asset_hash_count(), 1);
+
+        let retrieved = ebpf.get_asset_hash(&hash);
+        assert!(retrieved.is_some(), "asset hash should be retrievable");
+
+        let meta = retrieved.expect("test: unwrap asset hash metadata");
+        assert_eq!(meta.shard_index, 3);
+        assert_eq!(meta.shard_count, 14);
+        assert_eq!(meta.position.x, 5.0);
+
+        // Non-existent hash returns None
+        let missing = ContentHash::from_bytes([0xFFu8; 32]);
+        assert!(ebpf.get_asset_hash(&missing).is_none());
+    }
+
+    #[test]
+    fn test_pos_validation_stores_and_retrieves() {
+        let ebpf = HyperMeshEbpf::default();
+        let hash_valid = ContentHash::from_bytes([0x01u8; 32]);
+        let hash_invalid = ContentHash::from_bytes([0x02u8; 32]);
+
+        assert_eq!(ebpf.pos_validation_count(), 0);
+
+        ebpf.set_pos_validation(hash_valid, true)
+            .expect("test: set valid pos");
+        ebpf.set_pos_validation(hash_invalid, false)
+            .expect("test: set invalid pos");
+
+        assert_eq!(ebpf.pos_validation_count(), 2);
+
+        assert_eq!(ebpf.get_pos_validation(&hash_valid), Some(true));
+        assert_eq!(ebpf.get_pos_validation(&hash_invalid), Some(false));
+
+        // Non-existent returns None
+        let missing = ContentHash::from_bytes([0xFFu8; 32]);
+        assert_eq!(ebpf.get_pos_validation(&missing), None);
+    }
+
+    #[test]
+    fn test_pos_validation_overwrite() {
+        let ebpf = HyperMeshEbpf::default();
+        let hash = ContentHash::from_bytes([0x10u8; 32]);
+
+        ebpf.set_pos_validation(hash, true).expect("test: set valid");
+        assert_eq!(ebpf.get_pos_validation(&hash), Some(true));
+
+        // Overwrite with false
+        ebpf.set_pos_validation(hash, false).expect("test: set invalid");
+        assert_eq!(ebpf.get_pos_validation(&hash), Some(false));
+        assert_eq!(ebpf.pos_validation_count(), 1);
     }
 }

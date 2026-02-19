@@ -6,27 +6,29 @@ phase = "alpha"
 
 [features.working]
 items = [
-    "Unified HyperMeshEbpf orchestrator API",
+    "Unified HyperMeshEbpf orchestrator API with real state management",
     "System capability detection (XDP, AF_XDP, kernel version)",
     "XDP program management and packet filtering",
-    "AF_XDP zero-copy socket management",
-    "eBPF program compiler and kernel loader",
+    "AF_XDP zero-copy socket management with kernel capability probing",
+    "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
     "Validation hooks (certificate, packet, extension)",
-    "PoS header parsing and validation",
+    "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
     "Asset hash verification (BLAKE3)",
-    "Matrix routing path validation",
-    "Policy map management",
+    "Matrix routing path validation (IPv6 + matrix position)",
+    "Policy map management with BPF map sync (kernel-attach)",
     "Unified intelligence + transport metrics",
     "PacketDecision three-path routing (Pass/Redirect/Forward/Drop)",
-    "C kernel programs (XDP counter, kprobe, tracepoint, STOQ XDP)",
+    "C kernel programs (XDP counter, kprobe, tracepoint, HyperMesh XDP)",
     "Privacy tier eBPF enforcement",
+    "Orchestrator routing rules, asset hash, and PoS validation state storage",
+    "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
+    "FastValidationResult detailed PoS pre-validation",
+    "STOQ send path with persistent AF_XDP socket reuse",
 ]
 
 [features.in_development]
 items = [
-    "Kernel-space XDP program attachment (feature-gated)",
-    "BPF map synchronization with kernel",
-    "AF_XDP kernel-backed socket creation",
+    "Kernel-space XDP program attachment (feature-gated, compile-verified)",
 ]
 
 [features.planned]

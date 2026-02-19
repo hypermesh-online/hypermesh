@@ -2,8 +2,10 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-// STOQ XDP Filter - Kernel-level packet classification for HyperMesh
-// Extracted from stoq/src/transport/ebpf/loader.rs ProgramGenerator::generate_xdp_source()
+// HyperMesh Unified XDP Filter - Kernel-level packet classification
+// Originally extracted from stoq/src/transport/ebpf/loader.rs
+// Renamed from stoq_xdp.c to hypermesh_xdp.c as the unified program
+// for the entire HyperMesh eBPF subsystem.
 
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
@@ -13,7 +15,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-#define STOQ_PORT 9292
+#define HYPERMESH_PORT 9292
 
 /* Connection tracking map */
 struct {
@@ -64,8 +66,8 @@ struct filter_key {
     __u8 dst_ip[16];
 };
 
-SEC("xdp/stoq_filter")
-int stoq_xdp_filter(struct xdp_md *ctx) {
+SEC("xdp/hypermesh_filter")
+int hypermesh_xdp_filter(struct xdp_md *ctx) {
     void *data = (void *)(long)ctx->data;
     void *data_end = (void *)(long)ctx->data_end;
 
@@ -100,8 +102,8 @@ int stoq_xdp_filter(struct xdp_md *ctx) {
     if (data + sizeof(*eth) + sizeof(*ip6) + sizeof(*udp) > data_end)
         return XDP_DROP;
 
-    /* Check if it's STOQ traffic (port 9292) */
-    if (bpf_ntohs(udp->dest) != STOQ_PORT && bpf_ntohs(udp->source) != STOQ_PORT)
+    /* Check if it's HyperMesh/STOQ traffic (port 9292) */
+    if (bpf_ntohs(udp->dest) != HYPERMESH_PORT && bpf_ntohs(udp->source) != HYPERMESH_PORT)
         return XDP_PASS;
 
     /* Update connection tracking */

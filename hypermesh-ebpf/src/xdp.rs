@@ -20,6 +20,7 @@ use parking_lot::RwLock;
 
 use crate::policy_maps::PolicyManager;
 use crate::hypermesh_headers::*;
+use crate::validation::{ProofOfStateValidator, FastValidationResult};
 use hypermesh_lib::MatrixPosition;
 
 // -----------------------------------------------------------------------
@@ -128,6 +129,8 @@ pub struct XdpManager {
     available: bool,
     /// Policy manager for validation decisions
     policy_manager: PolicyManager,
+    /// Proof of State fast validator
+    pos_validator: ProofOfStateValidator,
     /// Loaded BPF handle (only present when kernel-attach feature enabled)
     #[cfg(feature = "kernel-attach")]
     bpf: Option<aya::Bpf>,
@@ -149,6 +152,7 @@ impl XdpManager {
             stats: Arc::new(RwLock::new(XdpStats::default())),
             available,
             policy_manager,
+            pos_validator: ProofOfStateValidator::default(),
             #[cfg(feature = "kernel-attach")]
             bpf: None,
         })
@@ -355,13 +359,26 @@ impl XdpManager {
         }
     }
 
-    /// Validate Proof of State extension header
+    /// Validate Proof of State extension header using the enhanced four-proof
+    /// validator. Returns true only if all four proofs pass fast validation.
     pub fn validate_proof_of_state(&self, proof: &ProofOfStateHeader) -> bool {
-        if !proof.validate_timestamps() {
-            tracing::warn!("Proof of State timestamp validation failed");
+        let result = self.pos_validator.validate_fast(proof);
+        if !result.all_ok() {
+            tracing::warn!(
+                "Proof of State fast validation failed: timestamp={}, stake={}, work={}, space={}",
+                result.timestamp_ok, result.stake_ok, result.work_ok, result.space_ok
+            );
             return false;
         }
         true
+    }
+
+    /// Validate Proof of State with detailed per-proof results.
+    pub fn validate_proof_of_state_detailed(
+        &self,
+        proof: &ProofOfStateHeader,
+    ) -> FastValidationResult {
+        self.pos_validator.validate_fast(proof)
     }
 
     /// Validate Asset Hash extension header
@@ -461,6 +478,52 @@ impl XdpManager {
         Ok(())
     }
 
+    /// Sync all policies from the PolicyManager into the kernel BPF "policy_map".
+    ///
+    /// Each policy is serialized as a 24-byte `#[repr(C)]` blob (matching
+    /// `ValidationPolicy` layout) keyed by connection ID (u64).
+    ///
+    /// When `kernel-attach` is not enabled this is a no-op that returns `Ok(())`.
+    #[cfg(feature = "kernel-attach")]
+    pub fn sync_policies_to_bpf(&mut self) -> Result<()> {
+        if let Some(ref mut bpf) = self.bpf {
+            use aya::maps::HashMap as BpfHashMap;
+
+            if let Some(map) = bpf.map_mut("policy_map") {
+                match BpfHashMap::<_, u64, [u8; 24]>::try_from(map) {
+                    Ok(mut bpf_map) => {
+                        let policies = self.policy_manager.get_all_policies();
+                        for (conn_id, policy) in &policies {
+                            let bytes = policy_to_bytes(policy);
+                            bpf_map.insert(conn_id, &bytes, 0)
+                                .map_err(|e| anyhow!(
+                                    "Failed to insert policy for conn {}: {}",
+                                    conn_id, e
+                                ))?;
+                        }
+                        tracing::debug!(
+                            "Synced {} policies to kernel BPF map",
+                            policies.len()
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to access policy_map: {}", e);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "kernel-attach"))]
+    pub fn sync_policies_to_bpf(&mut self) -> Result<()> {
+        tracing::debug!(
+            "kernel-attach not enabled; policy sync is userspace-only ({} policies)",
+            self.policy_manager.policy_count()
+        );
+        Ok(())
+    }
+
     /// Get the interface name this manager is attached to (first attached)
     pub fn interface(&self) -> Option<String> {
         self.attached.read().keys().next().cloned()
@@ -470,6 +533,31 @@ impl XdpManager {
     pub fn policy_manager(&self) -> &PolicyManager {
         &self.policy_manager
     }
+}
+
+/// Serialize a `ValidationPolicy` to a 24-byte `#[repr(C)]` byte array
+/// suitable for writing into a BPF hash map.
+///
+/// Layout (24 bytes):
+///   [0]     requires_pos (bool as u8)
+///   [1]     validate_asset_hash (bool as u8)
+///   [2]     check_matrix_routing (bool as u8)
+///   [3]     privacy_tier (u8)
+///   [4..8]  max_packet_size (u32 little-endian)
+///   [8..12] rate_limit_per_sec (u32 little-endian)
+///   [12..20] _reserved (8 bytes)
+///   [20..24] padding (zeros)
+#[cfg(any(feature = "kernel-attach", test))]
+fn policy_to_bytes(policy: &crate::policy_maps::ValidationPolicy) -> [u8; 24] {
+    let mut buf = [0u8; 24];
+    buf[0] = policy.requires_pos as u8;
+    buf[1] = policy.validate_asset_hash as u8;
+    buf[2] = policy.check_matrix_routing as u8;
+    buf[3] = policy.privacy_tier;
+    buf[4..8].copy_from_slice(&policy.max_packet_size.to_le_bytes());
+    buf[8..12].copy_from_slice(&policy.rate_limit_per_sec.to_le_bytes());
+    // bytes 12..24 remain zero (reserved + padding)
+    buf
 }
 
 /// XDP action to take on packets (matches kernel XDP_* constants)
@@ -494,6 +582,35 @@ impl Drop for XdpManager {
 mod tests {
     use super::*;
     use crate::policy_maps::ValidationPolicy;
+    use crate::validation::ALG_FALCON_1024;
+
+    /// Build a valid `who` field: FALCON-1024 algorithm indicator + 8 non-zero prefix bytes.
+    fn valid_who() -> [u8; 32] {
+        let mut who = [0xABu8; 32];
+        who[0] = ALG_FALCON_1024;
+        who
+    }
+
+    /// Build a valid `what` field: first byte zero (8 leading zero bits meets default difficulty).
+    fn valid_what() -> [u8; 32] {
+        let mut what = [0xFFu8; 32];
+        what[0] = 0x00;
+        what
+    }
+
+    /// Build a valid `where_` field: IPv6 global unicast prefix (0x20).
+    fn valid_where() -> [u8; 16] {
+        let mut w = [0x01u8; 16];
+        w[0] = 0x20;
+        w
+    }
+
+    fn now_micros() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("test: get system time")
+            .as_micros() as u64
+    }
 
     #[test]
     fn test_xdp_manager_creation() {
@@ -524,7 +641,6 @@ mod tests {
     #[test]
     fn test_packet_decision_drop_oversized() {
         let pm = PolicyManager::new().expect("test: create policy manager");
-        // Default policy has max_packet_size = 65535
         let mgr = XdpManager::new(pm).expect("test: create xdp manager");
 
         let large_packet = vec![0u8; 70000];
@@ -533,7 +649,7 @@ mod tests {
             PacketDecision::Drop { reason } => {
                 assert!(reason.contains("too large"));
             }
-            other => assert!(false, "Expected Drop, got {:?}", other),
+            other => unreachable!("test: expected Drop, got {:?}", other),
         }
     }
 
@@ -549,30 +665,75 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_of_state_validation() {
+    fn test_proof_of_state_validation_valid() {
         let pm = PolicyManager::new().expect("test: create policy manager");
         let mgr = XdpManager::new(pm).expect("test: create xdp manager");
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("test: get system time")
-            .as_micros() as u64;
-
         let valid_proof = ProofOfStateHeader {
-            who: [1u8; 32],
-            what: [2u8; 32],
-            when: now,
-            where_: [3u8; 16],
+            who: valid_who(),
+            what: valid_what(),
+            when: now_micros(),
+            where_: valid_where(),
         };
         assert!(mgr.validate_proof_of_state(&valid_proof));
+    }
 
-        // Future proof (invalid)
+    #[test]
+    fn test_proof_of_state_validation_future_timestamp() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
         let future_proof = ProofOfStateHeader {
-            who: [1u8; 32],
-            what: [2u8; 32],
-            when: now + 10 * 60 * 1_000_000,
-            where_: [3u8; 16],
+            who: valid_who(),
+            what: valid_what(),
+            when: now_micros() + 10 * 60 * 1_000_000, // 10 min in future
+            where_: valid_where(),
         };
         assert!(!mgr.validate_proof_of_state(&future_proof));
+    }
+
+    #[test]
+    fn test_proof_of_state_detailed_results() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let proof = ProofOfStateHeader {
+            who: valid_who(),
+            what: valid_what(),
+            when: now_micros(),
+            where_: valid_where(),
+        };
+
+        let result = mgr.validate_proof_of_state_detailed(&proof);
+        assert!(result.all_ok());
+        assert!(result.timestamp_ok);
+        assert!(result.stake_ok);
+        assert!(result.work_ok);
+        assert!(result.space_ok);
+    }
+
+    #[test]
+    fn test_sync_policies_to_bpf_no_kernel() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        pm.set_policy(1, ValidationPolicy::strict());
+        pm.set_policy(2, ValidationPolicy::permissive());
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        // Without kernel-attach, this should succeed as a no-op
+        assert!(mgr.sync_policies_to_bpf().is_ok());
+    }
+
+    #[test]
+    fn test_policy_to_bytes_roundtrip() {
+        let policy = ValidationPolicy::strict();
+        let bytes = policy_to_bytes(&policy);
+        assert_eq!(bytes[0], 1); // requires_pos = true
+        assert_eq!(bytes[1], 1); // validate_asset_hash = true
+        assert_eq!(bytes[2], 1); // check_matrix_routing = true
+        assert_eq!(bytes[3], 2); // privacy_tier = 2
+        let max_pkt = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        assert_eq!(max_pkt, 9000);
+        let rate = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
+        assert_eq!(rate, 100);
     }
 }

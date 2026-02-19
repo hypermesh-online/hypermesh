@@ -194,13 +194,16 @@ impl EbpfLoader {
     /// With `kernel-attach`: uses aya to load BPF object into kernel.
     /// Without: logs a message and returns Ok (graceful degradation).
     pub fn load(&mut self) -> Result<()> {
-        let xdp_path = self.sources.output_dir.join("stoq_xdp.o");
-        let alt_path = self.sources.output_dir.join("hypermesh_xdp.o");
+        let xdp_path = self.sources.output_dir.join("hypermesh_xdp.o");
+        let legacy_path = self.sources.output_dir.join("stoq_xdp.o");
 
-        let load_path = if alt_path.exists() {
-            alt_path
-        } else if xdp_path.exists() {
+        let load_path = if xdp_path.exists() {
             xdp_path.clone()
+        } else if legacy_path.exists() {
+            tracing::info!(
+                "Using legacy stoq_xdp.o (rename to hypermesh_xdp.o recommended)"
+            );
+            legacy_path
         } else {
             // Try to compile first
             let _ = self.compile();
@@ -253,7 +256,7 @@ impl EbpfLoader {
 
     /// Get the output path for the main XDP object
     pub fn output_path(&self) -> PathBuf {
-        self.sources.output_dir.join("stoq_xdp.o")
+        self.sources.output_dir.join("hypermesh_xdp.o")
     }
 
     /// Take ownership of the loaded BPF handle

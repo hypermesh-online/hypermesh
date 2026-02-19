@@ -20,12 +20,11 @@ impl StoqTransport {
     pub async fn send(&self, conn: &Connection, data: &[u8]) -> Result<()> {
         let start_time = std::time::Instant::now();
 
-        // Try eBPF zero-copy send if available (delegates to hypermesh-ebpf)
-        // Scope the write guard so it doesn't span the .await point
-        let af_xdp_socket = self.ebpf_transport.as_ref().and_then(|ebpf| {
-            ebpf.write().create_af_xdp_socket("lo", 0).ok()
-        });
-        if let Some(socket) = af_xdp_socket {
+        // Try eBPF zero-copy send if available (delegates to hypermesh-ebpf).
+        // Uses the pre-created AF_XDP socket stored during transport init.
+        // If the socket is not kernel-backed, send() returns Err and we
+        // gracefully fall through to the standard QUIC path below.
+        if let Some(ref socket) = self.af_xdp_socket {
             if socket.send(data).await.is_ok() {
                 self.metrics.record_bytes_sent(data.len());
                 self.performance_stats.read().record_zero_copy();

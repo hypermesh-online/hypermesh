@@ -139,25 +139,27 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Unified HyperMeshEbpf orchestrator API",
+        "Unified HyperMeshEbpf orchestrator API with real state management",
         "System capability detection (XDP, AF_XDP, kernel version)",
         "XDP program management and packet filtering",
-        "AF_XDP zero-copy socket management",
-        "eBPF program compiler and kernel loader",
+        "AF_XDP zero-copy socket management with kernel capability probing",
+        "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
         "Validation hooks (certificate, packet, extension)",
-        "PoS header parsing and validation",
+        "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
         "Asset hash verification (BLAKE3)",
-        "Matrix routing path validation",
-        "Policy map management",
+        "Matrix routing path validation (IPv6 + matrix position)",
+        "Policy map management with BPF map sync (kernel-attach)",
         "Unified intelligence + transport metrics",
         "PacketDecision three-path routing (Pass/Redirect/Forward/Drop)",
-        "C kernel programs (XDP counter, kprobe, tracepoint, STOQ XDP)",
-        "Privacy tier eBPF enforcement"
+        "C kernel programs (XDP counter, kprobe, tracepoint, HyperMesh XDP)",
+        "Privacy tier eBPF enforcement",
+        "Orchestrator routing rules, asset hash, and PoS validation state storage",
+        "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
+        "FastValidationResult detailed PoS pre-validation",
+        "STOQ send path with persistent AF_XDP socket reuse"
       ],
       "inDevelopment": [
-        "Kernel-space XDP program attachment (feature-gated)",
-        "BPF map synchronization with kernel",
-        "AF_XDP kernel-backed socket creation"
+        "Kernel-space XDP program attachment (feature-gated, compile-verified)"
       ],
       "planned": [
         "Kernel-space PoS validation at line rate",
@@ -165,7 +167,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 70
+    "completion": 82
   },
   {
     "id": "hypermesh-lib",
@@ -209,22 +211,22 @@ export const crateStatuses: CrateStatus[] = [
         "Network isolation (4 privacy tiers)",
         "Adaptive congestion control",
         "Transport metrics collection",
-        "Protocol extension framework (packets/tokens/shards)"
+        "Protocol extension framework (packets/tokens/shards)",
+        "eBPF transport integration (thin consumer of hypermesh-ebpf)",
+        "AF_XDP socket reuse in send path"
       ],
       "inDevelopment": [
-        "eBPF capability detection (wired up)",
         "XDP packet filtering (feature-gated)",
-        "AF_XDP zero-copy sockets (feature-gated)",
-        "PoS protocol-level validation stubs"
+        "AF_XDP zero-copy sockets (feature-gated)"
       ],
       "planned": [
-        "Kernel eBPF program loading",
-        "Protocol-level PoS token validation",
+        "Kernel eBPF program loading via STOQ",
+        "Protocol-level PoS token validation at line rate",
         "Adaptive transport tiers",
         "Multi-path QUIC"
       ]
     },
-    "completion": 50
+    "completion": 63
   },
   {
     "id": "trustchain",
