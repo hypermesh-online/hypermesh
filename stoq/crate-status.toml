@@ -22,11 +22,12 @@ items = [
     "Canonical length-prefixed token serialization",
     "Dynamic FALCON key_id in protocol frames",
     "MatrixPosition using hypermesh_lib canonical type (f64)",
+    "FalconTrustChainClient with real FALCON-1024 signature verification",
+    "Tunnel traffic type enforcement in network isolation",
 ]
 
 [features.in_development]
 items = [
-    "TrustChainClient wiring for signature verification",
     "AF_XDP zero-copy UMEM I/O (kernel-backed)",
 ]
 

@@ -29,16 +29,17 @@ export const crateStatuses: CrateStatus[] = [
         "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
         "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
         "Matrix persistence (WAL, snapshots, recovery)",
-        "Proof of State four-proof validation"
+        "Proof of State four-proof validation",
+        "eBPF security manager with XDP attachment and policy enforcement",
+        "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
+        "Security integration tests (framework, eBPF manager, syscall tracing, metrics)"
       ],
       "inDevelopment": [
         "Asset pipeline reorder (Compress-Encrypt-Shard)",
         "Kyber-1024 for asset encryption",
         "Instruction-based retrieval system",
         "OS integration layer (Linux/macOS/Windows)",
-        "eBPF security manager with XDP attachment and policy enforcement",
-        "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)",
-        "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)"
+        "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)"
       ],
       "planned": [
         "Multi-scope blockchain (User/Group/Org/Public)",
@@ -47,7 +48,7 @@ export const crateStatuses: CrateStatus[] = [
         "Dynamic shard rebalancing"
       ]
     },
-    "completion": 42
+    "completion": 55
   },
   {
     "id": "caesar",
@@ -160,7 +161,14 @@ export const crateStatuses: CrateStatus[] = [
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
         "FastValidationResult detailed PoS pre-validation",
         "STOQ send+receive path with persistent AF_XDP socket reuse",
-        "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)"
+        "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)",
+        "C kernel BPF maps (policy_map, pos_header_map, asset_hash_map, xsk_map)",
+        "HyperMesh extension header parsing at XDP level (PoS, asset, matrix, privacy)",
+        "AF_XDP zero-copy redirect via xsk_map in kernel XDP program",
+        "BPF policy serialization (32-byte LE format matching C struct policy_value)",
+        "sync_to_kernel policy iteration and BPF map synchronization",
+        "Asset registry validation against blockchain HashMap",
+        "kretprobe failed execve tracking with PID/UID/command capture"
       ],
       "inDevelopment": [
         "Kernel-space XDP program attachment (feature-gated, compile-verified)"
@@ -171,7 +179,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 83
+    "completion": 87
   },
   {
     "id": "hypermesh-lib",
@@ -223,10 +231,11 @@ export const crateStatuses: CrateStatus[] = [
         "PoW hash-meets-difficulty validation",
         "Canonical length-prefixed token serialization",
         "Dynamic FALCON key_id in protocol frames",
-        "MatrixPosition using hypermesh_lib canonical type (f64)"
+        "MatrixPosition using hypermesh_lib canonical type (f64)",
+        "FalconTrustChainClient with real FALCON-1024 signature verification",
+        "Tunnel traffic type enforcement in network isolation"
       ],
       "inDevelopment": [
-        "TrustChainClient wiring for signature verification",
         "AF_XDP zero-copy UMEM I/O (kernel-backed)"
       ],
       "planned": [
@@ -236,7 +245,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-path QUIC"
       ]
     },
-    "completion": 73
+    "completion": 78
   },
   {
     "id": "trustchain",

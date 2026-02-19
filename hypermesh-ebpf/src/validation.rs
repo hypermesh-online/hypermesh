@@ -312,14 +312,32 @@ impl AssetHashValidator {
         hasher.finalize().into()
     }
 
-    /// Validate asset exists in blockchain registry
-    pub async fn validate_asset_registry(asset_id: &[u8; 32]) -> Result<bool> {
-        // In production, this would:
-        // 1. Query blockchain for asset registration
-        // 2. Verify asset metadata
-        // 3. Check ownership and permissions
+    /// Validate asset exists in the registered asset hash registry.
+    ///
+    /// Checks the asset_id against the in-memory registry maintained by
+    /// `HyperMeshEbpf::register_asset_hash()`. Returns true if the asset
+    /// is registered with a valid (non-zero) hash.
+    pub fn validate_asset_in_registry(
+        asset_id: &[u8; 32],
+        registry: &std::collections::HashMap<String, [u8; 32]>,
+    ) -> bool {
+        // Zero asset IDs are always invalid
+        if asset_id.iter().all(|&b| b == 0) {
+            return false;
+        }
 
-        // Placeholder: Accept all non-zero asset IDs
+        // Check if the asset ID (as hex string) exists in the registry
+        let asset_key = hex::encode(asset_id);
+        registry.contains_key(&asset_key)
+    }
+
+    /// Validate asset exists in blockchain registry.
+    ///
+    /// Deprecated: Use `validate_asset_in_registry()` with a registry reference instead.
+    /// This fallback accepts all non-zero asset IDs when no registry is available.
+    #[deprecated(note = "Use validate_asset_in_registry() with a registry reference instead")]
+    pub async fn validate_asset_registry(asset_id: &[u8; 32]) -> Result<bool> {
+        // Fallback: Accept all non-zero asset IDs when no registry is available
         Ok(!asset_id.iter().all(|&b| b == 0))
     }
 
@@ -775,5 +793,52 @@ mod tests {
         let incomplete_headers = headers[0..2].to_vec();
         let incomplete_payloads = payloads[0..2].to_vec();
         assert!(AssetHashValidator::validate_shard_set(&incomplete_headers, &incomplete_payloads).is_err());
+    }
+
+    // ------------------------------------------------------------------
+    // Asset registry validation (validate_asset_in_registry)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_asset_in_registry() {
+        let mut registry = std::collections::HashMap::new();
+        let asset_id = [0x42u8; 32];
+        let asset_hash = [0xABu8; 32];
+
+        // Not in registry
+        assert!(!AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
+
+        // Register it
+        registry.insert(hex::encode(asset_id), asset_hash);
+
+        // Now found
+        assert!(AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
+
+        // Zero asset ID always invalid
+        assert!(!AssetHashValidator::validate_asset_in_registry(&[0u8; 32], &registry));
+    }
+
+    #[test]
+    fn test_validate_asset_in_registry_multiple_entries() {
+        let mut registry = std::collections::HashMap::new();
+        let id_a = [0x01u8; 32];
+        let id_b = [0x02u8; 32];
+        let id_c = [0x03u8; 32];
+
+        registry.insert(hex::encode(id_a), [0xAAu8; 32]);
+        registry.insert(hex::encode(id_b), [0xBBu8; 32]);
+
+        assert!(AssetHashValidator::validate_asset_in_registry(&id_a, &registry));
+        assert!(AssetHashValidator::validate_asset_in_registry(&id_b, &registry));
+        assert!(!AssetHashValidator::validate_asset_in_registry(&id_c, &registry));
+    }
+
+    #[test]
+    fn test_validate_asset_in_registry_empty_registry() {
+        let registry = std::collections::HashMap::new();
+        let asset_id = [0xFFu8; 32];
+
+        // Non-zero ID in empty registry -> not found
+        assert!(!AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
     }
 }

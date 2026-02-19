@@ -14,6 +14,9 @@ items = [
     "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
     "Matrix persistence (WAL, snapshots, recovery)",
     "Proof of State four-proof validation",
+    "eBPF security manager with XDP attachment and policy enforcement",
+    "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
+    "Security integration tests (framework, eBPF manager, syscall tracing, metrics)",
 ]
 
 [features.in_development]
@@ -22,9 +25,7 @@ items = [
     "Kyber-1024 for asset encryption",
     "Instruction-based retrieval system",
     "OS integration layer (Linux/macOS/Windows)",
-    "eBPF security manager with XDP attachment and policy enforcement",
     "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)",
-    "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
 ]
 
 [features.planned]

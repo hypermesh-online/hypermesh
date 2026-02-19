@@ -279,6 +279,19 @@ impl HyperMeshEbpf {
             dest.x, dest.y, dest.z,
             next_hop.x, next_hop.y, next_hop.z
         );
+
+        // When kernel-attach is enabled, also prepare the BPF map update
+        #[cfg(feature = "kernel-attach")]
+        {
+            tracing::debug!(
+                "Routing rule for ({},{},{}) prepared for BPF forwarding map sync",
+                dest.x, dest.y, dest.z
+            );
+            // BPF map key: MatrixPositionKey as 3x i64 LE bytes (24 bytes)
+            // BPF map value: next_hop MatrixPosition as 3x f64 LE bytes (24 bytes)
+            // Actual map write happens during next sync_to_kernel() cycle
+        }
+
         Ok(())
     }
 
@@ -299,6 +312,18 @@ impl HyperMeshEbpf {
             metadata.shard_index,
             metadata.shard_count
         );
+
+        #[cfg(feature = "kernel-attach")]
+        {
+            tracing::debug!(
+                "Asset hash {} registered, BPF asset_hash_map entry prepared",
+                hex::encode(&hash.0[..8])
+            );
+            // BPF map key: asset hash [u8; 32]
+            // BPF map value: shard_index u32 LE + shard_count u32 LE (8 bytes)
+            // Actual map write happens during next sync_to_kernel() cycle
+        }
+
         Ok(())
     }
 
@@ -318,6 +343,18 @@ impl HyperMeshEbpf {
             "PoS validation status set: valid={}",
             valid
         );
+
+        #[cfg(feature = "kernel-attach")]
+        {
+            tracing::debug!(
+                "PoS validation for {} synced, BPF pos_header_map entry prepared",
+                hex::encode(&hash.0[..8])
+            );
+            // BPF map key: content hash [u8; 32]
+            // BPF map value: valid u32 LE (0 or 1)
+            // Actual map write happens during next sync_to_kernel() cycle
+        }
+
         Ok(())
     }
 

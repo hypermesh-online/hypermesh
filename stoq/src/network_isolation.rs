@@ -128,6 +128,8 @@ pub enum ViolationType {
     UnauthorizedTunnel,
     /// Privacy tier violation
     PrivacyTierMismatch,
+    /// Traffic type not allowed through tunnel
+    TrafficTypeViolation,
 }
 
 /// Isolation configuration
@@ -301,11 +303,15 @@ impl NetworkIsolationManager {
     }
 
     /// Verify packet isolation (called by STOQ transport)
+    ///
+    /// Checks that cross-network traffic is only allowed through active tunnels
+    /// whose `allowed_traffic` list includes the given `traffic_type` (or `TrafficType::All`).
     pub async fn verify_packet_isolation(
         &self,
         network_id: &NetworkId,
         connection_id: ConnectionId,
         destination_network: &NetworkId,
+        traffic_type: &TrafficType,
     ) -> bool {
         // Same network - always allowed
         if network_id == destination_network {
@@ -318,12 +324,27 @@ impl NetworkIsolationManager {
             let tunnels = stack.tunnels.read().await;
             if let Some(tunnel) = tunnels.get(destination_network) {
                 if tunnel.active {
-                    return true;
+                    // Check if traffic type is allowed through this tunnel
+                    if tunnel.allowed_traffic.contains(&TrafficType::All)
+                        || tunnel.allowed_traffic.contains(traffic_type)
+                    {
+                        return true;
+                    }
+                    // Traffic type not in allowed list
+                    self.record_violation(IsolationViolation {
+                        timestamp: std::time::SystemTime::now(),
+                        source_network: *network_id,
+                        target_network: *destination_network,
+                        violation_type: ViolationType::TrafficTypeViolation,
+                        connection_id: Some(connection_id),
+                    })
+                    .await;
+                    return false;
                 }
             }
         }
 
-        // Isolation violation
+        // Isolation violation - no tunnel exists
         self.record_violation(IsolationViolation {
             timestamp: std::time::SystemTime::now(),
             source_network: *network_id,
@@ -454,10 +475,10 @@ mod tests {
         ).await.unwrap();
 
         // Verify same-network traffic allowed
-        assert!(manager.verify_packet_isolation(&network1, 1, &network1).await);
+        assert!(manager.verify_packet_isolation(&network1, 1, &network1, &TrafficType::All).await);
 
         // Verify cross-network traffic blocked
-        assert!(!manager.verify_packet_isolation(&network1, 1, &network2).await);
+        assert!(!manager.verify_packet_isolation(&network1, 1, &network2, &TrafficType::All).await);
 
         // Check violation recorded
         let violations = manager.get_violations().await;
@@ -494,9 +515,9 @@ mod tests {
             true,
         ).await.unwrap();
 
-        // Now cross-network traffic should be allowed
+        // Now cross-network traffic should be allowed (tunnel allows AssetProof)
         manager.clear_violations().await;
-        assert!(manager.verify_packet_isolation(&network1, 1, &network2).await);
+        assert!(manager.verify_packet_isolation(&network1, 1, &network2, &TrafficType::AssetProof).await);
 
         // No violations
         let violations = manager.get_violations().await;
@@ -520,5 +541,60 @@ mod tests {
         manager.remove_network_stack(network1).await.unwrap();
 
         assert_eq!(manager.active_networks().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_tunnel_traffic_type_enforcement() {
+        init_test_crypto();
+        let config = IsolationConfig::default();
+        let manager = NetworkIsolationManager::new(config);
+
+        let net1 = NetworkId([1u8; 16]);
+        let net2 = NetworkId([2u8; 16]);
+
+        // Create network stacks
+        manager
+            .create_network_stack(net1, "Net1".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: create net1");
+        manager
+            .create_network_stack(net2, "Net2".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: create net2");
+
+        // Create tunnel allowing only AssetProof traffic
+        manager
+            .create_tunnel(net1, net2, vec![TrafficType::AssetProof], true)
+            .await
+            .expect("test: create tunnel");
+
+        // AssetProof should be allowed
+        assert!(
+            manager
+                .verify_packet_isolation(&net1, 1, &net2, &TrafficType::AssetProof)
+                .await
+        );
+
+        // Consensus should be blocked
+        assert!(
+            !manager
+                .verify_packet_isolation(&net1, 1, &net2, &TrafficType::Consensus)
+                .await
+        );
+
+        // Same network always allowed regardless of type
+        assert!(
+            manager
+                .verify_packet_isolation(&net1, 1, &net1, &TrafficType::Consensus)
+                .await
+        );
+
+        // Verify the violation was recorded as TrafficTypeViolation
+        let violations = manager.get_violations().await;
+        assert_eq!(violations.len(), 1);
+        assert!(matches!(
+            violations[0].violation_type,
+            ViolationType::TrafficTypeViolation
+        ));
     }
 }

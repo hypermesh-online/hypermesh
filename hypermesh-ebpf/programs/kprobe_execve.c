@@ -70,8 +70,35 @@ int trace_execve(struct pt_regs *ctx)
 SEC("kretprobe/sys_execve")
 int trace_execve_ret(struct pt_regs *ctx)
 {
-    // Could track return values here if needed
-    // For now, just a placeholder
+    int ret = PT_REGS_RC(ctx);
+
+    /* Only track failed execve calls (potential security events) */
+    if (ret < 0) {
+        __u32 pid = bpf_get_current_pid_tgid() >> 32;
+        __u32 uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+
+        /* Reserve space in ring buffer for the failure event */
+        struct exec_event *event;
+        event = bpf_ringbuf_reserve(&exec_events, sizeof(*event), 0);
+        if (!event)
+            return 0;
+
+        event->pid = pid;
+        event->uid = uid;
+        bpf_get_current_comm(&event->comm, sizeof(event->comm));
+
+        bpf_ringbuf_submit(event, 0);
+
+        /* Also bump the per-UID execution count for failed attempts */
+        __u64 *count = bpf_map_lookup_elem(&exec_counts, &uid);
+        if (count) {
+            __sync_fetch_and_add(count, 1);
+        } else {
+            __u64 init_count = 1;
+            bpf_map_update_elem(&exec_counts, &uid, &init_count, BPF_ANY);
+        }
+    }
+
     return 0;
 }
 

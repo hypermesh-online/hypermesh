@@ -1,4 +1,4 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (C) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
@@ -7,13 +7,12 @@
 use crate::security::{
     SecurityConfig, SecurityError, SecurityManager,
     monitoring::SecurityMonitor,
+    types::{
+        HyperMeshSecurity, NetworkPacket, SystemCall, ProcessContext,
+    },
+    ebpf::EBPFSecurityManager,
 };
-use std::collections::HashMap;
 use std::time::SystemTime;
-use tokio;
-
-// TODO: Implement tests when HyperMeshSecurity framework is available
-// The tests below are placeholders and need to be reimplemented with actual security types
 
 #[tokio::test]
 async fn test_security_config() {
@@ -37,34 +36,39 @@ async fn test_security_monitor() {
     let monitor = SecurityMonitor::new();
     // Start monitoring and check it starts successfully
     assert!(monitor.start().await.is_ok());
+    // Stop monitoring cleanly
+    assert!(monitor.stop().await.is_ok());
 }
 
-// Original tests commented out - need HyperMeshSecurity types
-/*
 #[tokio::test]
 async fn test_security_framework_initialization() {
     let config = SecurityConfig::default();
-    let mut security = HyperMeshSecurity::new(config).await.unwrap();
+    let mut security = HyperMeshSecurity::new(config).await
+        .expect("test: create HyperMeshSecurity");
 
     // Test initialization
-    security.initialize().await.unwrap();
+    security.initialize().await
+        .expect("test: initialize security framework");
 
     // Test shutdown
-    security.shutdown().await.unwrap();
+    security.shutdown().await
+        .expect("test: shutdown security framework");
 }
 
 #[tokio::test]
 async fn test_ebpf_security_manager() {
-    let mut ebpf_manager = EBPFSecurityManager::new().await.unwrap();
+    let mut ebpf_manager = EBPFSecurityManager::new().await
+        .expect("test: create EBPFSecurityManager");
 
     // Test loading default programs
-    ebpf_manager.load_default_programs().await.unwrap();
+    ebpf_manager.load_default_programs().await
+        .expect("test: load default programs");
 
     // Test program listing
     let programs = ebpf_manager.list_programs().await;
     assert!(!programs.is_empty());
 
-    // Test network traffic analysis
+    // Test network traffic analysis via process_packet
     let packet = NetworkPacket {
         src_addr: "192.168.1.100".to_string(),
         dst_addr: "10.0.0.1".to_string(),
@@ -76,9 +80,94 @@ async fn test_ebpf_security_manager() {
         timestamp: SystemTime::now(),
     };
 
-    let assessment = ebpf_manager.analyze_network_traffic(&packet).await;
-    assert!(assessment.is_ok());
+    // process_packet should not error regardless of XDP filter decision.
+    // With XDP attached, the string-serialized packet may be dropped by the
+    // XDP pipeline (it expects raw packet bytes, not metadata strings), so
+    // we only assert the call succeeds without error.
+    let _allowed = ebpf_manager.process_packet(&packet).await
+        .expect("test: process packet should not error");
 }
 
-// ... rest of original tests omitted for brevity
-*/
+#[tokio::test]
+async fn test_ebpf_syscall_tracing() {
+    let ebpf_manager = EBPFSecurityManager::new().await
+        .expect("test: create EBPFSecurityManager");
+
+    let safe_call = SystemCall {
+        number: 0,
+        name: "read".to_string(),
+        args: vec![],
+        return_value: None,
+        process: ProcessContext {
+            pid: 1234,
+            name: "safe_proc".to_string(),
+            uid: 1000,
+            gid: 1000,
+            cmdline: "cat /etc/hostname".to_string(),
+            ppid: 1,
+        },
+        timestamp: SystemTime::now(),
+    };
+
+    let result = ebpf_manager.trace_syscall(&safe_call).await
+        .expect("test: trace safe syscall");
+    assert!(result, "read syscall should be allowed");
+
+    // Dangerous syscall should be denied
+    let dangerous_call = SystemCall {
+        number: 101,
+        name: "ptrace".to_string(),
+        args: vec![],
+        return_value: None,
+        process: ProcessContext {
+            pid: 5678,
+            name: "attacker".to_string(),
+            uid: 1000,
+            gid: 1000,
+            cmdline: "strace -p 1".to_string(),
+            ppid: 1,
+        },
+        timestamp: SystemTime::now(),
+    };
+
+    let result = ebpf_manager.trace_syscall(&dangerous_call).await
+        .expect("test: trace dangerous syscall");
+    assert!(!result, "ptrace syscall should be denied");
+}
+
+#[tokio::test]
+async fn test_security_monitor_metrics() {
+    let monitor = SecurityMonitor::new();
+    monitor.start().await.expect("test: start monitor");
+
+    // Record some events
+    monitor.record_event("threat_detected").await;
+    monitor.record_event("policy_evaluated").await;
+    monitor.record_event("access_denied").await;
+
+    let metrics = monitor.get_metrics().await;
+    assert!(metrics.threats_detected >= 1);
+    assert!(metrics.policies_evaluated >= 1);
+    assert!(metrics.access_denials >= 1);
+    assert!(metrics.events_processed >= 3);
+
+    monitor.stop().await.expect("test: stop monitor");
+}
+
+#[tokio::test]
+async fn test_security_manager_invalid_config() {
+    let mut config = SecurityConfig::default();
+    // Set invalid policy evaluation mode
+    config.policies.evaluation_mode = "invalid_mode".to_string();
+
+    let manager = SecurityManager::new(config);
+    let result = manager.validate();
+    assert!(result.is_err());
+
+    match result {
+        Err(SecurityError::ConfigurationError { message }) => {
+            assert!(message.contains("evaluation mode"));
+        }
+        other => panic!("test: expected ConfigurationError, got {:?}", other),
+    }
+}
