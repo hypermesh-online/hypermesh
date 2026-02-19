@@ -28,4 +28,5 @@ items = [
     "Protocol-level PoS token validation at line rate",
     "Adaptive transport tiers",
     "Multi-path QUIC",
+    "Reflector pool transport — redundancy/sync protocol for Public and Federated blockchain scopes",
 ]

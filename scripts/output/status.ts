@@ -43,12 +43,17 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": [
         "Multi-scope blockchain (User/Group/Org/Public)",
+        "Global sync state for Public/Federated scopes — collective redundancy across participating nodes",
+        "Reflector pooling — redundancy/replication system working in tandem with STOQ transport",
+        "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
         "Container runtime with isolation",
         "Multi-node production deployment",
-        "Dynamic shard rebalancing"
+        "Dynamic shard rebalancing",
+        "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
+        "CLI for matrix topology queries, node management, and asset operations"
       ]
     },
-    "completion": 60
+    "completion": 48
   },
   {
     "id": "caesar",
@@ -76,10 +81,15 @@ export const crateStatuses: CrateStatus[] = [
         "Reward distribution system",
         "Gold peg stabilization mechanism",
         "Actual stake storage implementation",
-        "Balance lookup service (actual implementation)"
+        "Balance lookup service (actual implementation)",
+        "Full transaction processing pipeline — end-to-end CAES settlement with asset integration",
+        "NGauge tensor-coordinated transaction routing across the Caesar network",
+        "caesar.hypermesh.online clearnet gateway for external integration",
+        "Caesar SDK for third-party payment integration",
+        "Caesar CLI for wallet management and transaction operations"
       ]
     },
-    "completion": 44
+    "completion": 33
   },
   {
     "id": "catalog",
@@ -104,15 +114,18 @@ export const crateStatuses: CrateStatus[] = [
       "planned": [
         "Full asset marketplace",
         "Peer-to-peer package sharing",
-        "Consensus proof validation for packages"
+        "Consensus proof validation for packages",
+        "Asset SDK for third-party developers (publish, discover, integrate)",
+        "Asset transaction integration with Caesar settlement pipeline",
+        "catalog.hypermesh.online clearnet registry access"
       ]
     },
-    "completion": 54
+    "completion": 44
   },
   {
     "id": "gateway",
     "name": "Gateway",
-    "description": "HTTP/3 gateway for trust.hypermesh.online and federated entry points",
+    "description": "HTTP/3 gateway for *.hypermesh.online domains and federated entry points",
     "phase": "planning",
     "features": {
       "working": [
@@ -131,10 +144,13 @@ export const crateStatuses: CrateStatus[] = [
         "Federated gateway mesh",
         "STOQ protocol bridge",
         "Load balancing across backends",
-        "Rate limiting and DDoS protection"
+        "Rate limiting and DDoS protection",
+        "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
+        "REST and GraphQL API layer for clearnet integration",
+        "API documentation (OpenAPI/GraphQL schema)"
       ]
     },
-    "completion": 50
+    "completion": 40
   },
   {
     "id": "hypermesh-ebpf",
@@ -190,10 +206,11 @@ export const crateStatuses: CrateStatus[] = [
       "planned": [
         "Canonical consensus proof types",
         "Shared serialization formats",
-        "Common test utilities"
+        "Common test utilities",
+        "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 62
+    "completion": 57
   },
   {
     "id": "stoq",
@@ -218,10 +235,11 @@ export const crateStatuses: CrateStatus[] = [
       "planned": [
         "Protocol-level PoS token validation at line rate",
         "Adaptive transport tiers",
-        "Multi-path QUIC"
+        "Multi-path QUIC",
+        "Reflector pool transport — redundancy/sync protocol for Public and Federated blockchain scopes"
       ]
     },
-    "completion": 79
+    "completion": 73
   },
   {
     "id": "trustchain",
@@ -283,9 +301,12 @@ export const crateStatuses: CrateStatus[] = [
         "Live STOQ WebSocket data connections",
         "Real-time metrics streaming",
         "Multi-node cluster topology visualization",
-        "Security monitoring with live alerts"
+        "Security monitoring with live alerts",
+        "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
+        "Caesar wallet and transaction management UI",
+        "NGauge analytics and reward distribution dashboard"
       ]
     },
-    "completion": 60
+    "completion": 52
   }
 ];

@@ -1,7 +1,7 @@
 [crate]
 name = "Gateway"
 id = "gateway"
-description = "HTTP/3 gateway for trust.hypermesh.online and federated entry points"
+description = "HTTP/3 gateway for *.hypermesh.online domains and federated entry points"
 phase = "planning"
 
 [features.working]
@@ -26,4 +26,7 @@ items = [
     "STOQ protocol bridge",
     "Load balancing across backends",
     "Rate limiting and DDoS protection",
+    "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
+    "REST and GraphQL API layer for clearnet integration",
+    "API documentation (OpenAPI/GraphQL schema)",
 ]

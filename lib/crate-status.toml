@@ -27,4 +27,5 @@ items = [
     "Canonical consensus proof types",
     "Shared serialization formats",
     "Common test utilities",
+    "Public SDK types for third-party integration (stable API surface)",
 ]

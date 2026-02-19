@@ -34,4 +34,7 @@ items = [
     "Real-time metrics streaming",
     "Multi-node cluster topology visualization",
     "Security monitoring with live alerts",
+    "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
+    "Caesar wallet and transaction management UI",
+    "NGauge analytics and reward distribution dashboard",
 ]

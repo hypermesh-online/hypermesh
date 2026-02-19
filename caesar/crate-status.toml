@@ -30,4 +30,9 @@ items = [
     "Gold peg stabilization mechanism",
     "Actual stake storage implementation",
     "Balance lookup service (actual implementation)",
+    "Full transaction processing pipeline — end-to-end CAES settlement with asset integration",
+    "NGauge tensor-coordinated transaction routing across the Caesar network",
+    "caesar.hypermesh.online clearnet gateway for external integration",
+    "Caesar SDK for third-party payment integration",
+    "Caesar CLI for wallet management and transaction operations",
 ]

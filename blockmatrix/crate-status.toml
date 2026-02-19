@@ -31,7 +31,12 @@ items = [
 [features.planned]
 items = [
     "Multi-scope blockchain (User/Group/Org/Public)",
+    "Global sync state for Public/Federated scopes — collective redundancy across participating nodes",
+    "Reflector pooling — redundancy/replication system working in tandem with STOQ transport",
+    "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
     "Container runtime with isolation",
     "Multi-node production deployment",
     "Dynamic shard rebalancing",
+    "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
+    "CLI for matrix topology queries, node management, and asset operations",
 ]

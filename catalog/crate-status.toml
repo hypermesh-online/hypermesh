@@ -27,4 +27,7 @@ items = [
     "Full asset marketplace",
     "Peer-to-peer package sharing",
     "Consensus proof validation for packages",
+    "Asset SDK for third-party developers (publish, discover, integrate)",
+    "Asset transaction integration with Caesar settlement pipeline",
+    "catalog.hypermesh.online clearnet registry access",
 ]
