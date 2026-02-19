@@ -1,29 +1,37 @@
 [crate]
 name = "HyperMesh eBPF"
 id = "hypermesh-ebpf"
-description = "Kernel-level packet validation and intelligence layer using eBPF"
+description = "Unified eBPF intelligence layer - single source of truth for all packet processing"
 phase = "alpha"
 
 [features.working]
 items = [
-    "Userspace packet validation framework",
+    "Unified HyperMeshEbpf orchestrator API",
+    "System capability detection (XDP, AF_XDP, kernel version)",
+    "XDP program management and packet filtering",
+    "AF_XDP zero-copy socket management",
+    "eBPF program compiler and kernel loader",
+    "Validation hooks (certificate, packet, extension)",
     "PoS header parsing and validation",
     "Asset hash verification (BLAKE3)",
     "Matrix routing path validation",
     "Policy map management",
-    "Metrics collection framework",
+    "Unified intelligence + transport metrics",
+    "PacketDecision three-path routing (Pass/Redirect/Forward/Drop)",
+    "C kernel programs (XDP counter, kprobe, tracepoint, STOQ XDP)",
+    "Privacy tier eBPF enforcement",
 ]
 
 [features.in_development]
 items = [
-    "XDP program loading via aya (feature-gated)",
-    "BPF map synchronization",
-    "Privacy tier header enforcement",
+    "Kernel-space XDP program attachment (feature-gated)",
+    "BPF map synchronization with kernel",
+    "AF_XDP kernel-backed socket creation",
 ]
 
 [features.planned]
 items = [
-    "Kernel-space PoS validation",
-    "AF_XDP zero-copy fast path",
-    "Hardware offload support",
+    "Kernel-space PoS validation at line rate",
+    "Hardware offload support (smart NICs)",
+    "Multi-queue AF_XDP load balancing",
 ]
