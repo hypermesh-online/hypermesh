@@ -32,14 +32,14 @@ export const crateStatuses: CrateStatus[] = [
         "Proof of State four-proof validation",
         "eBPF security manager with XDP attachment and policy enforcement",
         "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
-        "Security integration tests (framework, eBPF manager, syscall tracing, metrics)"
+        "Security integration tests (framework, eBPF manager, syscall tracing, metrics)",
+        "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)"
       ],
       "inDevelopment": [
         "Asset pipeline reorder (Compress-Encrypt-Shard)",
         "Kyber-1024 for asset encryption",
         "Instruction-based retrieval system",
-        "OS integration layer (Linux/macOS/Windows)",
-        "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)"
+        "OS integration layer (Linux/macOS/Windows)"
       ],
       "planned": [
         "Multi-scope blockchain (User/Group/Org/Public)",
@@ -48,7 +48,7 @@ export const crateStatuses: CrateStatus[] = [
         "Dynamic shard rebalancing"
       ]
     },
-    "completion": 55
+    "completion": 60
   },
   {
     "id": "caesar",
@@ -168,18 +168,17 @@ export const crateStatuses: CrateStatus[] = [
         "BPF policy serialization (32-byte LE format matching C struct policy_value)",
         "sync_to_kernel policy iteration and BPF map synchronization",
         "Asset registry validation against blockchain HashMap",
-        "kretprobe failed execve tracking with PID/UID/command capture"
+        "kretprobe failed execve tracking with PID/UID/command capture",
+        "Kernel-space XDP program attachment (feature-gated via kernel-attach)"
       ],
-      "inDevelopment": [
-        "Kernel-space XDP program attachment (feature-gated, compile-verified)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Kernel-space PoS validation at line rate",
         "Hardware offload support (smart NICs)",
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 87
+    "completion": 90
   },
   {
     "id": "hypermesh-lib",

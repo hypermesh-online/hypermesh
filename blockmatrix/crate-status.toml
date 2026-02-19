@@ -17,6 +17,7 @@ items = [
     "eBPF security manager with XDP attachment and policy enforcement",
     "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
     "Security integration tests (framework, eBPF manager, syscall tracing, metrics)",
+    "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
 ]
 
 [features.in_development]
@@ -25,7 +26,6 @@ items = [
     "Kyber-1024 for asset encryption",
     "Instruction-based retrieval system",
     "OS integration layer (Linux/macOS/Windows)",
-    "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates)",
 ]
 
 [features.planned]

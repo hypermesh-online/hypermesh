@@ -32,11 +32,11 @@ items = [
     "sync_to_kernel policy iteration and BPF map synchronization",
     "Asset registry validation against blockchain HashMap",
     "kretprobe failed execve tracking with PID/UID/command capture",
+    "Kernel-space XDP program attachment (feature-gated via kernel-attach)",
 ]
 
 [features.in_development]
 items = [
-    "Kernel-space XDP program attachment (feature-gated, compile-verified)",
 ]
 
 [features.planned]
