@@ -6,26 +6,17 @@ phase = "alpha"
 
 [features.working]
 items = [
-    "QUIC transport over IPv6",
-    "Connection pool with health checks",
-    "FALCON-1024 key generation and signing",
-    "Certificate management (4 strategies)",
-    "Network isolation (PrivacyMode: Anonymous/Private/Public) with eBPF policy push",
-    "Adaptive congestion control",
+    "QUIC/IPv6 transport — connection pooling, health checks, adaptive congestion control",
+    "FALCON-1024 crypto — key generation, signing, dynamic key_id, real signature verification via FalconTrustChainClient",
+    "Certificate management (4 strategies: self-signed, CA-issued, ACME, manual)",
+    "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push and tunnel traffic type enforcement",
+    "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport thin consumer wrapper",
+    "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf orchestrator",
+    "Kernel eBPF program loading via hypermesh-ebpf ebpf-loader feature gate",
+    "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
+    "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
     "Transport metrics collection",
-    "Protocol extension framework (packets/tokens/shards)",
-    "eBPF transport integration with validation hooks (CertificateValidator, PacketValidator)",
-    "AF_XDP socket reuse in send+receive path",
-    "PoS validation results fed to eBPF layer",
-    "Configurable eBPF interface resolution",
-    "PoW hash-meets-difficulty validation",
-    "Canonical length-prefixed token serialization",
-    "Dynamic FALCON key_id in protocol frames",
-    "MatrixPosition using hypermesh_lib canonical type (f64)",
-    "FalconTrustChainClient with real FALCON-1024 signature verification",
-    "Tunnel traffic type enforcement in network isolation",
-    "AF_XDP zero-copy UMEM I/O (via hypermesh-ebpf kernel-attach)",
-    "Kernel eBPF program loading (via hypermesh-ebpf ebpf-loader)",
+    "Matrix-aware positioning via hypermesh_lib canonical types",
 ]
 
 [features.in_development]

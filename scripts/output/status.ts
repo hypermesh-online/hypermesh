@@ -143,36 +143,20 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Unified HyperMeshEbpf orchestrator API with real state management",
-        "System capability detection (XDP, AF_XDP, kernel version)",
-        "XDP program management and packet filtering",
-        "AF_XDP zero-copy socket management with real UMEM I/O (sendto/poll/recvmsg syscalls)",
-        "eBPF program compiler and kernel loader (hypermesh_xdp.o)",
-        "Validation hooks with STOQ+BlockMatrix implementations (certificate, packet, extension)",
-        "PoS header parsing and enhanced validation (algorithm indicators, difficulty checks)",
-        "Asset hash verification (BLAKE3)",
-        "Matrix routing path validation (IPv6 + matrix position)",
-        "Policy map management with BPF map sync (kernel-attach)",
-        "Unified intelligence + transport metrics",
-        "PacketDecision three-path routing (Pass/Redirect/Forward/Drop)",
-        "C kernel programs (XDP counter, kprobe, tracepoint, HyperMesh XDP)",
-        "Privacy tier eBPF enforcement",
-        "Orchestrator routing rules, asset hash, and PoS validation state storage",
-        "build.rs auto-compilation of C eBPF programs (ebpf-loader feature)",
-        "FastValidationResult detailed PoS pre-validation",
-        "STOQ send+receive path with persistent AF_XDP socket reuse",
-        "AF_XDP UMEM 4-ring buffer architecture (fill, completion, rx, tx)",
-        "AF_XDP frame allocator with batch operations and thread-safe free-list",
-        "AF_XDP kernel state management with mmap cleanup on Drop",
-        "XdpManager policy flag enforcement (requires_pos, validate_asset_hash, check_matrix_routing)",
-        "C kernel BPF maps (policy_map, pos_header_map, asset_hash_map, xsk_map)",
-        "HyperMesh extension header parsing at XDP level (PoS, asset, matrix, privacy)",
-        "AF_XDP zero-copy redirect via xsk_map in kernel XDP program",
-        "BPF policy serialization (32-byte LE format matching C struct policy_value)",
-        "sync_to_kernel policy iteration and BPF map synchronization",
-        "Asset registry validation against blockchain HashMap",
-        "kretprobe failed execve tracking with PID/UID/command capture",
-        "Kernel-space XDP program attachment (feature-gated via kernel-attach)"
+        "HyperMeshEbpf orchestrator API — capability detection, state management, graceful degradation (Full eBPF+AF_XDP → eBPF only → userspace)",
+        "AF_XDP zero-copy I/O — 4-ring UMEM buffers, frame allocator, batch send/receive via syscalls",
+        "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with extension header parsing (magic 0x484D)",
+        "AF_XDP kernel integration — xsk_map redirect, UMEM mmap lifecycle, socket reuse across send/receive paths",
+        "BPF map policy enforcement — policy/PoS/asset/xsk maps with 32-byte LE serialization and sync_to_kernel",
+        "PacketDecision three-path routing — Pass (local), Redirect (AF_XDP→STOQ), Forward (XDP_TX to matrix node), Drop",
+        "PoS pre-validation pipeline — header parsing, algorithm indicators, difficulty checks, FastValidationResult",
+        "Validation hooks — STOQ (certificate, packet) + BlockMatrix (extension) registered via set_validation_hooks()",
+        "Asset hash verification (BLAKE3) and blockchain registry validation",
+        "Matrix routing path validation (IPv6 + matrix position encoding)",
+        "Privacy tier eBPF enforcement with per-policy flag control",
+        "Orchestrator state storage — routing rules, asset hashes, PoS validation state persisted across sessions",
+        "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
+        "Unified intelligence + transport metrics collection"
       ],
       "inDevelopment": [],
       "planned": [
@@ -181,7 +165,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-queue AF_XDP load balancing"
       ]
     },
-    "completion": 91
+    "completion": 82
   },
   {
     "id": "hypermesh-lib",
@@ -218,26 +202,17 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "QUIC transport over IPv6",
-        "Connection pool with health checks",
-        "FALCON-1024 key generation and signing",
-        "Certificate management (4 strategies)",
-        "Network isolation (PrivacyMode: Anonymous/Private/Public) with eBPF policy push",
-        "Adaptive congestion control",
+        "QUIC/IPv6 transport — connection pooling, health checks, adaptive congestion control",
+        "FALCON-1024 crypto — key generation, signing, dynamic key_id, real signature verification via FalconTrustChainClient",
+        "Certificate management (4 strategies: self-signed, CA-issued, ACME, manual)",
+        "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push and tunnel traffic type enforcement",
+        "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport thin consumer wrapper",
+        "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf orchestrator",
+        "Kernel eBPF program loading via hypermesh-ebpf ebpf-loader feature gate",
+        "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
+        "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
         "Transport metrics collection",
-        "Protocol extension framework (packets/tokens/shards)",
-        "eBPF transport integration with validation hooks (CertificateValidator, PacketValidator)",
-        "AF_XDP socket reuse in send+receive path",
-        "PoS validation results fed to eBPF layer",
-        "Configurable eBPF interface resolution",
-        "PoW hash-meets-difficulty validation",
-        "Canonical length-prefixed token serialization",
-        "Dynamic FALCON key_id in protocol frames",
-        "MatrixPosition using hypermesh_lib canonical type (f64)",
-        "FalconTrustChainClient with real FALCON-1024 signature verification",
-        "Tunnel traffic type enforcement in network isolation",
-        "AF_XDP zero-copy UMEM I/O (via hypermesh-ebpf kernel-attach)",
-        "Kernel eBPF program loading (via hypermesh-ebpf ebpf-loader)"
+        "Matrix-aware positioning via hypermesh_lib canonical types"
       ],
       "inDevelopment": [],
       "planned": [
@@ -246,7 +221,7 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-path QUIC"
       ]
     },
-    "completion": 87
+    "completion": 79
   },
   {
     "id": "trustchain",
