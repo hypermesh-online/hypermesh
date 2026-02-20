@@ -13,7 +13,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
 ```bash
 # Clone
 git clone https://github.com/hypermesh-online/hypermesh.git
-cd hypermesh/core
+cd hypermesh
 
 # Install dependencies (Ubuntu)
 sudo apt install clang lld pkg-config
