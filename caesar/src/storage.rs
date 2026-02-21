@@ -1,61 +1,65 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (c) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Caesar Storage Layer - BlockMatrix Asset-based operations
+//! Caesar Storage Layer - Packet-centric EVP operations
 //!
-//! Uses BlockMatrix asset storage for wallet and transaction management
-//! instead of traditional databases.
+//! Stores ephemeral value packet records and settlement history.
+//! No wallets, no persistent balances — packets are the only unit of value.
 
-use anyhow::{Result, anyhow};
+#[allow(unused_imports)]
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
-use tracing::{info, debug};
-use uuid::Uuid;
-use std::collections::{HashMap, BTreeMap};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, info};
 
-use crate::models::*;
-use crate::DatabaseConfig;
+use hypermesh_lib::economic::{GoldGrams, PacketId, PacketState};
 
-/// Storage layer for Caesar economic system using BlockMatrix assets
+use crate::models::{PacketRecord, SettlementRecord};
+
+// ============ Configuration ============
+
+/// Storage configuration for Caesar EVP persistence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageConfig {
+    /// Path to the storage directory
+    pub path: String,
+}
+
+// ============ Storage ============
+
+/// Packet-centric storage for the Caesar EVP system.
+///
+/// All data is held in-memory with JSON file persistence.
+/// No wallet tables, no balance ledgers — only packets and settlements.
 pub struct CaesarStorage {
     /// Storage directory path
     storage_path: PathBuf,
-    /// In-memory cache of wallets (keyed by wallet_id String)
-    wallets: Arc<RwLock<HashMap<String, Wallet>>>,
-    /// In-memory cache of transactions (keyed by transaction_id String)
-    transactions: Arc<RwLock<BTreeMap<String, Transaction>>>,
-    /// In-memory cache of rewards
-    rewards: Arc<RwLock<Vec<RewardEntry>>>,
-    /// In-memory cache of economic metrics
+    /// In-memory packet records (keyed by PacketId)
+    packets: Arc<RwLock<HashMap<PacketId, PacketRecord>>>,
+    /// In-memory settlement records (keyed by settlement_id, ordered)
+    settlements: Arc<RwLock<BTreeMap<String, SettlementRecord>>>,
+    /// In-memory economic metrics
     metrics: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
 impl CaesarStorage {
-    pub async fn new(config: DatabaseConfig) -> Result<Self> {
-        info!("Initializing Caesar storage layer with BlockMatrix assets");
+    /// Create a new storage instance, loading any existing data from disk.
+    pub async fn new(config: StorageConfig) -> Result<Self> {
+        info!("Initializing Caesar EVP storage layer");
 
-        let storage_path = PathBuf::from(&config.url);
-
-        // Ensure storage directory exists
+        let storage_path = PathBuf::from(&config.path);
         tokio::fs::create_dir_all(&storage_path).await?;
 
-        // Initialize in-memory caches
-        let wallets = Arc::new(RwLock::new(HashMap::new()));
-        let transactions = Arc::new(RwLock::new(BTreeMap::new()));
-        let rewards = Arc::new(RwLock::new(Vec::new()));
-        let metrics = Arc::new(RwLock::new(HashMap::new()));
-
-        // Load existing data from disk
         let storage = Self {
-            storage_path: storage_path.clone(),
-            wallets: wallets.clone(),
-            transactions: transactions.clone(),
-            rewards: rewards.clone(),
-            metrics: metrics.clone(),
+            storage_path,
+            packets: Arc::new(RwLock::new(HashMap::new())),
+            settlements: Arc::new(RwLock::new(BTreeMap::new())),
+            metrics: Arc::new(RwLock::new(HashMap::new())),
         };
 
         storage.load_from_disk().await?;
@@ -63,131 +67,164 @@ impl CaesarStorage {
         Ok(storage)
     }
 
-    /// Load data from disk storage
+    // ---- Disk persistence ----
+
+    /// Load packets and settlements from JSON files on disk.
+    ///
+    /// Packets are stored as a Vec (PacketId is `[u8; 32]` and cannot be
+    /// used as a JSON map key), then reconstructed into a HashMap on load.
     async fn load_from_disk(&self) -> Result<()> {
-        // Load wallets
-        let wallets_file = self.storage_path.join("wallets.json");
-        if wallets_file.exists() {
-            let data = tokio::fs::read_to_string(&wallets_file).await?;
-            if let Ok(loaded_wallets) = serde_json::from_str::<HashMap<String, Wallet>>(&data) {
-                *self.wallets.write().await = loaded_wallets;
-                debug!("Loaded {} wallets from disk", self.wallets.read().await.len());
+        let packets_file = self.storage_path.join("packets.json");
+        if packets_file.exists() {
+            let data = tokio::fs::read_to_string(&packets_file).await?;
+            if let Ok(loaded) = serde_json::from_str::<Vec<PacketRecord>>(&data)
+            {
+                let map: HashMap<PacketId, PacketRecord> =
+                    loaded.into_iter().map(|p| (p.packet_id, p)).collect();
+                *self.packets.write().await = map;
+                debug!(
+                    "Loaded {} packets from disk",
+                    self.packets.read().await.len()
+                );
             }
         }
 
-        // Load transactions
-        let transactions_file = self.storage_path.join("transactions.json");
-        if transactions_file.exists() {
-            let data = tokio::fs::read_to_string(&transactions_file).await?;
-            if let Ok(loaded_transactions) = serde_json::from_str::<BTreeMap<String, Transaction>>(&data) {
-                *self.transactions.write().await = loaded_transactions;
-                debug!("Loaded {} transactions from disk", self.transactions.read().await.len());
-            }
-        }
-
-        // Load rewards
-        let rewards_file = self.storage_path.join("rewards.json");
-        if rewards_file.exists() {
-            let data = tokio::fs::read_to_string(&rewards_file).await?;
-            if let Ok(loaded_rewards) = serde_json::from_str::<Vec<RewardEntry>>(&data) {
-                *self.rewards.write().await = loaded_rewards;
-                debug!("Loaded {} rewards from disk", self.rewards.read().await.len());
+        let settlements_file = self.storage_path.join("settlements.json");
+        if settlements_file.exists() {
+            let data = tokio::fs::read_to_string(&settlements_file).await?;
+            if let Ok(loaded) =
+                serde_json::from_str::<BTreeMap<String, SettlementRecord>>(&data)
+            {
+                *self.settlements.write().await = loaded;
+                debug!(
+                    "Loaded {} settlements from disk",
+                    self.settlements.read().await.len()
+                );
             }
         }
 
         Ok(())
     }
 
-    /// Persist data to disk
+    /// Persist current state to JSON files on disk.
+    ///
+    /// Packets are serialized as a Vec (not a HashMap) because PacketId
+    /// (`[u8; 32]`) cannot be used as a JSON object key.
     async fn persist_to_disk(&self) -> Result<()> {
-        // Save wallets
-        let wallets_file = self.storage_path.join("wallets.json");
-        let wallets_data = serde_json::to_string_pretty(&*self.wallets.read().await)?;
-        tokio::fs::write(&wallets_file, wallets_data).await?;
-
-        // Save transactions
-        let transactions_file = self.storage_path.join("transactions.json");
-        let transactions_data = serde_json::to_string_pretty(&*self.transactions.read().await)?;
-        tokio::fs::write(&transactions_file, transactions_data).await?;
-
-        // Save rewards
-        let rewards_file = self.storage_path.join("rewards.json");
-        let rewards_data = serde_json::to_string_pretty(&*self.rewards.read().await)?;
-        tokio::fs::write(&rewards_file, rewards_data).await?;
-
-        Ok(())
-    }
-
-    // Wallet operations
-    pub async fn create_wallet(&self, user_id: String) -> Result<Wallet> {
-        let wallet = Wallet {
-            wallet_id: Uuid::new_v4().to_string(),
-            user_id,
-            balance: Decimal::ZERO,
-            created_at: Utc::now(),
-            last_activity: Utc::now(),
-            is_active: true,
+        let packets_file = self.storage_path.join("packets.json");
+        let packets_data = {
+            let guard = self.packets.read().await;
+            let packets_vec: Vec<&PacketRecord> = guard.values().collect();
+            serde_json::to_string_pretty(&packets_vec)?
         };
+        tokio::fs::write(&packets_file, packets_data).await?;
 
-        self.wallets.write().await.insert(wallet.wallet_id.clone(), wallet.clone());
+        let settlements_file = self.storage_path.join("settlements.json");
+        let settlements_data =
+            serde_json::to_string_pretty(&*self.settlements.read().await)?;
+        tokio::fs::write(&settlements_file, settlements_data).await?;
+
+        Ok(())
+    }
+
+    // ---- Packet operations ----
+
+    /// Store a new packet record and persist to disk.
+    pub async fn store_packet(&self, record: PacketRecord) -> Result<()> {
+        let id = record.packet_id;
+        self.packets.write().await.insert(id, record);
         self.persist_to_disk().await?;
-
-        info!("Created wallet {} for user {}", wallet.wallet_id, wallet.user_id);
-        Ok(wallet)
+        debug!("Stored packet {}", id);
+        Ok(())
     }
 
-    pub async fn get_wallet(&self, wallet_id: &str) -> Result<Option<Wallet>> {
-        Ok(self.wallets.read().await.get(wallet_id).cloned())
+    /// Look up a packet by its identifier.
+    pub async fn get_packet(
+        &self,
+        id: &PacketId,
+    ) -> Result<Option<PacketRecord>> {
+        Ok(self.packets.read().await.get(id).cloned())
     }
 
-    pub async fn get_wallets_by_user(&self, user_id: &str) -> Result<Vec<Wallet>> {
-        let wallets = self.wallets.read().await;
-        let user_wallets: Vec<Wallet> = wallets
-            .values()
-            .filter(|w| w.user_id == user_id)
-            .cloned()
-            .collect();
-        Ok(user_wallets)
-    }
-
-    pub async fn update_balance(&self, wallet_id: &str, new_balance: Decimal) -> Result<()> {
-        let mut wallets = self.wallets.write().await;
-        if let Some(wallet) = wallets.get_mut(wallet_id) {
-            wallet.balance = new_balance;
-            wallet.last_activity = Utc::now();
-        } else {
-            return Err(anyhow!("Wallet not found"));
+    /// Update a packet's state and current value.
+    ///
+    /// Also bumps `updated_at` to now.
+    pub async fn update_packet_state(
+        &self,
+        id: &PacketId,
+        new_state: PacketState,
+        new_value: GoldGrams,
+    ) -> Result<()> {
+        let mut packets = self.packets.write().await;
+        let record = packets
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("Packet {} not found", id))?;
+        record.state = new_state;
+        record.current_value = new_value;
+        record.updated_at = Utc::now();
+        if new_state.is_terminal() {
+            record.settled_at = Some(Utc::now());
         }
-        drop(wallets);
+        drop(packets);
         self.persist_to_disk().await?;
+        debug!("Updated packet {} to state {:?}", id, new_state);
         Ok(())
     }
 
-    // Transaction operations
-    pub async fn create_transaction(&self, tx: Transaction) -> Result<()> {
-        self.transactions.write().await.insert(tx.transaction_id.clone(), tx.clone());
-        self.persist_to_disk().await?;
-        info!("Created transaction {}", tx.transaction_id);
-        Ok(())
-    }
-
-    pub async fn get_transaction(&self, tx_id: &str) -> Result<Option<Transaction>> {
-        Ok(self.transactions.read().await.get(tx_id).cloned())
-    }
-
-    pub async fn get_wallet_transactions(&self, wallet_id: &str) -> Result<Vec<Transaction>> {
-        let transactions = self.transactions.read().await;
-        let wallet_txs: Vec<Transaction> = transactions
+    /// Return all packets that are currently active (non-terminal).
+    pub async fn list_active_packets(&self) -> Result<Vec<PacketRecord>> {
+        let packets = self.packets.read().await;
+        let active: Vec<PacketRecord> = packets
             .values()
-            .filter(|tx| tx.from_wallet == wallet_id || tx.to_wallet == wallet_id)
+            .filter(|p| p.state.is_active())
             .cloned()
             .collect();
-        Ok(wallet_txs)
+        Ok(active)
     }
 
-    pub async fn get_recent_transactions(&self, limit: usize) -> Result<Vec<Transaction>> {
-        let transactions = self.transactions.read().await;
-        let recent: Vec<Transaction> = transactions
+    /// Return all packets in a specific state.
+    pub async fn list_packets_by_state(
+        &self,
+        state: PacketState,
+    ) -> Result<Vec<PacketRecord>> {
+        let packets = self.packets.read().await;
+        let filtered: Vec<PacketRecord> = packets
+            .values()
+            .filter(|p| p.state == state)
+            .cloned()
+            .collect();
+        Ok(filtered)
+    }
+
+    // ---- Settlement operations ----
+
+    /// Store a settlement record and persist to disk.
+    pub async fn store_settlement(
+        &self,
+        record: SettlementRecord,
+    ) -> Result<()> {
+        let id = record.settlement_id.clone();
+        self.settlements.write().await.insert(id.clone(), record);
+        self.persist_to_disk().await?;
+        debug!("Stored settlement {}", id);
+        Ok(())
+    }
+
+    /// Look up a settlement by its identifier.
+    pub async fn get_settlement(
+        &self,
+        id: &str,
+    ) -> Result<Option<SettlementRecord>> {
+        Ok(self.settlements.read().await.get(id).cloned())
+    }
+
+    /// Return the most recent N settlements (ordered by BTreeMap key).
+    pub async fn list_recent_settlements(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<SettlementRecord>> {
+        let settlements = self.settlements.read().await;
+        let recent: Vec<SettlementRecord> = settlements
             .values()
             .rev()
             .take(limit)
@@ -196,156 +233,312 @@ impl CaesarStorage {
         Ok(recent)
     }
 
-    // Reward operations
-    pub async fn create_reward(&self, reward: RewardEntry) -> Result<()> {
-        self.rewards.write().await.push(reward.clone());
-        self.persist_to_disk().await?;
-        info!("Created reward {} for wallet {}", reward.reward_id, reward.wallet_id);
-        Ok(())
-    }
+    // ---- Metrics operations ----
 
-    pub async fn get_wallet_rewards(&self, wallet_id: &str) -> Result<Vec<RewardEntry>> {
-        let rewards = self.rewards.read().await;
-        let wallet_rewards: Vec<RewardEntry> = rewards
-            .iter()
-            .filter(|r| r.wallet_id == wallet_id)
-            .cloned()
-            .collect();
-        Ok(wallet_rewards)
-    }
-
-    pub async fn get_recent_rewards(&self, limit: usize) -> Result<Vec<RewardEntry>> {
-        let rewards = self.rewards.read().await;
-        let recent: Vec<RewardEntry> = rewards
-            .iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect();
-        Ok(recent)
-    }
-
-    // Economic metrics operations
-    pub async fn save_metrics(&self, metrics: serde_json::Value) -> Result<()> {
+    /// Save a metrics snapshot, keeping only the most recent 1000 entries.
+    pub async fn save_metrics(
+        &self,
+        metrics: serde_json::Value,
+    ) -> Result<()> {
         let timestamp = Utc::now().to_rfc3339();
-        self.metrics.write().await.insert(timestamp, metrics);
+        self.metrics
+            .write()
+            .await
+            .insert(timestamp, metrics);
 
-        // Keep only last 1000 metric entries
-        let mut metrics = self.metrics.write().await;
-        if metrics.len() > 1000 {
-            let to_remove: Vec<String> = metrics
+        let mut store = self.metrics.write().await;
+        if store.len() > 1000 {
+            let to_remove: Vec<String> = store
                 .keys()
-                .take(metrics.len() - 1000)
+                .take(store.len() - 1000)
                 .cloned()
                 .collect();
             for key in to_remove {
-                metrics.remove(&key);
+                store.remove(&key);
             }
         }
-        drop(metrics);
+        drop(store);
 
         self.persist_to_disk().await?;
         Ok(())
     }
 
-    pub async fn get_latest_metrics(&self) -> Result<Option<serde_json::Value>> {
+    /// Get the most recently stored metrics snapshot.
+    pub async fn get_latest_metrics(
+        &self,
+    ) -> Result<Option<serde_json::Value>> {
         let metrics = self.metrics.read().await;
         Ok(metrics.values().last().cloned())
     }
 
-    pub async fn get_metrics_history(&self, limit: usize) -> Result<Vec<serde_json::Value>> {
+    /// Get up to `limit` metrics snapshots, most recent first.
+    pub async fn get_metrics_history(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<serde_json::Value>> {
         let metrics = self.metrics.read().await;
-        // Convert to sorted vec since HashMap values don't support reverse iteration
-        let mut history: Vec<serde_json::Value> = metrics
-            .values()
-            .cloned()
-            .collect();
+        let mut history: Vec<serde_json::Value> =
+            metrics.values().cloned().collect();
         history.reverse();
         history.truncate(limit);
         Ok(history)
     }
 
-    // Statistics
-    pub async fn get_total_supply(&self) -> Result<Decimal> {
-        let wallets = self.wallets.read().await;
-        let total = wallets
+    // ---- Statistics ----
+
+    /// Count of all non-terminal packets.
+    pub async fn get_active_packet_count(&self) -> Result<usize> {
+        let packets = self.packets.read().await;
+        let count = packets.values().filter(|p| p.state.is_active()).count();
+        Ok(count)
+    }
+
+    /// Sum of `current_value` across all `InTransit` packets.
+    pub async fn get_total_in_transit_value(&self) -> Result<GoldGrams> {
+        let packets = self.packets.read().await;
+        let total = packets
             .values()
-            .fold(Decimal::ZERO, |acc, w| acc + w.balance);
+            .filter(|p| p.state == PacketState::InTransit)
+            .fold(GoldGrams::zero(), |acc, p| acc + p.current_value);
         Ok(total)
     }
 
-    pub async fn get_active_wallets_count(&self) -> Result<usize> {
-        let wallets = self.wallets.read().await;
-        let active = wallets
+    /// Sum of `fee_collected` across settlements completed since `since`.
+    pub async fn get_settlement_volume(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<GoldGrams> {
+        let settlements = self.settlements.read().await;
+        let total = settlements
             .values()
-            .filter(|w| w.is_active)
-            .count();
-        Ok(active)
+            .filter(|s| s.settled_at >= since)
+            .fold(GoldGrams::zero(), |acc, s| acc + s.fee_collected);
+        Ok(total)
     }
-
-    pub async fn get_transaction_volume(&self, since: DateTime<Utc>) -> Result<Decimal> {
-        let transactions = self.transactions.read().await;
-        let volume = transactions
-            .values()
-            .filter(|tx| tx.created_at >= since)
-            .fold(Decimal::ZERO, |acc, tx| acc + tx.amount);
-        Ok(volume)
-    }
-
 }
+
+// ============ Tests ============
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::*;
+    use hypermesh_lib::economic::MarketTier;
+    use hypermesh_lib::NodeId;
+    use rust_decimal::Decimal;
     use tempfile::TempDir;
+
+    fn make_config(dir: &TempDir) -> StorageConfig {
+        StorageConfig {
+            path: dir
+                .path()
+                .to_str()
+                .expect("test: tempdir path should be valid utf-8")
+                .to_string(),
+        }
+    }
+
+    fn make_packet(id_byte: u8, state: PacketState, value: i64) -> PacketRecord {
+        let now = Utc::now();
+        PacketRecord {
+            packet_id: PacketId::new([id_byte; 32]),
+            state,
+            tier: MarketTier::L0,
+            initial_value: GoldGrams::from_decimal(Decimal::new(value, 0)),
+            current_value: GoldGrams::from_decimal(Decimal::new(value, 0)),
+            fee_budget: GoldGrams::from_decimal(Decimal::new(5, 0)),
+            hop_count: 0,
+            hop_limit: 10,
+            demurrage_cost: GoldGrams::zero(),
+            route: vec![NodeId::from("node-a")],
+            created_at: now,
+            updated_at: now,
+            settled_at: None,
+        }
+    }
 
     #[tokio::test]
     async fn test_storage_basic() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = DatabaseConfig {
-            url: temp_dir.path().to_str().unwrap().to_string(),
-            redis_url: None,
-            pool_size: 5,
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let config = make_config(&dir);
+
+        let storage = CaesarStorage::new(config)
+            .await
+            .expect("test: storage init should succeed");
+
+        let packet = make_packet(1, PacketState::Minted, 100);
+        storage
+            .store_packet(packet.clone())
+            .await
+            .expect("test: store_packet should succeed");
+
+        let retrieved = storage
+            .get_packet(&PacketId::new([1u8; 32]))
+            .await
+            .expect("test: get_packet should succeed");
+        assert!(retrieved.is_some());
+        let r = retrieved.expect("test: packet should exist");
+        assert_eq!(r.state, PacketState::Minted);
+        assert_eq!(r.initial_value.0, Decimal::new(100, 0));
+    }
+
+    #[tokio::test]
+    async fn test_packet_state_update() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init should succeed");
+
+        let packet = make_packet(2, PacketState::Minted, 200);
+        let pid = packet.packet_id;
+        storage
+            .store_packet(packet)
+            .await
+            .expect("test: store should succeed");
+
+        let new_value = GoldGrams::from_decimal(Decimal::new(190, 0));
+        storage
+            .update_packet_state(&pid, PacketState::InTransit, new_value)
+            .await
+            .expect("test: update should succeed");
+
+        let updated = storage
+            .get_packet(&pid)
+            .await
+            .expect("test: get should succeed")
+            .expect("test: packet should exist");
+        assert_eq!(updated.state, PacketState::InTransit);
+        assert_eq!(updated.current_value.0, Decimal::new(190, 0));
+        assert!(updated.settled_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_list_active_packets() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init should succeed");
+
+        // Minted (active)
+        storage
+            .store_packet(make_packet(10, PacketState::Minted, 100))
+            .await
+            .expect("test: store minted");
+        // InTransit (active)
+        storage
+            .store_packet(make_packet(11, PacketState::InTransit, 200))
+            .await
+            .expect("test: store in-transit");
+        // Settled (terminal, NOT active)
+        storage
+            .store_packet(make_packet(12, PacketState::Settled, 300))
+            .await
+            .expect("test: store settled");
+
+        let active = storage
+            .list_active_packets()
+            .await
+            .expect("test: list_active should succeed");
+        assert_eq!(active.len(), 2);
+
+        let by_state = storage
+            .list_packets_by_state(PacketState::InTransit)
+            .await
+            .expect("test: list_by_state should succeed");
+        assert_eq!(by_state.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_settlement_storage() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init should succeed");
+
+        let settlement = SettlementRecord {
+            settlement_id: "s-001".to_string(),
+            packet_id: PacketId::new([42u8; 32]),
+            egress_node: NodeId::from("egress-1"),
+            finality_type: "instant".to_string(),
+            fee_collected: GoldGrams::from_decimal(Decimal::new(50, 1)),
+            settled_at: Utc::now(),
         };
 
-        let storage = CaesarStorage::new(config).await.unwrap();
+        storage
+            .store_settlement(settlement)
+            .await
+            .expect("test: store settlement should succeed");
 
-        // Create wallet
-        let user_id = Uuid::new_v4().to_string();
-        let wallet = storage.create_wallet(user_id).await.unwrap();
-        assert_eq!(wallet.balance, Decimal::ZERO);
-
-        // Get wallet
-        let retrieved = storage.get_wallet(&wallet.wallet_id).await.unwrap();
+        let retrieved = storage
+            .get_settlement("s-001")
+            .await
+            .expect("test: get settlement should succeed");
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().wallet_id, wallet.wallet_id);
+        let s = retrieved.expect("test: settlement should exist");
+        assert_eq!(s.finality_type, "instant");
+        assert_eq!(s.fee_collected.0, Decimal::new(50, 1));
     }
 
     #[tokio::test]
     async fn test_persistence() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = DatabaseConfig {
-            url: temp_dir.path().to_str().unwrap().to_string(),
-            redis_url: None,
-            pool_size: 5,
-        };
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let config = make_config(&dir);
 
-        let user_id = Uuid::new_v4().to_string();
-        let wallet_id;
+        let pid = PacketId::new([99u8; 32]);
 
-        // Create and save
+        // Create and store
         {
-            let storage = CaesarStorage::new(config.clone()).await.unwrap();
-            let wallet = storage.create_wallet(user_id.clone()).await.unwrap();
-            wallet_id = wallet.wallet_id;
+            let storage = CaesarStorage::new(config.clone())
+                .await
+                .expect("test: first init should succeed");
+            storage
+                .store_packet(make_packet(99, PacketState::Minted, 500))
+                .await
+                .expect("test: store should succeed");
         }
 
         // Reload and verify
         {
-            let storage = CaesarStorage::new(config).await.unwrap();
-            let wallet = storage.get_wallet(&wallet_id).await.unwrap();
-            assert!(wallet.is_some());
-            assert_eq!(wallet.unwrap().user_id, user_id);
+            let storage = CaesarStorage::new(config)
+                .await
+                .expect("test: second init should succeed");
+            let packet = storage
+                .get_packet(&pid)
+                .await
+                .expect("test: get should succeed");
+            assert!(packet.is_some());
+            let p = packet.expect("test: packet should survive persistence");
+            assert_eq!(p.state, PacketState::Minted);
+            assert_eq!(p.initial_value.0, Decimal::new(500, 0));
         }
+    }
+
+    #[tokio::test]
+    async fn test_in_transit_value() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init should succeed");
+
+        // Two InTransit packets
+        storage
+            .store_packet(make_packet(20, PacketState::InTransit, 100))
+            .await
+            .expect("test: store 1");
+        storage
+            .store_packet(make_packet(21, PacketState::InTransit, 250))
+            .await
+            .expect("test: store 2");
+        // One Minted (not InTransit, should not count)
+        storage
+            .store_packet(make_packet(22, PacketState::Minted, 999))
+            .await
+            .expect("test: store 3");
+
+        let total = storage
+            .get_total_in_transit_value()
+            .await
+            .expect("test: get total should succeed");
+        assert_eq!(total.0, Decimal::new(350, 0));
     }
 }

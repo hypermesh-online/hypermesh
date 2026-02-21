@@ -26,7 +26,7 @@ export const crateStatuses: CrateStatus[] = [
         "Tensor math library (Vector3D, Matrix3x3, A*)",
         "Every-node blockchain (independent chains)",
         "Geospatial module (GPS conversion, clustering)",
-        "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
+        "Asset adapters (CPU/GPU/Memory/Storage/Network/Container/Blockchain/Dns)",
         "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
         "Matrix persistence (WAL, snapshots, recovery)",
         "Proof of State four-proof validation",
@@ -54,38 +54,48 @@ export const crateStatuses: CrateStatus[] = [
   {
     "id": "caesar",
     "name": "Caesar",
-    "description": "Gold-pegged interop bridge for multi-chain and fiat payment integration",
-    "phase": "planning",
+    "description": "Gold-denominated Ephemeral Value Protocol for HyperMesh",
+    "phase": "alpha",
     "features": {
       "working": [
-        "Token economics configuration",
-        "Wallet creation and balance tracking",
-        "Transaction processing engine",
-        "Reward calculation framework",
-        "Staking manager with APY",
-        "Exchange rate engine",
+        "EVP core types (PacketId, GoldGrams, MarketTier, PacketState with 11 states, DemurrageRate)",
+        "CaesPacket state machine (Minted→InTransit→Delivered→Settling→Settled, plus Hold/Stall/Expire/Refund/Dissolve/Disperse)",
+        "Tier-based demurrage decay (L0 ~5%/hr, L1 ~0.1%/day, L2 ~0.01%/day, L3 ~0.001%/day)",
+        "Governor PID controller (velocity, gold deviation, volume, liquidity, in-transit float)",
+        "Constitutional fee caps (L0=5%, L1=2%, L2=0.5%, L3=0.1%)",
+        "Per-tier fee modifiers and demurrage overrides",
+        "Network pressure classification (6 quadrants: Bubble, Crash, Stagnation, GoldenEra, Bottleneck, Vacuum)",
+        "Universal Payment Interface — IngressAdapter + EgressAdapter traits with 4 finality types",
+        "Settlement protocol — validate_settlement, settle_packet, split_rewards (80/20 egress/transit)",
+        "Acceptance criteria — per-recipient tier/adapter/fee/delegate preferences on Network chain",
+        "Gravity dissolution — 90-day timeout, 6-criteria qualification, weighted shard-holder distribution",
+        "Packet processor — validate, handoff with hop/fee tracking, batch processing",
+        "Fee distribution — 80/20 egress/transit split, bytes-weighted transit allocation",
+        "Gold oracle — price tracking, 10% band validation, grams↔USD conversion",
+        "Effective price composite (whitepaper §5.1: network fees + speculation pressure - liquidity shadow)",
+        "Capacity-based packet routing (bandwidth/buffer/latency/load scoring, no trust/reputation)",
+        "Holding buffer — orbit buffer for fee-budget-exceeded/congestion packets with retry limits",
+        "Packet-centric storage (PacketRecord, SettlementRecord, metrics, JSON persistence)",
+        "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
+        "STOQ API handlers (route_packet, node_status, governor_params, effective_rate, health)",
         "Cross-chain bridge types (8 networks)"
       ],
       "inDevelopment": [
         "Banking provider STOQ migration",
-        "Analytics engine integration",
-        "STOQ API server endpoints"
+        "STOQ API handler wiring to CaesarProtocol internals",
+        "Node operator preferences integration with routing"
       ],
       "planned": [
-        "Live multi-chain bridge (BTC/ETH/SOL)",
-        "Fiat payment processing",
-        "Reward distribution system",
-        "Gold peg stabilization mechanism",
-        "Actual stake storage implementation",
-        "Balance lookup service (actual implementation)",
-        "Full transaction processing pipeline — end-to-end CAES settlement with asset integration",
-        "NGauge tensor-coordinated transaction routing across the Caesar network",
-        "caesar.hypermesh.online clearnet gateway for external integration",
+        "Live STOQ API with real packet routing end-to-end",
+        "NGauge capacity metrics integration (feature-gated)",
         "Caesar SDK for third-party payment integration",
-        "Caesar CLI for wallet management and transaction operations"
+        "Caesar CLI for packet operations and node management",
+        "caesar.hypermesh.online clearnet gateway",
+        "Live multi-chain UPI bridge (BTC/ETH/SOL)",
+        "Fiat UPI payment processing"
       ]
     },
-    "completion": 33
+    "completion": 68
   },
   {
     "id": "catalog",
@@ -94,7 +104,7 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Asset package types and metadata",
+        "Asset package types (PackageMetadata) and registry metadata",
         "Asset registry with publish/install/search",
         "Template generation framework",
         "Asset validation pipeline",
@@ -261,18 +271,18 @@ export const crateStatuses: CrateStatus[] = [
         "CRL generator and distributor",
         "Threshold cryptography (Shamir SSS over GF(256))",
         "HTTP/3 typed handler functions",
-        "Deployment quality gates"
+        "Deployment quality gates",
+        "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)"
       ],
       "inDevelopment": [
         "HTTP/3 endpoint wiring (handlers exist, binary uses mocks)",
         "CT log federation across nodes"
       ],
       "planned": [
-        "HSM key storage integration",
-        "Cross-network CA federation"
+        "HSM key storage integration"
       ]
     },
-    "completion": 80
+    "completion": 85
   },
   {
     "id": "ui",

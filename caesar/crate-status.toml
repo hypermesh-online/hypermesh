@@ -1,38 +1,48 @@
 [crate]
 name = "Caesar"
 id = "caesar"
-description = "Gold-pegged interop bridge for multi-chain and fiat payment integration"
-phase = "planning"
+description = "Gold-denominated Ephemeral Value Protocol for HyperMesh"
+phase = "alpha"
 
 [features.working]
 items = [
-    "Token economics configuration",
-    "Wallet creation and balance tracking",
-    "Transaction processing engine",
-    "Reward calculation framework",
-    "Staking manager with APY",
-    "Exchange rate engine",
+    "EVP core types (PacketId, GoldGrams, MarketTier, PacketState with 11 states, DemurrageRate)",
+    "CaesPacket state machine (Minted→InTransit→Delivered→Settling→Settled, plus Hold/Stall/Expire/Refund/Dissolve/Disperse)",
+    "Tier-based demurrage decay (L0 ~5%/hr, L1 ~0.1%/day, L2 ~0.01%/day, L3 ~0.001%/day)",
+    "Governor PID controller (velocity, gold deviation, volume, liquidity, in-transit float)",
+    "Constitutional fee caps (L0=5%, L1=2%, L2=0.5%, L3=0.1%)",
+    "Per-tier fee modifiers and demurrage overrides",
+    "Network pressure classification (6 quadrants: Bubble, Crash, Stagnation, GoldenEra, Bottleneck, Vacuum)",
+    "Universal Payment Interface — IngressAdapter + EgressAdapter traits with 4 finality types",
+    "Settlement protocol — validate_settlement, settle_packet, split_rewards (80/20 egress/transit)",
+    "Acceptance criteria — per-recipient tier/adapter/fee/delegate preferences on Network chain",
+    "Gravity dissolution — 90-day timeout, 6-criteria qualification, weighted shard-holder distribution",
+    "Packet processor — validate, handoff with hop/fee tracking, batch processing",
+    "Fee distribution — 80/20 egress/transit split, bytes-weighted transit allocation",
+    "Gold oracle — price tracking, 10% band validation, grams↔USD conversion",
+    "Effective price composite (whitepaper §5.1: network fees + speculation pressure - liquidity shadow)",
+    "Capacity-based packet routing (bandwidth/buffer/latency/load scoring, no trust/reputation)",
+    "Holding buffer — orbit buffer for fee-budget-exceeded/congestion packets with retry limits",
+    "Packet-centric storage (PacketRecord, SettlementRecord, metrics, JSON persistence)",
+    "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
+    "STOQ API handlers (route_packet, node_status, governor_params, effective_rate, health)",
     "Cross-chain bridge types (8 networks)",
 ]
 
 [features.in_development]
 items = [
     "Banking provider STOQ migration",
-    "Analytics engine integration",
-    "STOQ API server endpoints",
+    "STOQ API handler wiring to CaesarProtocol internals",
+    "Node operator preferences integration with routing",
 ]
 
 [features.planned]
 items = [
-    "Live multi-chain bridge (BTC/ETH/SOL)",
-    "Fiat payment processing",
-    "Reward distribution system",
-    "Gold peg stabilization mechanism",
-    "Actual stake storage implementation",
-    "Balance lookup service (actual implementation)",
-    "Full transaction processing pipeline — end-to-end CAES settlement with asset integration",
-    "NGauge tensor-coordinated transaction routing across the Caesar network",
-    "caesar.hypermesh.online clearnet gateway for external integration",
+    "Live STOQ API with real packet routing end-to-end",
+    "NGauge capacity metrics integration (feature-gated)",
     "Caesar SDK for third-party payment integration",
-    "Caesar CLI for wallet management and transaction operations",
+    "Caesar CLI for packet operations and node management",
+    "caesar.hypermesh.online clearnet gateway",
+    "Live multi-chain UPI bridge (BTC/ETH/SOL)",
+    "Fiat UPI payment processing",
 ]

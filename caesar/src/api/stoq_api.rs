@@ -1,10 +1,11 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (c) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Caesar STOQ API - Economic system over STOQ protocol
+//! Caesar STOQ API -- packet-centric EVP operations over STOQ protocol.
 //!
-//! Provides transaction, wallet, and economic incentive services via STOQ.
+//! Replaces the old wallet-based handlers with packet routing, node status,
+//! governor parameter queries, and effective rate lookups.
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -15,6 +16,10 @@ use tracing::{info, debug, instrument};
 use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
 use stoq::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
 
 /// Caesar STOQ API configuration
 #[derive(Debug, Clone)]
@@ -30,101 +35,94 @@ pub struct CaesarStoqConfig {
 impl Default for CaesarStoqConfig {
     fn default() -> Self {
         Self {
-            bind_address: "[::1]:9294".to_string(), // Caesar default port
+            bind_address: "[::1]:9294".to_string(),
             service_name: "caesar".to_string(),
             enable_logging: true,
         }
     }
 }
 
-// === Request/Response Types ===
+// ---------------------------------------------------------------------------
+// Request / Response types
+// ---------------------------------------------------------------------------
 
-/// Submit transaction request
+/// Route a value packet through the network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitTransactionRequest {
-    /// Transaction ID
-    pub transaction_id: String,
-    /// From address
-    pub from: String,
-    /// To address
-    pub to: String,
-    /// Amount
-    pub amount: rust_decimal::Decimal,
-    /// Transaction type
-    pub tx_type: String,
+pub struct RoutePacketRequest {
+    pub packet_id: String,
+    pub initial_value_grams: rust_decimal::Decimal,
+    /// Market tier: "L0", "L1", "L2", "L3"
+    pub tier: String,
+    pub sender_node: String,
+    pub recipient_hint: Option<String>,
 }
 
-/// Submit transaction response
+/// Result of a route-packet request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitTransactionResponse {
-    /// Transaction ID
-    pub transaction_id: String,
-    /// Success status
+pub struct RoutePacketResponse {
+    pub packet_id: String,
     pub success: bool,
-    /// Error message if failed
+    pub state: String,
     pub error: Option<String>,
 }
 
-/// Get wallet balance request
+/// Query node status in the EVP network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetBalanceRequest {
-    /// Wallet address
-    pub address: String,
+pub struct GetNodeStatusRequest {
+    pub node_id: String,
 }
 
-/// Get wallet balance response
+/// Node status response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetBalanceResponse {
-    /// Wallet address
-    pub address: String,
-    /// Current balance
-    pub balance: rust_decimal::Decimal,
-    /// Pending balance
-    pub pending: rust_decimal::Decimal,
+pub struct GetNodeStatusResponse {
+    pub node_id: String,
+    pub active_packets: u64,
+    pub settled_count: u64,
+    pub total_fees_earned_grams: rust_decimal::Decimal,
 }
 
-/// Calculate incentive request
+/// Governor parameter snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CalculateIncentiveRequest {
-    /// Resource type (CPU, GPU, storage, etc)
-    pub resource_type: String,
-    /// Resource amount
-    pub amount: f64,
-    /// Duration in seconds
-    pub duration: u64,
+pub struct GetGovernorParamsResponse {
+    pub pressure: String,
+    pub health_score: rust_decimal::Decimal,
+    pub recommended_fee_adjustment: rust_decimal::Decimal,
 }
 
-/// Calculate incentive response
+/// Effective CAES rate composite.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CalculateIncentiveResponse {
-    /// Calculated reward
-    pub reward: rust_decimal::Decimal,
-    /// Reward currency
-    pub currency: String,
+pub struct GetEffectiveRateResponse {
+    pub network_fees_component: rust_decimal::Decimal,
+    pub speculation_pressure: rust_decimal::Decimal,
+    pub liquidity_shadow: rust_decimal::Decimal,
+    pub effective_rate: rust_decimal::Decimal,
 }
 
-// === Handlers ===
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
 
-/// Transaction submission handler
-pub struct SubmitTransactionHandler;
+/// Route a value packet to the next hop.
+pub struct RoutePacketHandler;
 
 #[async_trait]
-impl ApiHandler for SubmitTransactionHandler {
+impl ApiHandler for RoutePacketHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-        debug!("Handling transaction submission: {}", request.id);
+        debug!("Handling route_packet: {}", request.id);
 
-        // Deserialize request
-        let tx_request: SubmitTransactionRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid transaction request: {}", e)))?;
+        let req: RoutePacketRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(
+                format!("Invalid route_packet request: {}", e),
+            ))?;
 
-        // TODO: Implement actual transaction processing
-        let response = SubmitTransactionResponse {
-            transaction_id: tx_request.transaction_id.clone(),
+        // Stub: accept the packet and return Minted state
+        let response = RoutePacketResponse {
+            packet_id: req.packet_id,
             success: true,
+            state: "minted".to_string(),
             error: None,
         };
 
-        // Serialize response
         let payload = serde_json::to_vec(&response)
             .map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
@@ -138,30 +136,31 @@ impl ApiHandler for SubmitTransactionHandler {
     }
 
     fn path(&self) -> &str {
-        "caesar/submit_transaction"
+        "caesar/route_packet"
     }
 }
 
-/// Wallet balance handler
-pub struct GetBalanceHandler;
+/// Query a node's status in the EVP network.
+pub struct GetNodeStatusHandler;
 
 #[async_trait]
-impl ApiHandler for GetBalanceHandler {
+impl ApiHandler for GetNodeStatusHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-        debug!("Handling balance query: {}", request.id);
+        debug!("Handling node_status: {}", request.id);
 
-        // Deserialize request
-        let balance_request: GetBalanceRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid balance request: {}", e)))?;
+        let req: GetNodeStatusRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(
+                format!("Invalid node_status request: {}", e),
+            ))?;
 
-        // TODO: Implement actual balance lookup
-        let response = GetBalanceResponse {
-            address: balance_request.address.clone(),
-            balance: rust_decimal::Decimal::ZERO,
-            pending: rust_decimal::Decimal::ZERO,
+        // Stub: return zeroed status for the requested node
+        let response = GetNodeStatusResponse {
+            node_id: req.node_id,
+            active_packets: 0,
+            settled_count: 0,
+            total_fees_earned_grams: rust_decimal::Decimal::ZERO,
         };
 
-        // Serialize response
         let payload = serde_json::to_vec(&response)
             .map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
@@ -175,29 +174,25 @@ impl ApiHandler for GetBalanceHandler {
     }
 
     fn path(&self) -> &str {
-        "caesar/get_balance"
+        "caesar/node_status"
     }
 }
 
-/// Incentive calculation handler
-pub struct CalculateIncentiveHandler;
+/// Get current Governor PID parameters.
+pub struct GetGovernorParamsHandler;
 
 #[async_trait]
-impl ApiHandler for CalculateIncentiveHandler {
+impl ApiHandler for GetGovernorParamsHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-        debug!("Handling incentive calculation: {}", request.id);
+        debug!("Handling governor_params: {}", request.id);
 
-        // Deserialize request
-        let _calc_request: CalculateIncentiveRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid calculation request: {}", e)))?;
-
-        // TODO: Implement actual incentive calculation
-        let response = CalculateIncentiveResponse {
-            reward: rust_decimal::Decimal::ZERO,
-            currency: "CAESAR".to_string(),
+        // Stub: return default governance state
+        let response = GetGovernorParamsResponse {
+            pressure: "golden_era".to_string(),
+            health_score: rust_decimal::Decimal::new(50, 0),
+            recommended_fee_adjustment: rust_decimal::Decimal::ZERO,
         };
 
-        // Serialize response
         let payload = serde_json::to_vec(&response)
             .map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
@@ -211,11 +206,44 @@ impl ApiHandler for CalculateIncentiveHandler {
     }
 
     fn path(&self) -> &str {
-        "caesar/calculate_incentive"
+        "caesar/governor_params"
     }
 }
 
-/// Health check handler
+/// Get the effective CAES rate composite.
+pub struct GetEffectiveRateHandler;
+
+#[async_trait]
+impl ApiHandler for GetEffectiveRateHandler {
+    async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
+        debug!("Handling effective_rate: {}", request.id);
+
+        // Stub: return neutral effective rate
+        let response = GetEffectiveRateResponse {
+            network_fees_component: rust_decimal::Decimal::ZERO,
+            speculation_pressure: rust_decimal::Decimal::ZERO,
+            liquidity_shadow: rust_decimal::Decimal::ZERO,
+            effective_rate: rust_decimal::Decimal::ZERO,
+        };
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+        Ok(ApiResponse {
+            request_id: request.id,
+            success: true,
+            payload: payload.into(),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
+    }
+
+    fn path(&self) -> &str {
+        "caesar/effective_rate"
+    }
+}
+
+/// Health check handler (unchanged from original).
 pub struct CaesarHealthHandler;
 
 #[async_trait]
@@ -251,10 +279,12 @@ impl ApiHandler for CaesarHealthHandler {
     }
 }
 
-// === Server ===
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
 
 /// Caesar STOQ API Server
-#[allow(dead_code)] // Server fields for API operations
+#[allow(dead_code)]
 pub struct CaesarStoqApi {
     server: Arc<StoqApiServer>,
     config: CaesarStoqConfig,
@@ -267,12 +297,20 @@ impl CaesarStoqApi {
         info!("Creating Caesar STOQ API server on {}", config.bind_address);
 
         // Parse bind address
-        let bind_addr: std::net::Ipv6Addr = config.bind_address.split(':')
+        let bind_addr: std::net::Ipv6Addr = config
+            .bind_address
+            .split(':')
             .next()
-            .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
+            .and_then(|addr| {
+                addr.trim_matches(|c| c == '[' || c == ']')
+                    .parse()
+                    .ok()
+            })
             .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
 
-        let port: u16 = config.bind_address.split(':')
+        let port: u16 = config
+            .bind_address
+            .split(':')
             .nth(1)
             .and_then(|p| p.parse().ok())
             .ok_or_else(|| anyhow!("Invalid port"))?;
@@ -286,16 +324,16 @@ impl CaesarStoqApi {
 
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
-        // Create API server
+        // Create API server and register packet-centric handlers
         let server = Arc::new(StoqApiServer::new(transport));
 
-        // Register handlers
-        server.register_handler(Arc::new(SubmitTransactionHandler));
-        server.register_handler(Arc::new(GetBalanceHandler));
-        server.register_handler(Arc::new(CalculateIncentiveHandler));
+        server.register_handler(Arc::new(RoutePacketHandler));
+        server.register_handler(Arc::new(GetNodeStatusHandler));
+        server.register_handler(Arc::new(GetGovernorParamsHandler));
+        server.register_handler(Arc::new(GetEffectiveRateHandler));
         server.register_handler(Arc::new(CaesarHealthHandler));
 
-        info!("Caesar STOQ API handlers registered");
+        info!("Caesar STOQ API handlers registered (5 endpoints)");
 
         Ok(Self { server, config })
     }
@@ -318,5 +356,30 @@ impl CaesarStoqApi {
 mod tests {
     use super::*;
 
-    // TODO: Add Caesar STOQ API integration tests
+    #[test]
+    fn route_packet_request_serialization() {
+        let req = RoutePacketRequest {
+            packet_id: "pkt-001".to_string(),
+            initial_value_grams: rust_decimal::Decimal::new(100, 0),
+            tier: "L0".to_string(),
+            sender_node: "node-a".to_string(),
+            recipient_hint: Some("node-z".to_string()),
+        };
+        let json = serde_json::to_string(&req)
+            .expect("test: serialization should succeed");
+        assert!(json.contains("pkt-001"));
+        assert!(json.contains("L0"));
+    }
+
+    #[test]
+    fn governor_params_response_serialization() {
+        let resp = GetGovernorParamsResponse {
+            pressure: "golden_era".to_string(),
+            health_score: rust_decimal::Decimal::new(75, 0),
+            recommended_fee_adjustment: rust_decimal::Decimal::ZERO,
+        };
+        let json = serde_json::to_string(&resp)
+            .expect("test: serialization should succeed");
+        assert!(json.contains("golden_era"));
+    }
 }

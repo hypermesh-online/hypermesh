@@ -222,12 +222,17 @@ mod tests {
     }
 
     #[test]
-    fn reject_terminal_expired_state() {
+    fn reject_expired_state() {
+        // Since Sprint 18, Expired is non-terminal (intermediate → Refunded).
+        // Settlement validation rejects it as NotDelivered, not TerminalState.
         let mut request = test_request();
         request.packet_state = PacketState::Expired;
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: expired should fail");
-        assert!(matches!(err, SettlementError::TerminalState(_)));
+        assert!(
+            matches!(err, SettlementError::NotDelivered(_, PacketState::Expired)),
+            "expected NotDelivered(Expired), got: {err}"
+        );
     }
 
     #[test]
