@@ -294,13 +294,14 @@ export const crateStatuses: CrateStatus[] = [
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
         "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
-        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
+        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)"
+      ],
+      "inDevelopment": [
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
       ],
-      "inDevelopment": [],
       "planned": []
     },
-    "completion": 100
+    "completion": 95
   },
   {
     "id": "ui",
@@ -310,7 +311,7 @@ export const crateStatuses: CrateStatus[] = [
     "features": {
       "working": [
         "Dashboard home with ecosystem overview",
-        "Module pages (STOQ, TrustChain, Catalog, Caesar, NGauge, HyperMesh)",
+        "Module pages (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
         "Component library (Radix UI primitives, Tailwind 4)",
         "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
         "TrustChain management (certificates, security, consensus, node config)",
@@ -335,7 +336,7 @@ export const crateStatuses: CrateStatus[] = [
         "Security monitoring with live alerts",
         "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
         "Caesar wallet and transaction management UI",
-        "NGauge analytics and reward distribution dashboard"
+        "Engauge analytics and reward distribution dashboard"
       ]
     },
     "completion": 52
