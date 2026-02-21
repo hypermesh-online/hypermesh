@@ -13,6 +13,7 @@ pub mod linux;
 pub mod windows;
 pub mod bsd;
 pub mod macos;
+pub mod platform_info;
 
 // Re-export types publicly
 pub use types::*;

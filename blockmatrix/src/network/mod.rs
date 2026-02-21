@@ -16,6 +16,7 @@ pub mod blockchain_integration;
 pub mod validation;
 pub mod reflector_pool;
 pub mod sync_dispatch;
+pub mod cluster;
 
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;

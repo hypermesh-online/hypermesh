@@ -1,8 +1,8 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Core container runtime implementation
+//! Core container runtime implementation with real process isolation.
 
 use super::{
     types::{ContainerId, ContainerSpec, CreateOptions, ContainerStatus},
@@ -13,6 +13,7 @@ use super::{
     resources::{ResourceManager, CgroupResourceManager, ResourceUsage},
     migration::{MigrationManager, DefaultMigrationManager, MigrationRequest},
     monitoring::{ContainerMonitor, DefaultContainerMonitor, ContainerMetrics},
+    process::ProcessIsolation,
     config::ContainerConfig,
     error::{Result, ContainerError},
 };
@@ -90,14 +91,14 @@ impl ContainerHandle {
     pub async fn metrics(&self) -> Result<ContainerMetrics> {
         self.runtime.get_metrics(&self.id).await
     }
-    
+
     /// Migrate container to another node
     pub async fn migrate(&self, request: MigrationRequest) -> Result<()> {
         self.runtime.migrate(request).await
     }
 }
 
-/// Main container runtime implementation
+/// Main container runtime implementation with process-based isolation.
 pub struct ContainerRuntime {
     /// Runtime configuration
     config: ContainerConfig,
@@ -115,6 +116,8 @@ pub struct ContainerRuntime {
     migration_manager: Arc<dyn MigrationManager>,
     /// Container monitor
     monitor: Arc<dyn ContainerMonitor>,
+    /// Process isolation manager for real process execution
+    process_isolation: Arc<ProcessIsolation>,
     /// Container registry (handles to created containers)
     containers: Arc<RwLock<HashMap<ContainerId, ContainerHandle>>>,
     /// Performance metrics
@@ -150,7 +153,15 @@ impl ContainerRuntime {
         let resource_manager = Arc::new(CgroupResourceManager::new());
         let migration_manager = Arc::new(DefaultMigrationManager::new());
         let monitor = Arc::new(DefaultContainerMonitor::new());
-        
+
+        let max_memory = config.limits.max_memory_per_container
+            * config.runtime.max_containers as u64;
+        let max_cpu_millicores = (config.limits.max_cpu_per_container * 1000.0) as u64
+            * config.runtime.max_containers as u64;
+        let process_isolation = Arc::new(
+            ProcessIsolation::new(max_memory, max_cpu_millicores),
+        );
+
         Ok(Self {
             config,
             lifecycle,
@@ -160,11 +171,12 @@ impl ContainerRuntime {
             resource_manager,
             migration_manager,
             monitor,
+            process_isolation,
             containers: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(RuntimeMetrics::default())),
         })
     }
-    
+
     /// Create a container runtime with custom components
     pub fn with_components(
         config: ContainerConfig,
@@ -176,6 +188,14 @@ impl ContainerRuntime {
         migration_manager: Arc<dyn MigrationManager>,
         monitor: Arc<dyn ContainerMonitor>,
     ) -> Self {
+        let max_memory = config.limits.max_memory_per_container
+            * config.runtime.max_containers as u64;
+        let max_cpu_millicores = (config.limits.max_cpu_per_container * 1000.0) as u64
+            * config.runtime.max_containers as u64;
+        let process_isolation = Arc::new(
+            ProcessIsolation::new(max_memory, max_cpu_millicores),
+        );
+
         Self {
             config,
             lifecycle,
@@ -185,21 +205,22 @@ impl ContainerRuntime {
             resource_manager,
             migration_manager,
             monitor,
+            process_isolation,
             containers: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(RuntimeMetrics::default())),
         }
     }
-    
+
     /// Get runtime configuration
     pub fn config(&self) -> &ContainerConfig {
         &self.config
     }
-    
+
     /// Get runtime metrics
     pub async fn metrics(&self) -> RuntimeMetrics {
         self.metrics.read().await.clone()
     }
-    
+
     /// Update runtime metrics
     async fn update_metrics<F>(&self, update_fn: F)
     where
@@ -208,7 +229,7 @@ impl ContainerRuntime {
         let mut metrics = self.metrics.write().await;
         update_fn(&mut *metrics);
     }
-    
+
     /// Validate container specification
     fn validate_spec(&self, spec: &ContainerSpec) -> Result<()> {
         if spec.image.is_empty() {
@@ -218,12 +239,13 @@ impl ContainerRuntime {
         if spec.command.as_ref().map_or(true, |c| c.is_empty()) {
             return Err(ContainerError::config("Container command cannot be empty"));
         }
-        
+
         // Validate resource limits
         if spec.resources.memory_bytes > self.config.limits.max_memory_per_container {
             return Err(ContainerError::config(
                 format!("Memory limit {} exceeds maximum {}",
-                       spec.resources.memory_bytes, self.config.limits.max_memory_per_container)
+                       spec.resources.memory_bytes,
+                       self.config.limits.max_memory_per_container)
             ));
         }
 
@@ -234,37 +256,42 @@ impl ContainerRuntime {
                        cpu_cores, self.config.limits.max_cpu_per_container)
             ));
         }
-        
+
         Ok(())
     }
-    
-    /// Create a new container
-    // STUB: Container creation is simulated, not actually creating containers
-    // TODO: Implement actual container runtime using runc, containerd, or custom implementation
-    // Priority: HIGH - Required for Option 2 (Container Runtime)
+
+    /// Create a new container.
+    ///
+    /// Validates the spec, pulls the image if needed, sets up filesystem and
+    /// networking, and registers the container with the process isolation
+    /// manager for resource budget tracking.
     #[instrument(skip(self), fields(image = %spec.image))]
-    pub async fn create(&self, spec: ContainerSpec, options: CreateOptions) -> Result<ContainerHandle> {
+    pub async fn create(
+        &self,
+        spec: ContainerSpec,
+        options: CreateOptions,
+    ) -> Result<ContainerHandle> {
         let start_time = Instant::now();
-        
+
         // Validate specification
         self.validate_spec(&spec)?;
-        
+
         // Generate container ID
         let id = ContainerId::new();
-        
+
         // Check if we've reached container limit
         let containers = self.containers.read().await;
         if containers.len() >= self.config.runtime.max_containers as usize {
             return Err(ContainerError::resource("Maximum container limit reached"));
         }
         drop(containers);
-        
+
         // Pull image if necessary
         if !self.image_manager.exists(&spec.image).await? {
             info!("Pulling image: {}", spec.image);
             self.image_manager.pull(&spec.image).await?;
         }
-        
+
         // Create container filesystem
         self.filesystem.create_container_filesystem(&id, &spec).await?;
 
@@ -276,9 +303,11 @@ impl ContainerRuntime {
             dns_servers: Vec::new(),
             hostname: id.to_string(),
         };
-        self.network_usage.create_network_namespace(&id, &default_network_config).await?;
+        self.network_usage
+            .create_network_namespace(&id, &default_network_config)
+            .await?;
 
-        // Configure resource limits - convert ResourceRequirements to ResourceQuota
+        // Configure resource limits
         let quota = super::resources::ResourceQuota {
             memory_limit: Some(spec.resources.memory_bytes),
             cpu_quota: Some(spec.resources.cpu_millicores as f64 / 1000.0),
@@ -292,9 +321,19 @@ impl ContainerRuntime {
         };
         self.resource_manager.set_quota(&id, quota).await?;
 
+        // Register with process isolation manager for resource budget tracking
+        self.process_isolation
+            .register(
+                id,
+                spec.resources.memory_bytes,
+                spec.resources.cpu_millicores,
+                spec.resources.storage_bytes,
+            )
+            .await?;
+
         // Initialize container lifecycle
         self.lifecycle.create(&id, spec.clone()).await?;
-        
+
         // Create container handle
         let handle = ContainerHandle {
             id,
@@ -303,83 +342,122 @@ impl ContainerRuntime {
             created_at: Instant::now(),
             runtime: Arc::new(self.clone()),
         };
-        
+
         // Register container
         let mut containers = self.containers.write().await;
         containers.insert(id, handle.clone());
         drop(containers);
-        
+
         // Update metrics
         let creation_time = start_time.elapsed();
         self.update_metrics(|metrics| {
             metrics.containers_created += 1;
-        }).await;
-        
+        })
+        .await;
+
         info!("Created container {} in {:?}", id, creation_time);
-
-        // CreateOptions doesn't have auto_start field
-        // Containers need to be started manually after creation
-
         Ok(handle)
     }
-    
-    /// Start a container
-    // STUB: Container start is simulated, not actually starting containers
-    // TODO: Implement actual container lifecycle management
-    // Priority: HIGH - Required for Option 2 (Container Runtime)
+
+    /// Start a container by spawning its command as a child process.
+    ///
+    /// The container must have been created first. The process isolation
+    /// manager handles spawning, PID tracking, and process group setup.
     #[instrument(skip(self))]
     pub async fn start(&self, id: &ContainerId) -> Result<()> {
         let start_time = Instant::now();
 
-        // Start container lifecycle
+        // Look up the container spec to get the command
+        let handle = {
+            let containers = self.containers.read().await;
+            containers
+                .get(id)
+                .cloned()
+                .ok_or_else(|| ContainerError::NotFound {
+                    id: id.to_string(),
+                })?
+        };
+
+        let command = handle
+            .spec
+            .command
+            .as_ref()
+            .ok_or_else(|| ContainerError::config("container has no command"))?
+            .clone();
+        let args = handle.spec.args.clone().unwrap_or_default();
+
+        // Start container lifecycle state machine
         self.lifecycle.start(id).await?;
+
+        // Spawn the actual process
+        let pid = self
+            .process_isolation
+            .start(id, &command, &args, &handle.spec.env)
+            .await?;
+        info!("Container {} spawned as PID {}", id, pid);
 
         // Start monitoring
         self.monitor.start_monitoring(id).await?;
-        
+
         // Update metrics
         let startup_time = start_time.elapsed();
         self.update_metrics(|metrics| {
             metrics.containers_started += 1;
             metrics.running_containers += 1;
-            
-            // Update average startup time
-            let total_time = metrics.avg_startup_time.as_nanos() * (metrics.containers_started - 1) as u128
+
+            let total_time = metrics.avg_startup_time.as_nanos()
+                * (metrics.containers_started - 1) as u128
                 + startup_time.as_nanos();
-            metrics.avg_startup_time = Duration::from_nanos((total_time / metrics.containers_started as u128) as u64);
-        }).await;
-        
+            metrics.avg_startup_time = Duration::from_nanos(
+                (total_time / metrics.containers_started as u128) as u64,
+            );
+        })
+        .await;
+
         info!("Started container {} in {:?}", id, startup_time);
         Ok(())
     }
-    
-    /// Stop a container
+
+    /// Stop a container by terminating its process.
+    ///
+    /// Sends SIGTERM and waits for the configured timeout, then SIGKILL
+    /// if the process has not exited.
     #[instrument(skip(self))]
     pub async fn stop(&self, id: &ContainerId, timeout: Option<Duration>) -> Result<()> {
         let start_time = Instant::now();
+        let stop_timeout = timeout.unwrap_or(self.config.runtime.shutdown_timeout);
+
+        // Stop the actual process if running
+        if self.process_isolation.is_running(id).await {
+            let exit_code = self.process_isolation.stop(id, stop_timeout).await?;
+            info!("Container {} process exited with code {:?}", id, exit_code);
+        }
 
         // Stop container lifecycle
-        self.lifecycle.stop(id, timeout).await?;
+        self.lifecycle.stop(id, Some(stop_timeout)).await?;
 
         // Stop monitoring
         self.monitor.stop_monitoring(id).await?;
-        
+
         // Update metrics
         let shutdown_time = start_time.elapsed();
         self.update_metrics(|metrics| {
             metrics.containers_stopped += 1;
             metrics.running_containers = metrics.running_containers.saturating_sub(1);
-            
-            // Update average shutdown time
-            let total_time = metrics.avg_shutdown_time.as_nanos() * (metrics.containers_stopped - 1) as u128
+
+            let total_time = metrics.avg_shutdown_time.as_nanos()
+                * (metrics.containers_stopped - 1) as u128
                 + shutdown_time.as_nanos();
-            metrics.avg_shutdown_time = Duration::from_nanos((total_time / metrics.containers_stopped as u128) as u64);
-        }).await;
-        
+            metrics.avg_shutdown_time = Duration::from_nanos(
+                (total_time / metrics.containers_stopped as u128) as u64,
+            );
+        })
+        .await;
+
         info!("Stopped container {} in {:?}", id, shutdown_time);
         Ok(())
     }
-    
+
     /// Pause a container
     #[instrument(skip(self))]
     pub async fn pause(&self, id: &ContainerId) -> Result<()> {
@@ -395,25 +473,43 @@ impl ContainerRuntime {
         info!("Resumed container {}", id);
         Ok(())
     }
-    
-    /// Delete a container
+
+    /// Delete a container, releasing all resources.
+    ///
+    /// If the process is still running it will be stopped first. The
+    /// process isolation budget, lifecycle entry, networking, and
+    /// filesystem are all cleaned up.
     #[instrument(skip(self))]
     pub async fn delete(&self, id: &ContainerId) -> Result<()> {
         // Remove from container registry
         let mut containers = self.containers.write().await;
-        let _handle = containers.remove(id)
-            .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
+        let _handle = containers
+            .remove(id)
+            .ok_or_else(|| ContainerError::NotFound {
+                id: id.to_string(),
+            })?;
         drop(containers);
 
-        // Ensure container is stopped
+        // Ensure process is stopped
+        if self.process_isolation.is_running(id).await {
+            let _ = self
+                .process_isolation
+                .stop(id, self.config.runtime.shutdown_timeout)
+                .await;
+        }
+
+        // Ensure lifecycle state is stopped
         if let Ok(status) = self.lifecycle.status(id).await {
             if status.state == ContainerState::Running {
-                self.stop(id, None).await?;
+                self.lifecycle.stop(id, None).await?;
             }
         }
 
         // Delete container lifecycle
         self.lifecycle.delete(id).await?;
+
+        // Release process isolation budget
+        let _ = self.process_isolation.unregister(id).await;
 
         // Cleanup resources
         self.resource_manager.cleanup(id).await?;
@@ -423,16 +519,14 @@ impl ContainerRuntime {
 
         // Cleanup filesystem
         self.filesystem.delete_container_filesystem(id).await?;
-        
-        // Auto-remove handling
+
         info!("Deleted container {}", id);
         Ok(())
     }
-    
+
     /// Get container status
     pub async fn status(&self, id: &ContainerId) -> Result<ContainerStatus> {
         let lifecycle_status = self.lifecycle.status(id).await?;
-        // Convert lifecycle status to runtime status
         Ok(match lifecycle_status.state {
             ContainerState::Running => ContainerStatus::Running,
             ContainerState::Stopped => ContainerStatus::Stopped,
@@ -450,28 +544,37 @@ impl ContainerRuntime {
     /// Get container handle by ID
     pub async fn get_handle(&self, id: &ContainerId) -> Result<ContainerHandle> {
         let containers = self.containers.read().await;
-        containers.get(id)
+        containers
+            .get(id)
             .cloned()
-            .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
+            .ok_or_else(|| ContainerError::NotFound {
+                id: id.to_string(),
+            })
     }
 
-    /// Get resource usage for container
+    /// Get resource usage for container from the process isolation layer.
+    ///
+    /// On Linux, reads real values from `/proc/{pid}/stat` and
+    /// `/proc/{pid}/status`. Falls back to estimates on other platforms.
     pub async fn get_usage(&self, id: &ContainerId) -> Result<ResourceUsage> {
-        self.resource_manager.get_usage(id).await
+        self.process_isolation.get_usage(id).await
     }
 
     /// Get metrics for container
     pub async fn get_metrics(&self, id: &ContainerId) -> Result<ContainerMetrics> {
         self.monitor.get_metrics(id).await
     }
-    
+
     /// Migrate a container
     pub async fn migrate(&self, request: MigrationRequest) -> Result<()> {
-        let _result = self.migration_manager.migrate(request).await
+        let _result = self
+            .migration_manager
+            .migrate(request)
+            .await
             .map_err(|e| ContainerError::migration(e.to_string()))?;
         Ok(())
     }
-    
+
     /// Checkpoint a container
     pub async fn checkpoint(&self, id: &ContainerId, path: &str) -> Result<()> {
         self.lifecycle.checkpoint(id, path).await?;
@@ -485,28 +588,22 @@ impl ContainerRuntime {
         info!("Restored container {} from checkpoint at {}", id, path);
         Ok(())
     }
-    
-    /// Shutdown the runtime
+
+    /// Shutdown the runtime, stopping all running containers.
     pub async fn shutdown(&self) -> Result<()> {
         info!("Shutting down container runtime");
-        
-        // Stop all running containers
+
         let containers = self.containers.read().await;
         let container_ids: Vec<_> = containers.keys().copied().collect();
         drop(containers);
-        
+
         for id in container_ids {
-            if let Ok(status) = self.status(&id).await {
-                match status {
-                    ContainerStatus::Running => {
-                        warn!("Force stopping container {} during shutdown", id);
-                        let _ = self.stop(&id, Some(Duration::from_secs(5))).await;
-                    },
-                    _ => {},
-                }
+            if self.process_isolation.is_running(&id).await {
+                warn!("Force stopping container {} during shutdown", id);
+                let _ = self.stop(&id, Some(Duration::from_secs(5))).await;
             }
         }
-        
+
         info!("Container runtime shutdown complete");
         Ok(())
     }
@@ -524,6 +621,7 @@ impl Clone for ContainerRuntime {
             resource_manager: Arc::clone(&self.resource_manager),
             migration_manager: Arc::clone(&self.migration_manager),
             monitor: Arc::clone(&self.monitor),
+            process_isolation: Arc::clone(&self.process_isolation),
             containers: Arc::clone(&self.containers),
             metrics: Arc::clone(&self.metrics),
         }

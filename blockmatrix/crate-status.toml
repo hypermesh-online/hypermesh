@@ -30,11 +30,11 @@ items = [
     "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
     "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
     "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)",
+    "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
+    "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
+    "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
 ]
 
 [features.planned]
 items = [
-    "Container runtime with isolation",
-    "Multi-node production deployment",
-    "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
 ]
