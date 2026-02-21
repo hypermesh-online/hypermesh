@@ -24,14 +24,11 @@ items = [
     "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
     "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
     "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
-]
-
-[features.in_development]
-items = [
     "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
 ]
 
+[features.in_development]
+items = []
+
 [features.planned]
-items = [
-    "HSM key storage integration",
-]
+items = []

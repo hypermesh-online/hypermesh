@@ -23,6 +23,7 @@ pub mod crypto;   // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
 pub mod deployment; // NEW: Quality gates and deployment validation
 pub mod monitoring; // NEW: Native monitoring system without external dependencies
 pub mod http3; // NEW: HTTP/3 server infrastructure
+pub mod ephemeral; // Ephemeral self-signed certs for anonymous QUIC handshakes
 
 // Re-export main types
 pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
