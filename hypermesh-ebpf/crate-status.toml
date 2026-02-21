@@ -20,6 +20,9 @@ items = [
     "Orchestrator state storage — routing rules, asset hashes, PoS validation state persisted across sessions",
     "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
     "Unified intelligence + transport metrics collection",
+    "Multi-queue AF_XDP load balancing — RoundRobin/LeastLoaded/FlowHash strategies, QueueMetrics, MultiQueueManager orchestrator",
+    "Kernel-space PoS structural validation — difficulty (leading zero bits), algorithm indicator, TTL-based cache expiry; full crypto (FALCON-1024/Ed25519/ECDSA) validated in userspace cache model",
+    "Hardware offload detection and opportunistic NIC offload — driver detection (mlx5_core/nfp/bnxt_en), OffloadPolicy (Disabled/Opportunistic/Required), automatic fallback to native XDP",
 ]
 
 [features.in_development]
@@ -28,7 +31,4 @@ items = [
 
 [features.planned]
 items = [
-    "Kernel-space PoS validation at line rate",
-    "Hardware offload support (smart NICs)",
-    "Multi-queue AF_XDP load balancing",
 ]

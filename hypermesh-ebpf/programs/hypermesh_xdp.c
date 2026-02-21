@@ -137,6 +137,34 @@ struct {
     __type(value, __u32);
 } xsk_map SEC(".maps");
 
+/*
+ * PoS validation configuration - populated from userspace.
+ *
+ * Controls kernel-side structural checks that can reject obviously
+ * invalid packets at wire speed.  Cryptographic verification
+ * (FALCON-1024, Ed25519, ECDSA signatures) MUST remain in userspace
+ * because the BPF instruction set has no asymmetric crypto helpers.
+ *
+ * Layout (24 bytes, matches Rust KernelPosConfig serialization):
+ *   [0..4]   min_difficulty       (u32 LE)
+ *   [4..12]  max_timestamp_skew_ns(u64 LE)
+ *   [12..20] validation_ttl_ns    (u64 LE)
+ *   [20..24] enabled              (u32 LE, 1=enforce, 0=pass-through)
+ */
+struct pos_config {
+    __u32 min_difficulty;        /* Minimum leading zero bits required */
+    __u64 max_timestamp_skew_ns; /* Max clock skew (nanoseconds) */
+    __u64 validation_ttl_ns;     /* How long a cached validation is valid */
+    __u32 enabled;               /* 1=enforce kernel checks, 0=pass-through */
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, struct pos_config);
+} pos_config_map SEC(".maps");
+
 /* ============================================================
  * HyperMesh extension header definitions
  *
@@ -184,7 +212,56 @@ struct hmesh_matrix_header {
  * ============================================================ */
 
 /*
+ * count_leading_zero_bits_kernel - Count leading zero bits in a byte array.
+ *
+ * Walks up to 32 bytes (bounded for the BPF verifier). For each fully
+ * zero byte, adds 8.  For the first non-zero byte, uses a binary-search
+ * approach to count the leading zeros within that byte, then stops.
+ */
+static __always_inline __u32 count_leading_zero_bits_kernel(__u8 *hash, __u32 len)
+{
+    __u32 total = 0;
+    __u32 max = len < 32 ? len : 32; /* BPF verifier bound */
+
+    /* Explicit bound for BPF verifier - max 32 iterations */
+    for (__u32 i = 0; i < 32; i++) {
+        if (i >= max)
+            break;
+        __u8 byte = hash[i];
+        if (byte == 0) {
+            total += 8;
+            continue;
+        }
+        /* Count leading zeros in non-zero byte using binary search */
+        if (!(byte & 0xF0)) { total += 4; byte <<= 4; }
+        if (!(byte & 0xC0)) { total += 2; byte <<= 2; }
+        if (!(byte & 0x80)) { total += 1; }
+        break;
+    }
+    return total;
+}
+
+/*
+ * validate_pos_algorithm - Check that the algorithm indicator byte is
+ * one of the three supported signing algorithms.
+ *
+ * NOTE: This is a STRUCTURAL check only.  Actual signature verification
+ * (FALCON-1024 lattice sigs, Ed25519 curve ops, ECDSA point math)
+ * requires asymmetric crypto operations that the BPF instruction set
+ * does not support, so those MUST run in userspace.
+ *
+ * Returns 1 if valid, 0 otherwise.
+ */
+static __always_inline int validate_pos_algorithm(__u8 algorithm)
+{
+    return (algorithm == 0x01 ||  /* FALCON-1024 */
+            algorithm == 0x02 ||  /* Ed25519 */
+            algorithm == 0x03);   /* ECDSA */
+}
+
+/*
  * validate_pos_for_source - Check if source IP has a valid PoS entry
+ * (cache-only check without TTL enforcement).
  *
  * Returns 1 if validated, 0 otherwise.
  */
@@ -197,6 +274,82 @@ static __always_inline int validate_pos_for_source(__u8 src_ip[16])
         return 0; /* No entry -> not validated */
 
     return val->validated == 1;
+}
+
+/*
+ * validate_pos_enhanced - Enhanced PoS validation with structural checks.
+ *
+ * When kernel-side PoS validation is enabled (via pos_config_map), this
+ * function performs non-cryptographic structural checks before falling
+ * back to the cache-based lookup:
+ *
+ *   1. Algorithm indicator must be a known value (0x01/0x02/0x03)
+ *   2. PoW hash must meet minimum difficulty (leading zero bits)
+ *   3. Cached validation entry must not be stale (TTL check)
+ *
+ * Asymmetric crypto verification (FALCON-1024 lattice signatures,
+ * Ed25519 curve arithmetic, ECDSA point operations) is intentionally
+ * NOT performed here.  The BPF instruction set has no helpers for
+ * public-key cryptography, so full signature verification MUST remain
+ * in the Rust userspace validation layer (src/validation.rs).
+ *
+ * @src_ip:   16-byte IPv6 source address (key for pos_header_map)
+ * @pos_hdr:  Parsed PoS extension header, or NULL if packet does not
+ *            carry one (in which case only cache+TTL is checked)
+ *
+ * Returns 1 if the packet should be allowed, 0 if it should be dropped.
+ */
+static __always_inline int validate_pos_enhanced(
+    __u8 src_ip[16],
+    struct hmesh_pos_header *pos_hdr)
+{
+    __u32 config_key = 0;
+    struct pos_config *cfg = bpf_map_lookup_elem(&pos_config_map, &config_key);
+
+    /* If no config loaded or kernel checks disabled, fall back to
+     * the original cache-only check (backward compatible). */
+    if (!cfg || !cfg->enabled)
+        return validate_pos_for_source(src_ip);
+
+    /* ---------- Structural checks on the in-band PoS header ---------- */
+
+    if (pos_hdr) {
+        /* Check 1: Algorithm indicator must be a known value.
+         * Unknown algorithm bytes mean the packet is malformed or
+         * from an incompatible protocol version -> drop immediately. */
+        if (!validate_pos_algorithm(pos_hdr->algorithm))
+            return 0;
+
+        /* Check 2: PoW difficulty must meet the configured minimum.
+         * This catches trivially weak proofs (e.g., no work done)
+         * before they reach the expensive userspace crypto path. */
+        if (cfg->min_difficulty > 0) {
+            __u32 lz = count_leading_zero_bits_kernel(
+                pos_hdr->hash, 32);
+            if (lz < cfg->min_difficulty)
+                return 0;
+        }
+    }
+
+    /* ---------- Cache lookup with TTL enforcement ---------- */
+
+    struct pos_validation *val =
+        bpf_map_lookup_elem(&pos_header_map, src_ip);
+
+    if (val && val->validated == 1) {
+        /* Check 3: Cached validation must not be stale.
+         * last_validated is set by userspace using bpf_ktime_get_ns()
+         * (kernel monotonic clock) at the time of successful
+         * cryptographic verification. */
+        if (cfg->validation_ttl_ns > 0) {
+            __u64 now = bpf_ktime_get_ns();
+            if (now - val->last_validated > cfg->validation_ttl_ns)
+                return 0; /* Stale - force re-validation */
+        }
+        return 1; /* Valid and fresh */
+    }
+
+    return 0; /* No cached validation for this source */
 }
 
 /*
@@ -317,27 +470,43 @@ int hypermesh_xdp_filter(struct xdp_md *ctx)
                 policy_checked = 1;
                 void *ext_payload = payload + sizeof(struct hmesh_header);
 
-                /* --- PoS validation --- */
+                /* --- PoS validation (enhanced) ---
+                 *
+                 * When a PoS extension header is present in the packet,
+                 * perform kernel-side structural checks (algorithm,
+                 * difficulty) PLUS the cache lookup with TTL.
+                 *
+                 * When no PoS header is present, do a cache-only check
+                 * (with TTL if pos_config_map is populated).
+                 *
+                 * Full cryptographic verification (FALCON-1024 lattice
+                 * signatures, Ed25519/ECDSA point math) remains in
+                 * userspace -- the BPF instruction set has no asymmetric
+                 * crypto helpers.
+                 */
                 if (policy->requires_pos) {
                     if (hdr.type == HMESH_HDR_POS &&
                         ext_payload + sizeof(struct hmesh_pos_header) <= data_end) {
                         /*
-                         * Packet carries a PoS header; verify
-                         * the source IP has been validated in the
-                         * pos_header_map (populated by userspace
-                         * after full cryptographic verification).
+                         * Packet carries a PoS header - parse it and
+                         * run enhanced structural + cache validation.
                          */
-                        if (!validate_pos_for_source(conn.src_ip)) {
+                        struct hmesh_pos_header parsed_pos = {};
+                        __builtin_memcpy(&parsed_pos, ext_payload,
+                                         sizeof(struct hmesh_pos_header));
+
+                        if (!validate_pos_enhanced(conn.src_ip,
+                                                   &parsed_pos)) {
                             policy_passed = 0;
                         }
                     } else {
                         /*
-                         * Policy requires PoS but this packet
-                         * either has a different header type or
-                         * the PoS header is truncated.  Check if
-                         * the source has a prior validation.
+                         * Policy requires PoS but this packet either
+                         * has a different header type or the PoS header
+                         * is truncated.  Run cache+TTL check only
+                         * (NULL pos_hdr = no structural checks).
                          */
-                        if (!validate_pos_for_source(conn.src_ip)) {
+                        if (!validate_pos_enhanced(conn.src_ip, NULL)) {
                             policy_passed = 0;
                         }
                     }

@@ -26,7 +26,7 @@ export const crateStatuses: CrateStatus[] = [
         "Tensor math library (Vector3D, Matrix3x3, A*)",
         "Every-node blockchain (independent chains)",
         "Geospatial module (GPS conversion, clustering)",
-        "Asset adapters (CPU/GPU/Memory/Storage/Network/Container/Blockchain/Dns)",
+        "Asset adapters (CPU/GPU/Memory/Storage/Network/Container)",
         "Privacy allocation (PrivacyMode: Anonymous/Private/Public)",
         "Matrix persistence (WAL, snapshots, recovery)",
         "Proof of State four-proof validation",
@@ -87,21 +87,21 @@ export const crateStatuses: CrateStatus[] = [
         "Node status tracking in storage (settled count, fee earnings)",
         "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
         "Cross-chain bridge types (8 networks)",
-        "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)"
+        "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
+        "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
+        "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
+        "Caesar CLI — packet operations + node management (commands, executor, output modules)"
       ],
       "inDevelopment": [
-        "Banking provider STOQ migration",
-        "Caesar binary entry point — STOQ API server launcher (TODO: caesar/src/bin/caesar.rs)",
-        "Caesar SDK — extract UPI traits + examples into reusable crate (STUB: traits exist, needs packaging)",
-        "Caesar CLI — packet operations + node management (TODO: adapt blockmatrix CLI pattern with clap)",
-        "caesar.hypermesh.online gateway routing rule (TODO: add domain rule to gateway crate)"
+        "Banking provider STOQ migration (STUB: providers return pending-migration errors, tests fixed)",
+        "Caesar SDK — extract UPI traits + examples into reusable crate (STUB: traits exist, needs packaging)"
       ],
       "planned": [
         "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
         "Fiat UPI payment processing (blocked by: HTTP client decision — reqwest vs STOQ outbound + OAuth2 flows + PSD2 compliance)"
       ]
     },
-    "completion": 81
+    "completion": 89
   },
   {
     "id": "catalog",
@@ -110,7 +110,7 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Asset package types (PackageMetadata) and registry metadata",
+        "Asset package types and metadata",
         "Asset registry with publish/install/search",
         "Template generation framework",
         "Asset validation pipeline",
@@ -119,19 +119,19 @@ export const crateStatuses: CrateStatus[] = [
         "Scripting engine (syntax validation)",
         "STOQ transport for distribution",
         "Content-addressed storage (DHT)",
-        "TrustChain security integration (FALCON-1024 cert lifecycle)"
+        "TrustChain security integration (FALCON-1024 cert lifecycle)",
+        "Peer-to-peer package sharing",
+        "Proof of State validation for packages",
+        "Asset SDK (clean public API facade)"
       ],
       "inDevelopment": [],
       "planned": [
         "Full asset marketplace",
-        "Peer-to-peer package sharing",
-        "Consensus proof validation for packages",
-        "Asset SDK for third-party developers (publish, discover, integrate)",
         "Asset transaction integration with Caesar settlement pipeline",
         "catalog.hypermesh.online clearnet registry access"
       ]
     },
-    "completion": 63
+    "completion": 81
   },
   {
     "id": "engauge",
@@ -145,48 +145,45 @@ export const crateStatuses: CrateStatus[] = [
         "KYC compliance checker (self-sovereign attestation on Device chain, tier-based levels)",
         "Organic vs speculative traffic detection (pattern-based aggregate flow analysis, whitepaper §16.5)",
         "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio feedback)",
-        "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)"
+        "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)",
+        "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend, AggregatedCapacity)"
       ],
       "inDevelopment": [],
       "planned": [
-        "Real-time metrics streaming via STOQ transport",
-        "Multi-epoch capacity aggregation and trending"
+        "Real-time metrics streaming via STOQ transport (blocked by: STOQ API streaming subscription support)"
       ]
     },
-    "completion": 75
+    "completion": 88
   },
   {
     "id": "gateway",
     "name": "Gateway",
-    "description": "HTTP/3 + STOQ gateway for *.hypermesh.online domains and federated entry points",
-    "phase": "alpha",
+    "description": "HTTP/3 gateway for *.hypermesh.online domains and federated entry points",
+    "phase": "planning",
     "features": {
       "working": [
         "QUIC/HTTP3 server setup (quinn + h3)",
-        "TLS certificate loading (PEM/DER/TrustChain/SelfSigned)",
-        "Connection pool with health checks (HTTP/3 + STOQ)",
-        "Router with path/domain/scope-based backend selection",
+        "TLS certificate loading (PEM/DER)",
+        "Connection pool with health checks",
+        "Router with path-based backend selection",
         "Circuit breaker and retry logic",
-        "CORS middleware with origin matching",
-        "Request ID and structured logging",
-        "STOQ protocol bridge (dual-listener)",
-        "TrustChain CA certificate integration",
-        "PoS authentication and bootstrap tokens",
-        "Cross-scope routing (Device/Network)",
-        "Federation bridge (cross-network)",
-        "Rate limiting and DDoS protection",
-        "Load balancing (round-robin/least-connections/health-aware)",
-        "Multi-domain SNI routing (*.hypermesh.online)",
-        "Clearnet bootstrap gateway (HTTP/3 to STOQ transition)",
-        "Inbound proxy (clearnet to HyperMesh dashboards)",
-        "Outbound proxy (HyperMesh to clearnet HTTP/3)",
-        "Privacy-mode-aware forwarding",
-        "Comprehensive health checks"
+        "CORS middleware and request logging"
       ],
-      "inDevelopment": [],
-      "planned": []
+      "inDevelopment": [
+        "Request handling (h3 API fix needed)",
+        "HTTP/3 backend proxying"
+      ],
+      "planned": [
+        "Federated gateway mesh",
+        "STOQ protocol bridge",
+        "Load balancing across backends",
+        "Rate limiting and DDoS protection",
+        "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
+        "REST and GraphQL API layer for clearnet integration",
+        "API documentation (OpenAPI/GraphQL schema)"
+      ]
     },
-    "completion": 100
+    "completion": 40
   },
   {
     "id": "hypermesh-ebpf",
@@ -208,16 +205,15 @@ export const crateStatuses: CrateStatus[] = [
         "Privacy tier eBPF enforcement with per-policy flag control",
         "Orchestrator state storage — routing rules, asset hashes, PoS validation state persisted across sessions",
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
-        "Unified intelligence + transport metrics collection"
+        "Unified intelligence + transport metrics collection",
+        "Multi-queue AF_XDP load balancing — RoundRobin/LeastLoaded/FlowHash strategies, QueueMetrics, MultiQueueManager orchestrator",
+        "Kernel-space PoS structural validation — difficulty (leading zero bits), algorithm indicator, TTL-based cache expiry; full crypto (FALCON-1024/Ed25519/ECDSA) validated in userspace cache model",
+        "Hardware offload detection and opportunistic NIC offload — driver detection (mlx5_core/nfp/bnxt_en), OffloadPolicy (Disabled/Opportunistic/Required), automatic fallback to native XDP"
       ],
       "inDevelopment": [],
-      "planned": [
-        "Kernel-space PoS validation at line rate",
-        "Hardware offload support (smart NICs)",
-        "Multi-queue AF_XDP load balancing"
-      ]
+      "planned": []
     },
-    "completion": 82
+    "completion": 100
   },
   {
     "id": "hypermesh-lib",

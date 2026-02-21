@@ -29,6 +29,7 @@
 pub mod capabilities;
 pub mod xdp;
 pub mod af_xdp;
+pub mod queue_balancer;
 pub mod loader;
 pub mod hooks;
 pub mod policy_maps;
@@ -42,9 +43,13 @@ pub mod metrics;
 pub use aya;
 
 // Re-export key types for convenience
-pub use capabilities::EbpfCapabilities;
-pub use xdp::{XdpManager, PacketDecision, FilterAction, XdpAttachMode, XdpStats, XdpFilterConfig};
+pub use capabilities::{EbpfCapabilities, NicCapabilities};
+pub use xdp::{XdpManager, PacketDecision, FilterAction, XdpAttachMode, XdpStats, XdpFilterConfig, OffloadPolicy, KernelPosConfig};
 pub use af_xdp::{AfXdpManager, AfXdpSocket, AfXdpStats, UmemConfig, RingConfig};
+pub use queue_balancer::{
+    QueueBalancer, PacketHint, QueueMetrics, MultiQueueManager,
+    RoundRobinBalancer, LeastLoadedBalancer, FlowHashBalancer,
+};
 pub use loader::{EbpfLoader, ProgramType};
 pub use hooks::{
     CertificateValidator, PacketValidator, ExtensionValidator,
@@ -231,6 +236,19 @@ impl HyperMeshEbpf {
         &self.caps
     }
 
+    /// Detect NIC capabilities for an interface
+    pub fn detect_nic_capabilities(&mut self, interface: &str) -> NicCapabilities {
+        self.caps.detect_nic(interface);
+        self.caps.nic_capabilities.clone().unwrap_or_default()
+    }
+
+    /// Set the hardware offload policy
+    pub fn set_offload_policy(&mut self, policy: OffloadPolicy) {
+        if let Some(ref mut xdp) = self.xdp_manager {
+            xdp.set_offload_policy(policy);
+        }
+    }
+
     // -------------------------------------------------------------------
     // Configuration (called by blockmatrix/trustchain)
     // -------------------------------------------------------------------
@@ -330,8 +348,11 @@ impl HyperMeshEbpf {
     /// Set PoS validation status for a content hash.
     ///
     /// Stores the hash -> validation status for userspace lookups.
-    /// In production with kernel-attach, this would also update a BPF
-    /// hash map for kernel-level PoS validation.
+    /// In production with kernel-attach, this also updates the BPF
+    /// `pos_header_map` -- the `last_validated` field is set to the
+    /// current value of `bpf_ktime_get_ns()` (kernel monotonic clock),
+    /// which the XDP program uses for TTL enforcement when
+    /// `pos_config_map.validation_ttl_ns > 0`.
     pub fn set_pos_validation(
         &self,
         hash: ContentHash,
@@ -347,14 +368,45 @@ impl HyperMeshEbpf {
         #[cfg(feature = "kernel-attach")]
         {
             tracing::debug!(
-                "PoS validation for {} synced, BPF pos_header_map entry prepared",
+                "PoS validation for {} synced, BPF pos_header_map entry prepared \
+                 (last_validated = current bpf_ktime_get_ns())",
                 hex::encode(&hash.0[..8])
             );
-            // BPF map key: content hash [u8; 32]
-            // BPF map value: valid u32 LE (0 or 1)
+            // BPF map key: source IPv6 address [u8; 16]
+            // BPF map value: struct pos_validation {
+            //   algorithm: u8, difficulty: u32, validated: u8,
+            //   last_validated: u64  <-- set to bpf_ktime_get_ns() at write time
+            // }
             // Actual map write happens during next sync_to_kernel() cycle
         }
 
+        Ok(())
+    }
+
+    /// Set kernel-side PoS validation configuration.
+    ///
+    /// Configures the non-cryptographic structural checks that the XDP
+    /// program applies at wire speed (algorithm validation, PoW difficulty,
+    /// cache TTL).  Full asymmetric crypto verification remains in userspace.
+    ///
+    /// Delegates to `XdpManager::set_kernel_pos_config()` when the XDP
+    /// manager is attached.  Returns Ok if no XDP manager is present.
+    pub fn set_kernel_pos_config(
+        &mut self,
+        config: &KernelPosConfig,
+    ) -> Result<(), EbpfError> {
+        if let Some(ref mut xdp) = self.xdp_manager {
+            xdp.set_kernel_pos_config(config)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
+        } else {
+            tracing::debug!(
+                "No XDP manager attached; kernel PoS config not synced \
+                 (difficulty={}, ttl={}ns, enabled={})",
+                config.min_difficulty,
+                config.validation_ttl_ns,
+                config.enabled
+            );
+        }
         Ok(())
     }
 
@@ -426,6 +478,26 @@ impl HyperMeshEbpf {
         self.af_xdp_manager
             .create_socket(interface, queue_id)
             .map_err(|e| EbpfError::AfXdp(e.to_string()))
+    }
+
+    /// Create a multi-queue AF_XDP setup with load balancing.
+    ///
+    /// Allocates `queue_count` AF_XDP sockets on `interface` and wraps
+    /// them in a [`MultiQueueManager`] that uses `balancer` to steer
+    /// packets across queues.
+    pub fn create_multi_queue(
+        &mut self,
+        interface: &str,
+        queue_count: u32,
+        balancer: Box<dyn QueueBalancer>,
+    ) -> Result<MultiQueueManager, EbpfError> {
+        MultiQueueManager::new(
+            &mut self.af_xdp_manager,
+            balancer,
+            interface,
+            queue_count,
+        )
+        .map_err(|e| EbpfError::AfXdp(e.to_string()))
     }
 
     // -------------------------------------------------------------------
@@ -773,5 +845,56 @@ mod tests {
         ebpf.set_pos_validation(hash, false).expect("test: set invalid");
         assert_eq!(ebpf.get_pos_validation(&hash), Some(false));
         assert_eq!(ebpf.pos_validation_count(), 1);
+    }
+
+    // -------------------------------------------------------------------
+    // NIC capabilities and offload policy tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_nic_capabilities() {
+        let mut ebpf = HyperMeshEbpf::default();
+        assert!(ebpf.capabilities().nic_capabilities.is_none());
+
+        let nic = ebpf.detect_nic_capabilities("lo");
+        assert_eq!(nic.interface, "lo");
+        assert!(!nic.supports_xdp_offload);
+
+        // Should be cached in capabilities now
+        assert!(ebpf.capabilities().nic_capabilities.is_some());
+    }
+
+    #[test]
+    fn test_set_offload_policy_without_xdp() {
+        // set_offload_policy is a no-op if no XDP manager is attached
+        let mut ebpf = HyperMeshEbpf::default();
+        ebpf.set_offload_policy(OffloadPolicy::Required);
+        // Should not panic or error
+    }
+
+    // -------------------------------------------------------------------
+    // KernelPosConfig orchestrator tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_set_kernel_pos_config_no_xdp() {
+        // Without an XDP manager, set_kernel_pos_config should succeed
+        let mut ebpf = HyperMeshEbpf::default();
+        let cfg = KernelPosConfig::default();
+        let result = ebpf.set_kernel_pos_config(&cfg);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_set_kernel_pos_config_custom_values() {
+        let mut ebpf = HyperMeshEbpf::default();
+        let cfg = KernelPosConfig {
+            min_difficulty: 16,
+            max_timestamp_skew_ns: 10 * 60 * 1_000_000_000,
+            validation_ttl_ns: 30 * 60 * 1_000_000_000,
+            enabled: false,
+        };
+        let result = ebpf.set_kernel_pos_config(&cfg);
+        assert!(result.is_ok());
     }
 }

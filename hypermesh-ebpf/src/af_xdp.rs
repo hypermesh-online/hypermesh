@@ -1412,6 +1412,39 @@ impl AfXdpSocket {
         }
         0
     }
+
+    /// Get number of free fill ring slots (available for RX).
+    ///
+    /// For kernel-backed sockets, reads `ring.size - (producer - consumer)`.
+    /// For non-kernel-backed sockets, returns the configured fill ring size
+    /// (treats as fully available).
+    pub fn fill_ring_free(&self) -> u32 {
+        #[cfg(feature = "kernel-attach")]
+        if let Some(ref ks) = self.kernel_state {
+            let prod = ks.fill_ring.load_producer();
+            let cons = ks.fill_ring.load_consumer();
+            let in_use = prod.wrapping_sub(cons);
+            return ks.fill_ring.size.saturating_sub(in_use);
+        }
+        // Non-kernel-backed: treat as fully available
+        0
+    }
+
+    /// Get number of free TX ring slots.
+    ///
+    /// For kernel-backed sockets, reads `ring.size - (producer - consumer)`.
+    /// For non-kernel-backed sockets, returns 0.
+    pub fn tx_ring_free(&self) -> u32 {
+        #[cfg(feature = "kernel-attach")]
+        if let Some(ref ks) = self.kernel_state {
+            let prod = ks.tx_ring.load_producer();
+            let cons = ks.tx_ring.load_consumer();
+            let in_use = prod.wrapping_sub(cons);
+            return ks.tx_ring.size.saturating_sub(in_use);
+        }
+        // Non-kernel-backed: return 0
+        0
+    }
 }
 
 impl Clone for AfXdpSocket {

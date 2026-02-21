@@ -11,17 +11,105 @@
 //! This is THE single XDP manager for the entire HyperMesh stack.
 //! STOQ and blockmatrix are consumers via the `HyperMeshEbpf` orchestrator.
 
-use anyhow::Result;
-#[cfg(feature = "kernel-attach")]
-use anyhow::anyhow;
+use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 
+use crate::capabilities::NicCapabilities;
 use crate::policy_maps::PolicyManager;
 use crate::hypermesh_headers::*;
 use crate::validation::{ProofOfStateValidator, FastValidationResult};
 use hypermesh_lib::MatrixPosition;
+
+// -----------------------------------------------------------------------
+// Kernel-side PoS configuration
+// -----------------------------------------------------------------------
+
+/// Configuration for kernel-side PoS structural validation.
+///
+/// Synced to the `pos_config_map` BPF array map (index 0).
+///
+/// These checks are non-cryptographic -- they reject obviously invalid
+/// packets at wire speed (wrong algorithm byte, insufficient PoW
+/// difficulty, stale cache entries).  Full asymmetric crypto
+/// verification (FALCON-1024, Ed25519, ECDSA) MUST remain in
+/// userspace because the BPF instruction set has no such helpers.
+///
+/// Serialization layout (24 bytes, little-endian, matches C `struct pos_config`):
+///   `[0..4]`   min_difficulty        (u32 LE)
+///   `[4..12]`  max_timestamp_skew_ns (u64 LE)
+///   `[12..20]` validation_ttl_ns     (u64 LE)
+///   `[20..24]` enabled               (u32 LE, 1 or 0)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelPosConfig {
+    /// Minimum leading zero bits for PoW difficulty (0 = disabled)
+    pub min_difficulty: u32,
+    /// Maximum clock skew tolerance in nanoseconds (0 = disabled).
+    /// Stored in the BPF map for future use; current kernel code
+    /// uses `validation_ttl_ns` for staleness enforcement.
+    pub max_timestamp_skew_ns: u64,
+    /// How long a cached PoS validation is considered valid (ns).
+    /// 0 means cached entries never expire (infinite TTL).
+    pub validation_ttl_ns: u64,
+    /// Whether kernel-side PoS structural checks are enabled.
+    /// When false, the XDP program falls back to cache-only lookup.
+    pub enabled: bool,
+}
+
+impl Default for KernelPosConfig {
+    fn default() -> Self {
+        Self {
+            min_difficulty: 8, // Match userspace default (first byte must be 0x00)
+            max_timestamp_skew_ns: 5 * 60 * 1_000_000_000, // 5 minutes
+            validation_ttl_ns: 60 * 60 * 1_000_000_000,    // 1 hour
+            enabled: true,
+        }
+    }
+}
+
+impl KernelPosConfig {
+    /// Serialize to 24 bytes matching the C `struct pos_config` layout.
+    ///
+    /// Layout (all little-endian):
+    ///   `[0..4]`   min_difficulty        u32
+    ///   `[4..12]`  max_timestamp_skew_ns u64
+    ///   `[12..20]` validation_ttl_ns     u64
+    ///   `[20..24]` enabled               u32
+    pub fn to_bytes(&self) -> [u8; 24] {
+        let mut buf = [0u8; 24];
+        buf[0..4].copy_from_slice(&self.min_difficulty.to_le_bytes());
+        buf[4..12].copy_from_slice(&self.max_timestamp_skew_ns.to_le_bytes());
+        buf[12..20].copy_from_slice(&self.validation_ttl_ns.to_le_bytes());
+        buf[20..24].copy_from_slice(&(self.enabled as u32).to_le_bytes());
+        buf
+    }
+
+    /// Deserialize from 24 bytes (C `struct pos_config` layout).
+    ///
+    /// Returns `None` if the slice is too short.
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < 24 {
+            return None;
+        }
+        Some(Self {
+            min_difficulty: u32::from_le_bytes([
+                bytes[0], bytes[1], bytes[2], bytes[3],
+            ]),
+            max_timestamp_skew_ns: u64::from_le_bytes([
+                bytes[4], bytes[5], bytes[6], bytes[7],
+                bytes[8], bytes[9], bytes[10], bytes[11],
+            ]),
+            validation_ttl_ns: u64::from_le_bytes([
+                bytes[12], bytes[13], bytes[14], bytes[15],
+                bytes[16], bytes[17], bytes[18], bytes[19],
+            ]),
+            enabled: u32::from_le_bytes([
+                bytes[20], bytes[21], bytes[22], bytes[23],
+            ]) != 0,
+        })
+    }
+}
 
 // -----------------------------------------------------------------------
 // Packet decision types (the three execution paths)
@@ -68,6 +156,23 @@ pub enum XdpAttachMode {
     Generic,
     /// Offloaded to NIC hardware (if supported)
     Offload,
+}
+
+/// Policy for handling XDP hardware offload
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OffloadPolicy {
+    /// Never attempt hardware offload (default)
+    Disabled,
+    /// Try hardware offload, fall back to native XDP if unavailable
+    Opportunistic,
+    /// Require hardware offload, fail if NIC doesn't support it
+    Required,
+}
+
+impl Default for OffloadPolicy {
+    fn default() -> Self {
+        Self::Disabled
+    }
 }
 
 /// XDP program statistics aggregated from kernel maps
@@ -131,6 +236,8 @@ pub struct XdpManager {
     policy_manager: PolicyManager,
     /// Proof of State fast validator
     pos_validator: ProofOfStateValidator,
+    /// Hardware offload policy
+    offload_policy: OffloadPolicy,
     /// Loaded BPF handle (only present when kernel-attach feature enabled)
     #[cfg(feature = "kernel-attach")]
     bpf: Option<aya::Bpf>,
@@ -153,6 +260,7 @@ impl XdpManager {
             available,
             policy_manager,
             pos_validator: ProofOfStateValidator::default(),
+            offload_policy: OffloadPolicy::Disabled,
             #[cfg(feature = "kernel-attach")]
             bpf: None,
         })
@@ -193,23 +301,66 @@ impl XdpManager {
         self.attach_with_mode(interface, XdpAttachMode::Generic)
     }
 
+    /// Set the hardware offload policy
+    pub fn set_offload_policy(&mut self, policy: OffloadPolicy) {
+        self.offload_policy = policy;
+    }
+
     /// Attach with a specific XDP mode (Native/Generic/Offload)
+    ///
+    /// When mode is `Offload`, detects NIC capabilities and resolves the
+    /// effective mode based on the current `OffloadPolicy`:
+    /// - NIC supports offload: proceed with HW_MODE
+    /// - NIC does not support offload + `Required`: return error
+    /// - NIC does not support offload + `Opportunistic`/`Disabled`: fall back to Native
     pub fn attach_with_mode(
         &mut self,
         interface: &str,
         mode: XdpAttachMode,
     ) -> Result<()> {
+        let effective_mode = match mode {
+            XdpAttachMode::Offload => {
+                let nic = NicCapabilities::detect(interface);
+                if nic.supports_xdp_offload {
+                    tracing::info!(
+                        "NIC {} (driver: {}) supports XDP offload",
+                        interface, nic.driver_name
+                    );
+                    XdpAttachMode::Offload
+                } else {
+                    match self.offload_policy {
+                        OffloadPolicy::Required => {
+                            return Err(anyhow!(
+                                "NIC {} (driver: {}) does not support XDP offload and policy is Required",
+                                interface,
+                                if nic.driver_name.is_empty() { "unknown" } else { &nic.driver_name }
+                            ));
+                        }
+                        _ => {
+                            tracing::info!(
+                                "NIC {} (driver: {}) does not support XDP offload, falling back to native",
+                                interface,
+                                if nic.driver_name.is_empty() { "unknown" } else { &nic.driver_name }
+                            );
+                            XdpAttachMode::Native
+                        }
+                    }
+                }
+            }
+            other => other,
+        };
+
         #[cfg(feature = "kernel-attach")]
         {
             if self.available {
-                self.try_kernel_attach(interface, mode)?;
+                self.try_kernel_attach(interface, effective_mode)?;
             }
         }
 
         // Track attachment regardless of kernel/userspace mode
         let prog = AttachedProgram {
             _interface: interface.to_string(),
-            _attach_mode: mode,
+            _attach_mode: effective_mode,
         };
         self.attached.write().insert(interface.to_string(), prog);
 
@@ -650,6 +801,60 @@ impl XdpManager {
     /// Get policy manager reference
     pub fn policy_manager(&self) -> &PolicyManager {
         &self.policy_manager
+    }
+
+    // -------------------------------------------------------------------
+    // Kernel PoS config
+    // -------------------------------------------------------------------
+
+    /// Set kernel-side PoS validation configuration.
+    ///
+    /// With `kernel-attach`: serializes the config to a 24-byte blob and
+    /// writes it to the `pos_config_map` BPF array map at index 0.
+    ///
+    /// Without `kernel-attach`: logs the config and returns Ok.
+    #[allow(unused_variables)]
+    pub fn set_kernel_pos_config(&mut self, config: &KernelPosConfig) -> Result<()> {
+        #[cfg(feature = "kernel-attach")]
+        {
+            if let Some(ref mut bpf) = self.bpf {
+                use aya::maps::Array;
+
+                if let Some(map) = bpf.map_mut("pos_config_map") {
+                    match Array::<_, [u8; 24]>::try_from(map) {
+                        Ok(mut array) => {
+                            let bytes = config.to_bytes();
+                            array.set(0, &bytes, 0)
+                                .map_err(|e| anyhow!(
+                                    "Failed to write pos_config_map: {}", e
+                                ))?;
+                            tracing::info!(
+                                "Kernel PoS config synced: difficulty={}, ttl={}ns, enabled={}",
+                                config.min_difficulty,
+                                config.validation_ttl_ns,
+                                config.enabled
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to access pos_config_map: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(feature = "kernel-attach"))]
+        {
+            tracing::debug!(
+                "kernel-attach not enabled; kernel PoS config stored locally \
+                 (difficulty={}, ttl={}ns, enabled={})",
+                config.min_difficulty,
+                config.validation_ttl_ns,
+                config.enabled
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -1106,5 +1311,178 @@ mod tests {
         packet.extend_from_slice(&valid_asset_hash_bytes());
         let decision = mgr.validate_packet(0, &packet);
         assert_eq!(decision, PacketDecision::Pass);
+    }
+
+    // -------------------------------------------------------------------
+    // Offload policy tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_offload_policy_default() {
+        assert_eq!(OffloadPolicy::default(), OffloadPolicy::Disabled);
+    }
+
+    #[test]
+    fn test_offload_policy_set() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+        assert_eq!(mgr.offload_policy, OffloadPolicy::Disabled);
+
+        mgr.set_offload_policy(OffloadPolicy::Opportunistic);
+        assert_eq!(mgr.offload_policy, OffloadPolicy::Opportunistic);
+
+        mgr.set_offload_policy(OffloadPolicy::Required);
+        assert_eq!(mgr.offload_policy, OffloadPolicy::Required);
+    }
+
+    #[test]
+    fn test_attach_offload_falls_back_to_native() {
+        // loopback does not support XDP offload, so Offload mode should
+        // fall back to Native when policy is Disabled (default)
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let result = mgr.attach_with_mode("lo", XdpAttachMode::Offload);
+        assert!(result.is_ok(), "test: offload on lo should fall back, not error");
+
+        // Verify attachment was tracked
+        let attached = mgr.attached.read();
+        assert!(attached.contains_key("lo"));
+    }
+
+    #[test]
+    fn test_attach_offload_required_fails_on_unsupported_nic() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+        mgr.set_offload_policy(OffloadPolicy::Required);
+
+        // loopback does not support XDP offload
+        let result = mgr.attach_with_mode("lo", XdpAttachMode::Offload);
+        assert!(result.is_err(), "test: required offload on lo should fail");
+
+        let err_msg = result.expect_err("test: should be error").to_string();
+        assert!(
+            err_msg.contains("does not support XDP offload"),
+            "test: error should mention offload unsupported, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_attach_offload_opportunistic_falls_back() {
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+        mgr.set_offload_policy(OffloadPolicy::Opportunistic);
+
+        // loopback does not support offload - should succeed with fallback
+        let result = mgr.attach_with_mode("lo", XdpAttachMode::Offload);
+        assert!(result.is_ok(), "test: opportunistic offload on lo should fall back");
+    }
+
+    #[test]
+    fn test_attach_native_mode_unaffected_by_offload_policy() {
+        // Native and Generic modes should not be affected by offload policy
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+        mgr.set_offload_policy(OffloadPolicy::Required);
+
+        let result = mgr.attach_with_mode("lo", XdpAttachMode::Native);
+        assert!(result.is_ok(), "test: native mode should not check offload");
+
+        let _ = mgr.detach("lo");
+
+        let result = mgr.attach_with_mode("lo", XdpAttachMode::Generic);
+        assert!(result.is_ok(), "test: generic mode should not check offload");
+    }
+
+    // -------------------------------------------------------------------
+    // KernelPosConfig tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_kernel_pos_config_default() {
+        let cfg = KernelPosConfig::default();
+        assert_eq!(cfg.min_difficulty, 8);
+        assert_eq!(cfg.max_timestamp_skew_ns, 5 * 60 * 1_000_000_000);
+        assert_eq!(cfg.validation_ttl_ns, 60 * 60 * 1_000_000_000);
+        assert!(cfg.enabled);
+    }
+
+    #[test]
+    fn test_set_kernel_pos_config_no_xdp() {
+        // Calling set_kernel_pos_config without XDP attached should succeed
+        let pm = PolicyManager::new().expect("test: create policy manager");
+        let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
+
+        let cfg = KernelPosConfig::default();
+        let result = mgr.set_kernel_pos_config(&cfg);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_kernel_pos_config_serialization() {
+        let cfg = KernelPosConfig {
+            min_difficulty: 16,
+            max_timestamp_skew_ns: 300_000_000_000, // 5 min in ns
+            validation_ttl_ns: 3_600_000_000_000,   // 1 hour in ns
+            enabled: true,
+        };
+
+        let bytes = cfg.to_bytes();
+        assert_eq!(bytes.len(), 24);
+
+        // Verify field layout
+        let difficulty = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        assert_eq!(difficulty, 16);
+
+        let skew = u64::from_le_bytes([
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+        ]);
+        assert_eq!(skew, 300_000_000_000);
+
+        let ttl = u64::from_le_bytes([
+            bytes[12], bytes[13], bytes[14], bytes[15],
+            bytes[16], bytes[17], bytes[18], bytes[19],
+        ]);
+        assert_eq!(ttl, 3_600_000_000_000);
+
+        let enabled = u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+        assert_eq!(enabled, 1);
+    }
+
+    #[test]
+    fn test_kernel_pos_config_serialization_roundtrip() {
+        let original = KernelPosConfig {
+            min_difficulty: 24,
+            max_timestamp_skew_ns: 42_000_000,
+            validation_ttl_ns: 99_000_000_000,
+            enabled: false,
+        };
+
+        let bytes = original.to_bytes();
+        let decoded = KernelPosConfig::from_bytes(&bytes)
+            .expect("test: from_bytes should succeed with 24 bytes");
+
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn test_kernel_pos_config_from_bytes_too_short() {
+        let short = [0u8; 23];
+        assert!(KernelPosConfig::from_bytes(&short).is_none());
+    }
+
+    #[test]
+    fn test_kernel_pos_config_disabled_serialization() {
+        let cfg = KernelPosConfig {
+            min_difficulty: 0,
+            max_timestamp_skew_ns: 0,
+            validation_ttl_ns: 0,
+            enabled: false,
+        };
+        let bytes = cfg.to_bytes();
+        // All bytes should be zero
+        assert_eq!(bytes, [0u8; 24]);
     }
 }
