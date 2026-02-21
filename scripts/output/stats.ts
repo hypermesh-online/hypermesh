@@ -18,8 +18,8 @@ export const crateStats: CrateStats[] = [
   {
     "id": "caesar",
     "files": 32,
-    "linesOfCode": 9218,
-    "testCount": 162
+    "linesOfCode": 9320,
+    "testCount": 163
   },
   {
     "id": "catalog",
@@ -54,7 +54,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "trustchain",
     "files": 89,
-    "linesOfCode": 33891,
+    "linesOfCode": 33879,
     "testCount": 90
   },
   {
@@ -67,7 +67,7 @@ export const crateStats: CrateStats[] = [
 
 export const totalStats = {
   "totalFiles": 807,
-  "totalLines": 278331,
-  "totalTests": 1409,
+  "totalLines": 278421,
+  "totalTests": 1410,
   "crateCount": 9
 };
