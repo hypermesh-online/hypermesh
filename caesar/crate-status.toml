@@ -45,10 +45,10 @@ items = [
 
 [features.planned]
 items = [
-    "Live STOQ API with real packet routing end-to-end",
-    "Caesar SDK for third-party payment integration",
-    "Caesar CLI for packet operations and node management",
-    "caesar.hypermesh.online clearnet gateway",
-    "Live multi-chain UPI bridge (BTC/ETH/SOL)",
-    "Fiat UPI payment processing",
+    "Live STOQ API with real packet routing end-to-end (blocked by: STOQ transport + network-layer candidate metrics)",
+    "Caesar SDK for third-party payment integration (blocked by: stable public API surface)",
+    "Caesar CLI for packet operations and node management (blocked by: clap integration + stable protocol)",
+    "caesar.hypermesh.online clearnet gateway (blocked by: gateway crate wiring + deployment infra)",
+    "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: external chain API integrations)",
+    "Fiat UPI payment processing (blocked by: payment processor partnerships — Stripe/Plaid/Wire)",
 ]
