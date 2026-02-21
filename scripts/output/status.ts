@@ -172,14 +172,13 @@ export const crateStatuses: CrateStatus[] = [
         "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases, BlockMatrix asset integration)",
         "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
         "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
-        "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)"
+        "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
+        "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)"
       ],
       "inDevelopment": [],
-      "planned": [
-        "STOQ METRICS frame type integration (blocked by: STOQ custom frame type registry)"
-      ]
+      "planned": []
     },
-    "completion": 94
+    "completion": 100
   },
   {
     "id": "gateway",
@@ -322,7 +321,8 @@ export const crateStatuses: CrateStatus[] = [
         "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
         "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
         "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
-        "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge"
+        "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
+        "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads"
       ],
       "inDevelopment": [],
       "planned": []
