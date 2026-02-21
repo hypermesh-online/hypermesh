@@ -5,7 +5,6 @@
 // Example usage of HTTP/3 Test Client
 // This example demonstrates how to use the test client for basic testing
 
-use std::path::Path;
 use std::env;
 
 // Add the tests directory to the module path

@@ -39,6 +39,7 @@ fn create_test_plan(shard_count: usize, replicas_per_shard: usize) -> RetrievalP
         encryption: "aes-256-gcm".to_string(),
         content_type: "application/octet-stream".to_string(),
         created_at: chrono::Utc::now().timestamp(),
+        encrypted_blob_size: 0,
     };
 
     RetrievalPlan::new(content_hash, shard_map, metadata)

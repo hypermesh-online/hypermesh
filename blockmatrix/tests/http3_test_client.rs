@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use bytes::{Bytes, Buf};
 use h3::client::SendRequest;
 use h3_quinn::quinn;
-use http::{HeaderMap, Method, Request, Response, StatusCode};
+use http::{HeaderMap, Method, Request, StatusCode};
 use quinn::{ClientConfig, Endpoint, TransportConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -133,6 +133,7 @@ impl Default for TestConfig {
 
 /// Result of an HTTP/3 test request
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct TestResult {
     pub status: StatusCode,
     pub headers: HeaderMap,
@@ -229,6 +230,7 @@ impl Http3TestClient {
     }
 
     /// Execute a POST request
+    #[allow(dead_code)]
     pub async fn post(&self, path: &str, body: &[u8]) -> Result<TestResult> {
         self.request(Method::POST, path, Some(body), None).await
     }
@@ -520,6 +522,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
 }
 
 // Test assertions module
+#[allow(dead_code)]
 pub mod assertions {
     use super::*;
 

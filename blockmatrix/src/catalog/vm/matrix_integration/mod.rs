@@ -28,14 +28,12 @@ pub use coordinator::EntityAssetCoordinator;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::{ConsensusRequirements, VMConfig, ConsensusProofVM};
-    use super::super::consensus::ConsensusVM;
+    use super::super::{VMConfig, ConsensusProofVM};
     use crate::assets::matrix_blockchain::{
         MatrixBlockchainManager, EntityType, PrivacyPolicyConfig,
     };
     use std::sync::Arc;
     use std::collections::HashMap;
-    use std::time::Duration;
     use super::super::PrivacyMode;
 
     #[tokio::test]

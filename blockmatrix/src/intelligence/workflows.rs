@@ -558,11 +558,12 @@ mod tests {
             Ok(ProcessedAsset {
                 asset_id: asset.id,
                 shards: vec![],
-                encryption_key: crate::assets::pipeline::ShardKey {
-                    key: vec![0u8; 32],
-                    nonce: vec![0u8; 12],
-                    shard_index: 0,
-                },
+                decryption_key: crate::assets::pipeline::DecryptionKey::Aes(
+                    crate::assets::pipeline::AesKey {
+                        key: vec![0u8; 32],
+                        nonce: vec![0u8; 12],
+                    },
+                ),
                 distributed: DistributedAsset {
                     asset_id,
                     placements: vec![],

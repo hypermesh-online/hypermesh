@@ -381,7 +381,7 @@ async fn test_government_scenario_fully_federated() {
 #[tokio::test]
 async fn test_privacy_boundary_enforcement() {
     // Test privacy boundaries between public and federated pools
-    let (pool_manager, validator, cache, _registrar, _resolver) = setup_dns_system().await;
+    let (pool_manager, _validator, _cache, _registrar, _resolver) = setup_dns_system().await;
 
     println!("\n==== Privacy Boundary Enforcement ====");
 

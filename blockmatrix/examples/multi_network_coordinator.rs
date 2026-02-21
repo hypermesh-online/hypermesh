@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use blockmatrix::network::{
-    multi_network::{MultiNetworkCoordinator, NetworkConfig, VisibilityPolicy},
+    multi_network::{MultiNetworkCoordinator, NetworkConfig},
     trust::{NetworkType, ProofOfState},
     isolation::{DefaultIsolationManager, IsolationManager},
 };
@@ -18,9 +18,7 @@ use blockmatrix::assets::core::{
     AssetData,
 };
 use std::sync::Arc;
-use std::time::SystemTime;
-use uuid::Uuid;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber;
 
 /// Create a test asset ID

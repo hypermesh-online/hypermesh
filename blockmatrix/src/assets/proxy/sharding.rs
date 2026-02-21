@@ -693,7 +693,7 @@ impl ShardManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::{AssetRegistration, AssetType};
+    use crate::assets::core::AssetType;
     use crate::test_utils::test_asset_id;
 
     #[tokio::test]

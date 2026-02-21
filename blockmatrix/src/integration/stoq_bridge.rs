@@ -262,7 +262,5 @@ pub struct AssetRegistrationResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // TODO: Add STOQ bridge integration tests
 }

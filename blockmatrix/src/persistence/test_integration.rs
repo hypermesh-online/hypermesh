@@ -123,7 +123,7 @@ mod tests {
 
         // Get stats
         let stats = persistence_mgr.get_stats().await;
-        assert!(stats.total_used >= 0);
+        let _ = stats.total_used; // u64 always >= 0
 
         println!("✅ Persistence manager: PASSED");
 

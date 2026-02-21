@@ -8,9 +8,11 @@
 //! Every crate should import shared types from here, not define their own.
 
 pub mod types;
+pub mod asset;
 pub mod error;
 pub mod crypto;
 
 // Re-export commonly used types at crate root
 pub use types::*;
+pub use asset::*;
 pub use error::HypermeshError;

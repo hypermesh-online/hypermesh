@@ -9,8 +9,7 @@
 //! ## Pipeline Stages (EXACT ORDER)
 //!
 //! 1. **Compression** (Brotli): Compress raw data first for best ratio (levels 1-11)
-//! 2. **Encryption** (AES-256-GCM, whole blob): Encrypt the entire compressed blob
-//!    NOTE: Target is Kyber-1024 whole-blob encryption; currently uses AES-256-GCM
+//! 2. **Encryption** (Kyber-1024 KEM + AES-256-GCM): Encrypt the entire compressed blob
 //! 3. **Sharding** (Reed-Solomon): Split encrypted data into erasure-coded shards
 //! 4. **Distribution** (Matrix-aware): Place shards at optimal matrix positions
 //!
@@ -18,7 +17,7 @@
 //!
 //! - **Throughput**: 1GB/s end-to-end
 //! - **Compression**: Brotli level 4 (balance speed/ratio)
-//! - **Encryption**: AES-256-GCM whole-blob (target: Kyber-1024)
+//! - **Encryption**: Kyber-1024 KEM + AES-256-GCM whole-blob
 //! - **Sharding**: 10+4 Reed-Solomon (10 data, 4 parity)
 //! - **Distribution**: <100ms to calculate placement
 
@@ -36,13 +35,16 @@ pub mod orchestrator;
 
 // Re-exports
 pub use compression::{Compressor, CompressionConfig, CompressionAlgorithm, CompressionStats};
-pub use encryption::{Encryptor, EncryptionConfig, EncryptionStats, EncryptedData, ShardKey};
+pub use encryption::{
+    Encryptor, EncryptionConfig, EncryptionStats, EncryptedData,
+    KyberKeyPair, KyberEncryptionResult, AesKey,
+};
 pub use sharding::{Sharder, ShardingConfig, Shard, ShardMetadata, ShardingStats};
 pub use distribution::{
     MatrixDistributor, DistributionConfig, DistributedAsset, ShardPlacement,
     MatrixConstraints, DistributionStats,
 };
-pub use orchestrator::{AssetPipeline, PipelineConfig, PipelineStats, ProcessedAsset};
+pub use orchestrator::{AssetPipeline, DecryptionKey, PipelineConfig, PipelineStats, ProcessedAsset};
 
 /// Raw asset data to be processed
 #[derive(Clone, Debug)]

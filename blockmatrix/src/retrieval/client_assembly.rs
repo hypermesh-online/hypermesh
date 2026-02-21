@@ -13,8 +13,16 @@ use tokio::sync::RwLock;
 
 use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::assets::pipeline::{
+    Compressor, CompressionConfig, CompressionAlgorithm,
+    Encryptor, EncryptionConfig,
+    Sharder, ShardingConfig,
+    sharding::{Shard, ShardMetadata},
+    encryption::{KyberEncryptionResult, EncryptedData},
+    orchestrator::DecryptionKey,
+};
 
-use super::{RetrievalPlan, ShardLocation};
+use super::{RetrievalPlan, RetrievalMetadata, ShardLocation};
 
 /// Progress of assembly operation
 #[derive(Debug, Clone)]
@@ -298,7 +306,11 @@ impl ClientAssembler {
         Ok(vec![0u8; 1024]) // 1KB dummy shard
     }
 
-    /// Reconstruct file from fetched shards
+    /// Reconstruct file from fetched shards (basic concatenation).
+    ///
+    /// This method concatenates raw shard data without pipeline processing.
+    /// Use `reconstruct_with_pipeline()` for full reverse-pipeline
+    /// reconstruction (Reed-Solomon -> decrypt -> decompress).
     pub async fn reconstruct(&self) -> Result<Vec<u8>> {
         let plan = self.plan.read().await;
         let plan = plan.as_ref()
@@ -315,13 +327,6 @@ impl ClientAssembler {
             ));
         }
 
-        // In production, this would:
-        // 1. Decrypt shards if encrypted
-        // 2. Use Reed-Solomon to reconstruct from available shards
-        // 3. Decompress if compressed
-        // 4. Verify content hash
-
-        // For now, concatenate dummy data
         let mut reconstructed = Vec::new();
         for i in 0..plan.min_shards_required {
             if let Some(shard) = fetched.get(&i) {
@@ -330,6 +335,177 @@ impl ClientAssembler {
         }
 
         Ok(reconstructed)
+    }
+
+    /// Reconstruct file using the full reverse pipeline.
+    ///
+    /// Applies the reverse of the asset processing pipeline:
+    /// 1. Reed-Solomon reconstruct encrypted blob from shards
+    /// 2. Decrypt blob using the provided decryption key
+    /// 3. Decompress to recover original data
+    pub async fn reconstruct_with_pipeline(
+        &self,
+        decryption_key: &DecryptionKey,
+    ) -> Result<Vec<u8>> {
+        let plan = self.plan.read().await;
+        let plan = plan.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
+
+        let fetched = self.fetched_shards.read().await;
+
+        if fetched.len() < plan.min_shards_required {
+            return Err(anyhow::anyhow!(
+                "Insufficient shards: have {}, need {}",
+                fetched.len(),
+                plan.min_shards_required
+            ));
+        }
+
+        let pipeline_shards = self.build_pipeline_shards(&fetched, plan);
+
+        // Reverse pipeline: reconstruct -> decrypt -> decompress
+        let encrypted_blob = Self::reconstruct_shards(
+            &pipeline_shards,
+            &plan.metadata,
+        )?;
+        let compressed_data = Self::decrypt_blob(
+            &encrypted_blob,
+            decryption_key,
+            &plan.metadata,
+        )?;
+        let original_data = Self::decompress_data(
+            &compressed_data,
+            &plan.metadata,
+        )?;
+
+        Ok(original_data)
+    }
+
+    /// Convert fetched shards into pipeline Shard structs.
+    fn build_pipeline_shards(
+        &self,
+        fetched: &HashMap<usize, FetchedShard>,
+        plan: &RetrievalPlan,
+    ) -> Vec<Shard> {
+        let data_shard_count = plan.metadata.erasure_coding.0;
+
+        let mut shards: Vec<Shard> = Vec::with_capacity(fetched.len());
+
+        for (&idx, fetched_shard) in fetched.iter() {
+            let is_parity = idx >= data_shard_count;
+            let hash_hex = {
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(&fetched_shard.data);
+                hex::encode(hasher.finalize())
+            };
+
+            // Last data shard stores pre-sharding blob size for Reed-Solomon
+            // padding truncation. This is the encrypted blob size, NOT the
+            // original uncompressed data size.
+            let original_size = if !is_parity && idx == data_shard_count - 1 {
+                plan.metadata.encrypted_blob_size
+            } else {
+                fetched_shard.data.len()
+            };
+
+            let metadata = ShardMetadata {
+                index: idx,
+                is_parity,
+                size: fetched_shard.data.len(),
+                original_size,
+                hash: hash_hex,
+            };
+
+            shards.push(Shard {
+                data: fetched_shard.data.clone(),
+                metadata,
+            });
+        }
+
+        // Sort by index for consistent reconstruction
+        shards.sort_by_key(|s| s.metadata.index);
+        shards
+    }
+
+    /// Stage 1: Reed-Solomon reconstruct encrypted blob from shards.
+    fn reconstruct_shards(
+        shards: &[Shard],
+        metadata: &RetrievalMetadata,
+    ) -> Result<Vec<u8>> {
+        let config = ShardingConfig {
+            data_shards: metadata.erasure_coding.0,
+            parity_shards: metadata.erasure_coding.1,
+            ..Default::default()
+        };
+        let sharder = Sharder::new(config)
+            .map_err(|e| anyhow::anyhow!("Sharder init failed: {}", e))?;
+
+        sharder.reconstruct(shards)
+            .map_err(|e| anyhow::anyhow!("Shard reconstruction failed: {}", e))
+    }
+
+    /// Stage 2: Decrypt blob using decryption key.
+    fn decrypt_blob(
+        encrypted_blob: &[u8],
+        decryption_key: &DecryptionKey,
+        metadata: &RetrievalMetadata,
+    ) -> Result<Vec<u8>> {
+        if metadata.encryption.is_empty() || metadata.encryption == "none" {
+            return Ok(encrypted_blob.to_vec());
+        }
+
+        let encryptor = Encryptor::new(EncryptionConfig::default());
+
+        match decryption_key {
+            DecryptionKey::Kyber {
+                ciphertext_kem,
+                nonce,
+                original_size,
+                secret_key,
+            } => {
+                let kyber_result = KyberEncryptionResult {
+                    ciphertext_kem: ciphertext_kem.clone(),
+                    encrypted_data: encrypted_blob.to_vec(),
+                    nonce: nonce.clone(),
+                    original_size: *original_size,
+                };
+                encryptor.decrypt(&kyber_result, secret_key)
+                    .map_err(|e| anyhow::anyhow!("Kyber decryption failed: {}", e))
+            }
+            DecryptionKey::Aes(key) => {
+                let encrypted = EncryptedData {
+                    ciphertext: encrypted_blob.to_vec(),
+                    nonce: key.nonce.clone(),
+                    original_size: 0,
+                };
+                encryptor.decrypt_aes(&encrypted, key)
+                    .map_err(|e| anyhow::anyhow!("AES decryption failed: {}", e))
+            }
+        }
+    }
+
+    /// Stage 3: Decompress data.
+    fn decompress_data(
+        compressed_data: &[u8],
+        metadata: &RetrievalMetadata,
+    ) -> Result<Vec<u8>> {
+        if metadata.compression.is_empty() || metadata.compression == "none" {
+            return Ok(compressed_data.to_vec());
+        }
+
+        let algorithm = match metadata.compression.as_str() {
+            "brotli" => CompressionAlgorithm::Brotli,
+            _ => CompressionAlgorithm::None,
+        };
+
+        let compressor = Compressor::new(CompressionConfig {
+            algorithm,
+            ..Default::default()
+        });
+
+        compressor.decompress(compressed_data)
+            .map_err(|e| anyhow::anyhow!("Decompression failed: {}", e))
     }
 
     /// Get current progress
@@ -372,7 +548,7 @@ impl ClientAssembler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::retrieval::{CompleteShardMap, RetrievalMetadata, ShardMapEntry};
+    use crate::retrieval::{CompleteShardMap, ShardMapEntry};
 
     fn create_test_plan() -> RetrievalPlan {
         let content_hash = [1u8; 32];
@@ -394,6 +570,7 @@ mod tests {
             encryption: "aes-256-gcm".to_string(),
             content_type: "application/octet-stream".to_string(),
             created_at: chrono::Utc::now().timestamp(),
+            encrypted_blob_size: 0,
         };
 
         RetrievalPlan::new(content_hash, shard_map, metadata)
@@ -493,5 +670,185 @@ mod tests {
         let progress_after = assembler.get_progress().await;
         assert_eq!(progress_after.fetched_shards, 0);
         assert_eq!(progress_after.total_shards, 0);
+    }
+
+    #[tokio::test]
+    async fn test_reconstruct_with_pipeline_roundtrip() {
+        use crate::assets::pipeline::{
+            Asset, AssetMetadata as PipelineAssetMetadata,
+            AssetPipeline,
+        };
+
+        // 1. Process data through the forward pipeline
+        let original_data = b"Hello, HyperMesh instruction-based retrieval! ".repeat(200);
+        let asset = Asset {
+            id: "test-pipeline-roundtrip".to_string(),
+            data: original_data.clone(),
+            metadata: PipelineAssetMetadata {
+                name: "test.bin".to_string(),
+                content_type: "application/octet-stream".to_string(),
+                size: original_data.len(),
+                created_at: 1234567890,
+                custom: std::collections::HashMap::new(),
+            },
+        };
+
+        let pipeline = AssetPipeline::default()
+            .expect("test: create pipeline");
+        let processed = pipeline.process_asset(asset).await
+            .expect("test: process asset");
+
+        // 2. Build a retrieval plan from the processed asset
+        let content_hash = [42u8; 32];
+        let mut shard_map = CompleteShardMap::new();
+
+        for (i, shard) in processed.shards.iter().enumerate() {
+            let shard_hash = {
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(&shard.data);
+                let result = hasher.finalize();
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&result);
+                hash
+            };
+            let position = MatrixCoordinate::new(i as i64, 0, 0)
+                .expect("test: create coordinate");
+            let location = ShardLocation::new(position, 1.0);
+            let entry = ShardMapEntry::new(shard_hash, vec![location]);
+            shard_map.add_entry(entry);
+        }
+
+        let metadata = RetrievalMetadata {
+            erasure_coding: (10, 4),
+            compression: "brotli".to_string(),
+            encryption: "kyber-1024".to_string(),
+            content_type: "application/octet-stream".to_string(),
+            created_at: 1234567890,
+            encrypted_blob_size: processed.stats.encryption.encrypted_size,
+        };
+
+        let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
+        plan.original_size = original_data.len();
+
+        // 3. Manually inject processed shards as fetched shards
+        let assembler = ClientAssembler::new(4);
+        assembler.initialize(plan).await.expect("test: init plan");
+
+        {
+            let mut fetched = assembler.fetched_shards.write().await;
+            for (i, shard) in processed.shards.iter().enumerate() {
+                let position = MatrixCoordinate::new(i as i64, 0, 0)
+                    .expect("test: create coordinate");
+                fetched.insert(i, FetchedShard {
+                    hash: [0u8; 32],
+                    data: shard.data.clone(),
+                    source: position,
+                    fetch_time_ms: 0,
+                });
+            }
+
+            let mut progress = assembler.progress.write().await;
+            progress.fetched_shards = processed.shards.len();
+            progress.percentage = 1.0;
+        }
+
+        // 4. Reconstruct using the real pipeline
+        let reconstructed = assembler
+            .reconstruct_with_pipeline(&processed.decryption_key)
+            .await
+            .expect("test: reconstruct with pipeline");
+
+        assert_eq!(
+            reconstructed, original_data,
+            "Pipeline round-trip: reconstructed data must match original"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reconstruct_with_pipeline_aes_fallback() {
+        use crate::assets::pipeline::{
+            Asset, AssetMetadata as PipelineAssetMetadata,
+            AssetPipeline, PipelineConfig,
+        };
+
+        // Use AES-only (non-quantum) pipeline
+        let original_data = b"AES fallback test data ".repeat(100);
+        let asset = Asset {
+            id: "test-aes-roundtrip".to_string(),
+            data: original_data.clone(),
+            metadata: PipelineAssetMetadata {
+                name: "test.bin".to_string(),
+                content_type: "application/octet-stream".to_string(),
+                size: original_data.len(),
+                created_at: 1234567890,
+                custom: std::collections::HashMap::new(),
+            },
+        };
+
+        let config = PipelineConfig {
+            encryption: EncryptionConfig {
+                quantum_resistant: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let pipeline = AssetPipeline::new(config)
+            .expect("test: create pipeline");
+        let processed = pipeline.process_asset(asset).await
+            .expect("test: process asset");
+
+        // Build plan and inject shards
+        let mut shard_map = CompleteShardMap::new();
+        for i in 0..processed.shards.len() {
+            let position = MatrixCoordinate::new(i as i64, 0, 0)
+                .expect("test: coordinate");
+            let location = ShardLocation::new(position, 1.0);
+            let entry = ShardMapEntry::new([i as u8; 32], vec![location]);
+            shard_map.add_entry(entry);
+        }
+
+        let metadata = RetrievalMetadata {
+            erasure_coding: (10, 4),
+            compression: "brotli".to_string(),
+            encryption: "aes-256-gcm".to_string(),
+            content_type: "application/octet-stream".to_string(),
+            created_at: 1234567890,
+            encrypted_blob_size: processed.stats.encryption.encrypted_size,
+        };
+
+        let mut plan = RetrievalPlan::new([0u8; 32], shard_map, metadata);
+        plan.original_size = original_data.len();
+
+        let assembler = ClientAssembler::new(4);
+        assembler.initialize(plan).await.expect("test: init");
+
+        {
+            let mut fetched = assembler.fetched_shards.write().await;
+            for (i, shard) in processed.shards.iter().enumerate() {
+                let position = MatrixCoordinate::new(i as i64, 0, 0)
+                    .expect("test: coordinate");
+                fetched.insert(i, FetchedShard {
+                    hash: [0u8; 32],
+                    data: shard.data.clone(),
+                    source: position,
+                    fetch_time_ms: 0,
+                });
+            }
+
+            let mut progress = assembler.progress.write().await;
+            progress.fetched_shards = processed.shards.len();
+            progress.percentage = 1.0;
+        }
+
+        let reconstructed = assembler
+            .reconstruct_with_pipeline(&processed.decryption_key)
+            .await
+            .expect("test: reconstruct with AES pipeline");
+
+        assert_eq!(
+            reconstructed, original_data,
+            "AES pipeline round-trip: data must match"
+        );
     }
 }

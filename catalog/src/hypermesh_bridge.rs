@@ -208,19 +208,14 @@ impl HyperMeshAssetRegistry {
     }
 
     /// Convert Catalog asset type to HyperMesh AssetType
+    /// Map catalog type string to canonical AssetKind first, then to BM AssetType.
+    fn map_to_asset_kind(&self, catalog_type: &str) -> hypermesh_lib::AssetKind {
+        crate::asset_compat::parse_asset_kind(catalog_type)
+    }
+
+    /// Convert Catalog asset type to HyperMesh AssetType via canonical AssetKind.
     fn map_asset_type(&self, catalog_type: &str) -> AssetType {
-        match catalog_type {
-            "compute" | "cpu" => AssetType::Cpu,
-            "gpu" => AssetType::Gpu,
-            "memory" => AssetType::Memory,
-            "storage" => AssetType::Storage,
-            "network" => AssetType::Network,
-            "container" => AssetType::Container,
-            "vm" | "virtual_machine" => AssetType::VirtualMachine,
-            "library" | "lib" => AssetType::Library,
-            "economic" | "token" | "wallet" => AssetType::Economic,
-            _ => AssetType::Library, // Default to Library for unknown types
-        }
+        crate::asset_compat::asset_kind_to_bm_asset_type(&self.map_to_asset_kind(catalog_type))
     }
 
     /// Convert Catalog requirements to HyperMesh ResourceRequirements

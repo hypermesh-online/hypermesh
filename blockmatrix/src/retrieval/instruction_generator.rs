@@ -32,6 +32,15 @@ pub struct GeneratorConfig {
 
     /// Maximum replicas to include per shard
     pub max_replicas: usize,
+
+    /// Base latency in milliseconds (fixed overhead per request)
+    pub base_latency_ms: f64,
+
+    /// Additional latency per unit of Euclidean distance
+    pub per_hop_latency_ms: f64,
+
+    /// Maximum matrix distance used for normalization in scoring
+    pub max_expected_distance: f64,
 }
 
 impl Default for GeneratorConfig {
@@ -42,6 +51,9 @@ impl Default for GeneratorConfig {
             optimize_for_client: None,
             min_replicas: 1,
             max_replicas: 3,
+            base_latency_ms: 5.0,
+            per_hop_latency_ms: 2.0,
+            max_expected_distance: 100.0,
         }
     }
 }
@@ -136,12 +148,17 @@ impl InstructionGenerator {
         content_address: &ContentAddress,
     ) -> Result<CompleteShardMap> {
         let mut entries = Vec::new();
+        let data_shard_count = content_address.metadata.erasure_coding.0;
 
-        for (shard_hash, positions) in &content_address.retrieval_instructions.shard_map {
+        for (shard_index, (shard_hash, positions)) in
+            content_address.retrieval_instructions.shard_map.iter().enumerate()
+        {
             // Limit replicas based on config
             let replica_count = positions.len()
                 .min(self.config.max_replicas)
                 .max(self.config.min_replicas.min(positions.len()));
+
+            let is_data_shard = shard_index < data_shard_count;
 
             let locations: Vec<ShardLocation> = positions.iter()
                 .take(replica_count)
@@ -154,8 +171,12 @@ impl InstructionGenerator {
                         location.estimated_latency_ms = self.estimate_latency(pos);
                     }
 
-                    // Set priority based on position
-                    location.priority = self.calculate_priority(pos);
+                    // Set priority combining distance, health, and shard type
+                    location.priority = self.calculate_priority(
+                        pos,
+                        health_score,
+                        is_data_shard,
+                    );
 
                     location
                 })
@@ -176,48 +197,94 @@ impl InstructionGenerator {
             encryption: content_address.metadata.encryption.clone(),
             content_type: content_address.metadata.content_type.clone(),
             created_at: content_address.metadata.created_at,
+            encrypted_blob_size: 0, // Populated during asset processing
         }
     }
 
-    /// Estimate node health score (placeholder)
-    fn estimate_node_health(&self, _position: &MatrixCoordinate) -> f64 {
-        // In production, this would query actual node health metrics
-        // For now, assume all nodes are healthy
-        0.95
+    /// Estimate node health score based on matrix distance.
+    ///
+    /// Uses distance from the requesting client position as a proxy for
+    /// connection reliability. Closer nodes tend to have more stable
+    /// connections and lower packet loss. Returns 0.8 as a reasonable
+    /// baseline when no client position is configured.
+    ///
+    /// The score follows a decay curve: `0.95 * e^(-distance / max_distance)`
+    /// clamped to a minimum of 0.5 to avoid excluding distant but functional nodes.
+    fn estimate_node_health(&self, position: &MatrixCoordinate) -> f64 {
+        let Some(client_pos) = &self.config.optimize_for_client else {
+            // No client position known — use a reasonable baseline
+            return 0.8;
+        };
+
+        let distance = client_pos.euclidean_distance(position);
+
+        // Exponential decay: nearby nodes score near 0.95, distant nodes decay
+        // toward 0.5. The decay rate is tuned by max_expected_distance so that
+        // nodes at max distance score roughly 0.5 * 0.95 ≈ 0.475 → clamped to 0.5.
+        let decay_rate = 2.0 / self.config.max_expected_distance;
+        let raw_score = 0.95 * (-decay_rate * distance).exp();
+
+        // Clamp to [0.5, 1.0] — even far nodes get a fair baseline
+        raw_score.clamp(0.5, 1.0)
     }
 
-    /// Estimate latency to position (placeholder)
+    /// Estimate network latency to a position using a linear distance model.
+    ///
+    /// Applies the formula: `base_latency_ms + distance * per_hop_latency_ms`
+    /// where distance is the Euclidean distance in matrix coordinate space.
+    /// Uses `MatrixCoordinate::euclidean_distance()` for the calculation.
     fn estimate_latency(&self, position: &MatrixCoordinate) -> u64 {
-        // Simple distance-based estimation
-        // In production, this would use actual network measurements
-        if let Some(client_pos) = &self.config.optimize_for_client {
-            let dx = (position.x - client_pos.x) as f64;
-            let dy = (position.y - client_pos.y) as f64;
-            let dz = (position.z - client_pos.z) as f64;
-            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+        let Some(client_pos) = &self.config.optimize_for_client else {
+            // No client position — return base latency as default
+            return self.config.base_latency_ms as u64;
+        };
 
-            // Assume 1ms per unit distance (rough estimation)
-            distance as u64
-        } else {
-            10 // Default 10ms
-        }
+        let distance = client_pos.euclidean_distance(position);
+        let latency = self.config.base_latency_ms
+            + distance * self.config.per_hop_latency_ms;
+
+        latency as u64
     }
 
-    /// Calculate replica priority
-    fn calculate_priority(&self, position: &MatrixCoordinate) -> u32 {
-        // Prioritize based on distance from client
-        if let Some(client_pos) = &self.config.optimize_for_client {
-            let dx = (position.x - client_pos.x) as f64;
-            let dy = (position.y - client_pos.y) as f64;
-            let dz = (position.z - client_pos.z) as f64;
-            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
-
-            // Convert distance to priority (closer = higher)
-            let priority = 100.0 / (1.0 + distance);
-            priority as u32
+    /// Calculate a normalized priority score (mapped to 0-100 u32 range)
+    /// combining multiple factors:
+    ///
+    /// - **Distance factor** (40% weight): Closer replicas are preferred.
+    ///   Normalized via `1 / (1 + distance/max_expected_distance)`.
+    /// - **Health factor** (35% weight): Healthier nodes are preferred.
+    ///   Uses the health_score directly (already 0.0-1.0).
+    /// - **Shard type factor** (25% weight): Data shards get a slight boost
+    ///   over parity shards since they are needed for direct reconstruction.
+    fn calculate_priority(
+        &self,
+        position: &MatrixCoordinate,
+        health_score: f64,
+        is_data_shard: bool,
+    ) -> u32 {
+        // Distance factor: normalized so nearby = 1.0, distant = approaches 0.0
+        let distance_factor = if let Some(client_pos) = &self.config.optimize_for_client {
+            let distance = client_pos.euclidean_distance(position);
+            let normalized = distance / self.config.max_expected_distance;
+            1.0 / (1.0 + normalized)
         } else {
-            100 // Default priority
-        }
+            // No client position — treat all distances as equal
+            1.0
+        };
+
+        // Health factor: already normalized 0.0-1.0
+        let health_factor = health_score;
+
+        // Shard type factor: data shards = 1.0, parity shards = 0.7
+        let shard_type_factor = if is_data_shard { 1.0 } else { 0.7 };
+
+        // Weighted combination → normalized 0.0-1.0
+        let combined = 0.40 * distance_factor
+            + 0.35 * health_factor
+            + 0.25 * shard_type_factor;
+
+        // Scale to u32 range 0-100
+        let priority = (combined * 100.0).round() as u32;
+        priority.min(100)
     }
 
     /// Estimate instruction size for a content hash
@@ -233,21 +300,75 @@ mod tests {
     use crate::integration::phase1_foundation::MatrixFoundationConfig;
     use tempfile::TempDir;
 
+    /// Create a test generator with a real MatrixFoundation backed by a temp directory.
     async fn create_test_generator() -> (InstructionGenerator, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: create temp dir");
         let config = MatrixFoundationConfig {
             storage_path: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
 
-        let foundation = Arc::new(MatrixFoundation::new(config).await.unwrap());
+        let foundation = Arc::new(
+            MatrixFoundation::new(config).await.expect("test: create foundation"),
+        );
         let storage = Arc::new(
-            ContentAddressedStorage::new(foundation.clone()).await.unwrap()
+            ContentAddressedStorage::new(foundation.clone())
+                .await
+                .expect("test: create storage"),
         );
 
         let gen_config = GeneratorConfig::default();
         let generator = InstructionGenerator::new(gen_config, foundation, storage);
 
+        (generator, temp_dir)
+    }
+
+    /// Async helper: build a generator with a specific client position.
+    async fn build_generator_with_client(
+        client_pos: MatrixCoordinate,
+    ) -> (InstructionGenerator, TempDir) {
+        let temp_dir = TempDir::new().expect("test: create temp dir");
+        let mut config = GeneratorConfig::default();
+        config.optimize_for_client = Some(client_pos);
+
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig {
+                storage_path: temp_dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .expect("test: create foundation"),
+        );
+        let storage = Arc::new(
+            ContentAddressedStorage::new(foundation.clone())
+                .await
+                .expect("test: create storage"),
+        );
+
+        let generator = InstructionGenerator::new(config, foundation, storage);
+        (generator, temp_dir)
+    }
+
+    /// Async helper: build a generator with no client position.
+    async fn build_generator_no_client() -> (InstructionGenerator, TempDir) {
+        let temp_dir = TempDir::new().expect("test: create temp dir");
+        let config = GeneratorConfig::default();
+
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig {
+                storage_path: temp_dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .expect("test: create foundation"),
+        );
+        let storage = Arc::new(
+            ContentAddressedStorage::new(foundation.clone())
+                .await
+                .expect("test: create storage"),
+        );
+
+        let generator = InstructionGenerator::new(config, foundation, storage);
         (generator, temp_dir)
     }
 
@@ -264,59 +385,158 @@ mod tests {
         assert!(config.include_latency);
         assert_eq!(config.min_replicas, 1);
         assert_eq!(config.max_replicas, 3);
+        assert!((config.base_latency_ms - 5.0).abs() < f64::EPSILON);
+        assert!((config.per_hop_latency_ms - 2.0).abs() < f64::EPSILON);
+        assert!((config.max_expected_distance - 100.0).abs() < f64::EPSILON);
     }
 
-    #[test]
-    fn test_health_estimation() {
-        let pos = MatrixCoordinate::new(10, 20, 30).unwrap();
-
-        // Create minimal generator for testing
-        let config = GeneratorConfig::default();
-        let foundation = Arc::new(
-            futures::executor::block_on(async {
-                MatrixFoundation::new(MatrixFoundationConfig {
-                    storage_path: std::path::PathBuf::from("/tmp/test"),
-                    ..Default::default()
-                }).await.unwrap()
-            })
-        );
-        let storage = Arc::new(
-            futures::executor::block_on(async {
-                ContentAddressedStorage::new(foundation.clone()).await.unwrap()
-            })
-        );
-
-        let generator = InstructionGenerator::new(config, foundation, storage);
+    #[tokio::test]
+    async fn test_health_no_client_returns_baseline() {
+        let pos = MatrixCoordinate::new(10, 20, 30).expect("test: coord");
+        let (generator, _td) = build_generator_no_client().await;
         let health = generator.estimate_node_health(&pos);
 
-        assert!(health >= 0.0 && health <= 1.0);
+        // Without client position, should return baseline 0.8
+        assert!((health - 0.8).abs() < f64::EPSILON);
     }
 
-    #[test]
-    fn test_priority_calculation() {
-        let pos = MatrixCoordinate::new(10, 0, 0).unwrap();
-        let client_pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+    #[tokio::test]
+    async fn test_health_nearby_node_scores_high() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let nearby = MatrixCoordinate::new(1, 1, 0).expect("test: coord");
 
-        let mut config = GeneratorConfig::default();
-        config.optimize_for_client = Some(client_pos);
+        let (generator, _td) = build_generator_with_client(client).await;
+        let health = generator.estimate_node_health(&nearby);
 
-        let foundation = Arc::new(
-            futures::executor::block_on(async {
-                MatrixFoundation::new(MatrixFoundationConfig {
-                    storage_path: std::path::PathBuf::from("/tmp/test"),
-                    ..Default::default()
-                }).await.unwrap()
-            })
+        assert!(health >= 0.5 && health <= 1.0);
+        assert!(health > 0.9, "nearby node health should be > 0.9, got {health}");
+    }
+
+    #[tokio::test]
+    async fn test_health_distant_node_scores_lower() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let nearby = MatrixCoordinate::new(2, 0, 0).expect("test: coord");
+        let far = MatrixCoordinate::new(200, 200, 200).expect("test: coord");
+
+        let (generator, _td) = build_generator_with_client(client).await;
+
+        let health_near = generator.estimate_node_health(&nearby);
+        let health_far = generator.estimate_node_health(&far);
+
+        assert!(
+            health_near > health_far,
+            "nearby health ({health_near}) should exceed distant ({health_far})",
         );
-        let storage = Arc::new(
-            futures::executor::block_on(async {
-                ContentAddressedStorage::new(foundation.clone()).await.unwrap()
-            })
+        // Far node should be clamped at minimum 0.5
+        assert!(health_far >= 0.5);
+    }
+
+    #[tokio::test]
+    async fn test_latency_no_client_returns_base() {
+        let pos = MatrixCoordinate::new(50, 50, 50).expect("test: coord");
+        let (generator, _td) = build_generator_no_client().await;
+        let latency = generator.estimate_latency(&pos);
+
+        // No client -> base_latency_ms = 5
+        assert_eq!(latency, 5);
+    }
+
+    #[tokio::test]
+    async fn test_latency_increases_with_distance() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let near = MatrixCoordinate::new(5, 0, 0).expect("test: coord");
+        let far = MatrixCoordinate::new(50, 0, 0).expect("test: coord");
+
+        let (generator, _td) = build_generator_with_client(client).await;
+
+        let latency_near = generator.estimate_latency(&near);
+        let latency_far = generator.estimate_latency(&far);
+
+        assert!(
+            latency_far > latency_near,
+            "far latency ({latency_far}) should exceed near ({latency_near})",
         );
+        // near: base(5) + 5 * 2 = 15
+        assert_eq!(latency_near, 15);
+        // far: base(5) + 50 * 2 = 105
+        assert_eq!(latency_far, 105);
+    }
 
-        let generator = InstructionGenerator::new(config, foundation, storage);
-        let priority = generator.calculate_priority(&pos);
+    #[tokio::test]
+    async fn test_priority_data_shard_higher_than_parity() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let pos = MatrixCoordinate::new(10, 0, 0).expect("test: coord");
 
-        assert!(priority > 0 && priority <= 100);
+        let (generator, _td) = build_generator_with_client(client).await;
+        let health = 0.9;
+
+        let data_priority = generator.calculate_priority(&pos, health, true);
+        let parity_priority = generator.calculate_priority(&pos, health, false);
+
+        assert!(
+            data_priority >= parity_priority,
+            "data shard priority ({data_priority}) should >= parity ({parity_priority})",
+        );
+    }
+
+    #[tokio::test]
+    async fn test_priority_closer_node_higher() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let near = MatrixCoordinate::new(5, 0, 0).expect("test: coord");
+        let far = MatrixCoordinate::new(80, 0, 0).expect("test: coord");
+
+        let (generator, _td) = build_generator_with_client(client).await;
+
+        let near_pri = generator.calculate_priority(&near, 0.9, true);
+        let far_pri = generator.calculate_priority(&far, 0.9, true);
+
+        assert!(
+            near_pri > far_pri,
+            "near priority ({near_pri}) should exceed far ({far_pri})",
+        );
+    }
+
+    #[tokio::test]
+    async fn test_priority_healthier_node_higher() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let pos = MatrixCoordinate::new(10, 0, 0).expect("test: coord");
+
+        let (generator, _td) = build_generator_with_client(client).await;
+
+        let healthy = generator.calculate_priority(&pos, 0.95, true);
+        let unhealthy = generator.calculate_priority(&pos, 0.5, true);
+
+        assert!(
+            healthy >= unhealthy,
+            "healthy priority ({healthy}) should >= unhealthy ({unhealthy})",
+        );
+    }
+
+    #[tokio::test]
+    async fn test_priority_range_valid() {
+        let client = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let (generator, _td) = build_generator_with_client(client).await;
+
+        let positions = [
+            MatrixCoordinate::new(0, 0, 0).expect("test: coord"),
+            MatrixCoordinate::new(50, 50, 50).expect("test: coord"),
+            MatrixCoordinate::new(100, 100, 100).expect("test: coord"),
+        ];
+
+        for pos in &positions {
+            let p = generator.calculate_priority(pos, 0.8, true);
+            assert!(p <= 100, "priority {p} exceeds 100 for position {pos}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_priority_no_client_full_score() {
+        let (generator, _td) = build_generator_no_client().await;
+        let pos = MatrixCoordinate::new(999, 999, 999).expect("test: coord");
+
+        // No client: distance_factor=1.0, health=0.9, data shard=1.0
+        // combined = 0.40*1.0 + 0.35*0.9 + 0.25*1.0 = 0.965 -> 97
+        let priority = generator.calculate_priority(&pos, 0.9, true);
+        assert_eq!(priority, 97);
     }
 }

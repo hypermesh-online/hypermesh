@@ -14,6 +14,9 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [lib]
 name = "hypermesh_lib"
 path = "src/lib.rs"

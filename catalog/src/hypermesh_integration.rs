@@ -70,6 +70,19 @@ pub enum HyperMeshResource {
     },
 }
 
+impl HyperMeshResource {
+    /// Map to canonical system asset kind.
+    pub fn system_kind(&self) -> hypermesh_lib::SystemAssetKind {
+        match self {
+            HyperMeshResource::Cpu { .. } => hypermesh_lib::SystemAssetKind::Cpu,
+            HyperMeshResource::Gpu { .. } => hypermesh_lib::SystemAssetKind::Gpu,
+            HyperMeshResource::Memory { .. } => hypermesh_lib::SystemAssetKind::Memory,
+            HyperMeshResource::Storage { .. } => hypermesh_lib::SystemAssetKind::Storage,
+            HyperMeshResource::Network { .. } => hypermesh_lib::SystemAssetKind::Network,
+        }
+    }
+}
+
 /// Catalog execution context on HyperMesh
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogExecutionContext {

@@ -244,22 +244,20 @@ impl<'de> Deserialize<'de> for PrivacyMode {
     }
 }
 
-/// Blockchain consensus scopes (independent from network privacy)
-/// Controls who participates in consensus
+/// Blockchain operating mode — independent from network privacy (PrivacyMode)
+///
+/// A node always runs a Device chain. It can optionally sync with a Network.
+/// PrivacyMode (Anonymous/Private/Public) controls WHO participates.
+/// BlockchainScope controls WHETHER chains synchronize.
+///
+/// Sub-federation (groups within orgs within federations) is handled by
+/// nested Private networks, not separate scope variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BlockchainScope {
-    /// Single device, local-only
+    /// Single device, local-only blockchain — always running from boot
     Device,
-    /// User's devices share blockchain
-    User,
-    /// Small trusted groups
-    Group,
-    /// Companies, teams
-    Organization,
-    /// Multi-org collaboration
-    Federation,
-    /// Global public blockchain
-    Public,
+    /// Synchronized across participating nodes — reflector/swarm mode
+    Network,
 }
 
 /// Proof of State proof types
@@ -290,11 +288,7 @@ impl fmt::Display for BlockchainScope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BlockchainScope::Device => write!(f, "Device"),
-            BlockchainScope::User => write!(f, "User"),
-            BlockchainScope::Group => write!(f, "Group"),
-            BlockchainScope::Organization => write!(f, "Organization"),
-            BlockchainScope::Federation => write!(f, "Federation"),
-            BlockchainScope::Public => write!(f, "Public"),
+            BlockchainScope::Network => write!(f, "Network"),
         }
     }
 }

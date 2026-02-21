@@ -230,9 +230,9 @@ impl Sharder {
                 is_parity,
                 size: shard_data.len(),
                 original_size: if !is_parity && i == self.config.data_shards - 1 {
-                    // Last data shard - calculate original unpadded size
-                    let padding = padded_size.saturating_sub(original_len);
-                    shard_data.len().saturating_sub(padding)
+                    // Last data shard stores the TOTAL original data length
+                    // so reconstruct() can truncate padding exactly.
+                    original_len
                 } else {
                     shard_data.len()
                 },
@@ -286,12 +286,9 @@ impl Sharder {
         for shard in shards {
             rs_shards[shard.metadata.index] = Some(shard.data.clone());
 
-            // Track original size from last data shard
+            // Last data shard stores the total original data length
             if !shard.metadata.is_parity && shard.metadata.index == self.config.data_shards - 1 {
-                // Calculate total original size from last shard's original_size
-                let shard_size = shard.data.len();
-                let full_shards_size = shard_size * (self.config.data_shards - 1);
-                original_size = full_shards_size + shard.metadata.original_size;
+                original_size = shard.metadata.original_size;
             }
         }
 
@@ -341,15 +338,15 @@ mod tests {
         let config = ShardingConfig::default();
         assert_eq!(config.total_shards(), 14); // 10 + 4
         assert_eq!(config.min_shards_for_reconstruction(), 10);
-        config.validate().unwrap();
+        config.validate().expect("test: validate config");
     }
 
     #[test]
     fn test_shard_and_reconstruct() {
-        let sharder = Sharder::default().unwrap();
+        let sharder = Sharder::default().expect("test: create sharder");
         let data = b"Hello, World! This is test data for sharding.".repeat(100);
 
-        let (shards, stats) = sharder.shard(&data).unwrap();
+        let (shards, stats) = sharder.shard(&data).expect("test: shard data");
         assert_eq!(shards.len(), 14); // 10 data + 4 parity
         assert_eq!(stats.data_shards, 10);
         assert_eq!(stats.parity_shards, 4);
@@ -360,7 +357,7 @@ mod tests {
         }
 
         // Test 1: Reconstruct from all shards
-        let reconstructed = sharder.reconstruct(&shards).unwrap();
+        let reconstructed = sharder.reconstruct(&shards).expect("test: reconstruct from all shards");
         assert_eq!(reconstructed, data);
 
         // Test 2: Reconstruct from minimum data shards (no parity needed)
@@ -369,16 +366,16 @@ mod tests {
             .cloned()
             .collect();
 
-        let reconstructed = sharder.reconstruct(&data_shards).unwrap();
+        let reconstructed = sharder.reconstruct(&data_shards).expect("test: reconstruct from data shards");
         assert_eq!(reconstructed, data);
     }
 
     #[test]
     fn test_reed_solomon_recovery() {
-        let sharder = Sharder::default().unwrap();
+        let sharder = Sharder::default().expect("test: create sharder");
         let data = b"Reed-Solomon recovery test data! ".repeat(500);
 
-        let (shards, _) = sharder.shard(&data).unwrap();
+        let (shards, _) = sharder.shard(&data).expect("test: shard data");
 
         // Test recovering with 4 missing shards (using parity)
         // Keep first 10 shards (mix of data and parity)
@@ -387,7 +384,7 @@ mod tests {
             .cloned()
             .collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).unwrap();
+        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from partial");
         assert_eq!(reconstructed, data);
 
         // Test with different missing shard patterns
@@ -398,7 +395,7 @@ mod tests {
             .map(|(_, s)| s.clone())
             .collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).unwrap();
+        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from pattern");
         assert_eq!(reconstructed, data);
     }
 
@@ -409,10 +406,10 @@ mod tests {
             parity_shards: 4,
             target_shard_size: 1024,
         };
-        let sharder = Sharder::new(config).unwrap();
+        let sharder = Sharder::new(config).expect("test: create sharder with config");
         let data = vec![42u8; 10240]; // 10KB of data
 
-        let (shards, _) = sharder.shard(&data).unwrap();
+        let (shards, _) = sharder.shard(&data).expect("test: shard data");
 
         // Test with exactly 4 shards missing (maximum allowed)
         // Drop last 4 shards (all parity shards)
@@ -421,7 +418,7 @@ mod tests {
             .cloned()
             .collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).unwrap();
+        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from max loss");
         assert_eq!(reconstructed, data);
 
         // Test that we can't recover with 5 shards missing
@@ -435,10 +432,10 @@ mod tests {
 
     #[test]
     fn test_shard_integrity() {
-        let sharder = Sharder::default().unwrap();
+        let sharder = Sharder::default().expect("test: create sharder");
         let data = vec![0u8; 10000];
 
-        let (shards, _) = sharder.shard(&data).unwrap();
+        let (shards, _) = sharder.shard(&data).expect("test: shard data");
 
         // All shards should verify
         for shard in &shards {
@@ -453,10 +450,10 @@ mod tests {
 
     #[test]
     fn test_insufficient_shards() {
-        let sharder = Sharder::default().unwrap();
+        let sharder = Sharder::default().expect("test: create sharder");
         let data = b"Test data";
 
-        let (shards, _) = sharder.shard(data).unwrap();
+        let (shards, _) = sharder.shard(data).expect("test: shard data");
 
         // Try to reconstruct with too few shards
         let result = sharder.reconstruct(&shards[0..5]);
@@ -465,14 +462,30 @@ mod tests {
 
     #[test]
     fn test_sharding_stats() {
-        let sharder = Sharder::default().unwrap();
+        let sharder = Sharder::default().expect("test: create sharder");
         let data = vec![0u8; 100000];
 
-        let (shards, stats) = sharder.shard(&data).unwrap();
+        let (_shards, stats) = sharder.shard(&data).expect("test: shard data");
         assert_eq!(stats.original_size, 100000);
         assert!(stats.total_shard_size > stats.original_size);
         assert!(stats.redundancy_factor > 1.0);
         assert!(stats.throughput_mbps > 0.0);
+    }
+
+    #[test]
+    fn test_shard_reconstruct_small_data() {
+        // Regression: when data.len() < data_shards, padding spans multiple
+        // shards and the old per-shard original_size calculation via
+        // saturating_sub produced the wrong total, corrupting reconstruction.
+        let sharder = Sharder::default().expect("test: sharder"); // 10+4
+        for size in [1, 3, 5, 7, 9, 10, 11, 15, 20, 25, 30, 35, 40, 50] {
+            let data = vec![0xABu8; size];
+            let (shards, _) = sharder.shard(&data).expect("test: shard");
+            let reconstructed = sharder.reconstruct(&shards).expect("test: reconstruct");
+            assert_eq!(reconstructed.len(), data.len(),
+                "Size {} length mismatch: got {} expected {}", size, reconstructed.len(), data.len());
+            assert_eq!(reconstructed, data, "Size {} data mismatch", size);
+        }
     }
 
     #[test]
@@ -483,10 +496,10 @@ mod tests {
             target_shard_size: 1024,
         };
 
-        let sharder = Sharder::new(config).unwrap();
+        let sharder = Sharder::new(config).expect("test: create sharder with config");
         let data = vec![1u8; 5000];
 
-        let (shards, stats) = sharder.shard(&data).unwrap();
+        let (shards, stats) = sharder.shard(&data).expect("test: shard data");
         assert_eq!(shards.len(), 8); // 6 + 2
         assert_eq!(stats.data_shards, 6);
         assert_eq!(stats.parity_shards, 2);

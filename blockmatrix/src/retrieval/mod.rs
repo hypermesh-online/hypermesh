@@ -83,6 +83,11 @@ pub struct RetrievalMetadata {
 
     /// Creation timestamp
     pub created_at: i64,
+
+    /// Size of the encrypted blob before sharding (bytes).
+    /// The sharder uses this to strip padding during reconstruction.
+    /// Set to 0 if unknown (shards will include any padding).
+    pub encrypted_blob_size: usize,
 }
 
 impl RetrievalPlan {
@@ -153,13 +158,20 @@ impl RetrievalPlan {
         Ok(())
     }
 
-    /// Estimate instruction size in bytes
+    /// Estimate wire-format instruction size in bytes.
+    ///
+    /// Uses compact binary encoding: content_hash (32 bytes), shard map with
+    /// only essential data (hashes + positions), retrieval order as varint
+    /// indices, and short metadata strings.
     pub fn estimate_size(&self) -> usize {
-        // Rough estimation based on structure
-        let base_size = 32 + 8 + 8 + 8; // Hash + counts + metadata
+        // content_hash (32) + min_shards_required varint (2) + original_size varint (5)
+        let base_size = 39;
         let shard_map_size = self.shard_map.estimate_size();
-        let order_size = self.retrieval_order.len() * 8;
-        let metadata_size = 200; // Approximate metadata overhead
+        // Retrieval order: array header (2) + 1-byte varint per index
+        let order_size = 2 + self.retrieval_order.len();
+        // Metadata: erasure_coding 2*varint (4) + compression str (8)
+        //   + encryption str (14) + content_type str (26) + created_at (9)
+        let metadata_size = 61;
 
         base_size + shard_map_size + order_size + metadata_size
     }
@@ -168,8 +180,6 @@ impl RetrievalPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::storage::ContentMetadata;
-
     fn create_test_metadata() -> RetrievalMetadata {
         RetrievalMetadata {
             erasure_coding: (10, 4),
@@ -177,6 +187,7 @@ mod tests {
             encryption: "aes-256-gcm".to_string(),
             content_type: "application/octet-stream".to_string(),
             created_at: chrono::Utc::now().timestamp(),
+            encrypted_blob_size: 0,
         }
     }
 
@@ -202,8 +213,6 @@ mod tests {
 
     #[test]
     fn test_retrieval_plan_validation_valid() {
-        use crate::assets::storage::ShardMetadata;
-
         let content_hash = [1u8; 32];
         let mut shard_map = CompleteShardMap::new();
 

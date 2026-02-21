@@ -14,6 +14,7 @@ pub mod config;
 pub mod stoq_integration;
 pub mod blockchain_integration;
 pub mod validation;
+pub mod reflector_pool;
 
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;

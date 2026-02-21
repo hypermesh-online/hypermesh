@@ -4,7 +4,7 @@
 
 **Development Status**: ⚠️ **EARLY DEVELOPMENT** - Core components in initial implementation phase
 **Repository Status**: ✅ **SEPARATED** - 6 repositories at github.com/hypermesh-online/
-**Implementation Status**: ⚠️ **FOUNDATIONAL PHASE** - Basic blockchain and asset system partially operational, multi-scope architecture pending
+**Implementation Status**: ⚠️ **FOUNDATIONAL PHASE** - Basic blockchain and asset system partially operational, Network scope sync pending
 
 ---
 
@@ -17,19 +17,19 @@
 | **NGauge** | `/ngauge` | 🚧 Planning | Engagement platform concept |
 | **Caesar** | `/caesar` | ⚡ **40% Complete** | HTTP→STOQ migration in progress |
 | **Catalog** | `/catalog` | ⚡ **30% Complete** | Asset package registry/template library ONLY - NOT asset manager |
-| **BlockMatrix** | `/blockmatrix` | ⚠️ **10% Complete** | Single blockchain per node, multi-scope pending |
+| **BlockMatrix** | `/blockmatrix` | ⚠️ **10% Complete** | Device chain always running, Network sync pending |
 | **STOQ** | `/stoq` | ✅ **92% Complete** | QUIC transport with eBPF integration |
 | **TrustChain** | `/trustchain` | ✅ **95% Complete** | FALCON-1024 CA production-ready |
 
 ### Critical Architectural Note: Block-MATRIX Topology
 All components operate within a Block-MATRIX network where each node is a cell in a geospatial matrix (x,y,z coordinates). This enables:
 - **Tensor Operations**: Mathematical matrix operations for routing and resource allocation
-- **Multi-Scope Blockchain Participation**: Nodes participate in multiple blockchain scopes simultaneously (target architecture)
+- **Dual-Scope Blockchain**: Device (local) and Network (synced) blockchain scopes
 - **Matrix-Aware Coordination**: Intelligent shard distribution based on topology
 - **Network Independence**: Local blockchain runs regardless of network connectivity
 
-**CURRENT STATE**: Single blockchain per node (5-10% implemented)
-**TARGET STATE**: Multi-scope blockchain participation (see "Blockchain Architecture" section below)
+**CURRENT STATE**: Single blockchain per node — Device scope only (5-10% implemented)
+**TARGET STATE**: Device + Network blockchain scopes (see "Blockchain Architecture" section below)
 
 ### **Repository Sync Commands**
 ```bash
@@ -43,12 +43,11 @@ scripts/deploy/deploy-all.sh              # One-command deployment
 
 ## 🔧 **Critical Gaps (Next Priority)**
 
-### **1. Multi-Scope Blockchain Implementation**
-- ❌ BlockchainScope abstraction (foundational architecture)
-- ❌ User Scope implementation (Phase 1 MVP)
-- ❌ Gateway architecture for scope bridging
-- ❌ Cross-scope asset transfers
-- ❌ Scope-aware consensus rules
+### **1. Network Scope Blockchain Implementation**
+- ❌ Network scope sync (reflector/swarm mode)
+- ❌ Gateway architecture for Device-to-Network bridging
+- ❌ Cross-network asset transfers
+- ❌ Reflector pooling for Network chain synchronization
 
 ### **2. Integration and Testing**
 - ⚡ Component integration tests needed (components work individually)
@@ -159,86 +158,83 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 
 ## Blockchain Architecture
 
-### Multi-Scope Blockchain Participation (TARGET ARCHITECTURE)
+### Dual-Scope Blockchain Architecture (TARGET ARCHITECTURE)
 
-**CRITICAL DISTINCTION**: Network privacy tiers (Anonymous/P2P/Federated/Public) are TRANSPORT layer concerns. Blockchain scopes are CONSENSUS layer concerns. These are independent dimensions.
+**BlockchainScope is binary**: Device (local) | Network (synced). PrivacyMode (Anonymous/Private/Public) handles all participation semantics independently at the transport layer.
 
 #### Current Implementation Status: ~5-10%
 **What EXISTS today**:
-- ✅ Single blockchain per node (local Device scope only)
-- ✅ Multi-network participation (Anonymous/P2P/Federated/Public networks via STOQ)
+- ✅ Single blockchain per node (Device scope only)
+- ✅ Multi-network participation (Anonymous/Private/Public networks via STOQ)
 - ✅ Basic Proof of State validation (four proofs: PoSpace/PoStake/PoWork/PoTime)
 - ✅ Asset system with blockchain registration
-- ❌ Multi-blockchain-per-node capability (NOT implemented)
-- ❌ BlockchainScope abstraction (does NOT exist)
-- ❌ Gateway architecture for scope bridging (NOT implemented)
-- ❌ Cross-scope transfers (NOT implemented)
+- ❌ Network scope sync (reflector/swarm mode NOT implemented)
+- ❌ Gateway architecture for Device-to-Network bridging (NOT implemented)
+- ❌ Cross-network asset transfers (NOT implemented)
 
 **Key File Status**:
 - `/blockmatrix/src/blockchain/` - Single blockchain implementation (Device scope only)
 - `/blockmatrix/src/consensus/` - Basic PoS validation, no scope awareness
-- No `blockchain_scope.rs` or similar scope management files exist
 
-#### Target Multi-Scope Architecture (FUTURE VISION)
+#### Two Blockchain Scope Types
 
-**Six Blockchain Scope Types**:
-1. **Device Scope**: Single device, local-only blockchain (CURRENT STATE)
-2. **User Scope**: User's devices share blockchain (PHASE 1 TARGET)
-3. **Group Scope**: Small trusted groups (friends, family)
-4. **Organization Scope**: Companies, teams, departments
-5. **Federation Scope**: Multi-org collaboration networks
-6. **Public Scope**: Global public blockchain (trust.hypermesh.online)
+1. **Device**: Single device, local-only blockchain. Always running from boot. No network required.
+2. **Network**: Synchronized across participating nodes via reflector/swarm mode. Requires connectivity.
 
-**Multi-Blockchain Participation Model**:
-- Node participates in multiple blockchain scopes simultaneously
-- Each scope has independent blockchain with own consensus rules
-- Pluggable consensus per scope (Byzantine for Device/User, PoS for Public)
-- Gateway nodes bridge scopes, route cross-scope transfers
-- Hierarchical routing between scopes
+**Why only two**: PrivacyMode handles all participation semantics. A "Group" is a Private network with specific peers. An "Organization" is a bigger Private network. Sub-federation is nesting -- same protocol at every level. The blockchain either syncs with a network or it does not.
+
+**Participation Model**:
+- Node runs Device chain always (local, independent)
+- Node optionally joins one or more Network chains (synced via reflector pooling)
+- Each Network chain has independent consensus rules
+- Gateway nodes bridge Device-to-Network and cross-network transfers
+- PrivacyMode controls transport behavior independently of chain scope
 
 **Per-Asset Distribution Policies**:
-- Assets declare which scopes they participate in
-- Privacy settings determine scope visibility
-- Cross-scope transfers require proof of state in both scopes
-- Scope-aware shard placement based on matrix topology
+- Assets declare which chains they participate in (Device-only or Network-synced)
+- PrivacyMode settings determine transport behavior and visibility
+- Cross-network transfers require proof of state in both chains
+- Matrix-topology-aware shard placement
 
 #### Key Distinctions (Eliminate Confusion)
 
-**Network Privacy Tiers** (TRANSPORT layer via STOQ):
-- Anonymous, P2P, Federated, Public
+**PrivacyMode** (TRANSPORT layer via STOQ):
+- Anonymous (open, untracked), Private (bounded, tracked), Public (open, tracked)
 - Controls packet tracking and identity disclosure
 - Independent of blockchain scope
 
-**Blockchain Scopes** (CONSENSUS layer):
-- Device, User, Group, Org, Federation, Public
-- Controls who participates in consensus
-- Independent of network privacy
+**BlockchainScope** (CONSENSUS layer):
+- Device (local-only), Network (synced across nodes)
+- Controls whether chain state is replicated
+- Independent of transport privacy
 
 **Example Combinations**:
-- User Scope blockchain over Anonymous network = Private family devices, untraceable packets
-- Public Scope blockchain over Federated network = Open ledger, controlled network access
-- Group Scope blockchain over Public network = Friends-only consensus, tracked routing
+- Device chain + Anonymous transport = fully isolated, untraceable node
+- Device chain + Private transport = local chain visible to bounded group
+- Network chain + Anonymous transport = synced swarm, untraceable packets
+- Network chain + Private transport = synced group with identity (family, company)
+- Network chain + Public transport = open synced ledger, full transparency
 
 #### Gateway Architecture (FUTURE)
 
-**trust.hypermesh.online as Public Scope Gateway**:
-- Entry point for Public Scope blockchain participation
-- Routes requests to appropriate scope gateways
+**trust.hypermesh.online as Network Gateway**:
+- Entry point for public Network chain participation
+- Routes requests to appropriate network reflectors
 - NAT traversal for devices behind firewalls
 - Blockchain state replication vs resource location distinction
 
 **Gateway Nodes**:
-- Bridge between blockchain scopes
-- Validate cross-scope transfers
-- Maintain partial state from multiple scopes
-- Route based on matrix topology and scope membership
+- Bridge between Device and Network chains
+- Validate cross-network transfers
+- Maintain partial state from multiple Network chains
+- Route based on matrix topology and network membership
 
 #### Remote Access Model
 
 **Blockchain State Replication**:
-- User Scope: Devices replicate shared blockchain state
+- Network scope: Nodes replicate shared blockchain state via reflector pooling
 - Gateway caches recent blocks, routes queries to authoritative nodes
-- Full replication for small scopes, partial for large scopes
+- Full replication for small networks, partial for large networks
 
 **Resource Location vs Blockchain Access**:
 - Blockchain access: Query gateway for block/transaction data
@@ -254,11 +250,11 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 - Blockchain runs independently of network participation mode
 - Node is fully functional for localhost operations from moment of creation
 
-**Future Behavior (Multi-Scope)**:
-- Device Scope blockchain starts immediately on boot (as today)
-- User/Group/Org/Federation/Public scopes joined after network connection
-- Node queries gateway to discover and join appropriate scopes
-- Synchronizes blockchain state for each joined scope
+**Future Behavior (Device + Network)**:
+- Device chain starts immediately on boot (as today)
+- Network chains joined after connectivity is established
+- Node queries gateway/reflector to discover and join Network chains
+- Synchronizes blockchain state for each joined Network chain via reflector pooling
 
 ### Node-as-DNS-Provider First
 **Critical Difference from Traditional Systems:**
@@ -308,41 +304,32 @@ DNS names are blockchain assets earning CAESAR rewards.
 - **Privacy Tier Enforcement**: Different behavior for Anonymous vs Public connections
 - **Protocol-Level Routing**: Smart routing decisions based on matrix topology
 
-## Multi-Scope Implementation Roadmap
+## Network Scope Implementation Roadmap
 
-### Phase 1: User Scope (MVP Target)
-**Goal**: Enable user's devices to share blockchain
-- Implement BlockchainScope abstraction
-- Device Scope → User Scope migration
-- Shared blockchain state across user's devices
-- Private federated system isolated from public network
-- Use case: Personal cloud with all devices sharing resources
+### Phase 1: Network Sync (MVP Target)
+**Goal**: Enable nodes to join and synchronize a shared Network chain
+- Implement Network scope with reflector/swarm sync
+- Reflector pooling for chain state propagation
+- Use case: User's devices sharing resources via Private network
+- Use case: Friends/family group via Private network with specific peers
 
 **Files to Create**:
-- `/blockmatrix/src/blockchain_scope.rs` - Scope abstraction and management
-- `/blockmatrix/src/scope/user.rs` - User scope implementation
-- `/blockmatrix/src/scope/device.rs` - Refactor existing blockchain to Device scope
-- `/blockmatrix/src/gateway/scope_bridge.rs` - Cross-scope communication
+- `/blockmatrix/src/blockchain_scope.rs` - Device | Network scope abstraction
+- `/blockmatrix/src/gateway/scope_bridge.rs` - Device-to-Network bridging
 
-### Phase 2: Group/Organization Scopes
-**Goal**: Small trusted groups and organizational networks
-- Group Scope for friends/family trusted networks
-- Organization Scope for companies and teams
-- Federated trust integration with TrustChain
-- Scope-aware consensus rules
-
-### Phase 3: Public Scope Participation
-**Goal**: Integration with trust.hypermesh.online gateway
-- Public Scope blockchain via global gateway
+### Phase 2: Cross-Network Operations
+**Goal**: Enable transfers and interactions across Network chains
+- Cross-network asset transfers with dual proof of state
 - NAT traversal for behind-firewall devices
-- Cross-scope asset transfers
-- CAESAR reward distribution for public participation
+- TrustChain certificate-based cross-network trust
+- CAESAR reward distribution for public Network participation
 
-### Phase 4: Flexible Topology
-**Goal**: Configurable flat/nested/hybrid scope architectures
-- Flat: All scopes at same level
-- Nested: Hierarchical scopes (Device → User → Group → Org → Federation → Public)
-- Hybrid: Mix of flat and nested based on use case
+### Phase 3: Nested Networks
+**Goal**: Sub-federation support via nested Private networks
+- Nested Network chains (same protocol at every level)
+- Hierarchical routing between nested networks
+- Gateway nodes bridge parent/child networks
+- Use case: Department networks within organization network
 
 ## Four Privacy Tiers (Network-Level Behavior)
 
@@ -357,24 +344,25 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 **Network layer (transport) is COMPLETELY INDEPENDENT from blockchain layer (consensus):**
 
-**Transport Layer** (STOQ network privacy tiers):
-- Anonymous, P2P, Federated, Public
+**Transport Layer** (STOQ PrivacyMode):
+- Anonymous (open, untracked), Private (bounded, tracked), Public (open, tracked)
 - Controls packet tracking and communication privacy
 
-**Consensus Layer** (Blockchain scopes):
-- Device, User, Group, Org, Federation, Public
-- Controls who participates in blockchain consensus
+**Consensus Layer** (BlockchainScope):
+- Device (local-only), Network (synced)
+- Controls whether chain state is replicated across nodes
 
 **Example Combinations**:
-- **User Scope blockchain on Anonymous network** = Family devices sharing private blockchain, untraceable packets
-- **Public Scope blockchain on Federated network** = Open ledger accessible to world, controlled network membership
-- **Group Scope blockchain on Public network** = Friends-only consensus with full packet tracking
-- **Device Scope blockchain on Public network** = Single device, full public participation
+- **Device chain + Anonymous transport** = Fully isolated, untraceable node
+- **Device chain + Private transport** = Local chain visible to bounded group
+- **Network chain + Anonymous transport** = Synced swarm, untraceable packets
+- **Network chain + Private transport** = Synced group with identity (family, company)
+- **Network chain + Public transport** = Open synced ledger, full transparency
 
 **Real-world example (Current + Future)**:
-- **Today**: Single device runs Device Scope blockchain over any network privacy tier
-- **Phase 1**: User's devices share User Scope blockchain, communicate over Anonymous STOQ network
-- **Result**: Complete privacy (private consensus + untraceable packets), no external entity can see blockchain OR communication
+- **Today**: Single device runs Device chain over any PrivacyMode
+- **Phase 1**: User's devices join Network chain, communicate over Anonymous STOQ transport
+- **Result**: Complete privacy (synced chain + untraceable packets), no external entity can see blockchain OR communication
 
 ## Revolutionary Distribution: Instruction-Based Retrieval
 
@@ -413,24 +401,18 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 ## 🎯 **Next Actions (Context for Resumption)**
 
-### **Immediate Priority (Multi-Scope Implementation)**
-1. **BlockchainScope Abstraction**: Core multi-scope architecture (`/blockmatrix/src/blockchain_scope.rs`)
-2. **User Scope MVP**: Enable user's devices to share blockchain (Phase 1)
-3. **Gateway Architecture**: Cross-scope communication and bridging
+### **Immediate Priority (Network Scope Implementation)**
+1. **BlockchainScope Abstraction**: Device | Network scope (`/blockmatrix/src/blockchain_scope.rs`)
+2. **Network Sync MVP**: Reflector/swarm mode for Network chain synchronization (Phase 1)
+3. **Gateway Architecture**: Device-to-Network bridging and cross-network transfers
 4. **Integration Testing**: End-to-end workflow validation across components
 5. **Performance Optimization**: STOQ transport tuning (2.95 Gbps → adaptive tiers)
 
 ### **Key Files for Development**
 
-**Multi-Scope Blockchain (TO BE CREATED)**:
-- `/blockmatrix/src/blockchain_scope.rs` - Scope abstraction and management
-- `/blockmatrix/src/scope/device.rs` - Device scope (refactor existing blockchain)
-- `/blockmatrix/src/scope/user.rs` - User scope implementation
-- `/blockmatrix/src/scope/group.rs` - Group scope implementation
-- `/blockmatrix/src/scope/org.rs` - Organization scope implementation
-- `/blockmatrix/src/scope/federation.rs` - Federation scope implementation
-- `/blockmatrix/src/scope/public.rs` - Public scope implementation
-- `/blockmatrix/src/gateway/scope_bridge.rs` - Cross-scope communication
+**Network Scope Blockchain (TO BE CREATED)**:
+- `/blockmatrix/src/blockchain_scope.rs` - Device | Network scope abstraction
+- `/blockmatrix/src/gateway/scope_bridge.rs` - Device-to-Network bridging
 
 **Existing Implementation**:
 - `/blockmatrix/src/blockchain/` - Single blockchain implementation (Device scope only)
@@ -459,17 +441,17 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ Quantum-resistant cryptography (FALCON-1024, Kyber)
 
 **Blockchain Architecture** (Clarified):
-- ✅ **Current State**: Single blockchain per node (Device Scope only)
-- ✅ **Target State**: Multi-scope blockchain participation (6 scopes)
-- ✅ **Layer Separation**: Network privacy (transport) ≠ Blockchain scope (consensus)
-- ❌ **Multi-Blockchain-Per-Node**: NOT yet implemented (5-10% complete)
-- ❌ **BlockchainScope Abstraction**: Foundational architecture pending
+- ✅ **Current State**: Single blockchain per node (Device scope only)
+- ✅ **Target State**: Device (local) + Network (synced) dual-scope model
+- ✅ **Layer Separation**: PrivacyMode (transport) ≠ BlockchainScope (consensus)
+- ❌ **Network Scope Sync**: Reflector/swarm mode NOT yet implemented
+- ❌ **BlockchainScope Abstraction**: Device | Network pending
 
 **Privacy Architecture** (Clarified):
-- ✅ **Four Network Privacy Tiers**: Anonymous | Private P2P | Federated | Public (STOQ transport layer)
-- ✅ **Six Blockchain Scopes**: Device | User | Group | Org | Federation | Public (consensus layer)
-- ✅ **Privacy Flexibility Matrix**: Network privacy ≠ Blockchain scope (independent dimensions)
-- ✅ **Transport + Consensus Independence**: Any network tier can carry any blockchain scope
+- ✅ **Three PrivacyModes**: Anonymous | Private | Public (STOQ transport layer)
+- ✅ **Two Blockchain Scopes**: Device | Network (consensus layer)
+- ✅ **Privacy Flexibility Matrix**: PrivacyMode ≠ BlockchainScope (independent dimensions)
+- ✅ **Transport + Consensus Independence**: Any PrivacyMode can carry any BlockchainScope
 
 ---
 
@@ -481,13 +463,13 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ❌ **Lua VM Integration**: REMOVED - Remote execution on HyperMesh nodes only
 
 **Current Phase**: Foundation development with 5-10% implementation complete
-**Next Milestone**: Implement multi-scope blockchain architecture (BlockchainScope abstraction + User Scope MVP)
+**Next Milestone**: Implement Network scope blockchain sync (reflector/swarm mode)
 
 **Critical Understanding**:
-- **Current State**: Single blockchain per node (Device Scope only), NOT multi-scope
-- **Network vs Blockchain**: Privacy tiers (Anonymous/P2P/Federated/Public) are TRANSPORT layer, Blockchain scopes (Device/User/Group/Org/Federation/Public) are CONSENSUS layer
-- **Layer Independence**: Network privacy and blockchain scope are independent dimensions
-- **Target Architecture**: Nodes will participate in multiple blockchain scopes simultaneously
+- **Current State**: Single blockchain per node (Device scope only), Network scope not yet implemented
+- **PrivacyMode vs BlockchainScope**: PrivacyMode (Anonymous/Private/Public) is TRANSPORT layer, BlockchainScope (Device/Network) is CONSENSUS layer
+- **Layer Independence**: PrivacyMode and BlockchainScope are independent dimensions
+- **Target Architecture**: Nodes run Device chain always + optionally join Network chains via reflector pooling
 - The Block-MATRIX topology IS the trust mechanism - position in matrix determines trust relationships
 - STOQ provides protocol-level intelligence, not just transport
 - Everything runs through STOQ - no HTTP, no traditional networking

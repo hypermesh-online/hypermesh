@@ -380,7 +380,7 @@ mod tests {
         let matrix_east = converter.gps_to_matrix(&east).unwrap();
 
         // They should be close in matrix space (2 degrees apart)
-        let distance = ((matrix_west.x - matrix_east.x).abs() as f64);
+        let distance = (matrix_west.x - matrix_east.x).abs() as f64;
         assert!(distance < 250.0); // ~222km at equator
     }
 

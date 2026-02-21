@@ -16,24 +16,22 @@ items = [
     "Proof of State four-proof validation",
     "eBPF security manager with XDP attachment and policy enforcement",
     "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
-    "Security integration tests (framework, eBPF manager, syscall tracing, metrics)",
+    "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
     "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
+    "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
+    "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)",
 ]
 
 [features.in_development]
 items = [
-    "Asset pipeline reorder (Compress-Encrypt-Shard)",
-    "Kyber-1024 for asset encryption",
-    "Instruction-based retrieval system",
-    "OS integration layer (Linux/macOS/Windows)",
+    "Network scope sync + reflector pooling — Device↔Network chain synchronization (foundation built)",
 ]
 
 [features.planned]
 items = [
-    "Multi-scope blockchain (User/Group/Org/Public)",
-    "Global sync state for Public/Federated scopes — collective redundancy across participating nodes",
-    "Reflector pooling — redundancy/replication system working in tandem with STOQ transport",
+    "Gateway architecture for cross-scope asset transfers and scope bridging",
     "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
+    "Cross-scope proxy routing — NAT-like asset access across blockchain scope boundaries",
     "Container runtime with isolation",
     "Multi-node production deployment",
     "Dynamic shard rebalancing",

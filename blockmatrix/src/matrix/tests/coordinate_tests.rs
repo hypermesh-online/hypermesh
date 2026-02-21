@@ -4,7 +4,7 @@
 
 //! Integration tests for MatrixCoordinate
 
-use crate::matrix::{MatrixCoordinate, CoordinateError};
+use crate::matrix::MatrixCoordinate;
 
 #[test]
 fn test_coordinate_creation_and_validation() {

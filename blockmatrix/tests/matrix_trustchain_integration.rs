@@ -19,7 +19,7 @@ use blockmatrix::network::blockchain_integration::{
     MatrixPositionValidator, ValidationStatus
 };
 use blockmatrix::network::validation::NetworkPositionValidator;
-use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
+use trustchain::consensus::ConsensusProof;
 
 #[tokio::test]
 async fn test_matrix_position_registration_flow() -> Result<()> {
@@ -137,7 +137,7 @@ async fn test_pos_validation_requirements() -> Result<()> {
     let validator = MatrixPositionValidator::new(blockchain);
 
     // Create a proof that might not meet production requirements
-    let mut proof = ConsensusProof::new_for_testing();
+    let proof = ConsensusProof::new_for_testing();
 
     // Try to register with potentially insufficient proof
     let result = validator.register_position(

@@ -212,7 +212,7 @@ impl MockConsensusValidator {
 impl ConsensusValidator for MockConsensusValidator {
     async fn validate_storage_access(
         &self,
-        node_id: &str,
+        _node_id: &str,
         _asset_id: &str,
         _shard_id: &str,
     ) -> AssetResult<StorageAccessValidation> {

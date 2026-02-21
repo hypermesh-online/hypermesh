@@ -1,28 +1,36 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright (c) 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Encryption Stage - AES-256-GCM encryption for the asset pipeline
+//! Encryption Stage - Kyber-1024 KEM + AES-256-GCM whole-blob encryption
 //!
-//! Encrypts the whole compressed blob before sharding (not per-shard).
-//! TODO: Should use Kyber-1024 for whole-blob encryption instead of AES-256-GCM
+//! Encrypts the entire compressed blob before sharding using quantum-resistant
+//! Kyber-1024 key encapsulation mechanism (KEM) to establish a shared secret,
+//! then AES-256-GCM for symmetric encryption of the data.
+//!
+//! Pipeline order: Compress -> **Encrypt (whole blob)** -> Shard -> Distribute
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use rand::RngCore;
+use sha2::{Digest, Sha256};
+
+// ── Configuration ────────────────────────────────────────────────────────────
 
 /// Encryption configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptionConfig {
-    /// Enable quantum-resistant key exchange (Kyber-1024)
+    /// Enable quantum-resistant key exchange (Kyber-1024 KEM + AES-256-GCM).
+    /// When false, falls back to plain AES-256-GCM with a random key.
     pub quantum_resistant: bool,
-    /// Key derivation iterations
-    pub key_iterations: u32,
-    /// Nonce size (12 bytes for GCM)
+    /// Nonce size in bytes (12 for AES-GCM)
     pub nonce_size: usize,
 }
 
@@ -30,34 +38,33 @@ impl Default for EncryptionConfig {
     fn default() -> Self {
         Self {
             quantum_resistant: true,
-            key_iterations: 100_000,
             nonce_size: 12,
         }
     }
 }
+
+// ── Statistics ────────────────────────────────────────────────────────────────
 
 /// Encryption statistics
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EncryptionStats {
     /// Original size in bytes
     pub original_size: usize,
-    /// Encrypted size in bytes (includes nonce + tag)
+    /// Encrypted size in bytes (AES ciphertext including auth tag)
     pub encrypted_size: usize,
     /// Encryption time in milliseconds
     pub duration_ms: u64,
     /// Throughput in MB/s
     pub throughput_mbps: f64,
-    /// Number of shards encrypted
-    pub shards_encrypted: usize,
+    /// Whether Kyber-1024 KEM was used
+    pub quantum_resistant: bool,
 }
 
 impl EncryptionStats {
-    fn calculate(original_size: usize, encrypted_size: usize, duration_ms: u64) -> Self {
-        // Use microseconds for better precision and convert back for throughput calculation
+    fn calculate(original_size: usize, encrypted_size: usize, duration_ms: u64, qr: bool) -> Self {
         let throughput_mbps = if duration_ms > 0 {
             (original_size as f64 / (1024.0 * 1024.0)) / (duration_ms as f64 / 1000.0)
         } else if original_size > 0 {
-            // If duration is too small to measure, use a minimum of 0.001ms (1 microsecond)
             (original_size as f64 / (1024.0 * 1024.0)) / 0.001
         } else {
             0.0
@@ -68,38 +75,67 @@ impl EncryptionStats {
             encrypted_size,
             duration_ms,
             throughput_mbps,
-            shards_encrypted: 0,
+            quantum_resistant: qr,
         }
     }
 }
 
-/// Shard encryption key
+// ── Key types ────────────────────────────────────────────────────────────────
+
+/// Kyber-1024 key pair (public + secret) for KEM operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShardKey {
-    /// AES-256 key (32 bytes)
+pub struct KyberKeyPair {
+    /// Kyber-1024 public key bytes
     #[serde(with = "serde_bytes")]
-    pub key: Vec<u8>,
-    /// Nonce (12 bytes for GCM)
+    pub public_key: Vec<u8>,
+    /// Kyber-1024 secret key bytes
     #[serde(with = "serde_bytes")]
-    pub nonce: Vec<u8>,
-    /// Shard index
-    pub shard_index: usize,
+    pub secret_key: Vec<u8>,
 }
 
-/// Encrypted data with metadata
+/// Result of Kyber-1024 KEM + AES-256-GCM encryption on the whole blob.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KyberEncryptionResult {
+    /// Kyber KEM ciphertext (for key agreement / decapsulation)
+    #[serde(with = "serde_bytes")]
+    pub ciphertext_kem: Vec<u8>,
+    /// AES-256-GCM encrypted data (includes 16-byte auth tag appended by aes-gcm)
+    #[serde(with = "serde_bytes")]
+    pub encrypted_data: Vec<u8>,
+    /// 12-byte GCM nonce
+    #[serde(with = "serde_bytes")]
+    pub nonce: Vec<u8>,
+    /// Pre-encryption size in bytes
+    pub original_size: usize,
+}
+
+/// Legacy whole-blob encrypted data (plain AES-256-GCM, no Kyber).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedData {
-    /// Encrypted ciphertext (includes authentication tag)
+    /// AES-256-GCM ciphertext (includes auth tag)
     #[serde(with = "serde_bytes")]
     pub ciphertext: Vec<u8>,
-    /// Nonce used for encryption
+    /// 12-byte nonce
     #[serde(with = "serde_bytes")]
     pub nonce: Vec<u8>,
     /// Original data size
     pub original_size: usize,
 }
 
-/// Encryptor for asset data
+/// Plain AES-256-GCM key (used when `quantum_resistant` is false).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AesKey {
+    /// AES-256 key (32 bytes)
+    #[serde(with = "serde_bytes")]
+    pub key: Vec<u8>,
+    /// Nonce (12 bytes)
+    #[serde(with = "serde_bytes")]
+    pub nonce: Vec<u8>,
+}
+
+// ── Encryptor ────────────────────────────────────────────────────────────────
+
+/// Whole-blob encryptor using Kyber-1024 KEM + AES-256-GCM.
 pub struct Encryptor {
     config: EncryptionConfig,
 }
@@ -110,61 +146,178 @@ impl Encryptor {
         Self { config }
     }
 
-    /// Create encryptor with default configuration
+    /// Create encryptor with default (quantum-resistant) configuration
     pub fn default() -> Self {
         Self::new(EncryptionConfig::default())
     }
 
-    /// Generate a new encryption key
-    pub fn generate_key(&self) -> PipelineResult<ShardKey> {
-        let mut key = vec![0u8; 32]; // AES-256
-        let mut nonce = vec![0u8; self.config.nonce_size];
+    // ── Kyber keypair ────────────────────────────────────────────────────
 
-        OsRng.fill_bytes(&mut key);
-        OsRng.fill_bytes(&mut nonce);
+    /// Generate a Kyber-1024 key pair for KEM-based encryption.
+    pub fn generate_keypair(&self) -> PipelineResult<KyberKeyPair> {
+        let (pk, sk) = kyber1024::keypair();
 
-        Ok(ShardKey {
-            key,
-            nonce,
-            shard_index: 0,
+        let public_key = pk.as_bytes().to_vec();
+        let secret_key = sk.as_bytes().to_vec();
+
+        if public_key.len() != kyber1024::public_key_bytes() {
+            return Err(PipelineError::EncryptionFailed(format!(
+                "Kyber-1024 public key size mismatch: expected {}, got {}",
+                kyber1024::public_key_bytes(),
+                public_key.len()
+            )));
+        }
+        if secret_key.len() != kyber1024::secret_key_bytes() {
+            return Err(PipelineError::EncryptionFailed(format!(
+                "Kyber-1024 secret key size mismatch: expected {}, got {}",
+                kyber1024::secret_key_bytes(),
+                secret_key.len()
+            )));
+        }
+
+        Ok(KyberKeyPair {
+            public_key,
+            secret_key,
         })
     }
 
-    /// Generate keys for multiple shards
-    pub fn generate_shard_keys(&self, num_shards: usize) -> PipelineResult<Vec<ShardKey>> {
-        let mut keys = Vec::with_capacity(num_shards);
+    // ── Encrypt (whole blob) ─────────────────────────────────────────────
 
-        for i in 0..num_shards {
-            let mut key = self.generate_key()?;
-            key.shard_index = i;
-            keys.push(key);
-        }
-
-        Ok(keys)
-    }
-
-    /// Encrypt data with a given key
+    /// Encrypt entire data blob with Kyber-1024 KEM + AES-256-GCM.
+    ///
+    /// 1. `kyber1024::encapsulate(public_key)` produces `(shared_secret, ciphertext_kem)`
+    /// 2. Derive AES-256 key from `shared_secret` via SHA-256
+    /// 3. Generate random 12-byte nonce
+    /// 4. AES-256-GCM encrypt the full data blob
     pub fn encrypt(
         &self,
         data: &[u8],
-        key: &ShardKey,
+        public_key: &[u8],
+    ) -> PipelineResult<(KyberEncryptionResult, EncryptionStats)> {
+        let start = std::time::Instant::now();
+
+        // Reconstruct Kyber public key
+        let pk = kyber1024::PublicKey::from_bytes(public_key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!(
+                "Invalid Kyber-1024 public key: {}",
+                e
+            ))
+        })?;
+
+        // KEM encapsulation
+        let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
+
+        // Derive AES-256 key from shared secret
+        let aes_key = derive_aes_key(shared_secret.as_bytes());
+
+        // Generate random 12-byte nonce
+        let mut nonce_bytes = vec![0u8; self.config.nonce_size];
+        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+
+        // AES-256-GCM encrypt entire blob
+        let cipher = Aes256Gcm::new_from_slice(&aes_key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("AES key init failed: {}", e))
+        })?;
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let ciphertext = cipher.encrypt(nonce, data).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("AES-GCM encryption failed: {}", e))
+        })?;
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let stats = EncryptionStats::calculate(
+            data.len(),
+            ciphertext.len(),
+            duration_ms,
+            true,
+        );
+
+        let result = KyberEncryptionResult {
+            ciphertext_kem: kem_ct.as_bytes().to_vec(),
+            encrypted_data: ciphertext,
+            nonce: nonce_bytes,
+            original_size: data.len(),
+        };
+
+        Ok((result, stats))
+    }
+
+    // ── Decrypt (whole blob) ─────────────────────────────────────────────
+
+    /// Decrypt entire data blob with Kyber-1024 KEM + AES-256-GCM.
+    ///
+    /// 1. `kyber1024::decapsulate(ciphertext_kem, secret_key)` recovers `shared_secret`
+    /// 2. Derive AES-256 key from `shared_secret` via SHA-256
+    /// 3. AES-256-GCM decrypt using the stored nonce
+    pub fn decrypt(
+        &self,
+        encrypted: &KyberEncryptionResult,
+        secret_key: &[u8],
+    ) -> PipelineResult<Vec<u8>> {
+        // Reconstruct Kyber secret key
+        let sk = kyber1024::SecretKey::from_bytes(secret_key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!(
+                "Invalid Kyber-1024 secret key: {}",
+                e
+            ))
+        })?;
+
+        // Reconstruct KEM ciphertext
+        let kem_ct = kyber1024::Ciphertext::from_bytes(&encrypted.ciphertext_kem).map_err(|e| {
+            PipelineError::EncryptionFailed(format!(
+                "Invalid Kyber-1024 KEM ciphertext: {}",
+                e
+            ))
+        })?;
+
+        // KEM decapsulation
+        let shared_secret = kyber1024::decapsulate(&kem_ct, &sk);
+
+        // Derive same AES-256 key
+        let aes_key = derive_aes_key(shared_secret.as_bytes());
+
+        // AES-256-GCM decrypt
+        let cipher = Aes256Gcm::new_from_slice(&aes_key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("AES key init failed: {}", e))
+        })?;
+        let nonce = Nonce::from_slice(&encrypted.nonce);
+        let plaintext = cipher
+            .decrypt(nonce, encrypted.encrypted_data.as_ref())
+            .map_err(|e| {
+                PipelineError::EncryptionFailed(format!("AES-GCM decryption failed: {}", e))
+            })?;
+
+        Ok(plaintext)
+    }
+
+    // ── Plain AES-256-GCM helpers (non-quantum fallback) ─────────────────
+
+    /// Generate a random AES-256 key + nonce (non-quantum fallback).
+    pub fn generate_aes_key(&self) -> PipelineResult<AesKey> {
+        let mut key = vec![0u8; 32];
+        let mut nonce = vec![0u8; self.config.nonce_size];
+        rand::thread_rng().fill_bytes(&mut key);
+        rand::thread_rng().fill_bytes(&mut nonce);
+        Ok(AesKey { key, nonce })
+    }
+
+    /// Encrypt data with plain AES-256-GCM (non-quantum fallback).
+    pub fn encrypt_aes(
+        &self,
+        data: &[u8],
+        key: &AesKey,
     ) -> PipelineResult<(EncryptedData, EncryptionStats)> {
         let start = std::time::Instant::now();
 
-        // Create cipher
-        let cipher = Aes256Gcm::new_from_slice(&key.key)
-            .map_err(|e| PipelineError::EncryptionFailed(format!("Invalid key: {}", e)))?;
-
-        // Create nonce
+        let cipher = Aes256Gcm::new_from_slice(&key.key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("Invalid AES key: {}", e))
+        })?;
         let nonce = Nonce::from_slice(&key.nonce);
-
-        // Encrypt
-        let ciphertext = cipher
-            .encrypt(nonce, data)
-            .map_err(|e| PipelineError::EncryptionFailed(format!("Encryption failed: {}", e)))?;
+        let ciphertext = cipher.encrypt(nonce, data).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("AES encryption failed: {}", e))
+        })?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
-        let stats = EncryptionStats::calculate(data.len(), ciphertext.len(), duration_ms);
+        let stats = EncryptionStats::calculate(data.len(), ciphertext.len(), duration_ms, false);
 
         let encrypted = EncryptedData {
             ciphertext,
@@ -175,74 +328,22 @@ impl Encryptor {
         Ok((encrypted, stats))
     }
 
-    /// Decrypt data with a given key
-    pub fn decrypt(&self, encrypted: &EncryptedData, key: &ShardKey) -> PipelineResult<Vec<u8>> {
-        // Create cipher
-        let cipher = Aes256Gcm::new_from_slice(&key.key)
-            .map_err(|e| PipelineError::EncryptionFailed(format!("Invalid key: {}", e)))?;
-
-        // Create nonce
+    /// Decrypt data with plain AES-256-GCM (non-quantum fallback).
+    pub fn decrypt_aes(
+        &self,
+        encrypted: &EncryptedData,
+        key: &AesKey,
+    ) -> PipelineResult<Vec<u8>> {
+        let cipher = Aes256Gcm::new_from_slice(&key.key).map_err(|e| {
+            PipelineError::EncryptionFailed(format!("Invalid AES key: {}", e))
+        })?;
         let nonce = Nonce::from_slice(&encrypted.nonce);
-
-        // Decrypt
         let plaintext = cipher
             .decrypt(nonce, encrypted.ciphertext.as_ref())
-            .map_err(|e| PipelineError::EncryptionFailed(format!("Decryption failed: {}", e)))?;
-
+            .map_err(|e| {
+                PipelineError::EncryptionFailed(format!("AES decryption failed: {}", e))
+            })?;
         Ok(plaintext)
-    }
-
-    /// Encrypt multiple data blocks (for shards)
-    pub fn encrypt_shards(
-        &self,
-        shards: &[Vec<u8>],
-        keys: &[ShardKey],
-    ) -> PipelineResult<(Vec<EncryptedData>, EncryptionStats)> {
-        if shards.len() != keys.len() {
-            return Err(PipelineError::EncryptionFailed(
-                format!("Shard count ({}) does not match key count ({})", shards.len(), keys.len())
-            ));
-        }
-
-        let start = std::time::Instant::now();
-        let mut encrypted_shards = Vec::with_capacity(shards.len());
-        let mut total_original = 0;
-        let mut total_encrypted = 0;
-
-        for (shard, key) in shards.iter().zip(keys.iter()) {
-            let (encrypted, _) = self.encrypt(shard, key)?;
-            total_original += shard.len();
-            total_encrypted += encrypted.ciphertext.len();
-            encrypted_shards.push(encrypted);
-        }
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-        let mut stats = EncryptionStats::calculate(total_original, total_encrypted, duration_ms);
-        stats.shards_encrypted = shards.len();
-
-        Ok((encrypted_shards, stats))
-    }
-
-    /// Decrypt multiple encrypted blocks (for shards)
-    pub fn decrypt_shards(
-        &self,
-        encrypted: &[EncryptedData],
-        keys: &[ShardKey],
-    ) -> PipelineResult<Vec<Vec<u8>>> {
-        if encrypted.len() != keys.len() {
-            return Err(PipelineError::EncryptionFailed(
-                format!("Encrypted count ({}) does not match key count ({})", encrypted.len(), keys.len())
-            ));
-        }
-
-        let mut decrypted = Vec::with_capacity(encrypted.len());
-
-        for (enc, key) in encrypted.iter().zip(keys.iter()) {
-            let plain = self.decrypt(enc, key)?;
-            decrypted.push(plain);
-        }
-
-        Ok(decrypted)
     }
 
     /// Get encryption configuration
@@ -251,86 +352,153 @@ impl Encryptor {
     }
 }
 
+// ── Shared utility ───────────────────────────────────────────────────────────
+
+/// Derive AES-256 key from Kyber shared secret via SHA-256.
+/// Domain-separated with "KYBER-1024-AES-KEY:" prefix (same as trustchain).
+fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"KYBER-1024-AES-KEY:");
+    hasher.update(shared_secret);
+    hasher.finalize().into()
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_key_generation() {
+    fn test_kyber_keypair_generation() {
         let encryptor = Encryptor::default();
-        let key = encryptor.generate_key().unwrap();
+        let kp = encryptor
+            .generate_keypair()
+            .expect("test: keypair generation");
 
-        assert_eq!(key.key.len(), 32); // AES-256
-        assert_eq!(key.nonce.len(), 12); // GCM nonce
+        assert_eq!(
+            kp.public_key.len(),
+            kyber1024::public_key_bytes(),
+            "public key size"
+        );
+        assert_eq!(
+            kp.secret_key.len(),
+            kyber1024::secret_key_bytes(),
+            "secret key size"
+        );
     }
 
     #[test]
-    fn test_encryption_decryption() {
+    fn test_kyber_encrypt_decrypt_roundtrip() {
         let encryptor = Encryptor::default();
-        let key = encryptor.generate_key().unwrap();
-        let data = b"Hello, World! This is a test message.";
+        let kp = encryptor
+            .generate_keypair()
+            .expect("test: keypair generation");
+        let data = b"Hello, World! This is a quantum-resistant test message.";
 
-        let (encrypted, stats) = encryptor.encrypt(data, &key).unwrap();
-        assert!(encrypted.ciphertext.len() > data.len()); // Includes auth tag
-        assert_eq!(encrypted.original_size, data.len());
+        let (encrypted, stats) = encryptor
+            .encrypt(data, &kp.public_key)
+            .expect("test: encryption");
+
+        assert!(stats.quantum_resistant);
+        assert_eq!(stats.original_size, data.len());
+        assert!(stats.encrypted_size > data.len(), "ciphertext includes auth tag");
         assert!(stats.throughput_mbps > 0.0);
+        assert_eq!(encrypted.original_size, data.len());
+        assert!(!encrypted.ciphertext_kem.is_empty());
+        assert_eq!(encrypted.nonce.len(), 12);
 
-        let decrypted = encryptor.decrypt(&encrypted, &key).unwrap();
+        let decrypted = encryptor
+            .decrypt(&encrypted, &kp.secret_key)
+            .expect("test: decryption");
         assert_eq!(decrypted, data);
     }
 
     #[test]
-    fn test_shard_key_generation() {
+    fn test_wrong_secret_key_fails() {
         let encryptor = Encryptor::default();
-        let keys = encryptor.generate_shard_keys(10).unwrap();
-
-        assert_eq!(keys.len(), 10);
-        for (i, key) in keys.iter().enumerate() {
-            assert_eq!(key.shard_index, i);
-            assert_eq!(key.key.len(), 32);
-        }
-    }
-
-    #[test]
-    fn test_encrypt_decrypt_shards() {
-        let encryptor = Encryptor::default();
-        let shards = vec![
-            b"Shard 1".to_vec(),
-            b"Shard 2".to_vec(),
-            b"Shard 3".to_vec(),
-        ];
-        let keys = encryptor.generate_shard_keys(3).unwrap();
-
-        let (encrypted, stats) = encryptor.encrypt_shards(&shards, &keys).unwrap();
-        assert_eq!(encrypted.len(), 3);
-        assert_eq!(stats.shards_encrypted, 3);
-
-        let decrypted = encryptor.decrypt_shards(&encrypted, &keys).unwrap();
-        assert_eq!(decrypted, shards);
-    }
-
-    #[test]
-    fn test_wrong_key_fails() {
-        let encryptor = Encryptor::default();
-        let key1 = encryptor.generate_key().unwrap();
-        let key2 = encryptor.generate_key().unwrap();
+        let kp1 = encryptor
+            .generate_keypair()
+            .expect("test: keypair 1");
+        let kp2 = encryptor
+            .generate_keypair()
+            .expect("test: keypair 2");
         let data = b"Secret message";
 
-        let (encrypted, _) = encryptor.encrypt(data, &key1).unwrap();
-        let result = encryptor.decrypt(&encrypted, &key2);
+        let (encrypted, _) = encryptor
+            .encrypt(data, &kp1.public_key)
+            .expect("test: encryption");
 
-        assert!(result.is_err());
+        let result = encryptor.decrypt(&encrypted, &kp2.secret_key);
+        assert!(result.is_err(), "decryption with wrong key must fail");
     }
 
     #[test]
-    fn test_encryption_stats() {
+    fn test_large_blob_encrypt_decrypt() {
         let encryptor = Encryptor::default();
-        let key = encryptor.generate_key().unwrap();
-        let data = vec![0u8; 100000];
+        let kp = encryptor
+            .generate_keypair()
+            .expect("test: keypair generation");
 
-        let (encrypted, stats) = encryptor.encrypt(&data, &key).unwrap();
-        assert_eq!(stats.original_size, 100000);
-        assert!(stats.encrypted_size > stats.original_size); // Auth tag added
+        // 1 MB blob
+        let data = vec![0xABu8; 1024 * 1024];
+
+        let (encrypted, stats) = encryptor
+            .encrypt(&data, &kp.public_key)
+            .expect("test: large encryption");
+
+        assert_eq!(stats.original_size, 1024 * 1024);
+        assert!(stats.encrypted_size > 1024 * 1024);
+
+        let decrypted = encryptor
+            .decrypt(&encrypted, &kp.secret_key)
+            .expect("test: large decryption");
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_aes_fallback_encrypt_decrypt() {
+        let config = EncryptionConfig {
+            quantum_resistant: false,
+            ..Default::default()
+        };
+        let encryptor = Encryptor::new(config);
+        let key = encryptor
+            .generate_aes_key()
+            .expect("test: AES key generation");
+
+        assert_eq!(key.key.len(), 32);
+        assert_eq!(key.nonce.len(), 12);
+
+        let data = b"Fallback AES-256-GCM test data";
+        let (encrypted, stats) = encryptor
+            .encrypt_aes(data, &key)
+            .expect("test: AES encryption");
+
+        assert!(!stats.quantum_resistant);
+        assert!(encrypted.ciphertext.len() > data.len());
+
+        let decrypted = encryptor
+            .decrypt_aes(&encrypted, &key)
+            .expect("test: AES decryption");
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_encryption_stats_accuracy() {
+        let encryptor = Encryptor::default();
+        let kp = encryptor
+            .generate_keypair()
+            .expect("test: keypair generation");
+
+        let data = vec![0u8; 100_000];
+        let (_, stats) = encryptor
+            .encrypt(&data, &kp.public_key)
+            .expect("test: encryption");
+
+        assert_eq!(stats.original_size, 100_000);
+        assert!(stats.encrypted_size > 100_000, "auth tag adds bytes");
         assert!(stats.throughput_mbps > 0.0);
+        assert!(stats.quantum_resistant);
     }
 }

@@ -17,7 +17,7 @@ use blockmatrix::{
         distribute_shards_pos_aware, NodeInfo,
         pos_validator::{ConsensusValidator, StorageAccessValidation, DistributionProofType},
     },
-    assets::pipeline::sharding::{Sharder, ShardingConfig, Shard},
+    assets::pipeline::sharding::{Sharder, ShardingConfig},
     assets::core::AssetResult,
     matrix::coordinate::MatrixCoordinate,
 };

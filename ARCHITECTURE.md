@@ -215,7 +215,7 @@ Not yet implemented. Will provide unified metrics, distributed tracing, health m
 The single source of truth for canonical types shared across all crates:
 - `NodeId`, `AssetId` — identity newtypes
 - `NetworkPrivacyTier` — Anonymous | P2P | Federated | Public
-- `BlockchainScope` — Device | User | Group | Org | Federation | Public
+- `BlockchainScope` — Device | Network
 - `ProofType` — PoSpace | PoStake | PoWork | PoTime
 - `MatrixPosition`, `MatrixCoordinate` — topology primitives
 - `PipelineStage`, `CryptoAlgorithm`, `HypermeshError`
@@ -270,11 +270,10 @@ This is bilateral verification, not global consensus. The mesh scales without co
 
 Network privacy tiers (transport) and blockchain scopes (consensus) are independent dimensions:
 
-| | Anonymous Network | P2P Network | Federated Network | Public Network |
-|---|---|---|---|---|
-| **Device Scope** | Private device, untraceable | Private device, peer-visible | Private device, network-visible | Private device, fully visible |
-| **User Scope** | Family devices, untraceable | Family devices, peer-visible | Family devices, network-visible | Family devices, fully visible |
-| **Public Scope** | Open ledger, untraceable | Open ledger, peer-visible | Open ledger, network-visible | Open ledger, fully visible |
+| | Anonymous Transport | Private Transport | Public Transport |
+|---|---|---|---|
+| **Device Scope** | Local chain, untraceable | Local chain, group-visible | Local chain, fully visible |
+| **Network Scope** | Synced state, untraceable | Synced state, group-visible | Synced state, fully visible |
 
 ### Instruction-Based Retrieval
 

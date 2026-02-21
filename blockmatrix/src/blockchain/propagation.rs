@@ -499,7 +499,7 @@ mod tests {
         let result = propagator.propagate_block(&block, &network).await;
 
         // Verify metrics are recorded
-        assert!(result.propagation_time_ms >= 0);
+        let _ = result.propagation_time_ms; // u64 always >= 0
         assert_eq!(result.hop_count, 1);
         assert_eq!(
             result.reached_nodes.len() + result.failed_nodes.len(),

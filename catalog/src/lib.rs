@@ -34,6 +34,7 @@ pub mod plugin;
 pub mod distribution;
 pub mod security;
 pub mod sharing;
+pub mod asset_compat;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
@@ -42,6 +43,11 @@ use std::sync::Arc;
 // Re-export key types from HyperMesh
 pub use blockmatrix::consensus::proof_of_state_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 pub use blockmatrix::assets::core::{AssetRegistration, AssetType};
+
+// Canonical asset types from lib (aliased to avoid collision with catalog's own AssetMetadata)
+pub use hypermesh_lib::{AssetKind, SystemAssetKind, UserAssetKind, AssetAdapter as LibAssetAdapter};
+pub use hypermesh_lib::BaseState as LibBaseState;
+pub use hypermesh_lib::AssetMetadata as LibAssetMetadata;
 
 // Define ExecutionResult locally (Catalog-specific)
 #[derive(Debug, Clone, Serialize, Deserialize)]

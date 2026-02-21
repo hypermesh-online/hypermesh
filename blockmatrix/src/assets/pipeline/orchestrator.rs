@@ -9,7 +9,8 @@
 use crate::assets::pipeline::{
     Asset, PipelineResult,
     Compressor, CompressionConfig, CompressionStats,
-    Encryptor, EncryptionConfig, EncryptionStats, EncryptedData, ShardKey,
+    Encryptor, EncryptionConfig, EncryptionStats, EncryptedData, AesKey,
+    KyberEncryptionResult,
     Sharder, ShardingConfig, Shard, ShardingStats,
     MatrixDistributor, DistributionConfig, DistributedAsset, DistributionStats,
 };
@@ -62,6 +63,32 @@ impl Default for PipelineStages {
     }
 }
 
+/// Decryption material stored alongside processed asset.
+///
+/// For Kyber-1024 (quantum-resistant): stores the KEM ciphertext, nonce,
+/// original size, and the Kyber secret key needed for decapsulation.
+///
+/// For plain AES-256-GCM (fallback): stores the symmetric key and nonce.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DecryptionKey {
+    /// Kyber-1024 KEM + AES-256-GCM (quantum-resistant path)
+    Kyber {
+        /// Kyber KEM ciphertext (needed for decapsulation)
+        #[serde(with = "serde_bytes")]
+        ciphertext_kem: Vec<u8>,
+        /// AES-GCM nonce used during encryption
+        #[serde(with = "serde_bytes")]
+        nonce: Vec<u8>,
+        /// Pre-encryption size in bytes
+        original_size: usize,
+        /// Kyber-1024 secret key bytes (for decapsulation)
+        #[serde(with = "serde_bytes")]
+        secret_key: Vec<u8>,
+    },
+    /// Plain AES-256-GCM (non-quantum fallback)
+    Aes(AesKey),
+}
+
 /// Processed asset with all metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessedAsset {
@@ -69,9 +96,8 @@ pub struct ProcessedAsset {
     pub asset_id: String,
     /// Shards of the encrypted blob
     pub shards: Vec<Shard>,
-    /// Encryption key for the whole compressed blob
-    /// TODO: Should use Kyber-1024 for whole-blob encryption instead of per-shard AES-256-GCM
-    pub encryption_key: ShardKey,
+    /// Decryption material for the whole compressed blob
+    pub decryption_key: DecryptionKey,
     /// Distribution information
     pub distributed: DistributedAsset,
     /// Complete pipeline statistics
@@ -175,16 +201,29 @@ impl AssetPipeline {
         );
 
         // Stage 2: Encryption (whole blob)
-        // Encrypt the entire compressed blob, NOT per-shard
-        // TODO: Should use Kyber-1024 for whole-blob encryption instead of per-shard AES-256-GCM
-        let (encrypted_blob, encryption_key, encryption_stats) = if self.config.stages_enabled.encryption {
+        // Encrypt the entire compressed blob, NOT per-shard.
+        // Uses Kyber-1024 KEM + AES-256-GCM when quantum_resistant is true,
+        // otherwise falls back to plain AES-256-GCM.
+        let (encrypted_blob, decryption_key, encryption_stats) = if self.config.stages_enabled.encryption {
             tracing::debug!("Stage 2: Encryption (whole blob)");
-            let key = self.encryptor.generate_key()?;
-            let (encrypted, stats) = self.encryptor.encrypt(&compressed_data, &key)?;
-            (encrypted.ciphertext, key, stats)
+            if self.config.encryption.quantum_resistant {
+                let keypair = self.encryptor.generate_keypair()?;
+                let (result, stats) = self.encryptor.encrypt(&compressed_data, &keypair.public_key)?;
+                let dk = DecryptionKey::Kyber {
+                    ciphertext_kem: result.ciphertext_kem,
+                    nonce: result.nonce,
+                    original_size: result.original_size,
+                    secret_key: keypair.secret_key,
+                };
+                (result.encrypted_data, dk, stats)
+            } else {
+                let key = self.encryptor.generate_aes_key()?;
+                let (encrypted, stats) = self.encryptor.encrypt_aes(&compressed_data, &key)?;
+                (encrypted.ciphertext, DecryptionKey::Aes(key), stats)
+            }
         } else {
-            let key = self.encryptor.generate_key()?;
-            (compressed_data, key, EncryptionStats::default())
+            let key = self.encryptor.generate_aes_key()?;
+            (compressed_data, DecryptionKey::Aes(key), EncryptionStats::default())
         };
 
         tracing::info!("Encrypted: {} bytes -> {} bytes",
@@ -272,7 +311,7 @@ impl AssetPipeline {
         Ok(ProcessedAsset {
             asset_id: asset.id,
             shards,
-            encryption_key,
+            decryption_key,
             distributed,
             stats,
         })
@@ -300,12 +339,25 @@ impl AssetPipeline {
         // Stage 2: Decrypt the whole blob
         let compressed_data = if self.config.stages_enabled.encryption {
             tracing::debug!("Stage 2: Decryption (whole blob)");
-            let encrypted = EncryptedData {
-                ciphertext: encrypted_blob,
-                nonce: processed.encryption_key.nonce.clone(),
-                original_size: 0, // Not needed for decryption
-            };
-            self.encryptor.decrypt(&encrypted, &processed.encryption_key)?
+            match &processed.decryption_key {
+                DecryptionKey::Kyber { ciphertext_kem, nonce, original_size, secret_key } => {
+                    let kyber_result = KyberEncryptionResult {
+                        ciphertext_kem: ciphertext_kem.clone(),
+                        encrypted_data: encrypted_blob,
+                        nonce: nonce.clone(),
+                        original_size: *original_size,
+                    };
+                    self.encryptor.decrypt(&kyber_result, secret_key)?
+                }
+                DecryptionKey::Aes(key) => {
+                    let encrypted = EncryptedData {
+                        ciphertext: encrypted_blob,
+                        nonce: key.nonce.clone(),
+                        original_size: 0,
+                    };
+                    self.encryptor.decrypt_aes(&encrypted, key)?
+                }
+            }
         } else {
             encrypted_blob
         };
@@ -360,7 +412,8 @@ mod tests {
         // Verify processing
         assert_eq!(processed.asset_id, "test-asset-1");
         assert!(!processed.shards.is_empty());
-        assert_eq!(processed.encryption_key.key.len(), 32); // AES-256 key
+        // Default config is quantum_resistant=true → Kyber key
+        assert!(matches!(processed.decryption_key, DecryptionKey::Kyber { .. }));
         assert!(processed.stats.total_throughput_mbps > 0.0);
 
         // Reconstruct and verify

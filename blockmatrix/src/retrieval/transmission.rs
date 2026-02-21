@@ -282,6 +282,7 @@ mod tests {
             encryption: "aes-256-gcm".to_string(),
             content_type: "application/octet-stream".to_string(),
             created_at: chrono::Utc::now().timestamp(),
+            encrypted_blob_size: 0,
         };
 
         RetrievalPlan::new(content_hash, shard_map, metadata)
@@ -298,8 +299,8 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::None);
 
-        let encoded = transmitter.encode(&plan).unwrap();
-        let decoded = transmitter.decode(&encoded).unwrap();
+        let encoded = transmitter.encode(&plan).expect("test: encode");
+        let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
         assert_eq!(plan.shard_map.entries.len(), decoded.shard_map.entries.len());
@@ -310,8 +311,8 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Brotli);
 
-        let encoded = transmitter.encode(&plan).unwrap();
-        let decoded = transmitter.decode(&encoded).unwrap();
+        let encoded = transmitter.encode(&plan).expect("test: encode");
+        let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
         assert_eq!(plan.shard_map.entries.len(), decoded.shard_map.entries.len());
@@ -322,8 +323,8 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Zstd);
 
-        let encoded = transmitter.encode(&plan).unwrap();
-        let decoded = transmitter.decode(&encoded).unwrap();
+        let encoded = transmitter.encode(&plan).expect("test: encode");
+        let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
     }
@@ -333,8 +334,8 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::MessagePack);
 
-        let encoded = transmitter.encode(&plan).unwrap();
-        let decoded = transmitter.decode(&encoded).unwrap();
+        let encoded = transmitter.encode(&plan).expect("test: encode");
+        let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
     }
@@ -344,7 +345,7 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Brotli);
 
-        let (compressed, stats) = transmitter.encode_with_stats(&plan).unwrap();
+        let (_compressed, stats) = transmitter.encode_with_stats(&plan).expect("test: encode_with_stats");
 
         println!("Original size: {} bytes", stats.original_size);
         println!("Compressed size: {} bytes", stats.compressed_size);
@@ -361,7 +362,7 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Brotli);
 
-        let (compressed, stats) = transmitter.encode_with_stats(&plan).unwrap();
+        let (compressed, _stats) = transmitter.encode_with_stats(&plan).expect("test: encode_with_stats");
 
         println!("Compressed instruction size: {} bytes", compressed.len());
 
@@ -375,7 +376,7 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::default();
 
-        let best_format = transmitter.benchmark_formats(&plan).unwrap();
+        let best_format = transmitter.benchmark_formats(&plan).expect("test: benchmark_formats");
         println!("Best format: {:?}", best_format);
 
         // Should find a format

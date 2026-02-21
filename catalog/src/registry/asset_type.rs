@@ -43,6 +43,9 @@ pub struct AssetTypeDefinition {
 
     /// Metadata
     pub metadata: TypeMetadata,
+
+    /// Canonical asset kind (UserDefined with type_name + schema hash).
+    pub asset_kind: hypermesh_lib::AssetKind,
 }
 
 /// Type metadata
@@ -123,6 +126,18 @@ impl AssetTypeDefinition {
             ),
         );
 
+        // Compute UserAssetKind hash from type_name + schema
+        use sha2::{Sha256, Digest};
+        let mut kind_hasher = Sha256::new();
+        kind_hasher.update(type_name.as_bytes());
+        kind_hasher.update(serde_json::to_vec(&schema).unwrap_or_default());
+        let hash_bytes: [u8; 32] = kind_hasher.finalize().into();
+
+        let asset_kind = hypermesh_lib::AssetKind::UserDefined(hypermesh_lib::UserAssetKind {
+            type_name: type_name.clone(),
+            type_hash: hypermesh_lib::ContentHash::from_bytes(hash_bytes),
+        });
+
         Self {
             asset_id,
             type_name,
@@ -140,6 +155,7 @@ impl AssetTypeDefinition {
                 updated_at: chrono::Utc::now(),
                 license: None,
             },
+            asset_kind,
         }
     }
 

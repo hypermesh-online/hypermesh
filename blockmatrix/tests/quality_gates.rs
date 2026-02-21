@@ -20,21 +20,20 @@
 //! Total: 28 comprehensive integration tests
 
 use blockmatrix::network::{
-    multi_network::{MultiNetworkCoordinator, NetworkConfig, VisibilityPolicy},
+    multi_network::{MultiNetworkCoordinator, NetworkConfig},
     trust::{
-        NetworkType, NetworkHandler, NetworkConnection, NetworkConfig as TrustNetworkConfig,
-        Certificate, ProofOfState, EphemeralKey, PeerId, PeerInfo, AssetRequest, AssetResponse,
+        NetworkType, NetworkHandler, NetworkConfig as TrustNetworkConfig,
+        Certificate, ProofOfState, EphemeralKey,
         AnonymousNetworkHandler, P2PNetworkHandler, FederatedNetworkHandler, PublicNetworkHandler,
     },
-    isolation::{DefaultIsolationManager, IsolationManager, Packet, PacketId, zero_hash},
+    isolation::{DefaultIsolationManager, IsolationManager},
 };
 use blockmatrix::assets::core::{AssetRegistration, AssetCategory, BaseSystemType, NetworkScope, AssetData};
 use std::sync::Arc;
-use std::collections::HashMap;
 use anyhow::Result;
 use uuid::Uuid;
 use tokio;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Helper: Create test asset
 fn create_test_asset() -> AssetRegistration {
@@ -71,7 +70,7 @@ async fn qg1_node_starts_without_network() -> Result<()> {
 
     // Initialize coordinator without any network connections
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Verify coordinator is ready without external dependencies
     let active = coordinator.active_networks().await;
@@ -124,10 +123,10 @@ async fn qg1_unique_genesis_block_created() -> Result<()> {
 
     // Create two independent nodes - each should have unique genesis
     let isolation1 = Arc::new(DefaultIsolationManager::new());
-    let coordinator1 = MultiNetworkCoordinator::new(isolation1.clone());
+    let _coordinator1 = MultiNetworkCoordinator::new(isolation1.clone());
 
     let isolation2 = Arc::new(DefaultIsolationManager::new());
-    let coordinator2 = MultiNetworkCoordinator::new(isolation2.clone());
+    let _coordinator2 = MultiNetworkCoordinator::new(isolation2.clone());
 
     // Each coordinator represents a unique node with unique genesis
     // (In full implementation, would verify actual blockchain genesis blocks)
@@ -142,7 +141,7 @@ async fn qg1_no_external_dependencies_required() -> Result<()> {
 
     // Bootstrap without network, without trust.hypermesh.online, without anything external
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Should be fully operational in private mode
     let stats = coordinator.get_network_stats().await;
@@ -288,22 +287,22 @@ async fn qg3_all_four_networks_simultaneously() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join all 4 network types
-    let anon_id = coordinator.join_network(
+    let _anon_id = coordinator.join_network(
         NetworkType::Anonymous,
         NetworkConfig::anonymous(),
     ).await?;
 
-    let p2p_id = coordinator.join_network(
+    let _p2p_id = coordinator.join_network(
         NetworkType::P2P,
         NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
     ).await?;
 
-    let fed_id = coordinator.join_network(
+    let _fed_id = coordinator.join_network(
         NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
         NetworkConfig::federated("gateway.internal".to_string()),
     ).await?;
 
-    let pub_id = coordinator.join_network(
+    let _pub_id = coordinator.join_network(
         NetworkType::Public,
         NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
     ).await?;
@@ -590,17 +589,17 @@ async fn qg6_independent_connect() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Connect to networks in any order
-    let fed_id = coordinator.join_network(
+    let _fed_id = coordinator.join_network(
         NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
         NetworkConfig::federated("gateway.internal".to_string()),
     ).await?;
 
-    let anon_id = coordinator.join_network(
+    let _anon_id = coordinator.join_network(
         NetworkType::Anonymous,
         NetworkConfig::anonymous(),
     ).await?;
 
-    let p2p_id = coordinator.join_network(
+    let _p2p_id = coordinator.join_network(
         NetworkType::P2P,
         NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
     ).await?;

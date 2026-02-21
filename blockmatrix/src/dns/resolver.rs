@@ -346,6 +346,7 @@ mod tests {
         )
     }
 
+    #[allow(dead_code)]
     fn create_test_proof() -> ConsensusProof {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string(), 1000);
         let time = TimeProof::new(Duration::from_secs(10));

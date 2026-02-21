@@ -232,7 +232,6 @@ impl ComponentIntegration {
             // Maximum security and redundancy for public tier
             pipeline.encryption = EncryptionConfig {
                 quantum_resistant: true,
-                key_iterations: 100_000,
                 nonce_size: 12,
             };
             pipeline.sharding = ShardingConfig {
@@ -245,7 +244,6 @@ impl ComponentIntegration {
             // Federated-level config (more secure of the collapsed pair)
             pipeline.encryption = EncryptionConfig {
                 quantum_resistant: true,
-                key_iterations: 100_000,
                 nonce_size: 12,
             };
             pipeline.sharding = ShardingConfig {
@@ -258,7 +256,6 @@ impl ComponentIntegration {
             // ANONYMOUS: minimal tracking, fast processing
             pipeline.encryption = EncryptionConfig {
                 quantum_resistant: false,
-                key_iterations: 25_000,
                 nonce_size: 12,
             };
             pipeline.sharding = ShardingConfig {

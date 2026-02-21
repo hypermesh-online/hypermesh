@@ -131,6 +131,7 @@ mod tests {
         ).await.expect("test");
 
         let local_ptr = mapping.local_address as *mut u8;
+        #[allow(unsafe_code)]
         unsafe {
             *local_ptr = 42;
             assert_eq!(*local_ptr, 42);

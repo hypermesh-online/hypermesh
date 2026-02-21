@@ -196,6 +196,7 @@ mod linux_ebpf_tests {
     fn test_ebpf_program_state() {
         // Test program state management
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         struct ProgramState {
             attached: bool,
             attach_type: Option<EbpfAttachType>,

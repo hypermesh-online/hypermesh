@@ -10,7 +10,7 @@
 use blockmatrix::matrix::{
     coordinate::MatrixCoordinate,
     tensor::{
-        Vector3D, Matrix3x3, calculate_routing_vector, find_aligned_nodes,
+        Matrix3x3, calculate_routing_vector, find_aligned_nodes,
         calculate_orthogonal_routes, calculate_load_balanced_routes,
         calculate_routing_path, score_route_quality, PathFinder,
     },

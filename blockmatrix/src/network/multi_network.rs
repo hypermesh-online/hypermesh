@@ -409,8 +409,6 @@ mod tests {
     use crate::assets::core::{
         AssetCategory, BaseSystemType, NetworkScope, AssetData,
     };
-    use std::time::SystemTime;
-
     fn create_test_asset_id() -> AssetRegistration {
         let asset_data = AssetData {
             config: vec![1, 2, 3],

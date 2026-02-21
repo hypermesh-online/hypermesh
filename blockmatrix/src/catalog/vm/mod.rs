@@ -565,7 +565,6 @@ impl Default for ResourceSharingConfig {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use crate::test_utils::test_asset_id;
     use crate::catalog::vm::execution::context::{
         BlockchainExecutionContext, P2PExecutionContext,
         NetworkTopology, RoutingPreferences,
@@ -604,9 +603,8 @@ mod tests {
     
     #[tokio::test]
     async fn test_matrix_integration_types() {
-        use crate::assets::matrix_blockchain::{MatrixBlockchainManager, EntityType};
-        use crate::assets::core::{AssetType, asset_id::AssetRegistration as RealAssetId};
         use crate::test_utils::test_asset_id;
+        use crate::assets::core::AssetType;
 
         // Test CrossEntityValidation creation
         let validation = CrossEntityValidation {
@@ -660,9 +658,8 @@ mod tests {
     async fn test_matrix_execution_context_creation() {
         use crate::catalog::vm::execution::ExecutionContext;
         use crate::consensus::ConsensusProof;
-        use uuid::Uuid;
-        use crate::assets::core::{AssetType, asset_id::AssetRegistration as RealAssetId};
-        
+        use crate::assets::core::AssetType;
+        use crate::test_utils::test_asset_id;
         // Create base execution context
         let base_context = ExecutionContext {
             execution_id: "test-exec-001".to_string(),

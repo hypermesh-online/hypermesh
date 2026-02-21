@@ -9,13 +9,12 @@
 
 use blockmatrix::assets::pipeline::{
     Asset, AssetMetadata, orchestrator::AssetPipeline, PipelineConfig,
-    CompressionAlgorithm, CompressionConfig, Compressor,
+    CompressionAlgorithm, CompressionConfig,
     EncryptionConfig, Encryptor,
-    ShardingConfig, Sharder,
-    DistributionConfig, MatrixConstraints, MatrixDistributor, DistributedAsset,
+    ShardingConfig,
+    DistributionConfig, MatrixDistributor,
 };
 use blockmatrix::matrix::MatrixCoordinate;
-use std::sync::Arc;
 use std::time::Instant;
 
 #[test]
@@ -90,8 +89,6 @@ fn test_brotli_streaming_compression() {
 
 #[test]
 fn test_quantum_resistant_encryption() {
-    use blockmatrix::assets::pipeline::{Encryptor, ShardKey};
-
     let config = EncryptionConfig {
         quantum_resistant: true,
         ..Default::default()
@@ -100,21 +97,23 @@ fn test_quantum_resistant_encryption() {
     let encryptor = Encryptor::new(config);
     let test_data = b"Quantum-resistant encryption test data!".repeat(100);
 
-    // Generate key
-    let key = encryptor.generate_key().unwrap();
+    // Generate Kyber-1024 keypair
+    let keypair = encryptor.generate_keypair().expect("test: keypair generation");
 
-    // Encrypt
-    let (encrypted, stats) = encryptor.encrypt(&test_data, &key).unwrap();
+    // Encrypt with public key (Kyber-1024 KEM + AES-256-GCM)
+    let (encrypted, stats) = encryptor.encrypt(&test_data, &keypair.public_key)
+        .expect("test: encryption");
 
     println!("\n=== Quantum-Resistant Encryption Test ===");
     println!("Original size: {} bytes", stats.original_size);
     println!("Encrypted size: {} bytes", stats.encrypted_size);
     println!("Throughput: {:.2} MB/s", stats.throughput_mbps);
 
-    assert_ne!(encrypted.ciphertext, test_data);
+    assert_ne!(encrypted.encrypted_data, test_data.to_vec());
 
-    // Decrypt
-    let decrypted = encryptor.decrypt(&encrypted, &key).unwrap();
+    // Decrypt with secret key
+    let decrypted = encryptor.decrypt(&encrypted, &keypair.secret_key)
+        .expect("test: decryption");
     assert_eq!(decrypted, test_data);
 }
 

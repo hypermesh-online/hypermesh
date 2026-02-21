@@ -25,6 +25,7 @@ use anyhow::Result;
 struct RetrievalTestFixture {
     foundation: Arc<MatrixFoundation>,
     storage: Arc<ContentAddressedStorage>,
+    #[allow(dead_code)]
     pipeline: Arc<AssetPipeline>,
     _temp_dir: TempDir,
 }
@@ -52,6 +53,7 @@ impl RetrievalTestFixture {
     }
 }
 
+#[allow(dead_code)]
 fn create_test_content_address() -> ContentAddress {
     let content_hash = [1u8; 32];
     let mut shard_hashes = Vec::new();
@@ -198,6 +200,7 @@ async fn test_instruction_size_scaling() -> Result<()> {
             encryption: "aes-256-gcm".to_string(),
             content_type: "application/octet-stream".to_string(),
             created_at: chrono::Utc::now().timestamp(),
+            encrypted_blob_size: 0,
         };
 
         let plan = RetrievalPlan::new(content_hash, shard_map, metadata);
@@ -299,6 +302,7 @@ async fn test_client_position_optimization() -> Result<()> {
         encryption: "aes-256-gcm".to_string(),
         content_type: "application/octet-stream".to_string(),
         created_at: chrono::Utc::now().timestamp(),
+        encrypted_blob_size: 0,
     };
 
     let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
@@ -345,6 +349,7 @@ async fn test_compression_format_comparison() -> Result<()> {
         encryption: "aes-256-gcm".to_string(),
         content_type: "application/octet-stream".to_string(),
         created_at: chrono::Utc::now().timestamp(),
+        encrypted_blob_size: 0,
     };
 
     let plan = RetrievalPlan::new(content_hash, shard_map, metadata);
@@ -397,6 +402,7 @@ async fn test_parallel_vs_sequential_assembly() -> Result<()> {
         encryption: "aes-256-gcm".to_string(),
         content_type: "application/octet-stream".to_string(),
         created_at: chrono::Utc::now().timestamp(),
+        encrypted_blob_size: 0,
     };
 
     let plan = RetrievalPlan::new(content_hash, shard_map, metadata);

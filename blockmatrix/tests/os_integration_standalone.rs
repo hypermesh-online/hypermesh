@@ -24,6 +24,7 @@ mod os_integration_tests {
         
 
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct CpuInfo {
             pub cores: usize,
             pub model: String,
@@ -33,6 +34,7 @@ mod os_integration_tests {
         }
 
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct MemoryInfo {
             pub total_bytes: u64,
             pub available_bytes: u64,
@@ -43,6 +45,7 @@ mod os_integration_tests {
         }
 
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct StorageInfo {
             pub device: String,
             pub mount_point: String,
@@ -54,6 +57,7 @@ mod os_integration_tests {
         }
 
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct GpuInfo {
             pub model: String,
             pub vendor: String,
@@ -61,6 +65,7 @@ mod os_integration_tests {
         }
 
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct ResourceUsage {
             pub cpu_percent: f64,
             pub memory_used_bytes: u64,

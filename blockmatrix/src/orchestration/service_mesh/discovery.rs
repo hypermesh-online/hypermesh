@@ -960,7 +960,7 @@ mod tests {
         assert!(traditional_result.is_ok());
         assert!(cpe_result.is_ok());
         
-        let traditional_stats = traditional_discovery.get_stats().await;
+        let _traditional_stats = traditional_discovery.get_stats().await;
         let cpe_stats = cpe_discovery.get_stats().await;
         
         println!("Traditional discovery: {}µs", traditional_time.as_micros());

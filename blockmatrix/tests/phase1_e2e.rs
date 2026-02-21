@@ -15,7 +15,7 @@
 //! These tests validate the integrated system at scale with 100-node networks.
 
 use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
-use blockmatrix::matrix::{MatrixCoordinate, find_k_nearest, find_neighbors};
+use blockmatrix::matrix::MatrixCoordinate;
 use blockmatrix::matrix::tensor::{Vector3D, Matrix3x3, PathFinder};
 use blockmatrix::matrix::geospatial::{GpsCoordinate, GpsConverter, ScaleResolution};
 use blockmatrix::blockchain::PropagationStrategy;

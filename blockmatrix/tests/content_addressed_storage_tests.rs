@@ -7,12 +7,11 @@
 //! Comprehensive test suite for Sprint 2.5 implementation.
 
 use blockmatrix::assets::storage::{
-    ContentAddressedStorage, DeduplicationResult, StorageStats,
-    ContentAddress, RetrievalInstructions, compute_hash, bucket_id_from_hash,
+    ContentAddressedStorage,
+    compute_hash, bucket_id_from_hash,
 };
 use blockmatrix::assets::pipeline::{Shard, ShardMetadata as PipelineShardMetadata};
 use blockmatrix::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
-use blockmatrix::matrix::MatrixCoordinate;
 use std::sync::Arc;
 use std::collections::HashSet;
 use tokio;
@@ -382,7 +381,7 @@ async fn test_viral_content_replication() {
     // First upload
     let result = storage.store_shard(shard).await.unwrap();
     assert!(!result.deduplicated);
-    let initial_positions = result.positions.len();
+    let _initial_positions = result.positions.len();
 
     // Simulate 10,000 users downloading (all deduplicated)
     let mut dedup_count = 0;

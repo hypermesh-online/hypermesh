@@ -11,7 +11,6 @@ use blockmatrix::{
     bootstrap::PrivacyMode,
 };
 use std::sync::Arc;
-use std::net::{SocketAddr, Ipv6Addr};
 use stoq::{StoqTransport, TransportConfig};
 
 #[tokio::test]
@@ -54,7 +53,7 @@ async fn test_matrix_node_communication() -> Result<()> {
     let transport2 = Arc::new(StoqTransport::new(config2).await?);
 
     // Get the actual listening addresses
-    let addr1 = transport1.local_addr()?;
+    let _addr1 = transport1.local_addr()?;
     let addr2 = transport2.local_addr()?;
 
     // Create Matrix-STOQ integrations for both nodes
@@ -151,7 +150,7 @@ async fn test_matrix_neighbor_discovery() -> Result<()> {
 
     // Get addresses
     let addr1 = transport1.local_addr()?;
-    let addr2 = transport2.local_addr()?;
+    let _addr2 = transport2.local_addr()?;
     let addr3 = transport3.local_addr()?;
 
     // Start accepting connections on all nodes

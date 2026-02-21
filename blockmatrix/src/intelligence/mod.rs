@@ -354,7 +354,6 @@ impl IntelligenceLayer {
             },
             encryption: EncryptionConfig {
                 quantum_resistant: config.enable_quantum_encryption,
-                key_iterations: 100_000,
                 nonce_size: 12,
             },
             sharding: ShardingConfig {

@@ -251,14 +251,20 @@ impl CompleteShardMap {
             .collect()
     }
 
-    /// Estimate serialized size in bytes
+    /// Estimate wire-format size in bytes using compact binary encoding.
+    ///
+    /// The wire format only transmits essential data: shard hashes and matrix
+    /// positions. Derived metrics (health, latency, distance, priority) are
+    /// calculated by the client based on its own position and are NOT
+    /// transmitted, keeping the instruction payload minimal.
     pub fn estimate_size(&self) -> usize {
-        // Hash (32) + location count (8) per entry
-        let entry_overhead = 40;
-        // Position (24) + metrics (32) per location
-        let location_size = 56;
+        // Per entry: shard_hash (32 bytes) + location count varint (1 byte)
+        let entry_overhead = 33;
+        // Per location: position x,y,z as 3 varints (avg 4 bytes each = 12)
+        let location_size = 12;
 
-        let mut total = 16; // Base overhead (counts, avg)
+        // Base: entry count varint (2 bytes)
+        let mut total = 2;
 
         for entry in &self.entries {
             total += entry_overhead;

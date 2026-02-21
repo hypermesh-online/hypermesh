@@ -761,6 +761,7 @@ impl AssetAdapter for MemoryAssetAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
     use std::collections::HashMap;
     use std::time::Duration;

@@ -639,8 +639,8 @@ mod tests {
     
     #[tokio::test]
     async fn test_execution_environment_creation() {
-        let config = AdapterConfig::default();
-        let context = ExecutionContext::default(); // Would need actual implementation
+        let _config = AdapterConfig::default();
+        let _context = ExecutionContext::default(); // Would need actual implementation
         
         // Note: This test might fail due to missing ExecutionContext implementation
         // but demonstrates the expected structure

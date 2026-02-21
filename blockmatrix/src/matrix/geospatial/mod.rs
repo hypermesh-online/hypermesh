@@ -319,7 +319,7 @@ mod integration_tests {
         topology.add_node(node).unwrap();
 
         // Create a blockchain
-        let blockchain = NodeBlockchain::new(coord);
+        let _blockchain = NodeBlockchain::new(coord);
 
         // Integrate blockchain with topology
         topology.integrate_blockchain_node("blockchain_node", &coord).unwrap();

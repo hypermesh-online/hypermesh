@@ -477,6 +477,7 @@ impl ProofValidator<TimeProof> for TimeProofValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::consensus::{NetworkPosition, AccessPermissions};
     
     #[tokio::test]

@@ -865,10 +865,12 @@ impl AssetAdapter for CpuAssetAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
     use std::time::Duration;
     use std::collections::HashMap;
-    
+
+    #[allow(dead_code)]
     fn create_test_cpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
             asset_type: AssetType::Cpu,

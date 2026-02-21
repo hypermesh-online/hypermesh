@@ -8,22 +8,24 @@ phase = "alpha"
 items = [
     "NodeId, AssetId, NetworkId, and ContentHash newtypes",
     "PrivacyMode struct (2-axis: AccessScope + tracked)",
-    "BlockchainScope enum (6 scopes)",
+    "BlockchainScope enum (Device | Network)",
     "ProofType enum (PoSpace/PoStake/PoWork/PoTime)",
     "MatrixPosition coordinate type",
     "PipelineStage enum",
     "CryptoAlgorithm enum (Falcon/Kyber/AES)",
     "HypermeshError unified error type",
+    "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
 ]
 
 [features.in_development]
 items = [
-    "Additional shared trait definitions",
     "Cross-crate validation helpers",
+    "BlockMatrix/TrustChain migration to canonical asset types",
 ]
 
 [features.planned]
 items = [
+    "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
     "Canonical consensus proof types",
     "Shared serialization formats",
     "Common test utilities",

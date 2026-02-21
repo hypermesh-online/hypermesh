@@ -86,6 +86,45 @@ pub enum MatrixMessage {
     Heartbeat { coordinate: MatrixCoordinate, timestamp: u64 },
     /// Error message
     Error { message: String },
+
+    // --- Sync-related messages (Device <-> Network scope) ---
+
+    /// Request blocks from a peer for chain synchronization
+    SyncRequest {
+        /// Network scope identifier
+        network_id: String,
+        /// Start syncing from this block height
+        from_height: u64,
+        /// Maximum blocks to return in the response
+        max_blocks: u32,
+    },
+    /// Response containing blocks for synchronization
+    SyncResponse {
+        /// Network scope identifier
+        network_id: String,
+        /// Serialized block hashes (actual block data fetched separately)
+        block_hashes: Vec<String>,
+        /// The responding peer's current chain height
+        peer_height: u64,
+    },
+    /// Announce a new block to the network
+    SyncAnnounce {
+        /// Network scope identifier
+        network_id: String,
+        /// Height of the announced block
+        block_height: u64,
+        /// Hash of the announced block
+        block_hash: String,
+    },
+    /// Periodic heartbeat from a reflector node advertising availability
+    ReflectorHeartbeat {
+        /// Network scope identifier
+        network_id: String,
+        /// Reflector's current block height
+        block_height: u64,
+        /// Reflector's self-reported health score (0.0 to 1.0)
+        health_score: f64,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager

@@ -387,15 +387,22 @@ mod tests {
         let criteria = SelectionCriteria::default();
         let mut selector = ReplicaSelector::new(criteria, FallbackStrategy::Adaptive);
 
-        // Low failure rate: Sequential
-        selector.mark_successful(MatrixCoordinate::new(0, 0, 0).unwrap());
-        selector.mark_successful(MatrixCoordinate::new(1, 0, 0).unwrap());
-        selector.mark_failed(MatrixCoordinate::new(2, 0, 0).unwrap());
+        // Low failure rate (1/5 = 0.2, not > 0.2): Sequential
+        selector.mark_successful(MatrixCoordinate::new(0, 0, 0).expect("test: coord"));
+        selector.mark_successful(MatrixCoordinate::new(1, 0, 0).expect("test: coord"));
+        selector.mark_successful(MatrixCoordinate::new(10, 0, 0).expect("test: coord"));
+        selector.mark_successful(MatrixCoordinate::new(11, 0, 0).expect("test: coord"));
+        selector.mark_failed(MatrixCoordinate::new(2, 0, 0).expect("test: coord"));
         assert_eq!(selector.recommend_strategy(), FallbackStrategy::Sequential);
 
-        // High failure rate: Reed-Solomon
-        selector.mark_failed(MatrixCoordinate::new(3, 0, 0).unwrap());
-        selector.mark_failed(MatrixCoordinate::new(4, 0, 0).unwrap());
+        // Moderate failure rate (3/7 = 0.43, > 0.2): Parallel
+        selector.mark_failed(MatrixCoordinate::new(3, 0, 0).expect("test: coord"));
+        selector.mark_failed(MatrixCoordinate::new(4, 0, 0).expect("test: coord"));
+        assert_eq!(selector.recommend_strategy(), FallbackStrategy::Parallel);
+
+        // High failure rate (5/9 = 0.56, > 0.5): Reed-Solomon
+        selector.mark_failed(MatrixCoordinate::new(5, 0, 0).expect("test: coord"));
+        selector.mark_failed(MatrixCoordinate::new(6, 0, 0).expect("test: coord"));
         assert_eq!(selector.recommend_strategy(), FallbackStrategy::ReedSolomon);
     }
 

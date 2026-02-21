@@ -452,8 +452,6 @@ impl ProxySelector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::AssetType;
-
     #[test]
     fn test_trust_level_scoring() {
         assert_eq!(TrustLevel::None.to_score(), 0.0);

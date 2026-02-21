@@ -2,7 +2,7 @@
 
 A sovereign distributed computing platform built on a six-layer stack with post-quantum cryptography, 3D matrix topology, and bilateral Proof of State authentication.
 
-**8 crates** | **575 .rs files** | **208,787 lines** | **816 tests** | **0 compiler errors**
+**9 crates** | **756 .rs files** | **256,159 lines** | **948 tests** | **0 compiler errors**
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
 
@@ -82,14 +82,14 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Done | In Progress | TODO |
 |------|-------------|------|
-| NodeId and AssetId newtypes | Additional shared trait definitions | Canonical consensus proof types |
-| NetworkPrivacyTier enum (4 tiers) | Cross-crate validation helpers | Shared serialization formats |
-| BlockchainScope enum (6 scopes) | | Common test utilities |
-| ProofType enum (PoSpace/PoStake/PoWork/PoTime) | | |
-| MatrixPosition coordinate type | | |
-| PipelineStage enum | | |
-| CryptoAlgorithm enum (Falcon/Kyber/AES) | | |
+| NodeId, AssetId, NetworkId, ContentHash newtypes | Cross-crate validation helpers | Runtime state unification (all network execution and on-chain ops use Asset typedefs/impls) |
+| PrivacyMode struct (2-axis: AccessScope + tracked) | BlockMatrix/TrustChain migration to canonical asset types | Canonical consensus proof types |
+| BlockchainScope enum (Device \| Network) | | Shared serialization formats |
+| ProofType enum (PoSpace/PoStake/PoWork/PoTime) | | Common test utilities |
+| MatrixPosition coordinate type | | Public SDK types for third-party integration |
+| PipelineStage, CryptoAlgorithm enums | | |
 | HypermeshError unified error type | | |
+| Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter) | | |
 
 ### STOQ — Transport Protocol (alpha)
 
@@ -126,7 +126,7 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Done | In Progress | TODO |
 |------|-------------|------|
-| 3D coordinate system (x,y,z positioning) | Asset pipeline reorder (Compress-Encrypt-Shard) | Multi-scope blockchain (User/Group/Org/Public) |
+| 3D coordinate system (x,y,z positioning) | Asset pipeline reorder (Compress-Encrypt-Shard) | Network sync + reflector pooling |
 | Tensor math library (Vector3D, Matrix3x3, A*) | Kyber-1024 for asset encryption | Container runtime with isolation |
 | Every-node blockchain (independent chains) | Instruction-based retrieval system | Multi-node production deployment |
 | Geospatial module (GPS conversion, clustering) | OS integration layer (Linux/macOS/Windows) | Dynamic shard rebalancing |
@@ -142,10 +142,11 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 | Asset package types and metadata | STOQ transport for distribution | Full asset marketplace |
 | Asset registry with publish/install/search | Content-addressed storage (DHT) | Peer-to-peer package sharing |
 | Template generation framework | TrustChain security integration | Consensus proof validation for packages |
-| Asset validation pipeline | | |
-| Semantic versioning and dependency resolution | | |
-| HyperMesh execution delegation | | |
+| Asset validation pipeline | | Asset SDK for third-party developers |
+| Semantic versioning and dependency resolution | | Asset transaction integration with Caesar |
+| HyperMesh execution delegation | | catalog.hypermesh.online clearnet registry access |
 | Scripting engine (syntax validation) | | |
+| Canonical asset type integration with lib↔blockmatrix compat layer | | |
 
 ### Caesar — Payment Bridge (planning)
 
@@ -194,12 +195,12 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Category | Count |
 |----------|------:|
-| Done | 56 |
+| Done | 57 |
 | In Progress | 18 |
-| TODO | 25 |
+| TODO | 26 |
 
 **Priority TODOs** (cross-cutting):
-- [ ] Multi-scope blockchain (Device → User → Group → Org → Federation → Public)
+- [ ] Network scope sync + reflector pooling (Device ↔ Network synchronization)
 - [ ] Asset pipeline reorder (Compression → Encryption → Sharding → Distribution)
 - [ ] Protocol-level PoS token validation (STOQ + eBPF)
 - [ ] Multi-node production deployment
@@ -208,6 +209,7 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 - [ ] HSM key storage for TrustChain
 - [ ] Full asset marketplace (Catalog)
 - [ ] Live multi-chain bridge (Caesar)
+- [ ] Runtime state unification (all network execution uses Asset typedefs/impls)
 
 ---
 
@@ -222,6 +224,8 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 **Instruction-Based Retrieval**: Send shard map instructions, not raw data. Receiver fetches shards from nearest matrix nodes and reconstructs locally.
 
 **Distribution Pipeline**: Compression (Brotli) → Encryption (Kyber-1024) → Sharding (Reed-Solomon) → Placement (tensor-based).
+
+**Three-Pillar Asset System**: Every asset has a Kind (two-level classification: system or user-defined), a Status (programmable state machine where domain states map to infrastructure BaseState), and an Adapter (fully programmable runtime interface with lifecycle hooks, command/query dispatch, and self-describing capabilities). Defined canonically in hypermesh-lib, used by all crates.
 
 ---
 

@@ -8,9 +8,7 @@
 //! Tests all 5 sprints integrated through the IntelligenceLayer.
 
 use blockmatrix::intelligence::{
-    IntelligenceLayer, IntelligenceLayerConfig, AssetHandle,
-    AssetWorkflow, ProcessingWorkflow, RetrievalWorkflow,
-    ComponentIntegration, IntegrationValidator, PerformanceMonitor,
+    IntelligenceLayer, IntelligenceLayerConfig,
 };
 use blockmatrix::assets::pipeline::{Asset, AssetMetadata};
 use blockmatrix::assets::multi_node::{NetworkId, PrivacyMode};
@@ -20,7 +18,6 @@ use blockmatrix::matrix::MatrixCoordinate;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use std::collections::HashMap;
-use anyhow::Result;
 use tokio::test;
 
 // Initialize crypto provider for all tests

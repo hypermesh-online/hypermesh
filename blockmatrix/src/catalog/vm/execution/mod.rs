@@ -412,8 +412,11 @@ pub struct ExecutionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, ConsensusProof};
+    #[allow(unused_imports)]
     use crate::catalog::vm::{ConsensusRequirements, VMConfig};
+    #[allow(unused_imports)]
     use uuid::Uuid;
     
     #[tokio::test]

@@ -720,7 +720,7 @@ mod tests {
             HashMap::new(),
         ).await;
         
-        let routing_time = start.elapsed();
+        let _routing_time = start.elapsed();
         
         // Should complete successfully
         assert!(decision.is_ok());

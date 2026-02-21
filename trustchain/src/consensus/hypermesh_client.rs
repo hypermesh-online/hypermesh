@@ -271,8 +271,9 @@ impl HyperMeshConsensusClient {
     pub async fn new(config: HyperMeshClientConfig) -> Result<Self> {
         info!("Initializing HyperMesh consensus client (STOQ protocol)");
 
-        // Create STOQ transport for client
-        let transport_config = TransportConfig::default();
+        // Create STOQ transport for client (port 0 = OS-assigned to avoid conflicts)
+        let mut transport_config = TransportConfig::default();
+        transport_config.port = 0;
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
         // Create STOQ API client

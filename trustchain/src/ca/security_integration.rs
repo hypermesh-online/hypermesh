@@ -30,6 +30,14 @@ pub struct SecurityIntegratedCA {
     ca_falcon_keypair: Arc<FalconKeyPair>,
     /// Security integration configuration
     config: SecurityIntegrationConfig,
+    /// Certificates issued through this integrated CA
+    certificates_issued: Arc<std::sync::atomic::AtomicU64>,
+    /// Certificate validations performed
+    validations_performed: Arc<std::sync::atomic::AtomicU64>,
+    /// Failed operations count
+    operations_failed: Arc<std::sync::atomic::AtomicU64>,
+    /// Cumulative issuance time in milliseconds for averaging
+    total_issuance_time_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Security integration configuration
@@ -148,6 +156,10 @@ impl SecurityIntegratedCA {
             pqc,
             ca_falcon_keypair,
             config: security_config,
+            certificates_issued: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            validations_performed: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            operations_failed: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            total_issuance_time_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         };
 
         info!("✅ Security-Integrated CA initialized with FALCON-1024");
@@ -302,13 +314,13 @@ impl SecurityIntegratedCA {
         operation.state = SecureOperationState::Completed;
         
         let total_time = start_time.elapsed().unwrap_or_default().as_millis();
-        
-        info!("Secure certificate issuance COMPLETED for operation {} in {}ms: {}", 
+
+        self.certificates_issued.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.total_issuance_time_ms.fetch_add(total_time as u64, std::sync::atomic::Ordering::Relaxed);
+
+        info!("Secure certificate issuance COMPLETED for operation {} in {}ms: {}",
               operation_id, total_time, issued_cert.serial_number);
-        
-        // Log successful secure operation
-        debug!("Secure certificate operation completed successfully: {}", operation_id);
-        
+
         Ok(issued_cert)
     }
 
@@ -343,6 +355,7 @@ impl SecurityIntegratedCA {
             validated_at: SystemTime::now(),
         };
         
+        self.validations_performed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         info!("Secure certificate validation completed: valid={}", validation_result.is_valid);
         Ok(validation_result)
     }
@@ -354,10 +367,22 @@ impl SecurityIntegratedCA {
 
     /// Get CA metrics with security integration
     pub async fn get_integrated_metrics(&self) -> TrustChainResult<IntegratedCAMetrics> {
-        // TODO: Implement proper CA metrics collection
-        let ca_metrics = CAMetrics::default();
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let issued = self.certificates_issued.load(Relaxed);
+        let validations = self.validations_performed.load(Relaxed);
+        let total_time = self.total_issuance_time_ms.load(Relaxed);
+        let failed = self.operations_failed.load(Relaxed);
+        let total_ops = issued + failed;
+
+        let ca_metrics = CAMetrics {
+            certificates_issued: issued,
+            validation_requests: validations,
+            avg_issuance_time_ms: if issued > 0 { total_time / issued } else { 0 },
+            success_rate: if total_ops > 0 { issued as f64 / total_ops as f64 } else { 1.0 },
+        };
         let security_metrics = self.security_monitor.get_metrics().await;
-        
+
         Ok(IntegratedCAMetrics {
             ca_metrics,
             security_metrics,

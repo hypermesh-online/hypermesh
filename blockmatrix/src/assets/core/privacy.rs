@@ -456,7 +456,6 @@ impl AssetAllocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::AssetRegistration;
     use crate::AssetType;
     use crate::assets::core::status::AssetStatus;
     use crate::test_utils::test_asset_id;

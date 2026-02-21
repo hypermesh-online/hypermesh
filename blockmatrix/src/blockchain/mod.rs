@@ -25,6 +25,7 @@ pub mod propagation;
 pub mod state;
 pub mod errors;
 pub mod genesis_auth;
+pub mod sync_manager;
 
 pub use block::Block;
 pub use node_chain::{NodeBlockchain, ChainStats};
@@ -33,6 +34,7 @@ pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult};
 pub use state::{ChainStateManager, ChainSnapshot, BlockQuery, SortOrder, StorageStats};
 pub use errors::{BlockchainError, StateError, PropagationError, Result};
 pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
+pub use sync_manager::{SyncManager, SyncConfig, SyncState, SyncMessage, NetworkMembership};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use std::path::Path;
@@ -68,8 +70,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_blockchain_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let temp_dir = TempDir::new().expect("test: create temp dir");
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: create coordinate");
 
         let result = create_node_blockchain(
             coord.clone(),
@@ -77,7 +79,7 @@ mod tests {
         ).await;
 
         assert!(result.is_ok());
-        let (blockchain, state_manager, propagator) = result.unwrap();
+        let (blockchain, _state_manager, _propagator) = result.expect("test: create blockchain");
 
         // Verify components are initialized
         assert_eq!(blockchain.node_coordinate(), &coord);

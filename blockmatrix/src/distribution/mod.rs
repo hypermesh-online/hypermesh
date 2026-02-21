@@ -196,8 +196,6 @@ where
 mod tests {
     use super::*;
     use crate::consensus::validation::DefaultConsensusValidator;
-    use hypermesh_lib::PrivacyMode;
-
     #[tokio::test]
     async fn test_distribution_with_eligible_nodes() {
         // Create test nodes

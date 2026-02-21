@@ -131,8 +131,6 @@ pub async fn create_test_consensus_server(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     async fn test_create_consensus_api_server() {
         // TODO: Implement test with mock validation service
