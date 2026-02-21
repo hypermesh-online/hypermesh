@@ -18,6 +18,7 @@ pub mod sharding;
 pub mod nat_translation;
 pub mod remote_memory_transport;
 pub mod proxy_selector;
+pub mod scope_routing;
 
 pub use manager::{RemoteProxyManager};
 pub use routing::{ProxyRouter, ProxyRoute, RouteTable};
@@ -31,6 +32,10 @@ pub use remote_memory_transport::{
     MemoryOperationType, OperationResult, TransportMetrics,
 };
 pub use proxy_selector::{ProxySelector, ProxyNode, TrustLevel, ProxySelectorConfig};
+pub use scope_routing::{
+    ScopeAwareRouter, ScopeRoutingConfig, ScopeAwareRoute,
+    GatewayNodeInfo, ScopeRoutingError, ScopeRoutingStats,
+};
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

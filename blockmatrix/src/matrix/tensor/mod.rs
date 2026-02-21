@@ -39,6 +39,7 @@ pub mod vector;
 pub mod matrix_ops;
 pub mod routing;
 pub mod path_finding;
+pub mod transaction_routing;
 
 // Re-export main types and functions
 pub use vector::{Vector3D, TensorError};
@@ -58,6 +59,15 @@ pub use path_finding::{
     calculate_path_cost,
     optimize_path,
     bidirectional_search,
+};
+pub use transaction_routing::{
+    TransactionRouter,
+    TransactionRoutingConfig,
+    TransactionRoute,
+    RouteHop,
+    ScopeTransition,
+    RoutingError,
+    RoutingStatistics,
 };
 
 #[cfg(test)]

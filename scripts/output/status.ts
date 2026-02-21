@@ -40,15 +40,15 @@ export const crateStatuses: CrateStatus[] = [
       "inDevelopment": [
         "Network scope sync + reflector pooling — Device↔Network chain synchronization (wired: SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
         "Gateway architecture for cross-scope asset transfers and scope bridging (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
-        "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)"
+        "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
+        "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
+        "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
+        "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)"
       ],
       "planned": [
-        "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
-        "Cross-scope proxy routing — NAT-like asset access across blockchain scope boundaries",
         "Container runtime with isolation",
         "Multi-node production deployment",
-        "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
-        "CLI for matrix topology queries, node management, and asset operations"
+        "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation"
       ]
     },
     "completion": 61
