@@ -237,17 +237,16 @@ export const crateStatuses: CrateStatus[] = [
         "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
         "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
         "Transport metrics collection",
-        "Matrix-aware positioning via hypermesh_lib canonical types"
+        "Matrix-aware positioning via hypermesh_lib canonical types",
+        "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
+        "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
+        "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
+        "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge"
       ],
       "inDevelopment": [],
-      "planned": [
-        "Protocol-level PoS token validation at line rate",
-        "Adaptive transport tiers",
-        "Multi-path QUIC",
-        "Reflector pool transport — redundancy/sync protocol for Public and Federated blockchain scopes"
-      ]
+      "planned": []
     },
-    "completion": 73
+    "completion": 100
   },
   {
     "id": "trustchain",
@@ -270,19 +269,19 @@ export const crateStatuses: CrateStatus[] = [
         "OCSP responder with FALCON-1024 signed responses",
         "CRL generator and distributor",
         "Threshold cryptography (Shamir SSS over GF(256))",
-        "HTTP/3 typed handler functions",
         "Deployment quality gates",
-        "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)"
+        "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
+        "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
+        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)"
       ],
       "inDevelopment": [
-        "HTTP/3 endpoint wiring (handlers exist, binary uses mocks)",
-        "CT log federation across nodes"
+        "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
       ],
       "planned": [
         "HSM key storage integration"
       ]
     },
-    "completion": 85
+    "completion": 90
   },
   {
     "id": "ui",

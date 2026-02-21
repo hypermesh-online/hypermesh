@@ -64,6 +64,9 @@ impl TrustChainStoqClient {
             enable_falcon_crypto: true,
             falcon_variant: stoq::FalconVariant::Falcon1024,
             ebpf_interface: None,
+            ewma_alpha: 0.125,
+            mtu_probe_interval_secs: 30,
+            loss_window_size: 10,
         };
 
         let transport = Arc::new(StoqTransport::new(transport_config).await

@@ -72,6 +72,9 @@ impl Http3StoqServer {
             enable_falcon_crypto: false,
             falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,
             ebpf_interface: None,
+            ewma_alpha: 0.125,
+            mtu_probe_interval_secs: 30,
+            loss_window_size: 10,
         };
 
         // Initialize STOQ transport

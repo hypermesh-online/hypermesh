@@ -9,24 +9,29 @@ items = [
     "Certificate Authority with issuance and revocation",
     "FALCON-1024 post-quantum signing",
     "Kyber-1024 key encapsulation",
-    "Certificate Transparency (Merkle logs, SCTs)",
+    "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
     "Proof of State four-proof validation",
     "Security monitoring and Byzantine detection",
     "DNS resolver with STOQ transport",
     "STOQ-based API server",
+    "SecurityIntegratedCA with mandatory consensus and real metrics",
+    "Trust scoring / reputation system with time decay",
+    "Certificate rotation scheduler with background task",
+    "OCSP responder with FALCON-1024 signed responses",
+    "CRL generator and distributor",
+    "Threshold cryptography (Shamir SSS over GF(256))",
+    "Deployment quality gates",
+    "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
+    "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
+    "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
 ]
 
 [features.in_development]
 items = [
-    "Production certificate hardening",
-    "CT log federation across nodes",
-    "HTTP/3 server integration",
-    "Deployment quality gates",
+    "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
 ]
 
 [features.planned]
 items = [
     "HSM key storage integration",
-    "Cross-network CA federation",
-    "Automated certificate rotation",
 ]

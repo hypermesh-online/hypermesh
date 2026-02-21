@@ -3,132 +3,24 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use http::{Response, StatusCode};
-use serde::{Deserialize, Serialize};
+use http::{Request, Response, StatusCode};
+use serde::Serialize;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::sync::Arc;
 use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
+use trustchain::ca::certificate_store::CertificateStore;
+use trustchain::ca::{CAConfig, TrustChainCA};
+use trustchain::http3::handlers::{
+    self, HttpHandlerContext,
+    IssueCertificateRequest, ValidateCertificateRequest, RevokeCertificateRequest,
+    DnsResolveRequest as HandlerDnsResolveRequest,
+};
 use trustchain::http3::{ApiResponse, Router, Http3StoqServer};
+use trustchain::security::{SecurityConfig, SecurityMonitor};
 
-#[derive(Serialize)]
-struct HealthResponse {
-    status: String,
-    version: String,
-    uptime_seconds: u64,
-    endpoints_available: usize,
-}
-
-#[derive(Serialize)]
-struct StatusResponse {
-    node_id: String,
-    blockchain_height: u64,
-    peers_connected: usize,
-    certificates_issued: u64,
-    dns_zones: usize,
-}
-
-#[derive(Serialize)]
-struct MetricsResponse {
-    requests_total: u64,
-    requests_per_second: f64,
-    average_latency_ms: f64,
-    error_rate: f64,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct CertificateIssueRequest {
-    subject: String,
-    public_key: String,
-    validity_days: u32,
-}
-
-#[derive(Serialize)]
-struct CertificateResponse {
-    certificate_id: String,
-    certificate_pem: String,
-    issued_at: i64,
-    expires_at: i64,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct CertificateValidateRequest {
-    certificate_pem: String,
-}
-
-#[derive(Serialize)]
-struct ValidationResponse {
-    valid: bool,
-    issuer: String,
-    subject: String,
-    not_before: i64,
-    not_after: i64,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct DnsResolveRequest {
-    domain: String,
-    record_type: String,
-}
-
-#[derive(Serialize)]
-struct DnsResolveResponse {
-    domain: String,
-    record_type: String,
-    addresses: Vec<String>,
-    ttl: u32,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct DnsRegisterRequest {
-    domain: String,
-    owner: String,
-    addresses: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct DnsRegisterResponse {
-    domain: String,
-    asset_id: String,
-    blockchain_height: u64,
-}
-
-#[derive(Serialize)]
-struct ConsensusStatusResponse {
-    consensus_active: bool,
-    current_round: u64,
-    validators: usize,
-    finality_threshold: f64,
-}
-
-#[derive(Serialize)]
-struct ProofValidationResponse {
-    asset_id: String,
-    proofs_validated: Vec<String>,
-    validation_time_ms: u64,
-    consensus_achieved: bool,
-}
-
-// New structures for authentication endpoint
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct AuthCertificateRequest {
-    certificate_pem: String,
-}
-
-#[derive(Serialize)]
-struct AuthCertificateResponse {
-    authenticated: bool,
-    session_token: String,
-    expires_at: String,
-    permissions: Vec<String>,
-}
-
-/// Helper to build JSON response with proper error handling
+/// Build a JSON success response wrapping `data` in `ApiResponse`.
 fn build_json_response<T: Serialize>(data: T, request_id: String) -> Response<Vec<u8>> {
     match serde_json::to_vec(&ApiResponse::success(data, request_id)) {
         Ok(body) => Response::builder()
@@ -152,6 +44,58 @@ fn build_json_response<T: Serialize>(data: T, request_id: String) -> Response<Ve
     }
 }
 
+/// Build a JSON error response using the `ApiResponse` format.
+fn build_error_response(code: &str, message: String, request_id: String) -> Response<Vec<u8>> {
+    let api_resp: ApiResponse<()> = ApiResponse::error(
+        code.to_string(),
+        message,
+        request_id,
+    );
+    match serde_json::to_vec(&api_resp) {
+        Ok(body) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header("content-type", "application/json")
+            .body(body)
+            .unwrap_or_else(|e| {
+                error!("Failed to build error response: {}", e);
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(vec![])
+                    .unwrap_or_default()
+            }),
+        Err(e) => {
+            error!("Failed to serialize error response: {}", e);
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(vec![])
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// Parse a JSON request body, returning an error response on failure.
+fn parse_request_body<T: serde::de::DeserializeOwned>(
+    req: &Request<Vec<u8>>,
+    request_id: &str,
+) -> Result<T, Response<Vec<u8>>> {
+    serde_json::from_slice(req.body()).map_err(|e| {
+        build_error_response(
+            "BAD_REQUEST",
+            format!("Invalid request body: {}", e),
+            request_id.to_string(),
+        )
+    })
+}
+
+/// Extract the last path segment from a URI (for /{id} style routes).
+fn extract_path_id(req: &Request<Vec<u8>>) -> &str {
+    req.uri()
+        .path()
+        .split('/')
+        .last()
+        .unwrap_or("unknown")
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize rustls crypto provider
@@ -165,222 +109,24 @@ async fn main() -> Result<()> {
 
     info!("TrustChain HTTP/3 Server starting...");
 
-    // Initialize components (these would normally connect to actual implementations)
-    let start_time = std::time::Instant::now();
+    // Initialize real service components
+    let ca_config = CAConfig::default();
+    let ca = Arc::new(TrustChainCA::new(ca_config).await?);
 
-    // Create router with all endpoints
-    let router = Router::new()
-        // Health & Status endpoints
-        .get("/api/v1/trustchain/health", move |_req| {
-            let uptime = start_time.elapsed().as_secs();
-            async move {
-                let response = HealthResponse {
-                    status: "healthy".to_string(),
-                    version: env!("CARGO_PKG_VERSION").to_string(),
-                    uptime_seconds: uptime,
-                    endpoints_available: 15,
-                };
+    let certificate_store = Arc::new(CertificateStore::new().await?);
 
-                build_json_response(response, uuid::Uuid::new_v4().to_string())
-            }
-        })
-        .get("/api/v1/trustchain/status", |_req| async move {
-            let response = StatusResponse {
-                node_id: uuid::Uuid::new_v4().to_string(),
-                blockchain_height: 12345,
-                peers_connected: 8,
-                certificates_issued: 1024,
-                dns_zones: 32,
-            };
+    let security_config = SecurityConfig::default();
+    let security_monitor = Arc::new(SecurityMonitor::new(security_config).await?);
 
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .get("/api/v1/trustchain/metrics", |_req| async move {
-            let response = MetricsResponse {
-                requests_total: 10000,
-                requests_per_second: 150.5,
-                average_latency_ms: 12.3,
-                error_rate: 0.001,
-            };
+    let ctx = Arc::new(HttpHandlerContext {
+        ca,
+        certificate_store,
+        security_monitor,
+        start_time: std::time::Instant::now(),
+    });
 
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        // Certificate Management endpoints
-        .get("/api/v1/trustchain/certificates", |_req| async move {
-            let certificates = vec![
-                CertificateResponse {
-                    certificate_id: "cert_001".to_string(),
-                    certificate_pem: "-----BEGIN CERTIFICATE-----\nMIIB...".to_string(),
-                    issued_at: chrono::Utc::now().timestamp(),
-                    expires_at: chrono::Utc::now().timestamp() + 86400 * 365,
-                },
-            ];
-
-            build_json_response(certificates, uuid::Uuid::new_v4().to_string())
-        })
-        .post("/api/v1/trustchain/certificates/issue", |_req| async move {
-            // In production, this would parse the request body and issue a real certificate
-            let response = CertificateResponse {
-                certificate_id: uuid::Uuid::new_v4().to_string(),
-                certificate_pem: "-----BEGIN CERTIFICATE-----\nMIIB...".to_string(),
-                issued_at: chrono::Utc::now().timestamp(),
-                expires_at: chrono::Utc::now().timestamp() + 86400 * 365,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .post("/api/v1/trustchain/certificates/validate", |_req| async move {
-            let response = ValidationResponse {
-                valid: true,
-                issuer: "TrustChain Root CA".to_string(),
-                subject: "example.hypermesh.online".to_string(),
-                not_before: chrono::Utc::now().timestamp() - 86400,
-                not_after: chrono::Utc::now().timestamp() + 86400 * 364,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .get("/api/v1/trustchain/certificates/{id}", |req| async move {
-            // Extract certificate ID from path
-            let path = req.uri().path();
-            let cert_id = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
-
-            let response = CertificateResponse {
-                certificate_id: cert_id.to_string(),
-                certificate_pem: "-----BEGIN CERTIFICATE-----\nMIIB...".to_string(),
-                issued_at: chrono::Utc::now().timestamp() - 86400,
-                expires_at: chrono::Utc::now().timestamp() + 86400 * 364,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .post("/api/v1/trustchain/certificates/revoke", |_req| async move {
-            let response = serde_json::json!({
-                "revoked": true,
-                "revocation_time": chrono::Utc::now().timestamp(),
-                "reason": "key_compromise"
-            });
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        // DNS-as-Asset endpoints
-        .post("/api/v1/trustchain/dns/resolve", |_req| async move {
-            let response = DnsResolveResponse {
-                domain: "example.hypermesh.online".to_string(),
-                record_type: "AAAA".to_string(),
-                addresses: vec!["2001:db8::1".to_string()],
-                ttl: 300,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .get("/api/v1/trustchain/dns/zones", |_req| async move {
-            let zones = vec![
-                serde_json::json!({
-                    "zone": "hypermesh.online",
-                    "records": 42,
-                    "asset_id": "asset_dns_001"
-                }),
-                serde_json::json!({
-                    "zone": "trust.hypermesh.online",
-                    "records": 15,
-                    "asset_id": "asset_dns_002"
-                }),
-            ];
-
-            build_json_response(zones, uuid::Uuid::new_v4().to_string())
-        })
-        .post("/api/v1/trustchain/dns/register", |_req| async move {
-            let response = DnsRegisterResponse {
-                domain: "new.hypermesh.online".to_string(),
-                asset_id: uuid::Uuid::new_v4().to_string(),
-                blockchain_height: 12346,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .get("/api/v1/trustchain/dns/record/{domain}", |req| async move {
-            let path = req.uri().path();
-            let domain = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
-
-            let response = serde_json::json!({
-                "domain": domain,
-                "records": [
-                    {
-                        "type": "AAAA",
-                        "value": "2001:db8::1",
-                        "ttl": 300
-                    },
-                    {
-                        "type": "TXT",
-                        "value": "asset_id=asset_dns_123",
-                        "ttl": 300
-                    }
-                ],
-                "owner": "0x1234...5678",
-                "asset_id": "asset_dns_123"
-            });
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        // Consensus endpoints
-        .get("/api/v1/trustchain/consensus/status", |_req| async move {
-            let response = ConsensusStatusResponse {
-                consensus_active: true,
-                current_round: 5432,
-                validators: 21,
-                finality_threshold: 0.67,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .post("/api/v1/trustchain/consensus/validate", |_req| async move {
-            let response = serde_json::json!({
-                "valid": true,
-                "validation_type": "four_proof",
-                "proofs": ["PoSpace", "PoStake", "PoWork", "PoTime"],
-                "timestamp": chrono::Utc::now().timestamp()
-            });
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-        .get("/api/v1/trustchain/consensus/proofs/{asset_id}", |req| async move {
-            let path = req.uri().path();
-            let asset_id = path.split('/').last().unwrap_or("unknown");  // Safe: unwrap_or provides fallback
-
-            let response = ProofValidationResponse {
-                asset_id: asset_id.to_string(),
-                proofs_validated: vec![
-                    "PoSpace".to_string(),
-                    "PoStake".to_string(),
-                    "PoWork".to_string(),
-                    "PoTime".to_string(),
-                ],
-                validation_time_ms: 42,
-                consensus_achieved: true,
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        })
-
-        // 10. Authentication endpoint
-        .post("/api/v1/trustchain/auth/certificate", |_req| async move {
-            // In production, this would validate the certificate against the TrustChain CA
-            // For now, we mock a successful authentication
-
-            let response = AuthCertificateResponse {
-                authenticated: true,
-                session_token: uuid::Uuid::new_v4().to_string(),
-                expires_at: (chrono::Utc::now() + chrono::Duration::hours(24)).to_rfc3339(),
-                permissions: vec![
-                    "read".to_string(),
-                    "write".to_string(),
-                    "admin".to_string(),
-                ],
-            };
-
-            build_json_response(response, uuid::Uuid::new_v4().to_string())
-        });
+    // Create router with all endpoints wired to real handler functions
+    let router = build_router(ctx);
 
     // Start server on IPv6 localhost port 50053 using STOQ transport
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 50053);
@@ -390,4 +136,230 @@ async fn main() -> Result<()> {
     server.run().await?;
 
     Ok(())
+}
+
+fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
+    // Health endpoint
+    let ctx_health = Arc::clone(&ctx);
+    let router = Router::new()
+        .get("/api/v1/trustchain/health", move |_req| {
+            let ctx = Arc::clone(&ctx_health);
+            async move {
+                let rid = uuid::Uuid::new_v4().to_string();
+                match handlers::handle_health(&ctx).await {
+                    Ok(resp) => build_json_response(resp, rid),
+                    Err(e) => build_error_response("HEALTH_ERROR", e.to_string(), rid),
+                }
+            }
+        });
+
+    // Status endpoint (no real handler — keep as stub)
+    let router = router.get("/api/v1/trustchain/status", |_req| async move {
+        // TODO: Implement handle_status() in handlers.rs — needs node-level
+        // blockchain height, peer count, and zone count from BlockMatrix integration.
+        let response = serde_json::json!({
+            "node_id": uuid::Uuid::new_v4().to_string(),
+            "blockchain_height": 0,
+            "peers_connected": 0,
+            "certificates_issued": 0,
+            "dns_zones": 0,
+        });
+        build_json_response(response, uuid::Uuid::new_v4().to_string())
+    });
+
+    // Metrics endpoint
+    let ctx_metrics = Arc::clone(&ctx);
+    let router = router.get("/api/v1/trustchain/metrics", move |_req| {
+        let ctx = Arc::clone(&ctx_metrics);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            match handlers::handle_metrics(&ctx).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("METRICS_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // List certificates
+    let ctx_list = Arc::clone(&ctx);
+    let router = router.get("/api/v1/trustchain/certificates", move |_req| {
+        let ctx = Arc::clone(&ctx_list);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            match handlers::handle_list_certificates(&ctx).await {
+                Ok(certs) => build_json_response(certs, rid),
+                Err(e) => build_error_response("LIST_CERTS_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // Issue certificate
+    let ctx_issue = Arc::clone(&ctx);
+    let router = router.post("/api/v1/trustchain/certificates/issue", move |req| {
+        let ctx = Arc::clone(&ctx_issue);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let body: IssueCertificateRequest = match parse_request_body(&req, &rid) {
+                Ok(b) => b,
+                Err(resp) => return resp,
+            };
+            match handlers::handle_issue_certificate(&ctx, body).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("ISSUE_CERT_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // Validate certificate
+    let ctx_validate = Arc::clone(&ctx);
+    let router = router.post("/api/v1/trustchain/certificates/validate", move |req| {
+        let ctx = Arc::clone(&ctx_validate);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let body: ValidateCertificateRequest = match parse_request_body(&req, &rid) {
+                Ok(b) => b,
+                Err(resp) => return resp,
+            };
+            match handlers::handle_validate_certificate(&ctx, body).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("VALIDATE_CERT_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // Get certificate by ID
+    let ctx_get = Arc::clone(&ctx);
+    let router = router.get("/api/v1/trustchain/certificates/{id}", move |req| {
+        let ctx = Arc::clone(&ctx_get);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let serial = extract_path_id(&req).to_string();
+            match handlers::handle_get_certificate(&ctx, &serial).await {
+                Ok(Some(cert)) => build_json_response(cert, rid),
+                Ok(None) => build_error_response("NOT_FOUND", format!("Certificate {} not found", serial), rid),
+                Err(e) => build_error_response("GET_CERT_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // Revoke certificate
+    let ctx_revoke = Arc::clone(&ctx);
+    let router = router.post("/api/v1/trustchain/certificates/revoke", move |req| {
+        let ctx = Arc::clone(&ctx_revoke);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let body: RevokeCertificateRequest = match parse_request_body(&req, &rid) {
+                Ok(b) => b,
+                Err(resp) => return resp,
+            };
+            match handlers::handle_revoke_certificate(&ctx, body).await {
+                Ok(revoked) => build_json_response(
+                    serde_json::json!({
+                        "revoked": revoked,
+                        "revocation_time": chrono::Utc::now().timestamp(),
+                    }),
+                    rid,
+                ),
+                Err(e) => build_error_response("REVOKE_CERT_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // DNS resolve
+    let ctx_dns = Arc::clone(&ctx);
+    let router = router.post("/api/v1/trustchain/dns/resolve", move |req| {
+        let ctx = Arc::clone(&ctx_dns);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let body: HandlerDnsResolveRequest = match parse_request_body(&req, &rid) {
+                Ok(b) => b,
+                Err(resp) => return resp,
+            };
+            match handlers::handle_dns_resolve(&ctx, body).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("DNS_RESOLVE_ERROR", e.to_string(), rid),
+            }
+        }
+    });
+
+    // DNS zones (stub)
+    let router = router.get("/api/v1/trustchain/dns/zones", |_req| async move {
+        // TODO: Implement handle_dns_zones() in handlers.rs — needs DNS zone
+        // enumeration from DnsResolver, which requires STOQ transport integration.
+        let zones: Vec<serde_json::Value> = Vec::new();
+        build_json_response(zones, uuid::Uuid::new_v4().to_string())
+    });
+
+    // DNS register (stub)
+    let router = router.post("/api/v1/trustchain/dns/register", |_req| async move {
+        // TODO: Implement handle_dns_register() in handlers.rs — DNS registration
+        // is an asset operation requiring full Proof of State and blockchain
+        // integration via BlockMatrix.
+        build_error_response(
+            "NOT_IMPLEMENTED",
+            "DNS registration requires BlockMatrix asset integration (not yet wired)".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    });
+
+    // DNS record lookup (stub)
+    let router = router.get("/api/v1/trustchain/dns/record/{domain}", |_req| async move {
+        // TODO: Implement handle_dns_record_lookup() in handlers.rs — needs
+        // per-domain record enumeration from DnsResolver via STOQ transport.
+        build_error_response(
+            "NOT_IMPLEMENTED",
+            "DNS record lookup requires STOQ transport integration (not yet wired)".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    });
+
+    // Consensus status (stub)
+    let router = router.get("/api/v1/trustchain/consensus/status", |_req| async move {
+        // TODO: Implement handle_consensus_status() in handlers.rs — needs
+        // FourProofValidator round/validator state exposure.
+        let response = serde_json::json!({
+            "consensus_active": false,
+            "current_round": 0,
+            "validators": 0,
+            "finality_threshold": 0.67,
+        });
+        build_json_response(response, uuid::Uuid::new_v4().to_string())
+    });
+
+    // Consensus validate (stub)
+    let router = router.post("/api/v1/trustchain/consensus/validate", |_req| async move {
+        // TODO: Implement handle_consensus_validate() in handlers.rs — needs
+        // ConsensusProof deserialization from request body and validation via
+        // SecurityMonitor::validate_certificate_operation().
+        build_error_response(
+            "NOT_IMPLEMENTED",
+            "Consensus validation endpoint requires proof deserialization (not yet wired)".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    });
+
+    // Consensus proofs by asset ID (stub)
+    let router = router.get("/api/v1/trustchain/consensus/proofs/{asset_id}", |_req| async move {
+        // TODO: Implement handle_consensus_proofs() in handlers.rs — needs
+        // per-asset proof retrieval from blockchain/consensus layer.
+        build_error_response(
+            "NOT_IMPLEMENTED",
+            "Consensus proof retrieval requires blockchain integration (not yet wired)".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    });
+
+    // Auth certificate (stub)
+    let router = router.post("/api/v1/trustchain/auth/certificate", |_req| async move {
+        // TODO: Implement handle_auth_certificate() in handlers.rs — needs
+        // certificate-based authentication flow: validate cert against CA,
+        // generate session token, assign permissions based on cert attributes.
+        build_error_response(
+            "NOT_IMPLEMENTED",
+            "Certificate authentication requires session management (not yet wired)".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    });
+
+    router
 }

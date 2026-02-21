@@ -29,6 +29,7 @@ pub mod fingerprint_tracker;
 pub mod simple_storage;
 pub mod certificate_transparency;
 pub mod stoq_ct_client;
+pub mod federation_sync;
 
 pub use merkle_log::*;
 pub use sct_manager::*;
@@ -36,6 +37,10 @@ pub use fingerprint_tracker::*;
 pub use simple_storage::{SimpleCTStorage as CTStorage, StorageStats};
 pub use certificate_transparency::*;
 pub use stoq_ct_client::*;
+pub use federation_sync::{
+    CtFederationSync, CtSyncMessage, CtLogEntry, CtSyncMetrics,
+    SyncResult, FederationSyncStatus,
+};
 
 /// Certificate Transparency service
 pub struct CertificateTransparency {

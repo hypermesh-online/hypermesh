@@ -19,11 +19,13 @@ pub mod falcon;
 pub mod kyber;
 pub mod hybrid;
 pub mod certificate;
+pub mod threshold;
 
 pub use falcon::*;
 pub use kyber::*;
 pub use hybrid::*;
 pub use certificate::*;
+pub use threshold::{ThresholdConfig, ThresholdScheme, SecretShare, KeyShare, ThresholdSigner};
 
 /// Post-quantum cryptographic key pair for FALCON-1024
 #[derive(Clone, Debug, Serialize, Deserialize)]

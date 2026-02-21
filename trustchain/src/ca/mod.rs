@@ -31,6 +31,7 @@ pub mod policy;
 pub mod certificate_authority;
 pub mod stoq_ca_client;
 pub mod security_integration; // Security integration module
+pub mod federation;
 
 pub use certificate_manager::*;
 pub use certificate_store::{CertificateStore as CertStore, CertificateStoreMetrics};
@@ -41,6 +42,11 @@ pub use stoq_ca_client::*;
 pub use certificate_authority::{TrustChainCA as TrustChainCAImpl, *};
 // Re-export security integration
 pub use security_integration::*;
+// Re-export federation types
+pub use federation::{
+    FederationManager, FederatedCA, FederationTrustLevel,
+    FederationPolicy, FederatedValidationResult, FederationStatus,
+};
 
 /// TrustChain Certificate Authority (Legacy - use SecurityIntegratedCA for new deployments)
 #[derive(Clone)]
