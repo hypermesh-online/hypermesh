@@ -41,14 +41,14 @@ items = [
 [features.in_development]
 items = [
     "Banking provider STOQ migration",
+    "Caesar binary entry point — STOQ API server launcher (TODO: caesar/src/bin/caesar.rs)",
+    "Caesar SDK — extract UPI traits + examples into reusable crate (STUB: traits exist, needs packaging)",
+    "Caesar CLI — packet operations + node management (TODO: adapt blockmatrix CLI pattern with clap)",
+    "caesar.hypermesh.online gateway routing rule (TODO: add domain rule to gateway crate)",
 ]
 
 [features.planned]
 items = [
-    "Live STOQ API with real packet routing end-to-end (blocked by: STOQ transport + network-layer candidate metrics)",
-    "Caesar SDK for third-party payment integration (blocked by: stable public API surface)",
-    "Caesar CLI for packet operations and node management (blocked by: clap integration + stable protocol)",
-    "caesar.hypermesh.online clearnet gateway (blocked by: gateway crate wiring + deployment infra)",
-    "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: external chain API integrations)",
-    "Fiat UPI payment processing (blocked by: payment processor partnerships — Stripe/Plaid/Wire)",
+    "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
+    "Fiat UPI payment processing (blocked by: HTTP client decision — reqwest vs STOQ outbound + OAuth2 flows + PSD2 compliance)",
 ]
