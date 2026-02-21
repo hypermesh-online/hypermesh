@@ -8,7 +8,9 @@
 //! metrics only -- bandwidth, buffer depth, latency, and current load.
 //! No trust scores, no reputation, no subjective inputs.
 
-use hypermesh_lib::economic::MarketTier;
+use std::collections::HashMap;
+
+use hypermesh_lib::economic::{GoldGrams, MarketTier};
 use hypermesh_lib::NodeId;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
@@ -164,6 +166,73 @@ impl PacketRouter {
             },
         })
     }
+
+    /// Select next hop incorporating operator soft preferences.
+    ///
+    /// Each candidate's base capacity score is multiplied by the operator's
+    /// tier weight for the packet's tier. If the packet value falls outside
+    /// the operator's preferred range, a 0.5x penalty is applied. Nodes in
+    /// `auto_mode` always use 1.0x multipliers (no preferences).
+    pub fn find_route_with_preferences(
+        &self,
+        candidates: &[CapacityMetrics],
+        packet_tier: MarketTier,
+        packet_value: GoldGrams,
+        operator_prefs: &HashMap<NodeId, crate::models::OperatorPreferences>,
+    ) -> Result<RouteSelection, RoutingError> {
+        if candidates.is_empty() {
+            return Err(RoutingError::NoCandidates);
+        }
+
+        let scored: Vec<(usize, Decimal)> = candidates
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                let buffer_dec = Decimal::from_u64(m.buffer_capacity_packets)
+                    .unwrap_or(Decimal::ZERO);
+                let active_dec = Decimal::from_u64(m.active_packet_count)
+                    .unwrap_or(Decimal::ZERO);
+
+                let mut score = WEIGHT_BANDWIDTH * m.available_bandwidth_mbps
+                    + WEIGHT_BUFFER * buffer_dec
+                    - WEIGHT_LATENCY * m.avg_latency_ms
+                    - WEIGHT_LOAD * active_dec;
+
+                if let Some(prefs) = operator_prefs.get(&m.node_id) {
+                    if !prefs.auto_mode {
+                        let tier_weight = match packet_tier {
+                            MarketTier::L0 => prefs.tier_weights.l0,
+                            MarketTier::L1 => prefs.tier_weights.l1,
+                            MarketTier::L2 => prefs.tier_weights.l2,
+                            MarketTier::L3 => prefs.tier_weights.l3,
+                        };
+                        score *= tier_weight;
+
+                        let outside_range =
+                            packet_value.0 < prefs.preferred_min_packet.0
+                                || packet_value.0 > prefs.preferred_max_packet.0;
+                        if outside_range {
+                            score *= dec!(0.5);
+                        }
+                    }
+                }
+
+                (i, score)
+            })
+            .collect();
+
+        let (best_idx, best_score) = scored
+            .iter()
+            .max_by(|a, b| a.1.cmp(&b.1))
+            .expect("candidates is non-empty");
+
+        let best = &candidates[*best_idx];
+        Ok(RouteSelection {
+            next_hop: best.node_id.clone(),
+            score: *best_score,
+            metrics: best.clone(),
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +331,157 @@ mod tests {
             .expect("test: should avoid high load");
 
         assert_eq!(result.next_hop, NodeId::from("idle"));
+    }
+
+    #[test]
+    fn route_with_preferences_auto_mode() {
+        use crate::models::OperatorPreferences;
+
+        let router = PacketRouter::default();
+        let candidates = vec![
+            make_metrics("a", dec!(200), 100, dec!(10), 5),
+            make_metrics("b", dec!(500), 200, dec!(5), 2),
+        ];
+
+        // Both nodes in auto_mode — preferences ignored, highest capacity wins
+        let mut prefs = HashMap::new();
+        prefs.insert(
+            NodeId::from("a"),
+            OperatorPreferences { auto_mode: true, ..Default::default() },
+        );
+        prefs.insert(
+            NodeId::from("b"),
+            OperatorPreferences { auto_mode: true, ..Default::default() },
+        );
+
+        let result = router
+            .find_route_with_preferences(
+                &candidates,
+                MarketTier::L0,
+                GoldGrams::from_decimal(dec!(100)),
+                &prefs,
+            )
+            .expect("test: auto_mode routing should succeed");
+
+        // Same result as find_route — node "b" has higher base score
+        assert_eq!(result.next_hop, NodeId::from("b"));
+    }
+
+    #[test]
+    fn route_with_preferences_tier_weight() {
+        use crate::models::{OperatorPreferences, TierWeights};
+
+        let router = PacketRouter::default();
+        // Equal capacity so base scores are identical
+        let candidates = vec![
+            make_metrics("high-w", dec!(200), 100, dec!(10), 5),
+            make_metrics("low-w", dec!(200), 100, dec!(10), 5),
+        ];
+
+        let mut prefs = HashMap::new();
+        prefs.insert(
+            NodeId::from("high-w"),
+            OperatorPreferences {
+                tier_weights: TierWeights {
+                    l0: dec!(2.0),
+                    ..Default::default()
+                },
+                auto_mode: false,
+                ..Default::default()
+            },
+        );
+        prefs.insert(
+            NodeId::from("low-w"),
+            OperatorPreferences {
+                tier_weights: TierWeights {
+                    l0: dec!(0.5),
+                    ..Default::default()
+                },
+                auto_mode: false,
+                ..Default::default()
+            },
+        );
+
+        let result = router
+            .find_route_with_preferences(
+                &candidates,
+                MarketTier::L0,
+                GoldGrams::from_decimal(dec!(100)),
+                &prefs,
+            )
+            .expect("test: tier weight routing should succeed");
+
+        assert_eq!(result.next_hop, NodeId::from("high-w"));
+    }
+
+    #[test]
+    fn route_with_preferences_value_penalty() {
+        use crate::models::OperatorPreferences;
+
+        let router = PacketRouter::default();
+        // Equal capacity
+        let candidates = vec![
+            make_metrics("strict", dec!(200), 100, dec!(10), 5),
+            make_metrics("open", dec!(200), 100, dec!(10), 5),
+        ];
+
+        let mut prefs = HashMap::new();
+        // "strict" prefers packets >= 50g, packet is only 10g → penalty
+        prefs.insert(
+            NodeId::from("strict"),
+            OperatorPreferences {
+                preferred_min_packet: GoldGrams::from_decimal(dec!(50)),
+                preferred_max_packet: GoldGrams::from_decimal(dec!(1000)),
+                auto_mode: false,
+                ..Default::default()
+            },
+        );
+        // "open" accepts anything
+        prefs.insert(
+            NodeId::from("open"),
+            OperatorPreferences {
+                preferred_min_packet: GoldGrams::from_decimal(dec!(1)),
+                preferred_max_packet: GoldGrams::from_decimal(dec!(1000)),
+                auto_mode: false,
+                ..Default::default()
+            },
+        );
+
+        let result = router
+            .find_route_with_preferences(
+                &candidates,
+                MarketTier::L1,
+                GoldGrams::from_decimal(dec!(10)),
+                &prefs,
+            )
+            .expect("test: value penalty routing should succeed");
+
+        // "strict" gets 0.5x penalty, "open" does not → "open" wins
+        assert_eq!(result.next_hop, NodeId::from("open"));
+    }
+
+    #[test]
+    fn route_with_preferences_no_prefs_defaults() {
+        let router = PacketRouter::default();
+        let candidates = vec![
+            make_metrics("a", dec!(100), 50, dec!(20), 5),
+            make_metrics("b", dec!(500), 200, dec!(5), 2),
+        ];
+
+        // Empty prefs map — candidates not found → treated as auto_mode
+        let prefs: HashMap<NodeId, crate::models::OperatorPreferences> = HashMap::new();
+
+        let result = router
+            .find_route_with_preferences(
+                &candidates,
+                MarketTier::L0,
+                GoldGrams::from_decimal(dec!(100)),
+                &prefs,
+            )
+            .expect("test: no-prefs routing should succeed");
+
+        // Same as find_route — node "b" has higher base score
+        assert_eq!(result.next_hop, NodeId::from("b"));
     }
 
     #[cfg(feature = "engauge")]

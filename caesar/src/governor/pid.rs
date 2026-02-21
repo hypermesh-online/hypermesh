@@ -97,6 +97,13 @@ impl GovernorPid {
         Self { kp, ki, kd, ..Self::new() }
     }
 
+    /// Return the last computed governance parameters.
+    ///
+    /// Returns the default if `recalculate` has not been called yet.
+    pub fn last_params(&self) -> &GovernanceParams {
+        &self.last_params
+    }
+
     /// Run one PID control cycle, producing updated [`GovernanceParams`].
     pub fn recalculate(&mut self, metrics: &NetworkMetrics) -> GovernanceParams {
         let error = self.gold_deviation(metrics);
@@ -408,6 +415,24 @@ mod tests {
         assert_eq!(c.kp, dec!(1));
         assert_eq!(c.ki, dec!(2));
         assert_eq!(c.kd, dec!(3));
+    }
+
+    #[test]
+    fn last_params_default_before_recalculate() {
+        let g = GovernorPid::new();
+        let p = g.last_params();
+        assert_eq!(p.pressure, PressureQuadrant::GoldenEra);
+        assert_eq!(p.recommended_fee_adjustment, dec!(0));
+    }
+
+    #[test]
+    fn last_params_updated_after_recalculate() {
+        let mut g = GovernorPid::new();
+        let m = bubble();
+        let result = g.recalculate(&m);
+        let stored = g.last_params();
+        assert_eq!(stored.recommended_fee_adjustment, result.recommended_fee_adjustment);
+        assert_eq!(stored.pressure, result.pressure);
     }
 
     #[test]

@@ -176,6 +176,50 @@ impl GoldOracle {
             timestamp: Utc::now(),
         }
     }
+
+    /// Update price from an oracle feed source.
+    pub async fn update_from_feed(&self, feed: &dyn OracleFeed) -> Result<(), OracleError> {
+        let price = feed.fetch_gold_price_usd().await?;
+        self.update_price(price).await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OracleFeed trait
+// ---------------------------------------------------------------------------
+
+/// Trait for gold price feed sources.
+///
+/// Implementations can range from manual/hardcoded feeds (for testing and
+/// alpha) to real-time API integrations with multiple providers.
+#[async_trait::async_trait]
+pub trait OracleFeed: Send + Sync {
+    /// Fetch the current gold price in USD per troy ounce.
+    async fn fetch_gold_price_usd(&self) -> Result<Decimal, OracleError>;
+    /// Human-readable name for this feed source.
+    fn feed_name(&self) -> &str;
+}
+
+/// Manual feed -- returns a static price. Suitable for testing and alpha.
+pub struct ManualFeed {
+    price_usd: Decimal,
+}
+
+impl ManualFeed {
+    /// Create a manual feed with a fixed price.
+    pub fn new(price_usd: Decimal) -> Self {
+        Self { price_usd }
+    }
+}
+
+#[async_trait::async_trait]
+impl OracleFeed for ManualFeed {
+    async fn fetch_gold_price_usd(&self) -> Result<Decimal, OracleError> {
+        Ok(self.price_usd)
+    }
+    fn feed_name(&self) -> &str {
+        "manual"
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -301,5 +345,21 @@ mod tests {
 
         // liquidity_shadow should be 0 (no division by zero)
         assert_eq!(composite.liquidity_shadow, Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn manual_feed_returns_price() {
+        let feed = ManualFeed::new(dec!(2000));
+        let price = feed.fetch_gold_price_usd().await.expect("test: manual feed");
+        assert_eq!(price, dec!(2000));
+        assert_eq!(feed.feed_name(), "manual");
+    }
+
+    #[tokio::test]
+    async fn oracle_update_from_feed() {
+        let oracle = GoldOracle::new(dec!(2000));
+        let feed = ManualFeed::new(dec!(2050));
+        oracle.update_from_feed(&feed).await.expect("test: update from feed");
+        assert_eq!(oracle.current_gold_price_usd().await, dec!(2050));
     }
 }

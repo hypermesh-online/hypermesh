@@ -9,7 +9,7 @@
 
 #[allow(unused_imports)]
 use chrono::{DateTime, Utc};
-use hypermesh_lib::economic::{GoldGrams, MarketTier, PacketId, PacketState};
+use hypermesh_lib::economic::{DemurrageRate, GoldGrams, MarketTier, PacketId, PacketState};
 use hypermesh_lib::NodeId;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,36 @@ pub struct PacketRecord {
     pub updated_at: DateTime<Utc>,
     /// When settlement completed (terminal states only)
     pub settled_at: Option<DateTime<Utc>>,
+    /// Sender node (for CaesPacket reconstruction)
+    pub sender: NodeId,
+    /// Recipient node (for CaesPacket reconstruction)
+    pub recipient: NodeId,
+    /// Demurrage rate (for CaesPacket reconstruction)
+    pub demurrage_rate: DemurrageRate,
+}
+
+/// Reconstruct a CaesPacket from a stored PacketRecord.
+///
+/// Used by CaesarProtocol orchestration methods to apply state transitions
+/// to packets loaded from storage.
+pub fn packet_from_record(record: &PacketRecord) -> crate::evp::CaesPacket {
+    crate::evp::CaesPacket {
+        id: record.packet_id,
+        state: record.state,
+        tier: record.tier,
+        initial_value: record.initial_value,
+        demurrage_rate: record.demurrage_rate,
+        sender: record.sender.clone(),
+        recipient: record.recipient.clone(),
+        created_at: record.created_at,
+        last_transition: record.updated_at,
+        fee: GoldGrams::zero(), // fee already deducted at mint
+        route: record.route.clone(),
+        hold_retries: 0,
+        hop_count: record.hop_count,
+        hop_limit: record.hop_limit,
+        fee_budget: record.fee_budget,
+    }
 }
 
 // ============ Settlement Models ============
@@ -219,6 +249,9 @@ mod tests {
             created_at: now,
             updated_at: now,
             settled_at: None,
+            sender: NodeId::from("sender-node"),
+            recipient: NodeId::from("recipient-node"),
+            demurrage_rate: MarketTier::L0.default_demurrage_rate(),
         };
 
         assert_eq!(record.state, PacketState::Minted);

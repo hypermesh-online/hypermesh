@@ -77,14 +77,20 @@ export const crateStatuses: CrateStatus[] = [
         "Holding buffer — orbit buffer for fee-budget-exceeded/congestion packets with retry limits",
         "Packet-centric storage (PacketRecord, SettlementRecord, metrics, JSON persistence)",
         "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
-        "STOQ API handlers (route_packet, node_status, governor_params, effective_rate, health)",
+        "Conservation law verification + circuit breaker (whitepaper §3.1)",
+        "MeshCredit UPI adapter (internal BlockMatrix ledger, 1:1 CAES denomination)",
+        "Settlement execution pipeline (validate → egress adapter → fee distribution → conservation check)",
+        "Dispersed state handling (egress failure → holding buffer → retry settlement)",
+        "Node operator preferences integration with routing (tier weights, value range, auto_mode)",
+        "Governor-adjusted routing fees (PID-driven fee calculation per packet)",
+        "OracleFeed trait for pluggable gold price sources (ManualFeed for alpha)",
+        "Node status tracking in storage (settled count, fee earnings)",
+        "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
         "Cross-chain bridge types (8 networks)",
         "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)"
       ],
       "inDevelopment": [
-        "Banking provider STOQ migration",
-        "STOQ API handler wiring to CaesarProtocol internals",
-        "Node operator preferences integration with routing"
+        "Banking provider STOQ migration"
       ],
       "planned": [
         "Live STOQ API with real packet routing end-to-end",
@@ -95,7 +101,7 @@ export const crateStatuses: CrateStatus[] = [
         "Fiat UPI payment processing"
       ]
     },
-    "completion": 71
+    "completion": 81
   },
   {
     "id": "catalog",

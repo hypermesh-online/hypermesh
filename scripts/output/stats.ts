@@ -17,15 +17,15 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "caesar",
-    "files": 32,
-    "linesOfCode": 9436,
-    "testCount": 165
+    "files": 34,
+    "linesOfCode": 12132,
+    "testCount": 183
   },
   {
     "id": "catalog",
     "files": 58,
-    "linesOfCode": 27045,
-    "testCount": 54
+    "linesOfCode": 28425,
+    "testCount": 76
   },
   {
     "id": "engauge",
@@ -35,9 +35,9 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "gateway",
-    "files": 10,
-    "linesOfCode": 1712,
-    "testCount": 10
+    "files": 15,
+    "linesOfCode": 4176,
+    "testCount": 83
   },
   {
     "id": "hypermesh-ebpf",
@@ -54,7 +54,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "stoq",
     "files": 44,
-    "linesOfCode": 17959,
+    "linesOfCode": 17731,
     "testCount": 140
   },
   {
@@ -72,8 +72,8 @@ export const crateStats: CrateStats[] = [
 ];
 
 export const totalStats = {
-  "totalFiles": 817,
-  "totalLines": 282041,
-  "totalTests": 1495,
+  "totalFiles": 824,
+  "totalLines": 288353,
+  "totalTests": 1608,
   "crateCount": 10
 };

@@ -40,6 +40,8 @@ pub enum HoldReason {
     NetworkCongestion,
     /// No viable route to the destination.
     NoRouteAvailable,
+    /// Failed egress deposit -> Dispersed state escrow (section 10).
+    EgressFailure,
 }
 
 /// A packet currently in the holding buffer.

@@ -76,7 +76,7 @@ pub(crate) mod testing {
         }
 
         fn supported_denominations(&self) -> Vec<String> {
-            vec!["USD".into(), "BTC".into()]
+            vec!["USD".into(), "BTC".into(), "CAES".into()]
         }
 
         async fn available_capacity(&self) -> Result<GoldGrams, UpiError> {
@@ -97,13 +97,17 @@ pub(crate) mod testing {
                 });
             }
 
-            if denomination != "USD" && denomination != "BTC" {
+            if denomination != "USD" && denomination != "BTC" && denomination != "CAES" {
                 return Err(UpiError::UnsupportedDenomination {
                     denomination: denomination.into(),
                 });
             }
 
-            let dest_amount = value.0 * gold_price_usd;
+            let dest_amount = if denomination == "CAES" {
+                value.0 // 1:1 for internal CAES denomination
+            } else {
+                value.0 * gold_price_usd
+            };
             Ok(SettlementReceipt {
                 settlement_id: "mock-settle-001".into(),
                 adapter_id: self.adapter_id().into(),

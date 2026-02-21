@@ -44,6 +44,9 @@ pub enum SettlementError {
 
     #[error("packet expired -- TTL exceeded")]
     Expired,
+
+    #[error("egress adapter failed: {reason}")]
+    EgressFailed { reason: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +74,13 @@ pub struct SettlementResult {
     pub fee_collected: GoldGrams,
     pub settler_node: NodeId,
     pub settled_at: DateTime<Utc>,
+}
+
+/// Result of a fully executed settlement (validation + egress + fee distribution).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutedSettlement {
+    pub settlement_result: SettlementResult,
+    pub fee_distribution: crate::fee_distribution::FeeDistribution,
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +169,68 @@ impl SettlementProtocol {
         })
     }
 
+    /// Execute a full settlement: validate -> egress -> distribute fees.
+    ///
+    /// If the egress adapter fails, returns `EgressFailed` (caller should
+    /// transition the packet to Dispersed state for retry).
+    pub async fn execute_settlement(
+        request: SettlementRequest,
+        egress_adapter: &dyn crate::upi::EgressAdapter,
+        fee_distributor: &crate::fee_distribution::FeeDistributor,
+        transit_nodes: &[(NodeId, u64)],
+        gold_price_usd: rust_decimal::Decimal,
+    ) -> Result<ExecutedSettlement, SettlementError> {
+        Self::validate_settlement(&request)?;
+
+        let settled_value = request.packet_value - request.fee;
+
+        let receipt = egress_adapter
+            .settle(
+                settled_value,
+                &format!("{}", request.settler_node.0),
+                "CAES",
+                gold_price_usd,
+            )
+            .await
+            .map_err(|e| SettlementError::EgressFailed {
+                reason: format!("{}", e),
+            })?;
+
+        let settlement_result = SettlementResult {
+            packet_id: request.packet_id,
+            settled_value,
+            fee_collected: request.fee,
+            settler_node: request.settler_node.clone(),
+            settled_at: receipt.settled_at,
+        };
+
+        let fee_distribution = if request.fee.is_zero() {
+            crate::fee_distribution::FeeDistribution {
+                total_fee: request.fee,
+                egress_payment: crate::fee_distribution::NodePayment {
+                    node_id: request.settler_node.clone(),
+                    amount: GoldGrams::zero(),
+                },
+                transit_payments: Vec::new(),
+            }
+        } else {
+            fee_distributor
+                .distribute_fee(
+                    request.fee,
+                    request.settler_node.clone(),
+                    transit_nodes,
+                )
+                .map_err(|e| SettlementError::EgressFailed {
+                    reason: format!("fee distribution: {}", e),
+                })?
+        };
+
+        Ok(ExecutedSettlement {
+            settlement_result,
+            fee_distribution,
+        })
+    }
+
     /// Whether a packet can be auto-settled (validates + checks threshold).
     pub fn can_auto_settle(request: &SettlementRequest) -> bool {
         if Self::validate_settlement(request).is_err() {
@@ -177,6 +249,8 @@ impl SettlementProtocol {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::upi::egress::testing::MockEgressAdapter;
+    use hypermesh_lib::NodeId;
     use rust_decimal_macros::dec;
 
     fn test_criteria() -> AcceptanceCriteria {
@@ -402,5 +476,182 @@ mod tests {
             .expect("test: zero fee settlement should succeed");
         assert_eq!(result.settled_value.0, dec!(5));
         assert_eq!(result.fee_collected.0, dec!(0));
+    }
+
+    // -- execute_settlement tests -------------------------------------------
+
+    fn mock_adapter() -> MockEgressAdapter {
+        MockEgressAdapter::new(GoldGrams::from_decimal(dec!(10000)))
+    }
+
+    fn fee_distributor() -> crate::fee_distribution::FeeDistributor {
+        crate::fee_distribution::FeeDistributor::default()
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_success() {
+        let request = test_request();
+        let adapter = mock_adapter();
+        let distributor = fee_distributor();
+
+        let result = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &[],
+            dec!(75),
+        )
+        .await
+        .expect("test: execute_settlement should succeed");
+
+        assert_eq!(result.settlement_result.settled_value.0, dec!(4.95));
+        assert_eq!(result.settlement_result.fee_collected.0, dec!(0.05));
+        assert_eq!(
+            result.fee_distribution.egress_payment.node_id,
+            NodeId::from("settler-node"),
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_egress_failure() {
+        let request = test_request();
+        let adapter = MockEgressAdapter::new(GoldGrams::zero());
+        let distributor = fee_distributor();
+
+        let err = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &[],
+            dec!(75),
+        )
+        .await
+        .expect_err("test: zero-capacity adapter should fail");
+
+        assert!(
+            matches!(err, SettlementError::EgressFailed { .. }),
+            "expected EgressFailed, got: {err}",
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_validation_failure() {
+        let mut request = test_request();
+        request.packet_state = PacketState::Minted;
+        let adapter = mock_adapter();
+        let distributor = fee_distributor();
+
+        let err = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &[],
+            dec!(75),
+        )
+        .await
+        .expect_err("test: Minted state should be rejected");
+
+        assert!(
+            matches!(err, SettlementError::NotDelivered(_, PacketState::Minted)),
+            "expected NotDelivered(Minted), got: {err}",
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_zero_fee() {
+        let mut request = test_request();
+        request.fee = GoldGrams::zero();
+        let adapter = mock_adapter();
+        let distributor = fee_distributor();
+
+        let result = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &[],
+            dec!(75),
+        )
+        .await
+        .expect("test: zero-fee settlement should succeed");
+
+        assert_eq!(result.settlement_result.settled_value.0, dec!(5));
+        assert_eq!(result.settlement_result.fee_collected.0, dec!(0));
+        assert!(result.fee_distribution.transit_payments.is_empty());
+        assert!(result.fee_distribution.egress_payment.amount.is_zero());
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_with_transit_nodes() {
+        let mut request = test_request();
+        request.packet_value = GoldGrams::from_decimal(dec!(100));
+        request.fee = GoldGrams::from_decimal(dec!(1)); // 1% fee
+        let adapter = mock_adapter();
+        let distributor = fee_distributor();
+        let transit = vec![
+            (NodeId::from("relay-a"), 500_u64),
+            (NodeId::from("relay-b"), 500_u64),
+        ];
+
+        let result = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &transit,
+            dec!(75),
+        )
+        .await
+        .expect("test: transit-node settlement should succeed");
+
+        assert_eq!(result.fee_distribution.transit_payments.len(), 2);
+        assert_eq!(
+            result.fee_distribution.transit_payments[0].node_id,
+            NodeId::from("relay-a"),
+        );
+        assert_eq!(
+            result.fee_distribution.transit_payments[1].node_id,
+            NodeId::from("relay-b"),
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_settlement_fee_distribution_matches() {
+        let mut request = test_request();
+        request.packet_value = GoldGrams::from_decimal(dec!(100));
+        request.fee = GoldGrams::from_decimal(dec!(2)); // 2% fee = 2g (at tolerance)
+        let adapter = mock_adapter();
+        let distributor = fee_distributor();
+        let transit = vec![
+            (NodeId::from("relay-1"), 500_u64),
+            (NodeId::from("relay-2"), 500_u64),
+        ];
+
+        let result = SettlementProtocol::execute_settlement(
+            request,
+            &adapter,
+            &distributor,
+            &transit,
+            dec!(75),
+        )
+        .await
+        .expect("test: fee distribution should succeed");
+
+        // Default split: 80% egress, 20% transit
+        // Egress gets 80% of 2g = 1.6g
+        assert_eq!(
+            result.fee_distribution.egress_payment.amount.0,
+            dec!(1.6),
+            "egress should get 80% of fee",
+        );
+        // Transit pool = 0.4g, split 50/50 = 0.2g each
+        assert_eq!(
+            result.fee_distribution.transit_payments[0].amount.0,
+            dec!(0.2),
+            "relay-1 should get 0.2g",
+        );
+        assert_eq!(
+            result.fee_distribution.transit_payments[1].amount.0,
+            dec!(0.2),
+            "relay-2 should get 0.2g",
+        );
     }
 }

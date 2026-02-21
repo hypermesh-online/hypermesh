@@ -4,4 +4,4 @@
 
 pub mod stoq_api;
 
-pub use stoq_api::{CaesarStoqApi, CaesarStoqConfig};
+pub use stoq_api::{CaesarAppState, CaesarStoqApi, CaesarStoqConfig};

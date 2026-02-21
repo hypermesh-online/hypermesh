@@ -69,6 +69,7 @@ engauge = { path = "../../engauge", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+bytes = { workspace = true }
 
 [features]
 default = ["production"]

@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 use hypermesh_lib::economic::{GoldGrams, PacketId, PacketState};
+use hypermesh_lib::NodeId;
 
 use crate::models::{PacketRecord, SettlementRecord};
 
@@ -45,6 +46,8 @@ pub struct CaesarStorage {
     settlements: Arc<RwLock<BTreeMap<String, SettlementRecord>>>,
     /// In-memory economic metrics
     metrics: Arc<RwLock<HashMap<String, serde_json::Value>>>,
+    /// In-memory node status records
+    node_statuses: Arc<RwLock<HashMap<NodeId, crate::models::NodeStatus>>>,
 }
 
 impl CaesarStorage {
@@ -60,6 +63,7 @@ impl CaesarStorage {
             packets: Arc::new(RwLock::new(HashMap::new())),
             settlements: Arc::new(RwLock::new(BTreeMap::new())),
             metrics: Arc::new(RwLock::new(HashMap::new())),
+            node_statuses: Arc::new(RwLock::new(HashMap::new())),
         };
 
         storage.load_from_disk().await?;
@@ -168,6 +172,23 @@ impl CaesarStorage {
         drop(packets);
         self.persist_to_disk().await?;
         debug!("Updated packet {} to state {:?}", id, new_state);
+        Ok(())
+    }
+
+    /// Replace a packet record entirely (used by orchestration after state transitions).
+    ///
+    /// The record's `packet_id` must match an existing packet. Use `store_packet`
+    /// for new packets instead.
+    pub async fn replace_packet(&self, record: PacketRecord) -> Result<()> {
+        let id = record.packet_id;
+        let mut packets = self.packets.write().await;
+        if !packets.contains_key(&id) {
+            return Err(anyhow!("Packet {} not found for replacement", id));
+        }
+        packets.insert(id, record);
+        drop(packets);
+        self.persist_to_disk().await?;
+        debug!("Replaced packet {}", id);
         Ok(())
     }
 
@@ -284,6 +305,20 @@ impl CaesarStorage {
         Ok(history)
     }
 
+    // ---- Bulk reads (for auditing) ----
+
+    /// Return all packet records regardless of state.
+    pub async fn list_all_packets(&self) -> Result<Vec<PacketRecord>> {
+        let packets = self.packets.read().await;
+        Ok(packets.values().cloned().collect())
+    }
+
+    /// Return all settlement records.
+    pub async fn list_all_settlements(&self) -> Result<Vec<SettlementRecord>> {
+        let settlements = self.settlements.read().await;
+        Ok(settlements.values().cloned().collect())
+    }
+
     // ---- Statistics ----
 
     /// Count of all non-terminal packets.
@@ -314,6 +349,30 @@ impl CaesarStorage {
             .filter(|s| s.settled_at >= since)
             .fold(GoldGrams::zero(), |acc, s| acc + s.fee_collected);
         Ok(total)
+    }
+
+    // ---- Node status operations ----
+
+    /// Store or update a node's status.
+    pub async fn update_node_status(&self, status: crate::models::NodeStatus) -> Result<()> {
+        self.node_statuses.write().await.insert(status.node_id.clone(), status);
+        Ok(())
+    }
+
+    /// Get a node's status.
+    pub async fn get_node_status(&self, node_id: &NodeId) -> Result<Option<crate::models::NodeStatus>> {
+        Ok(self.node_statuses.read().await.get(node_id).cloned())
+    }
+
+    /// Increment a node's settled count and fee earnings.
+    pub async fn increment_node_settled(&self, node_id: &NodeId, fee_earned: GoldGrams) -> Result<()> {
+        let mut statuses = self.node_statuses.write().await;
+        if let Some(status) = statuses.get_mut(node_id) {
+            status.settled_count += 1;
+            status.total_fees_earned = status.total_fees_earned + fee_earned;
+            status.last_activity = chrono::Utc::now();
+        }
+        Ok(())
     }
 }
 
@@ -351,6 +410,9 @@ mod tests {
             hop_limit: 10,
             demurrage_cost: GoldGrams::zero(),
             route: vec![NodeId::from("node-a")],
+            sender: NodeId::from("node-sender"),
+            recipient: NodeId::from("node-recipient"),
+            demurrage_rate: MarketTier::L0.default_demurrage_rate(),
             created_at: now,
             updated_at: now,
             settled_at: None,
@@ -540,5 +602,113 @@ mod tests {
             .await
             .expect("test: get total should succeed");
         assert_eq!(total.0, Decimal::new(350, 0));
+    }
+
+    #[tokio::test]
+    async fn test_replace_packet() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init");
+
+        let mut packet = make_packet(50, PacketState::Minted, 100);
+        let pid = packet.packet_id;
+        storage.store_packet(packet.clone()).await.expect("test: store");
+
+        // Replace with updated state
+        packet.state = PacketState::InTransit;
+        packet.current_value = GoldGrams::from_decimal(Decimal::new(95, 0));
+        storage.replace_packet(packet).await.expect("test: replace");
+
+        let loaded = storage.get_packet(&pid).await.expect("test: get")
+            .expect("test: packet should exist");
+        assert_eq!(loaded.state, PacketState::InTransit);
+        assert_eq!(loaded.current_value.0, Decimal::new(95, 0));
+    }
+
+    #[tokio::test]
+    async fn test_replace_nonexistent_fails() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init");
+
+        let packet = make_packet(99, PacketState::Minted, 100);
+        let result = storage.replace_packet(packet).await;
+        assert!(result.is_err(), "replacing non-existent packet should fail");
+    }
+
+    #[tokio::test]
+    async fn test_node_status_tracking() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init");
+
+        let status = crate::models::NodeStatus {
+            node_id: NodeId::from("node-alpha"),
+            active_packets: 5,
+            settled_count: 10,
+            total_fees_earned: GoldGrams::from_decimal(Decimal::new(42, 0)),
+            operator_preferences: crate::models::OperatorPreferences::default(),
+            last_activity: Utc::now(),
+        };
+
+        storage.update_node_status(status.clone()).await.expect("test: update node status");
+
+        let retrieved = storage
+            .get_node_status(&NodeId::from("node-alpha"))
+            .await
+            .expect("test: get node status");
+        assert!(retrieved.is_some());
+        let r = retrieved.expect("test: node status should exist");
+        assert_eq!(r.node_id, NodeId::from("node-alpha"));
+        assert_eq!(r.active_packets, 5);
+        assert_eq!(r.settled_count, 10);
+        assert_eq!(r.total_fees_earned.0, Decimal::new(42, 0));
+    }
+
+    #[tokio::test]
+    async fn test_increment_node_settled() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init");
+
+        let status = crate::models::NodeStatus {
+            node_id: NodeId::from("node-beta"),
+            active_packets: 0,
+            settled_count: 0,
+            total_fees_earned: GoldGrams::zero(),
+            operator_preferences: crate::models::OperatorPreferences::default(),
+            last_activity: Utc::now(),
+        };
+        storage.update_node_status(status).await.expect("test: store node");
+
+        let fee = GoldGrams::from_decimal(Decimal::new(10, 0));
+        storage.increment_node_settled(&NodeId::from("node-beta"), fee).await.expect("test: increment 1");
+        storage.increment_node_settled(&NodeId::from("node-beta"), fee).await.expect("test: increment 2");
+
+        let r = storage
+            .get_node_status(&NodeId::from("node-beta"))
+            .await
+            .expect("test: get")
+            .expect("test: node should exist");
+        assert_eq!(r.settled_count, 2);
+        assert_eq!(r.total_fees_earned.0, Decimal::new(20, 0));
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent_node_status() {
+        let dir = TempDir::new().expect("test: should create tempdir");
+        let storage = CaesarStorage::new(make_config(&dir))
+            .await
+            .expect("test: storage init");
+
+        let result = storage
+            .get_node_status(&NodeId::from("unknown-node"))
+            .await
+            .expect("test: get should succeed");
+        assert!(result.is_none(), "unknown node should return None");
     }
 }

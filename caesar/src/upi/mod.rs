@@ -10,6 +10,7 @@
 
 pub mod egress;
 pub mod ingress;
+pub mod mesh_credit;
 pub mod types;
 
 pub use egress::EgressAdapter;

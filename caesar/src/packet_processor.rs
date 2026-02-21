@@ -138,6 +138,9 @@ impl PacketProcessor {
         // Increment hop (may fail if at limit)
         packet.increment_hop()?;
 
+        // Record transit node in route for fee distribution
+        packet.route.push(next_node.clone());
+
         // Deduct fee from the packet's initial_value
         packet.initial_value = GoldGrams::from_decimal(
             packet.initial_value.0 - fee.0,
@@ -332,6 +335,21 @@ mod tests {
         assert_eq!(r1.remaining_value, GoldGrams(dec!(198)));
         let r2 = results[2].as_ref().expect("test: result 2");
         assert_eq!(r2.remaining_value, GoldGrams(dec!(297)));
+    }
+
+    #[test]
+    fn handoff_records_route() {
+        let mut pkt = mint_packet(GoldGrams(dec!(100)), GoldGrams(dec!(10)));
+        let proc = default_processor();
+
+        proc.process_handoff(&mut pkt, NodeId::from("relay-1"), GoldGrams(dec!(1)))
+            .expect("test: first handoff");
+        proc.process_handoff(&mut pkt, NodeId::from("relay-2"), GoldGrams(dec!(1)))
+            .expect("test: second handoff");
+
+        assert_eq!(pkt.route.len(), 2);
+        assert_eq!(pkt.route[0], NodeId::from("relay-1"));
+        assert_eq!(pkt.route[1], NodeId::from("relay-2"));
     }
 
     #[test]
