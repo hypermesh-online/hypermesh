@@ -17,26 +17,32 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "caesar",
-    "files": 39,
-    "linesOfCode": 13651,
-    "testCount": 222
+    "files": 35,
+    "linesOfCode": 12688,
+    "testCount": 220
+  },
+  {
+    "id": "caesar-sdk",
+    "files": 5,
+    "linesOfCode": 1039,
+    "testCount": 2
   },
   {
     "id": "catalog",
-    "files": 58,
-    "linesOfCode": 26629,
-    "testCount": 44
+    "files": 61,
+    "linesOfCode": 28253,
+    "testCount": 52
   },
   {
     "id": "engauge",
-    "files": 8,
-    "linesOfCode": 2357,
-    "testCount": 66
+    "files": 21,
+    "linesOfCode": 5602,
+    "testCount": 130
   },
   {
     "id": "gateway",
     "files": 24,
-    "linesOfCode": 7001,
+    "linesOfCode": 7040,
     "testCount": 155
   },
   {
@@ -65,15 +71,15 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "ui",
-    "files": 178,
-    "linesOfCode": 40376,
+    "files": 179,
+    "linesOfCode": 40356,
     "testCount": 5
   }
 ];
 
 export const totalStats = {
-  "totalFiles": 840,
-  "totalLines": 292703,
-  "totalTests": 1732,
-  "crateCount": 10
+  "totalFiles": 858,
+  "totalLines": 297667,
+  "totalTests": 1804,
+  "crateCount": 11
 };

@@ -325,10 +325,107 @@ impl DiscoveryService {
     }
 
     /// Get package from local index
-    pub async fn get_local_package(&self, _asset_id: &AssetRegistration) -> Result<Option<AssetPackage>> {
-        // Would retrieve from local storage
-        // This is a placeholder implementation
-        Ok(None)
+    pub async fn get_local_package(&self, asset_id: &AssetRegistration) -> Result<Option<AssetPackage>> {
+        let index = self.local_index.read().await;
+        let entry = match index.get(asset_id) {
+            Some(e) => e.clone(),
+            None => return Ok(None),
+        };
+        Ok(Some(Self::build_package_from_metadata(
+            &entry.metadata,
+            &asset_id.to_hex_string(),
+        )))
+    }
+
+    /// Construct a minimal AssetPackage from metadata and hash.
+    fn build_package_from_metadata(metadata: &AssetMetadata, hash: &str) -> AssetPackage {
+        AssetPackage {
+            spec: crate::AssetSpec {
+                api_version: "v1".to_string(),
+                kind: "Asset".to_string(),
+                metadata: metadata.clone(),
+                spec: Self::default_asset_specification(),
+            },
+            content: Self::default_content_resolved(),
+            validation: Self::default_validation_status(),
+            package_hash: hash.to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            signature: None,
+        }
+    }
+
+    fn default_asset_specification() -> crate::assets::types::AssetSpecification {
+        crate::assets::types::AssetSpecification {
+            asset_type: "package".to_string(),
+            content: crate::AssetContent {
+                main: String::new(), files: vec![], inline: None,
+                binary: vec![], templates: vec![],
+            },
+            security: crate::AssetSecurity {
+                consensus_required: false, certificate_pinning: false,
+                hash_validation: "sha256".to_string(),
+                sandbox_level: "standard".to_string(), allowed_syscalls: vec![],
+                network_access: crate::assets::types::NetworkAccess {
+                    enabled: false, allowed_domains: vec![],
+                    allowed_ports: vec![], require_tls: true,
+                },
+                file_access: crate::assets::types::FileAccess {
+                    level: "read".to_string(), allowed_paths: vec![],
+                    denied_paths: vec![], allow_temp: false,
+                },
+                permissions: vec![],
+            },
+            resources: crate::AssetResources {
+                cpu_limit: "1".to_string(), memory_limit: "128M".to_string(),
+                execution_timeout: "60s".to_string(), storage_required: None,
+                network_bandwidth: None, gpu_required: false,
+                hardware_requirements: vec![],
+            },
+            execution: crate::AssetExecution {
+                delegation_strategy: "any".to_string(), minimum_consensus: 1,
+                retry_policy: "none".to_string(), max_concurrent: None,
+                priority: "normal".to_string(),
+                timeout_config: crate::assets::types::TimeoutConfig {
+                    execution: "60s".to_string(), network: "30s".to_string(),
+                    io: "30s".to_string(), compilation: None,
+                },
+                scheduling: crate::assets::types::SchedulingConfig {
+                    timing: "immediate".to_string(),
+                    allocation_strategy: "best-fit".to_string(),
+                    node_affinity: vec![], anti_affinity: vec![],
+                },
+            },
+            dependencies: vec![],
+            environment: std::collections::HashMap::new(),
+            config_schema: None,
+        }
+    }
+
+    fn default_content_resolved() -> crate::assets::types::AssetContentResolved {
+        crate::assets::types::AssetContentResolved {
+            main_content: String::new(),
+            file_contents: std::collections::HashMap::new(),
+            binary_contents: std::collections::HashMap::new(),
+            template_content: std::collections::HashMap::new(),
+            resolved_dependencies: vec![],
+        }
+    }
+
+    fn default_validation_status() -> crate::assets::registry::AssetValidationStatus {
+        crate::assets::registry::AssetValidationStatus {
+            is_valid: false,
+            validated_at: chrono::Utc::now(),
+            errors: vec![],
+            warnings: vec![],
+            security_results: crate::assets::registry::SecurityScanResults {
+                security_score: 0,
+                vulnerabilities: vec![],
+                recommendations: vec![],
+                scanned_at: chrono::Utc::now(),
+            },
+            dependency_results: Default::default(),
+        }
     }
 
     /// Check if package exists locally
@@ -475,8 +572,11 @@ impl DiscoveryService {
     // Helper methods
 
     fn get_local_node_id(&self) -> String {
-        // Would get actual node ID
-        "local".to_string()
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(b"catalog-discovery-local-node");
+        hasher.update(self.cache_ttl.as_secs().to_le_bytes());
+        format!("node_{}", hex::encode(&hasher.finalize()[..8]))
     }
 
     fn extract_keywords(&self, metadata: &AssetMetadata) -> Vec<String> {
@@ -569,22 +669,59 @@ impl DiscoveryService {
         download_score * 0.4 + weekly_score * 0.4 + star_score * 0.2
     }
 
-    fn get_cached_popularity(&self, _asset_id: &AssetRegistration) -> f64 {
-        // Would get from cache
-        0.5
+    fn get_cached_popularity(&self, asset_id: &AssetRegistration) -> f64 {
+        if let Ok(cache) = self.federated_cache.try_read() {
+            if let Some(entry) = cache.entries.get(asset_id) {
+                return self.calculate_popularity(&entry.usage_stats);
+            }
+        }
+        if let Ok(index) = self.local_index.try_read() {
+            if let Some(entry) = index.get(asset_id) {
+                return self.calculate_popularity(&entry.usage_stats);
+            }
+        }
+        0.0
     }
 
-    async fn search_cache(&self, _query: &str) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
-        // Would check cache
-        Ok(None)
+    async fn search_cache(&self, query: &str) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
+        let cache = self.federated_cache.read().await;
+        let elapsed = SystemTime::now()
+            .duration_since(cache.cached_at)
+            .unwrap_or(Duration::from_secs(u64::MAX));
+        if elapsed > cache.ttl || cache.entries.is_empty() {
+            return Ok(None);
+        }
+        let mut results = Vec::new();
+        for (asset_id, entry) in cache.entries.iter() {
+            if self.matches_query(entry, query) {
+                results.push((asset_id.clone(), entry.metadata.clone()));
+            }
+        }
+        if results.is_empty() { Ok(None) } else { Ok(Some(results)) }
     }
 
     async fn cache_search_results(
         &self,
         _query: &str,
-        _results: &[(AssetRegistration, AssetMetadata)],
+        results: &[(AssetRegistration, AssetMetadata)],
     ) -> Result<()> {
-        // Would cache results
+        let mut cache = self.federated_cache.write().await;
+        for (asset_id, metadata) in results {
+            if !cache.entries.contains_key(asset_id) {
+                cache.entries.insert(asset_id.clone(), AssetIndex {
+                    asset_id: asset_id.clone(),
+                    metadata: metadata.clone(),
+                    available_nodes: HashSet::new(),
+                    permissions: SharePermission::Public,
+                    indexed_at: SystemTime::now(),
+                    keywords: self.extract_keywords(metadata),
+                    categories: metadata.tags.clone(),
+                    dependencies: vec![],
+                    usage_stats: UsageStats::default(),
+                });
+            }
+        }
+        cache.cached_at = SystemTime::now();
         Ok(())
     }
 
@@ -658,45 +795,60 @@ impl DiscoveryService {
     }
 
     fn fuzzy_distance(&self, s1: &str, s2: &str) -> Option<usize> {
-        // Simplified Levenshtein distance
-        // Would use proper fuzzy matching library
-        if s1 == s2 {
-            return Some(0);
-        }
+        // Levenshtein edit distance via dynamic programming.
+        let a: Vec<char> = s1.to_lowercase().chars().collect();
+        let b: Vec<char> = s2.to_lowercase().chars().collect();
+        let (m, n) = (a.len(), b.len());
 
-        if s1.len().abs_diff(s2.len()) > 3 {
+        if m.abs_diff(n) > m.max(n) / 2 + 3 {
             return None;
         }
 
-        // Very simplified distance calculation
-        let mut distance = 0;
-        for (c1, c2) in s1.chars().zip(s2.chars()) {
-            if c1 != c2 {
-                distance += 1;
-            }
-        }
-        distance += s1.len().abs_diff(s2.len());
+        let mut prev = (0..=n).collect::<Vec<usize>>();
+        let mut curr = vec![0usize; n + 1];
 
-        Some(distance)
+        for i in 1..=m {
+            curr[0] = i;
+            for j in 1..=n {
+                let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+                curr[j] = (prev[j] + 1)
+                    .min(curr[j - 1] + 1)
+                    .min(prev[j - 1] + cost);
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+
+        Some(prev[n])
     }
 
     // Network operation stubs
 
     async fn search_peer(
-        _peer_id: &str,
-        _peer_address: &str,
-        _query: &str,
+        peer_id: &str,
+        peer_address: &str,
+        query: &str,
     ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
-        // Would perform actual network search
+        // Network-dependent: requires STOQ wire protocol.
+        tracing::debug!(
+            peer_id = %peer_id,
+            peer_address = %peer_address,
+            query = %query,
+            "Search request built for peer; requires STOQ transport for execution"
+        );
         Ok(Vec::new())
     }
 
     async fn request_peer_index(
         &self,
-        _peer_id: &str,
-        _peer_address: &str,
+        peer_id: &str,
+        peer_address: &str,
     ) -> Result<HashMap<AssetRegistration, AssetIndex>> {
-        // Would request index from peer
+        // Network-dependent: requires STOQ wire protocol.
+        tracing::debug!(
+            peer_id = %peer_id,
+            peer_address = %peer_address,
+            "Index request built for peer; requires STOQ transport for execution"
+        );
         Ok(HashMap::new())
     }
 }

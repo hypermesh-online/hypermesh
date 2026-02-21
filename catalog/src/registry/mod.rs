@@ -17,7 +17,7 @@ pub mod catalog_registry;
 
 // Re-export main types
 pub use asset_type::{
-    AssetTypeDefinition, TypeMetadata, ValidationRule, ValidationRuleType, ValidationResult,
+    AssetTypeDefinition, TypeMetadata, ValidationRule, ValidationRuleType, TypeValidationResult,
 };
 
 pub use catalog_registry::{

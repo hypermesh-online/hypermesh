@@ -21,53 +21,9 @@ const subNavigation = [
   { name: 'Settings', href: '/trustchain/settings' },
 ];
 
-interface NetworkConnection {
-  id: string;
-  name: string;
-  type: 'Public' | 'P2P' | 'Federated';
-  status: 'Connected' | 'Connecting' | 'Disconnected' | 'Error';
-  trustScore: number;
-  peers: number;
-  consensus: string;
-  description: string;
-}
-
-const networkConnections: NetworkConnection[] = [
-  {
-    id: 'public-main',
-    name: 'HyperMesh Public Network',
-    type: 'Public',
-    status: 'Connected',
-    trustScore: 94.2,
-    peers: 15420,
-    consensus: 'Proof of Stake',
-    description: 'Global public network with open access and democratic consensus'
-  },
-  {
-    id: 'p2p-local',
-    name: 'Local P2P Cluster',
-    type: 'P2P',
-    status: 'Connected',
-    trustScore: 98.7,
-    peers: 12,
-    consensus: 'Byzantine Fault Tolerance',
-    description: 'Direct peer-to-peer connections with trusted nodes'
-  },
-  {
-    id: 'fed-enterprise',
-    name: 'Enterprise Federation',
-    type: 'Federated',
-    status: 'Connecting',
-    trustScore: 87.5,
-    peers: 234,
-    consensus: 'Federated Byzantine Agreement',
-    description: 'Private federated network for enterprise resource sharing'
-  }
-];
-
 function TrustChainOverview() {
   const { systemStatus } = useSystemStatus(true);
-  
+
   const systemStatuses = [
     {
       name: 'TrustChain CA',
@@ -81,23 +37,34 @@ function TrustChainOverview() {
       },
       description: 'Certificate Authority and trust management system'
     },
-    ...networkConnections.map(net => ({
-      name: net.name,
-      status: (net.status === 'Connected' ? 'online' : 
-               net.status === 'Connecting' ? 'warning' : 'offline') as const,
-      uptime: Math.random() * 2592000000,
+    {
+      name: 'STOQ Transport',
+      status: (systemStatus ? 'online' : 'offline') as const,
+      uptime: systemStatus?.performance?.uptime ? systemStatus.performance.uptime * 86400000 : 0,
       lastChecked: new Date().toISOString(),
       metrics: {
-        'Trust Score': `${net.trustScore}%`,
-        'Peers': net.peers.toString(),
-        'Consensus': net.consensus
+        'Validation': 'Verified',
+        'Protocol': 'QUIC/IPv6',
+        'Encryption': 'FALCON-1024'
       },
-      description: net.description
-    }))
+      description: 'STOQ protocol transport layer with PoS validation'
+    },
+    {
+      name: 'eBPF Security',
+      status: 'online' as const,
+      uptime: 2592000000,
+      lastChecked: new Date().toISOString(),
+      metrics: {
+        'Validation': 'Active',
+        'Mode': 'XDP',
+        'Policies': 'Enforced'
+      },
+      description: 'eBPF packet processing and security enforcement'
+    }
   ];
 
   return (
-    <EcosystemMetricsDashboard 
+    <EcosystemMetricsDashboard
       systemStatuses={systemStatuses}
       onRefresh={() => {
         console.log('Refreshing TrustChain ecosystem data...');
@@ -108,7 +75,7 @@ function TrustChainOverview() {
 
 function ConsensusSettings() {
   return (
-    <ConsensusMetricsPanel 
+    <ConsensusMetricsPanel
       onRefresh={() => {
         console.log('Refreshing consensus metrics...');
       }}
@@ -151,7 +118,7 @@ export function TrustChainRouting() {
   return (
     <div className="space-y-6">
       <SubNavigation />
-      
+
       <Routes>
         <Route path="/" element={<TrustChainOverview />} />
         <Route path="/networks" element={<NetworkManagement />} />

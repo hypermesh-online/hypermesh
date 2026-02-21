@@ -20,18 +20,24 @@ use crate::proxy::{transform_backend_path, Http3Proxy};
 pub struct GatewayRouter {
     trustchain_pool: ConnectionPool,
     blockmatrix_pool: ConnectionPool,
+    caesar_pool: ConnectionPool,
     trustchain_proxy: Http3Proxy,
     blockmatrix_proxy: Http3Proxy,
+    caesar_proxy: Http3Proxy,
     /// TrustChain service address (retained for health check routing)
     #[allow(dead_code)]
     trustchain_addr: SocketAddr,
     /// BlockMatrix service address (retained for health check routing)
     #[allow(dead_code)]
     blockmatrix_addr: SocketAddr,
+    /// Caesar service address (retained for health check routing)
+    #[allow(dead_code)]
+    caesar_addr: SocketAddr,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
     trustchain_breaker: Arc<CircuitBreaker>,
     blockmatrix_breaker: Arc<CircuitBreaker>,
+    caesar_breaker: Arc<CircuitBreaker>,
 }
 
 impl GatewayRouter {
@@ -53,6 +59,14 @@ impl GatewayRouter {
         )
         .await?;
 
+        let caesar_pool = ConnectionPool::new(
+            config.caesar_addr,
+            &config.caesar_server_name,
+            config.pool.max_connections,
+            config.pool.idle_timeout,
+        )
+        .await?;
+
         // Create proxies
         let trustchain_proxy = Http3Proxy::new(
             trustchain_pool.clone(),
@@ -61,6 +75,11 @@ impl GatewayRouter {
 
         let blockmatrix_proxy = Http3Proxy::new(
             blockmatrix_pool.clone(),
+            config.pool.connect_timeout,
+        );
+
+        let caesar_proxy = Http3Proxy::new(
+            caesar_pool.clone(),
             config.pool.connect_timeout,
         );
 
@@ -75,17 +94,26 @@ impl GatewayRouter {
             Duration::from_secs(30),
         ));
 
+        let caesar_breaker = Arc::new(CircuitBreaker::new(
+            5,
+            Duration::from_secs(30),
+        ));
+
         Ok(Self {
             trustchain_pool,
             blockmatrix_pool,
+            caesar_pool,
             trustchain_proxy,
             blockmatrix_proxy,
+            caesar_proxy,
             trustchain_addr: config.trustchain_addr,
             blockmatrix_addr: config.blockmatrix_addr,
+            caesar_addr: config.caesar_addr,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
             trustchain_breaker,
             blockmatrix_breaker,
+            caesar_breaker,
         })
     }
 
@@ -182,7 +210,7 @@ impl GatewayRouter {
         } else if path.starts_with("/api/v1/stoq") {
             Ok((&self.blockmatrix_proxy, &self.blockmatrix_breaker, "/api/v1/stoq"))
         } else if path.starts_with("/api/v1/caesar") {
-            Ok((&self.blockmatrix_proxy, &self.blockmatrix_breaker, "/api/v1/caesar"))
+            Ok((&self.caesar_proxy, &self.caesar_breaker, "/api/v1/caesar"))
         } else {
             Err(anyhow!("No backend found for path: {}", path))
         }
@@ -226,9 +254,27 @@ impl GatewayRouter {
         };
         backends.insert("blockmatrix".to_string(), blockmatrix_status);
 
+        // Check Caesar health
+        let caesar_status = match self.caesar_pool.health_check().await {
+            Ok(latency) => {
+                json!({
+                    "status": "up",
+                    "latency_ms": latency.as_millis()
+                })
+            }
+            Err(_) => {
+                json!({
+                    "status": "down",
+                    "latency_ms": null
+                })
+            }
+        };
+        backends.insert("caesar".to_string(), caesar_status);
+
         // Get pool statistics
         let trustchain_stats = self.trustchain_pool.stats();
         let blockmatrix_stats = self.blockmatrix_pool.stats();
+        let caesar_stats = self.caesar_pool.stats();
 
         let response_body = json!({
             "status": "healthy",
@@ -245,6 +291,11 @@ impl GatewayRouter {
                     "total_connections": blockmatrix_stats.total_connections,
                     "active_connections": blockmatrix_stats.active_connections,
                     "requests_served": blockmatrix_stats.requests_served,
+                },
+                "caesar": {
+                    "total_connections": caesar_stats.total_connections,
+                    "active_connections": caesar_stats.active_connections,
+                    "requests_served": caesar_stats.requests_served,
                 }
             }
         });

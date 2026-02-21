@@ -20,6 +20,7 @@ import { SystemStatusWidget } from '@/components/api/SystemStatusWidget';
 import { PerformanceMonitor } from '@/components/api/PerformanceMonitor';
 import { useSystemStatus, useAssets, useQUICConnections, usePerformanceMetrics, useBalance, useEarnings } from '@/lib/api';
 import { useHardware } from '@/lib/hooks/useHardware';
+import { getCrateStatus } from '@/lib/data/crateStatus';
 import { 
   Network, 
   Package,
@@ -87,7 +88,8 @@ function useSystemOverview() {
     storageUsage: capabilities ?
       (capabilities.storage.reduce((sum, disk) => sum + disk.used_bytes, 0) /
        capabilities.storage.reduce((sum, disk) => sum + disk.total_bytes, 0)) * 100 : 0,
-    systemInfo: capabilities?.system
+    systemInfo: capabilities?.system,
+    activeSharingMode: sharing?.available_modes?.find(m => m.is_active)?.name || 'Device',
   };
 }
 
@@ -334,7 +336,7 @@ export function DashboardHome() {
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Mode:</span>
-                  <span className="text-purple-400">Federated</span>
+                  <span className="text-purple-400">{systemOverview.activeSharingMode}</span>
                 </div>
               </div>
               <Button 
@@ -369,8 +371,10 @@ export function DashboardHome() {
                   <span className="text-purple-400">{systemOverview.installedAssets} assets</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Updates:</span>
-                  <span className="text-yellow-400">3 available</span>
+                  <span className="text-gray-400">Development:</span>
+                  <span className="text-yellow-400">
+                    {getCrateStatus('catalog')?.features.inDevelopment.length || 0} in progress
+                  </span>
                 </div>
               </div>
               <Button 
@@ -403,11 +407,11 @@ export function DashboardHome() {
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Networks:</span>
-                  <span className="text-green-400">3 connected</span>
+                  <span className="text-green-400">{systemOverview.activeConnections} connected</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Trust Score:</span>
-                  <span className="text-green-400">98.7%</span>
+                  <span className="text-gray-400">PoS Validation:</span>
+                  <span className="text-green-400">Active</span>
                 </div>
               </div>
               <Button 

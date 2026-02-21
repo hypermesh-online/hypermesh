@@ -37,4 +37,8 @@ items = [
     "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
     "Caesar wallet and transaction management UI",
     "Engauge analytics and reward distribution dashboard",
+    "Remote device/resource/asset management hub (Tailscale-like C&C for sovereign nodes)",
+    "Private network remote access (manage resources across networks from any device)",
+    "First-run onboarding flow (sovereign node setup, network join, resource configuration)",
+    "New node registration experience (not traditional sign-up — sovereign identity bootstrap)",
 ]

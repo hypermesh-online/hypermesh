@@ -4,10 +4,19 @@
 
 //! Banking Provider Implementations
 //!
-//! Concrete implementations for OpenBanking, Stripe, Plaid, Link, and Square APIs
+//! Concrete implementations for OpenBanking, Stripe, Plaid, and Square APIs.
 //!
-//! NOTE: HTTP client functionality temporarily stubbed out pending STOQ integration.
-//! These providers will be re-implemented using STOQ protocol for secure banking API access.
+//! STATUS: PLANNED — awaiting external prerequisites:
+//! - API keys and sandbox credentials for each provider
+//! - OAuth2 client implementation (via Gateway HTTP outbound proxy)
+//! - PSD2/PCI-DSS compliance review for fiat rail operations
+//! - Gateway HTTP/3 outbound proxy for external API communication
+//!
+//! INTEGRATION DEPENDENCIES:
+//! - Gateway: Outbound HTTP proxy for external API calls
+//! - TrustChain: FALCON-1024 signed settlement attestations
+//! - BlockMatrix: Adapter instances registered as assets with Proof of State
+//! - Caesar UPI: Each provider implements IngressAdapter + EgressAdapter traits
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;

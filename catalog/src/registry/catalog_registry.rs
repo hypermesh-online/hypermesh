@@ -33,6 +33,9 @@ pub struct CatalogRegistry {
     /// Privacy level configuration
     privacy: PrivacyMode,
 
+    /// Full type definitions (for scoring metadata)
+    type_definitions: Arc<RwLock<HashMap<String, AssetTypeDefinition>>>,
+
     /// Trust policy
     trust_policy: TrustPolicy,
 
@@ -43,7 +46,7 @@ pub struct CatalogRegistry {
 /// Trust policy for registry operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustPolicy {
-    /// Require consensus proof for registration
+    /// Require Proof of State for registration
     pub require_consensus_proof: bool,
 
     /// Minimum stake amount for registration
@@ -116,6 +119,7 @@ impl CatalogRegistry {
         Self {
             registry_id,
             index: Arc::new(RwLock::new(HashMap::new())),
+            type_definitions: Arc::new(RwLock::new(HashMap::new())),
             privacy,
             trust_policy,
             config,
@@ -124,7 +128,7 @@ impl CatalogRegistry {
 
     /// Register a new asset type definition
     pub async fn register_type(&self, type_def: AssetTypeDefinition) -> Result<AssetRegistration> {
-        // Validate consensus proof if required
+        // Validate Proof of State if required
         if self.trust_policy.require_consensus_proof {
             self.validate_consensus_proof(&type_def.consensus_proof)?;
         }
@@ -145,13 +149,14 @@ impl CatalogRegistry {
 
         // Store in index
         let asset_id = type_def.asset_id.clone();
-        index.insert(type_def.type_name.clone(), asset_id.clone());
+        let type_name = type_def.type_name.clone();
+        index.insert(type_name.clone(), asset_id.clone());
 
-        // STUB: Phase 4b - Store type definition as BlockMatrix Asset
-        // For now, just maintain in-memory index
-        // Future: Use AssetManager to store type_def as Asset
+        // Store full definition for scoring
+        let mut defs = self.type_definitions.write().await;
+        defs.insert(type_name.clone(), type_def);
 
-        tracing::info!("Registered asset type: {}", type_def.type_name);
+        tracing::info!("Registered asset type: {}", type_name);
         Ok(asset_id)
     }
 
@@ -171,31 +176,97 @@ impl CatalogRegistry {
         Ok(types)
     }
 
-    /// Search types by query
+    /// Search types by query with multi-factor relevance scoring
     pub async fn search_types(&self, query: &SearchQuery) -> Result<SearchResults> {
         let index = self.index.read().await;
+        let defs = self.type_definitions.read().await;
 
         let mut matching_types = Vec::new();
+        let query_lower = query.query.to_lowercase();
 
         for (type_name, asset_id) in index.iter() {
-            // Simple name-based search for now
-            if query.query.is_empty()
-                || type_name.to_lowercase().contains(&query.query.to_lowercase())
-            {
-                matching_types.push(SearchResult {
-                    type_name: type_name.clone(),
-                    asset_id: asset_id.clone(),
-                    score: 1.0, // STUB: Phase 4b - Implement scoring
+            let name_lower = type_name.to_lowercase();
+
+            // Name matching score (0.0 - 0.5)
+            let name_score = if query.query.is_empty() {
+                0.3 // Neutral for browse-all queries
+            } else if name_lower == query_lower {
+                0.5 // Exact match
+            } else if name_lower.starts_with(&query_lower) {
+                0.4 // Prefix match
+            } else if name_lower.contains(&query_lower) {
+                0.25 // Contains
+            } else {
+                continue; // No match at all
+            };
+
+            // Metadata-based scoring (0.0 - 0.5)
+            let metadata_score = if let Some(def) = defs.get(type_name) {
+                let mut ms = 0.0f64;
+                // Tag match bonus
+                if !query.tags.is_empty() {
+                    let tag_matches = def.metadata.tags.iter()
+                        .filter(|t| query.tags.iter().any(|qt| qt.eq_ignore_ascii_case(t)))
+                        .count();
+                    ms += (tag_matches as f64 / query.tags.len().max(1) as f64) * 0.2;
+                }
+                // Author match bonus
+                if let Some(ref qa) = query.author {
+                    if def.metadata.author.as_deref() == Some(qa.as_str()) {
+                        ms += 0.1;
+                    }
+                }
+                // Recency bonus (newer = higher, max 0.1)
+                let age_days = (chrono::Utc::now() - def.metadata.created_at)
+                    .num_days()
+                    .max(0) as f64;
+                ms += 0.1 * (1.0 / (1.0 + age_days / 30.0));
+                // Version count bonus (more versions = more established, max 0.1)
+                ms += 0.1 * (def.metadata.version_count.min(10) as f64 / 10.0);
+                ms
+            } else {
+                0.0
+            };
+
+            let total_score = (name_score + metadata_score).min(1.0);
+
+            matching_types.push(SearchResult {
+                type_name: type_name.clone(),
+                asset_id: asset_id.clone(),
+                score: total_score,
+                publisher_score: None,
+                publisher_tier: None,
+            });
+        }
+
+        // Sort by requested criteria
+        match query.sort_by {
+            SortCriteria::Relevance => {
+                matching_types.sort_by(|a, b| {
+                    b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+            SortCriteria::Name => {
+                matching_types.sort_by(|a, b| a.type_name.cmp(&b.type_name));
+            }
+            _ => {
+                // Rating, Downloads, Updated, Published - sort by score as fallback
+                matching_types.sort_by(|a, b| {
+                    b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }
 
-        // Apply limit
+        // Apply pagination
+        let total_matching = matching_types.len();
+        if query.offset > 0 {
+            matching_types = matching_types.into_iter().skip(query.offset).collect();
+        }
         matching_types.truncate(query.limit);
 
         Ok(SearchResults {
             results: matching_types,
-            total_count: index.len(),
+            total_count: total_matching,
             query: query.clone(),
         })
     }
@@ -221,11 +292,11 @@ impl CatalogRegistry {
         }
     }
 
-    /// Validate consensus proof
+    /// Validate Proof of State
     fn validate_consensus_proof(&self, proof: &ConsensusProof) -> Result<()> {
         // Basic validation
         if !proof.validate() {
-            return Err(anyhow::anyhow!("Consensus proof validation failed"));
+            return Err(anyhow::anyhow!("Proof of State validation failed"));
         }
 
         // Check stake requirement
@@ -333,6 +404,14 @@ pub struct SearchResult {
 
     /// Relevance score (0.0 - 1.0)
     pub score: f64,
+
+    /// Publisher reputation score (0.0 - 1.0), if available
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher_score: Option<f64>,
+
+    /// Publisher tier
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher_tier: Option<String>,
 }
 
 /// Search results

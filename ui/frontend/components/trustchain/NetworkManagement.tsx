@@ -24,7 +24,7 @@ interface NetworkConnection {
   name: string;
   type: 'Public' | 'P2P' | 'Federated';
   status: 'Connected' | 'Connecting' | 'Disconnected' | 'Error';
-  trustScore: number;
+  validationStatus: 'verified' | 'rejected';
   peers: number;
   consensus: string;
   description: string;
@@ -36,7 +36,7 @@ const networkConnections: NetworkConnection[] = [
     name: 'HyperMesh Public Network',
     type: 'Public',
     status: 'Connected',
-    trustScore: 94.2,
+    validationStatus: 'verified',
     peers: 15420,
     consensus: 'Proof of Stake',
     description: 'Global public network with open access and democratic consensus'
@@ -46,7 +46,7 @@ const networkConnections: NetworkConnection[] = [
     name: 'Local P2P Cluster',
     type: 'P2P',
     status: 'Connected',
-    trustScore: 98.7,
+    validationStatus: 'verified',
     peers: 12,
     consensus: 'Byzantine Fault Tolerance',
     description: 'Direct peer-to-peer connections with trusted nodes'
@@ -56,7 +56,7 @@ const networkConnections: NetworkConnection[] = [
     name: 'Enterprise Federation',
     type: 'Federated',
     status: 'Connecting',
-    trustScore: 87.5,
+    validationStatus: 'verified',
     peers: 234,
     consensus: 'Federated Byzantine Agreement',
     description: 'Private federated network for enterprise resource sharing'
@@ -66,7 +66,6 @@ const networkConnections: NetworkConnection[] = [
 function NetworkOverviewCards() {
   const connectedCount = networkConnections.filter(n => n.status === 'Connected').length;
   const totalPeers = networkConnections.reduce((sum, n) => sum + n.peers, 0);
-  const avgTrustScore = networkConnections.reduce((sum, n) => sum + n.trustScore, 0) / networkConnections.length;
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
@@ -87,9 +86,9 @@ function NetworkOverviewCards() {
         className="border-blue-500/30"
       />
       <MetricCard
-        title="Avg Trust Score"
-        value={`${avgTrustScore.toFixed(1)}%`}
-        description="Network reputation"
+        title="Verified Networks"
+        value={`${networkConnections.filter(n => n.validationStatus === 'verified').length}/${networkConnections.length}`}
+        description="PoS validated"
         icon={Shield}
         color="text-purple-400"
         className="border-purple-500/30"
@@ -174,8 +173,10 @@ function NetworkConnectionCard({
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
-          <span className="text-gray-400">Trust Score:</span>
-          <div className="text-white font-mono">{network.trustScore}%</div>
+          <span className="text-gray-400">Validation:</span>
+          <div className={network.validationStatus === 'verified' ? 'text-green-400 font-mono' : 'text-red-400 font-mono'}>
+            {network.validationStatus === 'verified' ? 'Verified' : 'Rejected'}
+          </div>
         </div>
         <div>
           <span className="text-gray-400">Peers:</span>

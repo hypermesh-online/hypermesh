@@ -7,6 +7,9 @@ edition = "2021"
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
+# STOQ transport (for STOQ bridge)
+stoq = { path = "../stoq" }
+
 tokio = { workspace = true }
 h3 = "0.0.8"
 h3-quinn = "0.0.10"
@@ -14,6 +17,7 @@ quinn = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 rustls-native-certs = "0.8"
+rcgen = { workspace = true }
 http = "1.1"
 bytes = { workspace = true }
 tracing = { workspace = true }

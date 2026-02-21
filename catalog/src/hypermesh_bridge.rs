@@ -182,10 +182,10 @@ impl HyperMeshAssetRegistry {
         package: &AssetPackage,
         consensus_proof: Option<ConsensusProof>,
     ) -> Result<AssetAllocationRequest> {
-        // Generate consensus proof if not provided and required
+        // Generate Proof of State if not provided and required
         let consensus = if self.config.enable_consensus {
             consensus_proof.unwrap_or_else(|| {
-                // Create minimal consensus proof for testing
+                // Create minimal Proof of State for testing
                 // In production, this would come from the Proof of State validation system
                 ConsensusProof::default()
             })
@@ -360,6 +360,8 @@ impl HyperMeshAssetRegistry {
                 license: lib_package.license().map(|s| s.to_string()),
                 homepage: None,
                 repository: None,
+                download_count: 0,
+                featured: false,
                 keywords: vec![],
                 created: Some(Utc::now()),
                 updated: Some(Utc::now()),

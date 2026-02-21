@@ -18,6 +18,9 @@ blockmatrix = { path = "../blockmatrix" }
 # STOQ transport layer for P2P communication
 stoq = { path = "../stoq" }
 
+# Caesar EVP integration for asset transactions
+caesar = { path = "../caesar" }
+
 # Core async runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }
@@ -88,6 +91,9 @@ bincode = { workspace = true }
 
 # Extension module dependencies
 semver = { workspace = true }
+
+# Decimal arithmetic for gold-gram operations
+rust_decimal = { workspace = true }
 
 # Dynamic loading support
 libloading = { workspace = true }

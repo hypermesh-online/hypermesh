@@ -67,11 +67,11 @@ export const Default: Story = {
 
 export const WithProgress: Story = {
   args: {
-    title: 'Trust Score',
-    value: '98.7%',
-    subtitle: 'Network reputation',
+    title: 'System Uptime',
+    value: '99.9%',
+    subtitle: 'All systems operational',
     icon: Shield,
-    progress: 98.7,
+    progress: 99.9,
     theme: 'green',
   },
 };

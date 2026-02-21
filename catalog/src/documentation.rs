@@ -623,6 +623,8 @@ mod tests {
                     license: Some("MIT".to_string()),
                     homepage: None,
                     repository: None,
+                    download_count: 0,
+                    featured: false,
                     created: None,
                     updated: None,
                 },

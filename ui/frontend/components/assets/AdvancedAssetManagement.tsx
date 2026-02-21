@@ -79,7 +79,7 @@ interface ProxyAddress {
   accessLevel: 'private' | 'federated' | 'public';
   bandwidth: number;
   latency: number;
-  trustScore: number;
+  validationStatus: 'verified' | 'rejected';
 }
 
 export function AdvancedAssetManagement() {
@@ -145,7 +145,7 @@ export function AdvancedAssetManagement() {
       accessLevel: ['private', 'federated', 'public'][index % 3] as 'private' | 'federated' | 'public',
       bandwidth: Math.random() * 1000 + 100, // 100-1100 Mbps
       latency: Math.random() * 50 + 5, // 5-55ms
-      trustScore: Math.random() * 30 + 70 // 70-100%
+      validationStatus: index % 8 === 0 ? 'rejected' as const : 'verified' as const
     }));
   }, [assets, remoteProxies]);
 
@@ -544,15 +544,12 @@ export function AdvancedAssetManagement() {
                             <div className="text-white">{proxy.latency.toFixed(1)} ms</div>
                           </div>
                           <div>
-                            <span className="text-gray-400">Trust Score:</span>
-                            <div className={cn(
-                              'font-medium',
-                              proxy.trustScore >= 90 ? 'text-green-400' :
-                              proxy.trustScore >= 70 ? 'text-yellow-400' :
-                              'text-red-400'
+                            <span className="text-gray-400">Validation:</span>
+                            <Badge variant="outline" className={cn('text-xs',
+                              proxy.validationStatus === 'verified' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                             )}>
-                              {proxy.trustScore.toFixed(1)}%
-                            </div>
+                              {proxy.validationStatus === 'verified' ? 'Verified' : 'Rejected'}
+                            </Badge>
                           </div>
                         </div>
                       </div>

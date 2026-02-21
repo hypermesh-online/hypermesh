@@ -209,7 +209,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
         let instances = self.instances.read().await;
 
         // Check if instance exists
@@ -217,8 +217,26 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             return Ok(false);
         }
 
-        // In a real implementation, validate consensus proofs
-        // For now, return true if instance exists
+        // Validate all four Proof of State proofs (PoSpace, PoStake, PoWork, PoTime)
+        if !proof.validate() {
+            tracing::warn!("VM asset {}: Proof of State validation failed", id);
+            return Ok(false);
+        }
+
+        // Verify non-trivial proof values for VM assets
+        if proof.stake_proof.stake_amount == 0 {
+            tracing::warn!("VM asset {}: stake amount is zero", id);
+            return Ok(false);
+        }
+        if proof.space_proof.total_storage == 0 {
+            tracing::warn!("VM asset {}: space commitment is zero", id);
+            return Ok(false);
+        }
+        if proof.work_proof.computational_power == 0 {
+            tracing::warn!("VM asset {}: computational power is zero", id);
+            return Ok(false);
+        }
+
         Ok(true)
     }
 
@@ -442,9 +460,29 @@ impl AssetExtensionHandler for LibraryHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
         let packages = self.packages.read().await;
-        Ok(packages.contains_key(id))
+        if !packages.contains_key(id) {
+            return Ok(false);
+        }
+
+        // Validate all four Proof of State proofs (PoSpace, PoStake, PoWork, PoTime)
+        if !proof.validate() {
+            tracing::warn!("Library asset {}: Proof of State validation failed", id);
+            return Ok(false);
+        }
+
+        // Library assets require non-trivial stake (economic commitment)
+        if proof.stake_proof.stake_amount == 0 {
+            tracing::warn!("Library asset {}: stake amount is zero", id);
+            return Ok(false);
+        }
+        if proof.space_proof.total_storage == 0 {
+            tracing::warn!("Library asset {}: space commitment is zero", id);
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
@@ -629,9 +667,29 @@ impl AssetExtensionHandler for DatasetHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
         let datasets = self.datasets.read().await;
-        Ok(datasets.contains_key(id))
+        if !datasets.contains_key(id) {
+            return Ok(false);
+        }
+
+        // Validate all four Proof of State proofs (PoSpace, PoStake, PoWork, PoTime)
+        if !proof.validate() {
+            tracing::warn!("Dataset asset {}: Proof of State validation failed", id);
+            return Ok(false);
+        }
+
+        // Dataset assets require storage commitment (space proof)
+        if proof.stake_proof.stake_amount == 0 {
+            tracing::warn!("Dataset asset {}: stake amount is zero", id);
+            return Ok(false);
+        }
+        if proof.space_proof.total_storage == 0 {
+            tracing::warn!("Dataset asset {}: space commitment is zero", id);
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     async fn handle_operation(&self, _id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
@@ -801,9 +859,29 @@ impl AssetExtensionHandler for TemplateHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
         let templates = self.templates.read().await;
-        Ok(templates.contains_key(id))
+        if !templates.contains_key(id) {
+            return Ok(false);
+        }
+
+        // Validate all four Proof of State proofs (PoSpace, PoStake, PoWork, PoTime)
+        if !proof.validate() {
+            tracing::warn!("Template asset {}: Proof of State validation failed", id);
+            return Ok(false);
+        }
+
+        // Template assets require valid stake and work proofs
+        if proof.stake_proof.stake_amount == 0 {
+            tracing::warn!("Template asset {}: stake amount is zero", id);
+            return Ok(false);
+        }
+        if proof.work_proof.computational_power == 0 {
+            tracing::warn!("Template asset {}: computational power is zero", id);
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     async fn handle_operation(&self, _id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {

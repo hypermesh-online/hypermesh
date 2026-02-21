@@ -90,18 +90,36 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
         "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
         "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
-        "Caesar CLI — packet operations + node management (commands, executor, output modules)"
+        "Caesar CLI — packet operations + node management (commands, executor, output modules)",
+        "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate"
       ],
-      "inDevelopment": [
-        "Banking provider STOQ migration (STUB: providers return pending-migration errors, tests fixed)",
-        "Caesar SDK — extract UPI traits + examples into reusable crate (STUB: traits exist, needs packaging)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
-        "Fiat UPI payment processing (blocked by: HTTP client decision — reqwest vs STOQ outbound + OAuth2 flows + PSD2 compliance)"
+        "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)"
       ]
     },
-    "completion": 89
+    "completion": 94
+  },
+  {
+    "id": "caesar-sdk",
+    "name": "Caesar SDK",
+    "description": "Universal Payment Interface SDK — adapter traits for external payment rail integration",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "IngressAdapter trait (7 methods: adapter_id, supported_denominations, lock_external_value, verify_lock, release_lock, liquidity_pressure, to_gold_grams)",
+        "EgressAdapter trait (5 methods: adapter_id, supported_denominations, available_capacity, settle, capacity_ratio)",
+        "UPI shared types (IngressLockProof, SettlementReceipt, SettlementFinality, LiquidityPressure, UpiError)",
+        "MeshCreditAdapter reference implementation (internal BlockMatrix ledger, 1:1 CAES denomination)",
+        "MockIngressAdapter + MockEgressAdapter (public test utilities for adapter developers)"
+      ],
+      "inDevelopment": [],
+      "planned": [
+        "Adapter development guide and examples"
+      ]
+    },
+    "completion": 83
   },
   {
     "id": "catalog",
@@ -122,21 +140,20 @@ export const crateStatuses: CrateStatus[] = [
         "TrustChain security integration (FALCON-1024 cert lifecycle)",
         "Peer-to-peer package sharing",
         "Proof of State validation for packages",
-        "Asset SDK (clean public API facade)"
+        "Asset SDK (clean public API facade)",
+        "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
+        "Caesar contribution reward integration (CatalogRewardAdapter, ContributionTracker)",
+        "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)"
       ],
       "inDevelopment": [],
-      "planned": [
-        "Full asset marketplace",
-        "Asset transaction integration with Caesar settlement pipeline",
-        "catalog.hypermesh.online clearnet registry access"
-      ]
+      "planned": []
     },
-    "completion": 81
+    "completion": 100
   },
   {
     "id": "engauge",
     "name": "engauge",
-    "description": "Work tracking, content receipts, and capacity metrics for HyperMesh",
+    "description": "Work tracking, content receipts, capacity metrics, and network analytics for HyperMesh",
     "phase": "alpha",
     "features": {
       "working": [
@@ -146,44 +163,80 @@ export const crateStatuses: CrateStatus[] = [
         "Organic vs speculative traffic detection (pattern-based aggregate flow analysis, whitepaper §16.5)",
         "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio feedback)",
         "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)",
-        "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend, AggregatedCapacity)"
+        "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend, AggregatedCapacity)",
+        "Metrics streaming protocol (MetricsFrame, 4 payload types, encode/decode, privacy-mode-aware)",
+        "Differential privacy filter (Laplace noise injection, epsilon-calibrated, Anonymous/Private/Public)",
+        "Metrics publisher and subscriber (push model, per-source rolling window, sequence tracking)",
+        "Regional aggregator (multi-node metrics aggregation for routing decisions)",
+        "Routing intelligence (TensorWeightModifier, PathPolicyRecommendation, RoutingAdvisor + PathAdvisor traits)",
+        "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases, BlockMatrix asset integration)",
+        "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
+        "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
+        "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)"
       ],
       "inDevelopment": [],
       "planned": [
-        "Real-time metrics streaming via STOQ transport (blocked by: STOQ API streaming subscription support)"
+        "STOQ METRICS frame type integration (blocked by: STOQ custom frame type registry)"
       ]
     },
-    "completion": 88
+    "completion": 94
   },
   {
     "id": "gateway",
     "name": "Gateway",
-    "description": "HTTP/3 gateway for *.hypermesh.online domains and federated entry points",
-    "phase": "planning",
+    "description": "HTTP/3 + STOQ gateway for *.hypermesh.online — 4 roles: bootstrap, inbound proxy, outbound proxy, inter-network",
+    "phase": "alpha",
     "features": {
       "working": [
         "QUIC/HTTP3 server setup (quinn + h3)",
-        "TLS certificate loading (PEM/DER)",
+        "TLS provider (File/TrustChain/SelfSigned certificate sources)",
         "Connection pool with health checks",
         "Router with path-based backend selection",
         "Circuit breaker and retry logic",
-        "CORS middleware and request logging"
+        "CORS middleware and request logging",
+        "Request handling (h3 0.0.8 RequestResolver API)",
+        "HTTP/3 backend proxying",
+        "STOQ protocol bridge (dual-listener HTTP/3 + STOQ)",
+        "STOQ listener with exponential backoff",
+        "Bootstrap token flow (HTTP/3 to STOQ transition)",
+        "PoS authentication and session management",
+        "Cross-scope routing (Device/Network via ScopeRouter)",
+        "Federation bridge with trust levels (Full/Conditional/Untrusted)",
+        "Cross-scope transfer proxy (lock/transfer/unlock lifecycle)",
+        "Rate limiting and DDoS protection (token bucket per-IP/identity/global)",
+        "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
+        "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
+        "Outbound proxy with allowlist filtering",
+        "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)"
       ],
-      "inDevelopment": [
-        "Request handling (h3 API fix needed)",
-        "HTTP/3 backend proxying"
-      ],
+      "inDevelopment": [],
+      "planned": []
+    },
+    "completion": 100
+  },
+  {
+    "id": "hypermesh",
+    "name": "HyperMesh Repository",
+    "description": "Cross-cutting repository-wide milestones and meta-tasks",
+    "phase": "alpha",
+    "features": {
+      "working": [],
+      "inDevelopment": [],
       "planned": [
-        "Federated gateway mesh",
-        "STOQ protocol bridge",
-        "Load balancing across backends",
-        "Rate limiting and DDoS protection",
-        "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
-        "REST and GraphQL API layer for clearnet integration",
-        "API documentation (OpenAPI/GraphQL schema)"
+        "Refactor / consolidation — deduplicate shared patterns, unify error handling, reduce tech debt across all crates",
+        "Integrations and end-to-end tests — cross-crate integration suites, full workflow validation (boot→asset→transfer→settle)",
+        "Benchmarks — standardized performance baselines for STOQ throughput, consensus latency, asset pipeline, and eBPF paths",
+        "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
+        "Documentation 100% correct — audit and fix all README, API, and architecture docs to match current implementation",
+        "Full development/contributions pipeline and procedures — contributor guide, PR templates, code review process, issue triage workflow",
+        "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
+        "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
+        "Bug tracking/reporting — structured issue templates, severity labels, triage SLA, and public bug tracker",
+        "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
+        "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration"
       ]
     },
-    "completion": 40
+    "completion": 0
   },
   {
     "id": "hypermesh-ebpf",
@@ -339,9 +392,13 @@ export const crateStatuses: CrateStatus[] = [
         "Security monitoring with live alerts",
         "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
         "Caesar wallet and transaction management UI",
-        "Engauge analytics and reward distribution dashboard"
+        "Engauge analytics and reward distribution dashboard",
+        "Remote device/resource/asset management hub (Tailscale-like C&C for sovereign nodes)",
+        "Private network remote access (manage resources across networks from any device)",
+        "First-run onboarding flow (sovereign node setup, network join, resource configuration)",
+        "New node registration experience (not traditional sign-up — sovereign identity bootstrap)"
       ]
     },
-    "completion": 52
+    "completion": 44
   }
 ];

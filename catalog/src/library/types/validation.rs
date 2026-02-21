@@ -138,6 +138,8 @@ impl LibraryAssetPackage {
                     license: self.license().map(|s| s.to_string()),
                     homepage: None,
                     repository: None,
+                    download_count: 0,
+                    featured: false,
                     keywords: vec![],
                     created: None,
                     updated: None,

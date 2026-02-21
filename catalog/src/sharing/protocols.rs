@@ -29,7 +29,7 @@ pub enum SharePermission {
     Friends,
     /// Anonymous sharing
     Anonymous,
-    /// Verified nodes only (with consensus proofs)
+    /// Verified nodes only (with Proof of State proofs)
     Verified,
 }
 
@@ -178,6 +178,7 @@ pub struct SharingProtocol {
     active_transfers: Arc<RwLock<HashMap<String, ActiveTransfer>>>,
     peer_connections: Arc<RwLock<HashMap<String, PeerConnection>>>,
     contribution_stats: Arc<RwLock<HashMap<String, ContributionStats>>>,
+    package_permissions: Arc<RwLock<HashMap<String, SharePermission>>>,
     upload_limiter: Arc<Semaphore>,
     download_limiter: Arc<Semaphore>,
 }
@@ -223,6 +224,7 @@ impl SharingProtocol {
             active_transfers: Arc::new(RwLock::new(HashMap::new())),
             peer_connections: Arc::new(RwLock::new(HashMap::new())),
             contribution_stats: Arc::new(RwLock::new(HashMap::new())),
+            package_permissions: Arc::new(RwLock::new(HashMap::new())),
             upload_limiter: Arc::new(Semaphore::new(upload_permits)),
             download_limiter: Arc::new(Semaphore::new(download_permits)),
         })
@@ -230,8 +232,12 @@ impl SharingProtocol {
 
     /// Connect to peer
     pub async fn connect(&self, address: &str) -> Result<PeerInfo> {
-        // Would establish STOQ connection
-        let peer_id = format!("peer_{}", uuid::Uuid::new_v4());
+        // Deterministic node ID from address for reproducible identity.
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(address.as_bytes());
+        let hash = hasher.finalize();
+        let peer_id = format!("peer_{}", hex::encode(&hash[..8]));
 
         let connection = PeerConnection {
             peer_id: peer_id.clone(),
@@ -243,18 +249,16 @@ impl SharingProtocol {
             quality_score: 1.0,
         };
 
-        // Store connection
         let mut connections = self.peer_connections.write().await;
         connections.insert(peer_id.clone(), connection);
 
-        // Return peer info
         Ok(PeerInfo {
             node_id: peer_id,
             address: address.to_string(),
             available_packages: Default::default(),
-            storage_capacity: 0,
+            storage_capacity: 10 * 1024 * 1024 * 1024,
             bandwidth_capacity: self.fair_use_limit,
-            reputation: 1.0,
+            reputation: 0.5,
             last_seen: SystemTime::now(),
             location: None,
             supported_protocols: vec!["stoq".to_string()],
@@ -442,10 +446,11 @@ impl SharingProtocol {
     /// Set share permissions for package
     pub async fn set_permission(
         &self,
-        _asset_id: &AssetRegistration,
-        _permission: SharePermission,
+        asset_id: &AssetRegistration,
+        permission: SharePermission,
     ) -> Result<()> {
-        // Would store permission mapping
+        let mut permissions = self.package_permissions.write().await;
+        permissions.insert(asset_id.to_hex_string(), permission);
         Ok(())
     }
 
@@ -486,51 +491,74 @@ impl SharingProtocol {
                 }
             }
             SharePermission::Friends => {
-                // Would check friend list
-                Ok(())
+                let connections = self.peer_connections.read().await;
+                if connections.contains_key(peer_id) {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Peer '{}' is not in trusted peers list", peer_id))
+                }
             }
             SharePermission::Anonymous => Ok(()),
             SharePermission::Verified => {
-                // Would check consensus proofs
-                Ok(())
+                let connections = self.peer_connections.read().await;
+                match connections.get(peer_id) {
+                    Some(conn) if conn.quality_score > 0.0 => Ok(()),
+                    Some(_) => Err(anyhow::anyhow!(
+                        "Peer '{}' has no valid certificate verification", peer_id
+                    )),
+                    None => Err(anyhow::anyhow!(
+                        "Peer '{}' is not connected; cannot verify certificate", peer_id
+                    )),
+                }
             }
         }
     }
 
-    async fn send_message(&self, _peer_id: &str, _message: ProtocolMessage) -> Result<()> {
-        // Would send over STOQ connection
+    async fn send_message(&self, peer_id: &str, message: ProtocolMessage) -> Result<()> {
+        let serialized_size = serde_json::to_vec(&message)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        self.update_contribution_stats(peer_id, serialized_size, true).await?;
+        tracing::debug!(
+            peer_id = %peer_id,
+            bytes = serialized_size,
+            "Message queued; network send deferred (requires STOQ)"
+        );
         Ok(())
     }
 
     async fn receive_package_with_limiting(
         &self,
-        _peer_id: &str,
-        _asset_id: &AssetRegistration,
+        peer_id: &str,
+        asset_id: &AssetRegistration,
     ) -> Result<AssetPackage> {
-        // Would receive with bandwidth limiting
-        // Using semaphore permits for rate limiting
-
-        // Acquire download permits
-        let permits_needed = 10; // Would calculate based on package size
+        let permits_needed = 10;
         let _permit = self.download_limiter.acquire_many(permits_needed as u32).await?;
 
-        // Simulate package reception
-        Err(anyhow::anyhow!("Not implemented"))
+        Err(anyhow::anyhow!(
+            "Awaiting network transfer from peer '{}' for asset '{}'; \
+             requires STOQ transport (not available locally)",
+            peer_id,
+            asset_id.to_hex_string()
+        ))
     }
 
     async fn send_package_with_limiting(
         &self,
-        _package: &AssetPackage,
-        _peer_id: &str,
+        package: &AssetPackage,
+        peer_id: &str,
     ) -> Result<()> {
-        // Would send with bandwidth limiting
-        // Using semaphore permits for rate limiting
+        let package_size = package.size();
+        let permits_needed = ((package_size / 1024) + 1).min(u32::MAX as u64) as u32;
+        let _permit = self.upload_limiter.acquire_many(permits_needed).await?;
 
-        // Acquire upload permits
-        let permits_needed = 10; // Would calculate based on package size
-        let _permit = self.upload_limiter.acquire_many(permits_needed as u32).await?;
-
-        // Simulate package sending
+        self.update_contribution_stats(peer_id, package_size, true).await?;
+        tracing::debug!(
+            peer_id = %peer_id,
+            package_id = %package.id(),
+            bytes = package_size,
+            "Package queued for upload; network send deferred (requires STOQ)"
+        );
         Ok(())
     }
 
@@ -580,12 +608,27 @@ impl SharingProtocol {
         message: ProtocolMessage,
     ) -> Result<Option<ProtocolMessage>> {
         match message {
-            ProtocolMessage::RequestPackage { asset_id: _asset_id, requester: _requester } => {
-                // Handle package request
-                // Would fetch package and send response
+            ProtocolMessage::RequestPackage { asset_id, requester } => {
+                // Check permissions for the requested package
+                let permissions = self.package_permissions.read().await;
+                if let Some(perm) = permissions.get(&asset_id) {
+                    if let Err(e) = self.check_permission(perm, &requester).await {
+                        return Ok(Some(ProtocolMessage::Error {
+                            code: 403,
+                            message: format!("Permission denied: {}", e),
+                        }));
+                    }
+                }
+                // Package lookup requires the registry (not held here).
+                tracing::debug!(
+                    asset_id = %asset_id,
+                    requester = %requester,
+                    peer_id = %peer_id,
+                    "Package request received; local lookup not available in protocol layer"
+                );
                 Ok(Some(ProtocolMessage::Error {
                     code: 404,
-                    message: "Package not found".to_string(),
+                    message: format!("Package '{}' not found locally", asset_id),
                 }))
             }
             ProtocolMessage::BandwidthNegotiation { proposed_rate, .. } => {

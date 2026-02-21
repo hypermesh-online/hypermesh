@@ -36,19 +36,17 @@ items = [
     "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
     "Cross-chain bridge types (8 networks)",
     "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
+    "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
+    "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
+    "Caesar CLI — packet operations + node management (commands, executor, output modules)",
+    "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
 ]
 
 [features.in_development]
-items = [
-    "Banking provider STOQ migration",
-    "Caesar binary entry point — STOQ API server launcher (TODO: caesar/src/bin/caesar.rs)",
-    "Caesar SDK — extract UPI traits + examples into reusable crate (STUB: traits exist, needs packaging)",
-    "Caesar CLI — packet operations + node management (TODO: adapt blockmatrix CLI pattern with clap)",
-    "caesar.hypermesh.online gateway routing rule (TODO: add domain rule to gateway crate)",
-]
+items = []
 
 [features.planned]
 items = [
     "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
-    "Fiat UPI payment processing (blocked by: HTTP client decision — reqwest vs STOQ outbound + OAuth2 flows + PSD2 compliance)",
+    "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)",
 ]

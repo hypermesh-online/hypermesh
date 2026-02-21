@@ -1,32 +1,35 @@
 [crate]
 name = "Gateway"
 id = "gateway"
-description = "HTTP/3 gateway for *.hypermesh.online domains and federated entry points"
-phase = "planning"
+description = "HTTP/3 + STOQ gateway for *.hypermesh.online — 4 roles: bootstrap, inbound proxy, outbound proxy, inter-network"
+phase = "alpha"
 
 [features.working]
 items = [
     "QUIC/HTTP3 server setup (quinn + h3)",
-    "TLS certificate loading (PEM/DER)",
+    "TLS provider (File/TrustChain/SelfSigned certificate sources)",
     "Connection pool with health checks",
     "Router with path-based backend selection",
     "Circuit breaker and retry logic",
     "CORS middleware and request logging",
+    "Request handling (h3 0.0.8 RequestResolver API)",
+    "HTTP/3 backend proxying",
+    "STOQ protocol bridge (dual-listener HTTP/3 + STOQ)",
+    "STOQ listener with exponential backoff",
+    "Bootstrap token flow (HTTP/3 to STOQ transition)",
+    "PoS authentication and session management",
+    "Cross-scope routing (Device/Network via ScopeRouter)",
+    "Federation bridge with trust levels (Full/Conditional/Untrusted)",
+    "Cross-scope transfer proxy (lock/transfer/unlock lifecycle)",
+    "Rate limiting and DDoS protection (token bucket per-IP/identity/global)",
+    "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
+    "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
+    "Outbound proxy with allowlist filtering",
+    "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
 ]
 
 [features.in_development]
-items = [
-    "Request handling (h3 API fix needed)",
-    "HTTP/3 backend proxying",
-]
+items = []
 
 [features.planned]
-items = [
-    "Federated gateway mesh",
-    "STOQ protocol bridge",
-    "Load balancing across backends",
-    "Rate limiting and DDoS protection",
-    "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
-    "REST and GraphQL API layer for clearnet integration",
-    "API documentation (OpenAPI/GraphQL schema)",
-]
+items = []

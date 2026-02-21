@@ -6,7 +6,9 @@
 //!
 //! Enforces the thermodynamic invariant of the Caesar EVP system:
 //!
-//!     Input Value = Output Value + Transit Fees + Demurrage Decay
+//! ```text
+//! Input Value = Output Value + Transit Fees + Demurrage Decay
+//! ```
 //!
 //! Every settlement epoch, the conservation law is verified across all
 //! packet and settlement records. A circuit breaker halts minting if
@@ -68,7 +70,9 @@ impl ConservationLaw {
 
     /// Verify that a single settlement obeys the conservation invariant:
     ///
-    ///     initial_value = settled_value + fees + demurrage
+    /// ```text
+    /// initial_value = settled_value + fees + demurrage
+    /// ```
     ///
     /// A per-settlement tolerance of `0.0001` absorbs floating-point
     /// rounding. The absolute error is accumulated regardless and the

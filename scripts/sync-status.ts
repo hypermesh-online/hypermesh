@@ -484,7 +484,7 @@ function findCrateDirectories(coreDir: string): string[] {
 
   // Also scan sibling directories (outside core workspace)
   const parentDir = resolve(coreDir, "..");
-  const siblingNames = ["engauge"];
+  const siblingNames = ["engauge", "caesar-sdk"];
   for (const name of siblingNames) {
     const siblingPath = join(parentDir, name);
     if (existsSync(siblingPath)) {
@@ -524,6 +524,26 @@ function main(): void {
   const stats: CrateStats[] = [];
   let hasErrors = false;
   let tomlCount = 0;
+
+  // Check for root-level crate-status.toml (repo-wide milestones)
+  const rootTomlPath = join(coreDir, "crate-status.toml");
+  if (existsSync(rootTomlPath)) {
+    tomlCount++;
+    try {
+      const content = readFileSync(rootTomlPath, "utf-8");
+      const data = parseToml(content);
+      const status = tomlToCrateStatus(data, rootTomlPath);
+      if (status) {
+        statuses.push(status);
+        // No code stats for root-level meta entry
+      } else {
+        hasErrors = true;
+      }
+    } catch (err) {
+      console.error(`[ERROR] Failed to parse ${rootTomlPath}: ${err}`);
+      hasErrors = true;
+    }
+  }
 
   for (const crateDir of crateDirs) {
     const dirName = crateDir.split("/").pop() ?? "";

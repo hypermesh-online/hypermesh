@@ -215,8 +215,9 @@ impl MirrorManager {
         }
 
         // Select mirror nodes
-        // TODO: Calculate actual metadata size
-        let metadata_size = 1024u64; // Placeholder size
+        let metadata_size = serde_json::to_vec(metadata)
+            .map(|v| v.len() as u64)
+            .unwrap_or(256);
         let selected_nodes = self.select_mirror_nodes(
             metadata_size,
             self.replication_factor,
@@ -546,9 +547,10 @@ impl MirrorManager {
         let mut nodes = self.mirror_nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
             node.mirrored_packages.insert(asset_id.clone());
-            // STUB: AssetMetadata doesn't have size, would need full package
-            // For now, use estimated size of 1MB per package
-            node.storage_used += 1024 * 1024;
+            let estimated_size = serde_json::to_vec(_metadata)
+                .map(|v| v.len() as u64)
+                .unwrap_or(256);
+            node.storage_used += estimated_size;
             Ok(())
         } else {
             Err(anyhow::anyhow!("Node not found"))
@@ -557,11 +559,26 @@ impl MirrorManager {
 
     async fn replicate_to_specific_node(
         &self,
-        _asset_id: &AssetRegistration,
-        _node_id: &str,
+        asset_id: &AssetRegistration,
+        node_id: &str,
     ) -> Result<()> {
-        // Would get metadata and call replicate_to_node
-        Ok(())
+        // Build minimal metadata for the replication call.
+        let metadata = crate::AssetMetadata {
+            name: asset_id.to_hex_string(),
+            version: "0.0.0".to_string(),
+            tags: vec![],
+            description: None,
+            author: None,
+            license: None,
+            homepage: None,
+            repository: None,
+            download_count: 0,
+            featured: false,
+            keywords: vec![],
+            created: None,
+            updated: None,
+        };
+        self.replicate_to_node(asset_id, &metadata, node_id).await
     }
 
     /// Get mirror status
@@ -617,14 +634,28 @@ impl MirrorManager {
     pub async fn health_check(&self) -> Result<()> {
         let mut nodes = self.mirror_nodes.write().await;
         let now = SystemTime::now();
+        let stale_threshold = Duration::from_secs(300);
 
         for (_node_id, node) in nodes.iter_mut() {
-            // Would perform actual health check
-            node.last_health_check = now;
+            let elapsed = now.duration_since(node.last_health_check)
+                .unwrap_or(Duration::from_secs(0));
+            let is_stale = elapsed > stale_threshold;
 
-            // Update uptime based on response
-            // This would be based on actual health check result
-            node.uptime = node.uptime * 0.99 + 0.01; // Gradual improvement
+            let response_health = 1.0 / (1.0 + node.avg_response_time as f64 / 500.0);
+            let storage_health = if node.storage_capacity > 0 {
+                1.0 - (node.storage_used as f64 / node.storage_capacity as f64)
+            } else {
+                0.0
+            };
+
+            if is_stale {
+                node.uptime = (node.uptime * 0.95).max(0.0);
+            } else {
+                let health = response_health * 0.6 + storage_health * 0.4;
+                node.uptime = node.uptime * 0.9 + health * 0.1;
+            }
+
+            node.last_health_check = now;
         }
 
         Ok(())
@@ -696,22 +727,64 @@ impl MirrorManager {
 
     async fn select_optimal_nodes(
         &self,
-        _asset_id: &AssetRegistration,
+        asset_id: &AssetRegistration,
         _target_availability: f64,
-        _max_latency_ms: u64,
+        max_latency_ms: u64,
     ) -> Result<Vec<String>> {
-        // Would implement optimal node selection algorithm
-        Ok(Vec::new())
+        let nodes = self.mirror_nodes.read().await;
+        let mirrors = self.package_mirrors.read().await;
+        let existing: HashSet<String> = mirrors.get(asset_id)
+            .map(|s| s.mirror_nodes.iter().cloned().collect())
+            .unwrap_or_default();
+
+        let mut scored: Vec<(String, f64)> = Vec::new();
+        for (node_id, node) in nodes.iter() {
+            if existing.contains(node_id) { continue; }
+            if node.avg_response_time > max_latency_ms { continue; }
+
+            let storage_ratio = if node.storage_capacity > 0 {
+                (node.storage_capacity - node.storage_used) as f64
+                    / node.storage_capacity as f64
+            } else { 0.0 };
+            let latency_score = 1.0 / (1.0 + node.avg_response_time as f64 / 1000.0);
+            let load_score = 1.0 - (node.mirrored_packages.len() as f64 / 1000.0).min(1.0);
+            let score = storage_ratio * 0.3 + node.uptime * 0.3
+                + latency_score * 0.2 + load_score * 0.2;
+            scored.push((node_id.clone(), score));
+        }
+
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let top_n = self.replication_factor as usize;
+        Ok(scored.into_iter().take(top_n).map(|(id, _)| id).collect())
     }
 
-    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetRegistration>> {
-        // Would query package registry for priority
-        Ok(Vec::new())
+    async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetRegistration>> {
+        let popularity = self.popularity_metrics.read().await;
+        let mut scored: Vec<(AssetRegistration, f64)> = popularity.iter()
+            .map(|(id, metrics)| (id.clone(), self.calculate_popularity_score(metrics)))
+            .filter(|(_, score)| *score >= min_priority)
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(scored.into_iter().map(|(id, _)| id).collect())
     }
 
-    async fn select_regional_packages(&self, _region: &str) -> Result<Vec<AssetRegistration>> {
-        // Would select packages popular in region
-        Ok(Vec::new())
+    async fn select_regional_packages(&self, region: &str) -> Result<Vec<AssetRegistration>> {
+        let mirrors = self.package_mirrors.read().await;
+        let nodes = self.mirror_nodes.read().await;
+        let mut regional: Vec<AssetRegistration> = Vec::new();
+
+        for (asset_id, status) in mirrors.iter() {
+            let has_regional_seeder = status.mirror_nodes.iter().any(|nid| {
+                nodes.get(nid)
+                    .and_then(|n| n.location.as_ref())
+                    .map(|loc| loc.region == region)
+                    .unwrap_or(false)
+            });
+            if has_regional_seeder {
+                regional.push(asset_id.clone());
+            }
+        }
+        Ok(regional)
     }
 
     fn calculate_popularity_score(&self, metrics: &PopularityMetrics) -> f64 {

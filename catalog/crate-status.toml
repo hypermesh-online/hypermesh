@@ -13,21 +13,21 @@ items = [
     "Semantic versioning and dependency resolution",
     "HyperMesh execution delegation",
     "Scripting engine (syntax validation)",
+    "STOQ transport for distribution",
+    "Content-addressed storage (DHT)",
+    "TrustChain security integration (FALCON-1024 cert lifecycle)",
+    "Peer-to-peer package sharing",
+    "Proof of State validation for packages",
+    "Asset SDK (clean public API facade)",
+    "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
+    "Caesar contribution reward integration (CatalogRewardAdapter, ContributionTracker)",
+    "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
 ]
 
 [features.in_development]
 items = [
-    "STOQ transport for distribution",
-    "Content-addressed storage (DHT)",
-    "TrustChain security integration",
 ]
 
 [features.planned]
 items = [
-    "Full asset marketplace",
-    "Peer-to-peer package sharing",
-    "Consensus proof validation for packages",
-    "Asset SDK for third-party developers (publish, discover, integrate)",
-    "Asset transaction integration with Caesar settlement pipeline",
-    "catalog.hypermesh.online clearnet registry access",
 ]

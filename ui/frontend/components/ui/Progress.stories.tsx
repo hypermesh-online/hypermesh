@@ -101,10 +101,10 @@ export const WithLabels: Story = {
       </div>
       <div>
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-white">Trust Score</span>
-          <span className="text-green-400">98.7%</span>
+          <span className="text-white">System Uptime</span>
+          <span className="text-green-400">99.9%</span>
         </div>
-        <Progress value={98.7} className="[&>div]:bg-green-400" />
+        <Progress value={99.9} className="[&>div]:bg-green-400" />
       </div>
       <div>
         <div className="flex justify-between text-sm mb-2">

@@ -73,7 +73,23 @@ impl AssetLibraryExtension for CatalogExtension {
         self.start_operation().await;
 
         if self.config.consensus_validation {
-            // Validate consensus proof - integrates with HyperMesh consensus validation
+            // Consensus validation for installs requires the proof to be embedded in
+            // the package metadata. The proof is validated at publish time; for installs,
+            // we check if the package's security metadata requires consensus and log
+            // that validation is deferred to the execution layer.
+            let package_preview = self.library_manager.read().await
+                .get_package(package_id).await;
+            if let Some(pkg) = package_preview {
+                if let Some(ref spec) = pkg.spec {
+                    if spec.security.consensus_required {
+                        tracing::warn!(
+                            "Package {} requires consensus validation; \
+                             proof verification deferred to execution layer",
+                            package_id
+                        );
+                    }
+                }
+            }
         }
 
         let library_manager = self.library_manager.read().await;
@@ -207,13 +223,39 @@ impl AssetLibraryExtension for CatalogExtension {
     async fn publish_package(
         &self,
         package: AssetPackageSpec,
-        _proof: blockmatrix::assets::core::ConsensusProof,
+        proof: blockmatrix::assets::core::ConsensusProof,
     ) -> ExtensionResult<PublishResult> {
         self.increment_requests().await;
         self.start_operation().await;
 
         if self.config.consensus_validation {
             // Verify all four proofs (PoSpace, PoStake, PoWork, PoTime)
+            if !proof.validate() {
+                self.complete_operation().await;
+                return Err(ExtensionError::RuntimeError {
+                    message: "Proof of State validation failed: insufficient proof of state".to_string(),
+                });
+            }
+
+            // Verify minimum stake requirement for publishing
+            let min_stake = self.config.min_stake_for_publish();
+            if proof.stake_proof.stake_amount < min_stake {
+                self.complete_operation().await;
+                return Err(ExtensionError::RuntimeError {
+                    message: format!(
+                        "Insufficient stake for publishing: {} < {} required",
+                        proof.stake_proof.stake_amount, min_stake
+                    ),
+                });
+            }
+
+            tracing::info!(
+                "Proof of State validated for package '{}': stake={}, space={}, compute={}",
+                package.name,
+                proof.stake_proof.stake_amount,
+                proof.space_proof.total_storage,
+                proof.work_proof.computational_power,
+            );
         }
 
         let library_manager = self.library_manager.read().await;

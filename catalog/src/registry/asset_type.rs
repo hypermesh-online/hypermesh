@@ -38,7 +38,7 @@ pub struct AssetTypeDefinition {
     /// Dependencies on other type definitions
     pub dependencies: Vec<String>,
 
-    /// Consensus proof (all four: PoSp/PoSt/PoWk/PoTm)
+    /// Proof of State (all four: PoSp/PoSt/PoWk/PoTm)
     pub consensus_proof: ConsensusProof,
 
     /// Metadata
@@ -71,6 +71,10 @@ pub struct TypeMetadata {
 
     /// License information
     pub license: Option<String>,
+
+    /// Number of published versions (for scoring)
+    #[serde(default)]
+    pub version_count: u32,
 }
 
 /// Validation rule for asset type
@@ -154,6 +158,7 @@ impl AssetTypeDefinition {
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
                 license: None,
+                version_count: 1,
             },
             asset_kind,
         }
@@ -178,7 +183,7 @@ impl AssetTypeDefinition {
     }
 
     /// Validate instance data against this type definition
-    pub fn validate_instance(&self, instance_data: &JsonValue) -> Result<ValidationResult> {
+    pub fn validate_instance(&self, instance_data: &JsonValue) -> Result<TypeValidationResult> {
         let mut errors = Vec::new();
 
         // Validate against JSON schema
@@ -193,7 +198,7 @@ impl AssetTypeDefinition {
             }
         }
 
-        Ok(ValidationResult {
+        Ok(TypeValidationResult {
             valid: errors.is_empty(),
             errors,
         })
@@ -246,9 +251,9 @@ impl AssetTypeDefinition {
     }
 }
 
-/// Validation result
+/// Result of validating an instance against an asset type definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationResult {
+pub struct TypeValidationResult {
     /// Whether validation passed
     pub valid: bool,
 

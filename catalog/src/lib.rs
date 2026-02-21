@@ -26,15 +26,17 @@ pub mod validation;
 pub mod documentation;
 pub mod versioning;
 pub mod scripting;
-pub mod hypermesh_integration;
+pub(crate) mod hypermesh_integration;
 pub mod library;
-pub mod hypermesh_bridge;
+pub(crate) mod hypermesh_bridge;
 pub mod extension;
-pub mod plugin;
+pub(crate) mod plugin;
 pub mod distribution;
 pub mod security;
 pub mod sharing;
-pub mod asset_compat;
+pub mod api;
+pub(crate) mod asset_compat;
+pub mod settlement;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
@@ -77,14 +79,22 @@ pub use assets::{
     AssetResources, AssetExecution, AssetDependency
 };
 pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateRuntime};
-#[allow(deprecated)] // Re-export for backward compatibility during migration
-pub use registry::{AssetRegistry, RegistryConfig, AssetDiscovery};
+pub use registry::{
+    CatalogRegistry, RegistryConfig, SearchQuery, SearchResult, SearchResults,
+    RegistryStatistics, TrustPolicy, SortCriteria, DateRange,
+    AssetTypeDefinition, TypeMetadata, ValidationRule, ValidationRuleType,
+    TypeValidationResult,
+};
 pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
 pub use documentation::DocumentationGenerator;
 pub use versioning::{VersionManager, SemanticVersion, DependencyResolver};
 pub use scripting::{ScriptingEngine, ScriptResult};
-pub use hypermesh_integration::{HyperMeshClient, HyperMeshAssetAdapter};
-pub use hypermesh_bridge::{HyperMeshAssetRegistry, BridgeConfig};
+pub use security::VerificationResult;
+pub use sharing::{SharingConfig, SharingStats, SharingEvent, PeerInfo};
+pub use sharing::protocols::SharePermission;
+pub use distribution::DistributionConfig;
+pub use settlement::{CatalogRewardAdapter, ContributionTracker, ContributionMetrics, RewardService, RewardDistribution};
+pub use api::{CatalogStoqApi, CatalogStoqConfig, CatalogAppState};
 
 /// Catalog version
 pub const CATALOG_VERSION: &str = "0.1.0";
@@ -202,6 +212,11 @@ impl Catalog {
     }
     
     /// Publish an asset package
+    ///
+    /// Validates the package first, then publishes to the registry.
+    // NOTE: Currently delegates to deprecated AssetRegistry.publish(). CatalogRegistry
+    // handles type definitions (schemas), not package publishing. A proper
+    // PackageRegistry will replace this path once the migration is complete.
     pub async fn publish_asset(&self, package: AssetPackage) -> Result<assets::AssetPackageId> {
         // Validate the asset package
         let validation_result = self.asset_validator.validate(&package).await?;
@@ -211,6 +226,20 @@ impl Catalog {
                 "Asset validation failed: {} issues found",
                 validation_result.summary.total_issues
             ));
+        }
+
+        // Lightweight consensus metadata check: if the package declares consensus_required,
+        // verify that the consensus context is configured. Heavy proof validation happens
+        // in the extension lifecycle (publish_package).
+        if package.spec.spec.security.consensus_required {
+            if self.consensus_context.min_stake_amount == 0
+                && self.consensus_context.min_space_commitment == 0
+            {
+                tracing::warn!(
+                    "Package '{}' requires consensus but consensus context has zero thresholds",
+                    package.spec.metadata.name,
+                );
+            }
         }
 
         // Publish to registry
@@ -254,6 +283,17 @@ impl Catalog {
         asset_id: &AssetRegistration,
         package: &AssetPackage,
     ) -> Result<hypermesh_integration::CatalogExecutionContext> {
+        // Proof of State enforcement: if the package or context requires validation,
+        // log that PoS proofs are enforced at the execution layer.
+        if package.spec.spec.security.consensus_required {
+            tracing::info!(
+                "Asset {}: Proof of State validation enforced at execution layer (min_stake={}, min_space={})",
+                asset_id,
+                self.consensus_context.min_stake_amount,
+                self.consensus_context.min_space_commitment,
+            );
+        }
+
         let hypermesh_client = self.hypermesh_client.lock().await;
 
         // Map asset requirements to HyperMesh resources

@@ -8,6 +8,28 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Source of TLS certificates for the gateway's QUIC endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CertificateSource {
+    /// Load certificates from PEM/DER files on disk.
+    File {
+        cert_path: PathBuf,
+        key_path: PathBuf,
+    },
+    /// Obtain certificates from a TrustChain CA endpoint.
+    ///
+    /// Falls back to self-signed because FALCON-1024 certificates
+    /// are not trusted by clearnet browsers.
+    TrustChain {
+        ca_addr: SocketAddr,
+        common_name: String,
+    },
+    /// Generate an ephemeral self-signed certificate at startup.
+    SelfSigned {
+        common_name: String,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
     /// Gateway listening address
@@ -19,11 +41,17 @@ pub struct GatewayConfig {
     /// BlockMatrix backend address
     pub blockmatrix_addr: SocketAddr,
 
+    /// Caesar backend address
+    pub caesar_addr: SocketAddr,
+
     /// TLS server name for TrustChain backend (SNI)
     pub trustchain_server_name: String,
 
     /// TLS server name for BlockMatrix backend (SNI)
     pub blockmatrix_server_name: String,
+
+    /// TLS server name for Caesar backend (SNI)
+    pub caesar_server_name: String,
 
     /// Certificate configuration
     pub cert_path: PathBuf,
@@ -93,13 +121,15 @@ pub struct CorsConfig {
 impl Default for GatewayConfig {
     fn default() -> Self {
         Self {
-            listen_addr: "[::]:8443".parse().unwrap(),
-            trustchain_addr: "[::1]:50053".parse().unwrap(),
-            blockmatrix_addr: "[::1]:8446".parse().unwrap(),
+            listen_addr: "[::]:8443".parse().expect("hardcoded default listen addr is valid"),
+            trustchain_addr: "[::1]:50053".parse().expect("hardcoded default trustchain addr is valid"),
+            blockmatrix_addr: "[::1]:8446".parse().expect("hardcoded default blockmatrix addr is valid"),
+            caesar_addr: "[::1]:9294".parse().expect("hardcoded default caesar addr is valid"),
             trustchain_server_name: "trustchain".to_string(),
             blockmatrix_server_name: "blockmatrix".to_string(),
-            cert_path: PathBuf::from("/home/persist/repos/projects/web3/certs/server.crt"),
-            key_path: PathBuf::from("/home/persist/repos/projects/web3/certs/server.key"),
+            caesar_server_name: "caesar".to_string(),
+            cert_path: PathBuf::from("certs/server.crt"),
+            key_path: PathBuf::from("certs/server.key"),
             pool: ConnectionPoolConfig::default(),
             retry: RetryConfig::default(),
             cors: CorsConfig::default(),
@@ -169,12 +199,20 @@ impl GatewayConfig {
             config.blockmatrix_addr = addr.parse()?;
         }
 
+        if let Ok(addr) = std::env::var("CAESAR_ADDR") {
+            config.caesar_addr = addr.parse()?;
+        }
+
         if let Ok(name) = std::env::var("TRUSTCHAIN_SERVER_NAME") {
             config.trustchain_server_name = name;
         }
 
         if let Ok(name) = std::env::var("BLOCKMATRIX_SERVER_NAME") {
             config.blockmatrix_server_name = name;
+        }
+
+        if let Ok(name) = std::env::var("CAESAR_SERVER_NAME") {
+            config.caesar_server_name = name;
         }
 
         if let Ok(path) = std::env::var("CERT_PATH") {

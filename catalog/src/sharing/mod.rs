@@ -471,8 +471,7 @@ impl SharingManager {
 
             // Update stats
             let mut stats = self.stats.write().await;
-            // TODO: Calculate actual package size from content
-            stats.bandwidth_consumed += 1024; // Placeholder size
+            stats.bandwidth_consumed += package.size();
 
             Ok(package)
         } else {
@@ -524,8 +523,9 @@ impl SharingManager {
 
         // Check storage capacity
         let current_usage = self.mirror_manager.get_storage_usage().await?;
-        // TODO: Calculate actual metadata size
-        let metadata_size = 1024u64; // Placeholder size
+        let metadata_size = serde_json::to_vec(_metadata)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
         if current_usage + metadata_size > self.config.max_mirror_storage {
             return Ok(false);
         }

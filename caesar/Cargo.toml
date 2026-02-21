@@ -13,6 +13,10 @@ workspace = true
 name = "caesar"
 path = "src/lib.rs"
 
+[[bin]]
+name = "caesar"
+path = "src/bin/caesar.rs"
+
 [dependencies]
 # Core async runtime
 tokio = { workspace = true }
@@ -55,12 +59,16 @@ sha2 = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # STOQ Protocol Integration
 stoq = { path = "../stoq" }
 
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
+
+# Caesar SDK (UPI adapter traits)
+caesar-sdk = { path = "../../caesar-sdk" }
 
 # Engauge integration (optional)
 engauge = { path = "../../engauge", optional = true }

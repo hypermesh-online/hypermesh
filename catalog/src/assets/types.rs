@@ -57,6 +57,12 @@ pub struct AssetMetadata {
     pub license: Option<String>,
     pub homepage: Option<String>,
     pub repository: Option<String>,
+    /// Total download/reference count for this type definition
+    #[serde(default)]
+    pub download_count: u64,
+    /// Featured type definition flag (curated or stake-weighted)
+    #[serde(default)]
+    pub featured: bool,
     pub keywords: Vec<String>,
     pub created: Option<DateTime<Utc>>,
     pub updated: Option<DateTime<Utc>>,

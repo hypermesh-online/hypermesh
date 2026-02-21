@@ -72,12 +72,11 @@ interface ProxyMapping {
 interface ProxyNode {
   id: string;
   address: string;
-  trustScore: number;
+  validationStatus: 'verified' | 'rejected';
   location: string;
   bandwidth: number;
   latency: number;
   uptime: number;
-  reputation: number;
   capabilities: string[];
   securityLevel: 'basic' | 'standard' | 'enhanced' | 'quantum';
 }
@@ -124,12 +123,11 @@ export function NATAddressManager() {
     return Array.from({ length: 12 }, (_, index) => ({
       id: `node-${index}`,
       address: `[2001:db8::${(index + 10).toString(16)}]:443`,
-      trustScore: Math.random() * 30 + 70, // 70-100%
+      validationStatus: index % 10 === 0 ? 'rejected' as const : 'verified' as const,
       location: ['US-East', 'US-West', 'EU-Central', 'Asia-Pacific', 'Australia', 'Canada'][index % 6],
       bandwidth: Math.random() * 900 + 100, // 100-1000 Mbps
       latency: Math.random() * 80 + 20, // 20-100ms
       uptime: Math.random() * 5 + 95, // 95-100%
-      reputation: Math.random() * 20 + 80, // 80-100
       capabilities: [
         'IPv6-Native',
         'QUIC-Optimized',
@@ -198,7 +196,7 @@ export function NATAddressManager() {
         proxyAddress: node.address,
         trustLevel: 'medium'
       });
-      alert(`Trust validation successful! Trust score: ${node.trustScore.toFixed(1)}%`);
+      alert(`PoS validation successful! Status: Verified`);
     } catch (error) {
       console.error('Trust validation failed:', error);
       alert('Trust validation failed. Node may not be trustworthy.');
@@ -248,14 +246,14 @@ export function NATAddressManager() {
 
         <Card className="bg-black/40 border-purple-500/30 backdrop-blur-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Avg Trust Score</CardTitle>
+            <CardTitle className="text-sm font-medium text-white">Verified Nodes</CardTitle>
             <Shield className="h-4 w-4 text-purple-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-400">
-              {(availableProxyNodes.reduce((sum, node) => sum + node.trustScore, 0) / availableProxyNodes.length).toFixed(1)}%
+              {availableProxyNodes.filter(n => n.validationStatus === 'verified').length}/{availableProxyNodes.length}
             </div>
-            <p className="text-xs text-gray-400">Network trust level</p>
+            <p className="text-xs text-gray-400">PoS validated</p>
           </CardContent>
         </Card>
 
@@ -477,15 +475,12 @@ export function NATAddressManager() {
                       
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <span className="text-gray-400">Trust Score:</span>
-                          <div className={cn(
-                            'font-medium',
-                            node.trustScore >= 90 ? 'text-green-400' :
-                            node.trustScore >= 70 ? 'text-yellow-400' :
-                            'text-red-400'
+                          <span className="text-gray-400">Validation:</span>
+                          <Badge variant="outline" className={cn('text-xs',
+                            node.validationStatus === 'verified' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                           )}>
-                            {node.trustScore.toFixed(1)}%
-                          </div>
+                            {node.validationStatus === 'verified' ? 'Verified' : 'Rejected'}
+                          </Badge>
                         </div>
                         <div>
                           <span className="text-gray-400">Uptime:</span>

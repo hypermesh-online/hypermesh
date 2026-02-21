@@ -512,7 +512,7 @@ export class Web3APIClient {
             accessLevel: 'federated',
             bandwidth: 1000, // Mbps
             latency: 5.2, // ms
-            trustScore: 95.5
+            validationStatus: 'verified' as const
           }
         ];
       } else {

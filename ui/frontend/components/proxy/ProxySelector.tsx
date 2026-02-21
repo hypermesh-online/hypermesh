@@ -13,7 +13,6 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { 
   useRemoteProxies,
@@ -37,19 +36,16 @@ import {
   RefreshCw,
   Filter,
   Search,
-  Star,
-  TrendingUp
 } from 'lucide-react';
 
 interface ProxyNode {
   id: string;
   address: string;
   location: string;
-  trustScore: number;
+  validationStatus: 'verified' | 'rejected';
   uptime: number;
   bandwidth: number;
   latency: number;
-  reputation: number;
   capabilities: string[];
   securityLevel: 'basic' | 'standard' | 'enhanced' | 'quantum';
   status: 'online' | 'offline' | 'maintenance';
@@ -61,7 +57,7 @@ interface ProxySelectorProps {
   onSelect?: (proxyId: string) => void;
   onValidate?: (proxyId: string, isValid: boolean) => void;
   selectedProxyId?: string;
-  filterByTrust?: number; // Minimum trust score
+  filterByVerified?: boolean;
   filterByLocation?: string;
   showAdvanced?: boolean;
 }
@@ -70,7 +66,7 @@ export function ProxySelector({
   onSelect, 
   onValidate, 
   selectedProxyId,
-  filterByTrust = 70,
+  filterByVerified = true,
   filterByLocation,
   showAdvanced = true
 }: ProxySelectorProps) {
@@ -80,7 +76,7 @@ export function ProxySelector({
   const createRemoteProxy = useCreateRemoteProxy();
   
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [sortBy, setSortBy] = React.useState<'trust' | 'latency' | 'bandwidth' | 'reputation'>('trust');
+  const [sortBy, setSortBy] = React.useState<'latency' | 'bandwidth' | 'uptime'>('latency');
   const [validatingProxies, setValidatingProxies] = React.useState<Set<string>>(new Set());
 
   // Generate proxy nodes data
@@ -96,11 +92,10 @@ export function ProxySelector({
       id: `proxy-node-${index}`,
       address: `[2001:db8::${(index + 10).toString(16)}]:443`,
       location: locations[index % locations.length],
-      trustScore: Math.random() * 30 + 70, // 70-100%
+      validationStatus: index % 10 === 0 ? 'rejected' as const : 'verified' as const,
       uptime: Math.random() * 5 + 95, // 95-100%
       bandwidth: Math.random() * 900 + 100, // 100-1000 Mbps
       latency: Math.random() * 80 + 20, // 20-100ms
-      reputation: Math.random() * 20 + 80, // 80-100
       capabilities: capabilities.sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 4) + 3),
       securityLevel: ['basic', 'standard', 'enhanced', 'quantum'][Math.floor(Math.random() * 4)] as any,
       status: index % 15 === 0 ? 'maintenance' : index % 12 === 0 ? 'offline' : 'online',
@@ -115,8 +110,8 @@ export function ProxySelector({
       // Status filter - only show online proxies by default
       if (proxy.status !== 'online') return false;
       
-      // Trust score filter
-      if (proxy.trustScore < filterByTrust) return false;
+      // Verified filter
+      if (filterByVerified && proxy.validationStatus !== 'verified') return false;
       
       // Location filter
       if (filterByLocation && proxy.location !== filterByLocation) return false;
@@ -131,21 +126,19 @@ export function ProxySelector({
     // Sort proxies
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'trust':
-          return b.trustScore - a.trustScore;
         case 'latency':
           return a.latency - b.latency;
         case 'bandwidth':
           return b.bandwidth - a.bandwidth;
-        case 'reputation':
-          return b.reputation - a.reputation;
+        case 'uptime':
+          return b.uptime - a.uptime;
         default:
-          return b.trustScore - a.trustScore;
+          return a.latency - b.latency;
       }
     });
 
     return filtered;
-  }, [proxyNodes, filterByTrust, filterByLocation, searchTerm, sortBy]);
+  }, [proxyNodes, filterByVerified, filterByLocation, searchTerm, sortBy]);
 
   const handleValidate = async (proxyId: string) => {
     const proxy = proxyNodes.find(p => p.id === proxyId);
@@ -160,7 +153,7 @@ export function ProxySelector({
       });
       
       onValidate?.(proxyId, true);
-      alert(`Proxy validation successful! Trust score: ${proxy.trustScore.toFixed(1)}%`);
+      alert(`Proxy validation successful! Status: Verified`);
     } catch (error) {
       console.error('Proxy validation failed:', error);
       onValidate?.(proxyId, false);
@@ -181,13 +174,6 @@ export function ProxySelector({
       case 'standard': return 'text-green-400 bg-green-500/20';
       default: return 'text-gray-400 bg-gray-500/20';
     }
-  };
-
-  const getTrustColor = (score: number) => {
-    if (score >= 95) return 'text-green-400';
-    if (score >= 85) return 'text-yellow-400';
-    if (score >= 75) return 'text-orange-400';
-    return 'text-red-400';
   };
 
   return (
@@ -223,10 +209,9 @@ export function ProxySelector({
               onChange={(e) => setSortBy(e.target.value as any)}
               className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
             >
-              <option value="trust">Sort by Trust Score</option>
               <option value="latency">Sort by Latency</option>
               <option value="bandwidth">Sort by Bandwidth</option>
-              <option value="reputation">Sort by Reputation</option>
+              <option value="uptime">Sort by Uptime</option>
             </select>
           </div>
 
@@ -236,9 +221,9 @@ export function ProxySelector({
             <span className="text-gray-400">
               Showing {filteredProxies.length} of {proxyNodes.filter(p => p.status === 'online').length} online proxies
             </span>
-            {filterByTrust > 70 && (
-              <Badge variant="outline" className="text-xs bg-yellow-500/20 text-yellow-400">
-                Trust ≥ {filterByTrust}%
+            {filterByVerified && (
+              <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400">
+                Verified Only
               </Badge>
             )}
             {filterByLocation && (
@@ -285,10 +270,12 @@ export function ProxySelector({
                 {/* Trust and Performance Metrics */}
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-400">Trust Score:</span>
-                    <div className={cn('font-medium', getTrustColor(proxy.trustScore))}>
-                      {proxy.trustScore.toFixed(1)}%
-                    </div>
+                    <span className="text-gray-400">Validation:</span>
+                    <Badge variant="outline" className={cn('text-xs',
+                      proxy.validationStatus === 'verified' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                    )}>
+                      {proxy.validationStatus === 'verified' ? 'Verified' : 'Rejected'}
+                    </Badge>
                   </div>
                   <div>
                     <span className="text-gray-400">Uptime:</span>
@@ -302,15 +289,6 @@ export function ProxySelector({
                     <span className="text-gray-400">Latency:</span>
                     <div className="text-white font-medium">{proxy.latency.toFixed(1)} ms</div>
                   </div>
-                </div>
-
-                {/* Trust Score Progress */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Trust Level</span>
-                    <span className={getTrustColor(proxy.trustScore)}>{proxy.trustScore.toFixed(0)}%</span>
-                  </div>
-                  <Progress value={proxy.trustScore} className="h-1" />
                 </div>
 
                 {/* Capabilities */}
@@ -393,7 +371,7 @@ export function ProxySelector({
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm('');
-                  setSortBy('trust');
+                  setSortBy('latency');
                 }}
                 className="border-gray-600 text-gray-400"
               >
@@ -418,9 +396,9 @@ export function ProxySelector({
                 </p>
               </div>
               <div className="ml-auto text-right">
-                <div className="text-cyan-400 font-medium">
-                  {proxyNodes.find(p => p.id === selectedProxyId)?.trustScore.toFixed(1)}% Trust
-                </div>
+                <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400">
+                  Verified
+                </Badge>
                 <div className="text-gray-400 text-sm">
                   {proxyNodes.find(p => p.id === selectedProxyId)?.latency.toFixed(1)}ms latency
                 </div>

@@ -5,6 +5,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useHardware } from '@/lib/hooks/useHardware';
 import { 
   Home,
   Network,
@@ -62,6 +63,7 @@ const navigation = [
 
 export function Sidebar() {
   const location = useLocation();
+  const { capabilities, sharing } = useHardware();
 
   return (
     <div className="w-72 bg-black/80 backdrop-blur-lg border-r border-cyan-500/20">
@@ -121,14 +123,14 @@ export function Sidebar() {
           <div className="flex justify-between">
             <span>Resources:</span>
             <div className="text-right">
-              <div className="text-cyan-400">CPU: 4 cores</div>
-              <div className="text-cyan-400">RAM: 16GB</div>
-              <div className="text-cyan-400">Storage: 500GB</div>
+              <div className="text-cyan-400">CPU: {capabilities?.cpu.logical_cores ?? '?'} cores</div>
+              <div className="text-cyan-400">RAM: {capabilities ? Math.round(capabilities.memory.total_bytes / (1024 * 1024 * 1024)) : '?'}GB</div>
+              <div className="text-cyan-400">Storage: {capabilities ? Math.round(capabilities.storage.reduce((s, d) => s + d.total_bytes, 0) / (1024 * 1024 * 1024)) : '?'}GB</div>
             </div>
           </div>
           <div className="flex justify-between">
             <span>Sharing Mode:</span>
-            <span className="text-purple-400">Federated</span>
+            <span className="text-purple-400">{sharing?.available_modes?.find(m => m.is_active)?.name || 'Device'}</span>
           </div>
         </div>
       </div>

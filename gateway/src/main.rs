@@ -48,6 +48,7 @@ async fn main() -> Result<()> {
     info!("Router initialized with backends:");
     info!("  - TrustChain: {}", config.trustchain_addr);
     info!("  - BlockMatrix: {}", config.blockmatrix_addr);
+    info!("  - Caesar: {}", config.caesar_addr);
 
     // Load TLS certificates
     let (cert, key) = load_certificates(&config.cert_path, &config.key_path).await?;

@@ -40,6 +40,9 @@ pub mod conservation;
 // STOQ API layer
 pub mod api;
 
+// CLI module (library, no framework deps)
+pub mod cli;
+
 // Core EVP sub-systems
 pub mod evp;
 pub mod governor;

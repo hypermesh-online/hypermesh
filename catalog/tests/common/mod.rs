@@ -23,6 +23,8 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
                 license: Some("MIT".to_string()),
                 homepage: None,
                 repository: None,
+                download_count: 0,
+                featured: false,
                 keywords: vec![],
                 created: None,
                 updated: None,

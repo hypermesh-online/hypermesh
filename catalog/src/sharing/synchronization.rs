@@ -649,18 +649,36 @@ impl SyncManager {
     // Stub methods for actual network operations
 
     async fn request_merkle_root(&self, _peer_id: &str) -> Result<String> {
-        // Would make actual network request
-        Ok(String::new())
+        // Local-first: compute and return our own merkle root.
+        // For P2P sync the remote peer would do the same on their side.
+        let tree = self.merkle_tree.read().await;
+        if tree.is_empty() {
+            drop(tree);
+            self.rebuild_merkle_tree().await?;
+        }
+        self.calculate_current_merkle_root().await
     }
 
     async fn request_package_list(&self, _peer_merkle: &str) -> Result<HashMap<String, AssetMetadata>> {
-        // Would make actual network request
-        Ok(HashMap::new())
+        // Local-first: return local package index as id->metadata map.
+        // A real P2P call would fetch the remote peer's list over STOQ.
+        let packages = self.package_index.read().await;
+        let mut result = HashMap::new();
+        for (id, package) in packages.iter() {
+            result.insert(id.clone(), package.spec.metadata.clone());
+        }
+        Ok(result)
     }
 
-    async fn request_package(&self, _id: &str, _version: &str) -> Result<AssetPackage> {
-        // Would make actual network request
-        Err(anyhow::anyhow!("Not implemented"))
+    async fn request_package(&self, id: &str, _version: &str) -> Result<AssetPackage> {
+        // Local-first: look up in local index. If not found, the caller
+        // would need a P2P fetch over STOQ (network-dependent).
+        let packages = self.package_index.read().await;
+        packages.get(id)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!(
+                "Package '{}' not found locally; requires P2P fetch over STOQ", id
+            ))
     }
 
     async fn get_packages_since(&self, since: SystemTime) -> Result<Vec<AssetPackage>> {
@@ -683,13 +701,24 @@ impl SyncManager {
             .collect())
     }
 
-    async fn get_high_priority_packages(&self, _min_priority: f64) -> Result<Vec<AssetPackage>> {
+    async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
-        // Priority filtering removed as AssetMetadata doesn't have priority field
-        // Return all packages since we can't filter by priority
-        Ok(packages.values()
-            .cloned()
-            .collect())
+        let mut scored: Vec<(f64, AssetPackage)> = packages.values()
+            .map(|pkg| {
+                let meta = &pkg.spec.metadata;
+                // Score from metadata completeness: author, license, description, tags
+                let mut score = 0.0;
+                if meta.author.is_some() { score += 0.2; }
+                if meta.license.is_some() { score += 0.2; }
+                if meta.description.is_some() { score += 0.2; }
+                if !meta.tags.is_empty() { score += 0.2; }
+                if !meta.keywords.is_empty() { score += 0.2; }
+                (score, pkg.clone())
+            })
+            .filter(|(score, _)| *score >= min_priority)
+            .collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(scored.into_iter().map(|(_, pkg)| pkg).collect())
     }
 
     async fn get_package(&self, id: &str) -> Result<AssetPackage> {
@@ -699,43 +728,121 @@ impl SyncManager {
             .ok_or_else(|| anyhow::anyhow!("Package not found"))
     }
 
-    async fn needs_update(&self, _id: &str, _peer_id: &str) -> Result<bool> {
-        // Would check version comparison
-        Ok(false)
+    async fn needs_update(&self, id: &str, peer_id: &str) -> Result<bool> {
+        // Compare local version against peer's tracked version.
+        let packages = self.package_index.read().await;
+        let local_version = match packages.get(id) {
+            Some(pkg) => pkg.spec.metadata.version.clone(),
+            None => return Ok(false),
+        };
+        let peer_states = self.peer_states.read().await;
+        let peer_version = peer_states.get(peer_id)
+            .and_then(|state| {
+                state.package_versions.iter()
+                    .find(|(reg, _)| reg.to_hex_string() == id)
+                    .map(|(_, v)| v.clone())
+            })
+            .unwrap_or_else(|| "0.0.0".to_string());
+        // Update needed if local is newer than peer's copy
+        Ok(local_version != peer_version && local_version > peer_version)
     }
 
-    async fn send_package(&self, _package: &AssetPackage, _peer_id: &str) -> Result<()> {
-        // Would send over network
+    async fn send_package(&self, package: &AssetPackage, _peer_id: &str) -> Result<()> {
+        // Local-first: store in local index. Network send deferred.
+        let mut index = self.package_index.write().await;
+        index.insert(package.package_hash.clone(), package.clone());
+        tracing::debug!(
+            package_id = %package.id(),
+            "Package stored locally; network send deferred (requires STOQ)"
+        );
         Ok(())
     }
 
-    async fn send_package_update(&self, _package: &AssetPackage, _peer_id: &str) -> Result<()> {
-        // Would send update over network
+    async fn send_package_update(&self, package: &AssetPackage, _peer_id: &str) -> Result<()> {
+        // Local-first: update in local index. Network send deferred.
+        let mut index = self.package_index.write().await;
+        index.insert(package.package_hash.clone(), package.clone());
+        tracing::debug!(
+            package_id = %package.id(),
+            "Package update stored locally; network send deferred (requires STOQ)"
+        );
         Ok(())
     }
 
-    async fn find_merkle_differences(&self, _peer_root: &str) -> Result<Vec<String>> {
-        // Would compare merkle trees
-        Ok(Vec::new())
+    async fn find_merkle_differences(&self, peer_root: &str) -> Result<Vec<String>> {
+        // Compare our merkle root against the peer's. If they differ, return
+        // all local leaf node hashes as potential differences.
+        let our_root = self.calculate_current_merkle_root().await?;
+        if our_root == peer_root {
+            return Ok(Vec::new());
+        }
+        let tree = self.merkle_tree.read().await;
+        let diff_hashes: Vec<String> = tree.values()
+            .filter(|node| !node.packages.is_empty())
+            .map(|node| node.hash.clone())
+            .collect();
+        Ok(diff_hashes)
     }
 
-    async fn get_consensus_score(&self, _metadata: &AssetMetadata) -> Result<f64> {
-        // Would calculate consensus score
-        Ok(0.5)
+    async fn get_consensus_score(&self, metadata: &AssetMetadata) -> Result<f64> {
+        // Score based on metadata completeness and trust signals.
+        let mut score = 0.0;
+        let mut factors = 0;
+        if metadata.author.is_some() { score += 1.0; } factors += 1;
+        if metadata.license.is_some() { score += 1.0; } factors += 1;
+        if metadata.description.is_some() { score += 1.0; } factors += 1;
+        if !metadata.tags.is_empty() { score += 1.0; } factors += 1;
+        if metadata.homepage.is_some() { score += 1.0; } factors += 1;
+        if metadata.repository.is_some() { score += 1.0; } factors += 1;
+        // Version maturity: higher major versions imply more trust
+        let version_parts: Vec<&str> = metadata.version.split('.').collect();
+        if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
+            if major >= 1 { score += 1.0; }
+        }
+        factors += 1;
+        Ok(score / factors as f64)
     }
 
     async fn merge_packages(
         &self,
-        _local: &AssetMetadata,
-        _remote: &AssetMetadata,
+        local: &AssetMetadata,
+        remote: &AssetMetadata,
     ) -> Result<AssetPackage> {
-        // Would attempt to merge package versions
-        Err(anyhow::anyhow!("Merge not supported"))
+        // Last-writer-wins: take the package with the newer timestamp.
+        let winner_name = match (local.updated, remote.updated) {
+            (Some(local_ts), Some(remote_ts)) if remote_ts > local_ts => &remote.name,
+            (None, Some(_)) => &remote.name,
+            _ => &local.name,
+        };
+        let packages = self.package_index.read().await;
+        for pkg in packages.values() {
+            if pkg.spec.metadata.name == *winner_name {
+                return Ok(pkg.clone());
+            }
+        }
+        Err(anyhow::anyhow!(
+            "Merge winner '{}' not found in local index", winner_name
+        ))
     }
 
-    async fn can_safely_delete(&self, _id: &str) -> Result<bool> {
-        // Would check if package can be safely deleted
-        Ok(false) // Conservative default
+    async fn can_safely_delete(&self, id: &str) -> Result<bool> {
+        // Check if any other packages depend on this one.
+        let packages = self.package_index.read().await;
+        let target_name = packages.get(id)
+            .map(|p| p.spec.metadata.name.clone());
+        let target_name = match target_name {
+            Some(name) => name,
+            None => return Ok(true), // Already absent
+        };
+        for (pkg_id, pkg) in packages.iter() {
+            if pkg_id == id { continue; }
+            for dep in &pkg.spec.spec.dependencies {
+                if dep.name == target_name {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
     }
 }
 

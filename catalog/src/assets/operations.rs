@@ -295,6 +295,8 @@ spec:
                     license: None,
                     homepage: None,
                     repository: None,
+                    download_count: 0,
+                    featured: false,
                     keywords: vec![],
                     created: None,
                     updated: None,

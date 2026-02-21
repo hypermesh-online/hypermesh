@@ -107,6 +107,14 @@ impl CatalogExtensionConfig {
         self
     }
 
+    /// Minimum stake amount required for publishing packages.
+    /// Derived from security.min_consensus_proofs as a scaling factor.
+    /// Default: 100 tokens (requires non-trivial economic commitment).
+    pub fn min_stake_for_publish(&self) -> u64 {
+        // Base minimum of 100 tokens, scaled by Proof of State requirements
+        100 * self.security.min_consensus_proofs as u64
+    }
+
     /// Builder pattern for HyperMesh address
     pub fn with_hypermesh_address(mut self, address: String) -> Self {
         self.hypermesh_address = address;
@@ -237,10 +245,10 @@ pub struct SecurityConfig {
     /// Verify package signatures
     pub verify_signatures: bool,
 
-    /// Require consensus for all operations
+    /// Require Proof of State for all operations
     pub require_consensus: bool,
 
-    /// Minimum consensus proofs required
+    /// Minimum Proof of State proofs required
     pub min_consensus_proofs: u8,
 
     /// Enable sandboxing for execution
