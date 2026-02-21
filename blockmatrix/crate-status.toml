@@ -20,12 +20,8 @@ items = [
     "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
     "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
     "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)",
-]
-
-[features.in_development]
-items = [
-    "Network scope sync + reflector pooling — Device↔Network chain synchronization (wired: SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
-    "Gateway architecture for cross-scope asset transfers and scope bridging (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
+    "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
+    "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
     "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
     "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
     "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
@@ -33,6 +29,10 @@ items = [
     "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
     "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
     "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
+]
+
+[features.in_development]
+items = [
 ]
 
 [features.planned]

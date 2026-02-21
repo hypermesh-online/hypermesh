@@ -35,11 +35,9 @@ export const crateStatuses: CrateStatus[] = [
         "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
         "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
         "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
-        "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)"
-      ],
-      "inDevelopment": [
-        "Network scope sync + reflector pooling — Device↔Network chain synchronization (wired: SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
-        "Gateway architecture for cross-scope asset transfers and scope bridging (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
+        "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)",
+        "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
+        "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
         "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
         "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
         "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
@@ -48,9 +46,10 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
         "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)"
       ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 61
+    "completion": 100
   },
   {
     "id": "caesar",
@@ -250,25 +249,30 @@ export const crateStatuses: CrateStatus[] = [
         "Certificate Authority with issuance and revocation",
         "FALCON-1024 post-quantum signing",
         "Kyber-1024 key encapsulation",
-        "Certificate Transparency (Merkle logs, SCTs)",
+        "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
         "Proof of State four-proof validation",
         "Security monitoring and Byzantine detection",
         "DNS resolver with STOQ transport",
-        "STOQ-based API server"
+        "STOQ-based API server",
+        "SecurityIntegratedCA with mandatory consensus and real metrics",
+        "Trust scoring / reputation system with time decay",
+        "Certificate rotation scheduler with background task",
+        "OCSP responder with FALCON-1024 signed responses",
+        "CRL generator and distributor",
+        "Threshold cryptography (Shamir SSS over GF(256))",
+        "HTTP/3 typed handler functions",
+        "Deployment quality gates"
       ],
       "inDevelopment": [
-        "Production certificate hardening",
-        "CT log federation across nodes",
-        "HTTP/3 server integration",
-        "Deployment quality gates"
+        "HTTP/3 endpoint wiring (handlers exist, binary uses mocks)",
+        "CT log federation across nodes"
       ],
       "planned": [
         "HSM key storage integration",
-        "Cross-network CA federation",
-        "Automated certificate rotation"
+        "Cross-network CA federation"
       ]
     },
-    "completion": 53
+    "completion": 80
   },
   {
     "id": "ui",
