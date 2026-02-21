@@ -36,7 +36,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "engauge",
     "files": 21,
-    "linesOfCode": 5602,
+    "linesOfCode": 5568,
     "testCount": 130
   },
   {
@@ -79,7 +79,7 @@ export const crateStats: CrateStats[] = [
 
 export const totalStats = {
   "totalFiles": 858,
-  "totalLines": 297667,
+  "totalLines": 297633,
   "totalTests": 1804,
   "crateCount": 11
 };
