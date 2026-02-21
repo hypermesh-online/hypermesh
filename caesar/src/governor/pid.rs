@@ -9,6 +9,8 @@
 
 use hypermesh_lib::{GoldGrams, MarketTier};
 use rust_decimal::Decimal;
+#[cfg(feature = "engauge")]
+use rust_decimal::prelude::FromPrimitive;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 
@@ -195,6 +197,41 @@ impl GovernorPid {
             l3: dec!(1) + adj * dec!(0.5),
         }
     }
+
+    /// Apply an engauge throttle signal to the current governance params.
+    ///
+    /// Adjusts fee modifiers by the band_modifier and demurrage overrides
+    /// by the demurrage_modifier from the engauge throttle signal.
+    #[cfg(feature = "engauge")]
+    pub fn apply_throttle_signal(
+        &self,
+        params: &mut GovernanceParams,
+        signal: &engauge::ThrottleSignal,
+    ) {
+        let band = Decimal::from_f64(signal.band_modifier).unwrap_or(dec!(1));
+        params.fee_modifiers.l0 *= band;
+        params.fee_modifiers.l1 *= band;
+        params.fee_modifiers.l2 *= band;
+        params.fee_modifiers.l3 *= band;
+
+        let dem = signal.demurrage_modifier;
+        params.demurrage_overrides.l0 = params.demurrage_overrides.l0.map(|mut r| {
+            r.lambda *= dem;
+            r
+        });
+        params.demurrage_overrides.l1 = params.demurrage_overrides.l1.map(|mut r| {
+            r.lambda *= dem;
+            r
+        });
+        params.demurrage_overrides.l2 = params.demurrage_overrides.l2.map(|mut r| {
+            r.lambda *= dem;
+            r
+        });
+        params.demurrage_overrides.l3 = params.demurrage_overrides.l3.map(|mut r| {
+            r.lambda *= dem;
+            r
+        });
+    }
 }
 
 impl Default for GovernorPid { fn default() -> Self { Self::new() } }
@@ -378,6 +415,21 @@ mod tests {
         let g = GovernorPid::new();
         let m = metrics(dec!(100), dec!(0), dec!(0.1), dec!(500000), dec!(1000000), dec!(1.0));
         assert_eq!(g.gold_deviation(&m), dec!(0));
+    }
+
+    #[cfg(feature = "engauge")]
+    #[test]
+    fn apply_throttle_signal_organic() {
+        let g = GovernorPid::new();
+        let mut params = GovernanceParams::default();
+        let signal = engauge::ThrottleSignal {
+            activity_score: 0.8,
+            band_modifier: 0.5,  // organic: cheaper
+            demurrage_modifier: 0.8,  // organic: slower decay
+            organic_ratio: 1.0,
+        };
+        g.apply_throttle_signal(&mut params, &signal);
+        assert!(params.fee_modifiers.l0 < dec!(1), "organic should reduce fees");
     }
 
     // -- Fee cap enforcement tests (18D) ------------------------------------

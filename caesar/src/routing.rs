@@ -124,6 +124,46 @@ impl PacketRouter {
             metrics: best.clone(),
         })
     }
+
+    /// Select next hop using engauge capacity reports for scoring.
+    ///
+    /// Uses engauge's normalized capacity score (bytes served, compute,
+    /// storage, bandwidth, uptime) instead of raw network metrics.
+    #[cfg(feature = "engauge")]
+    pub fn route_with_capacity(
+        &self,
+        reports: &[engauge::CapacityReport],
+        _packet_tier: MarketTier,
+    ) -> Result<RouteSelection, RoutingError> {
+        if reports.is_empty() {
+            return Err(RoutingError::NoCandidates);
+        }
+
+        let (best_idx, best_score) = reports
+            .iter()
+            .enumerate()
+            .map(|(i, r)| (i, r.score.value()))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .ok_or(RoutingError::NoCandidates)?;
+
+        let best = &reports[best_idx];
+        let score = Decimal::from_f64(best_score).unwrap_or(Decimal::ZERO);
+
+        Ok(RouteSelection {
+            next_hop: best.node_id.clone(),
+            score,
+            metrics: CapacityMetrics {
+                node_id: best.node_id.clone(),
+                available_bandwidth_mbps: Decimal::from_u64(
+                    best.metrics.bandwidth_available_bps / 1_000_000,
+                )
+                .unwrap_or(Decimal::ZERO),
+                buffer_capacity_packets: 0,
+                avg_latency_ms: Decimal::ZERO,
+                active_packet_count: 0,
+            },
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -222,5 +262,29 @@ mod tests {
             .expect("test: should avoid high load");
 
         assert_eq!(result.next_hop, NodeId::from("idle"));
+    }
+
+    #[cfg(feature = "engauge")]
+    #[test]
+    fn route_with_capacity_selects_highest() {
+        let router = PacketRouter::default();
+        let high = engauge::CapacityReport::new(
+            NodeId::from("high-cap"),
+            engauge::CapacityMetrics::new(
+                1_073_741_824, 1_000_000, 10_737_418_240, 1_000_000_000, 1.0,
+            ),
+            1,
+        );
+        let low = engauge::CapacityReport::new(
+            NodeId::from("low-cap"),
+            engauge::CapacityMetrics::new(100, 100, 100, 100, 0.1),
+            1,
+        );
+
+        let result = router
+            .route_with_capacity(&[low, high], MarketTier::L0)
+            .expect("test: capacity routing");
+
+        assert_eq!(result.next_hop, NodeId::from("high-cap"));
     }
 }

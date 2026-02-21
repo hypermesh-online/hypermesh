@@ -62,6 +62,9 @@ stoq = { path = "../stoq" }
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
+# Engauge integration (optional)
+engauge = { path = "../../engauge", optional = true }
+
 # Performance monitoring
 
 [dev-dependencies]
@@ -73,3 +76,4 @@ production = ["redis-cache"]
 development = []
 redis-cache = []
 hypermesh = []
+engauge = ["dep:engauge"]

@@ -27,6 +27,7 @@ items = [
     "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
     "STOQ API handlers (route_packet, node_status, governor_params, effective_rate, health)",
     "Cross-chain bridge types (8 networks)",
+    "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
 ]
 
 [features.in_development]
@@ -39,7 +40,6 @@ items = [
 [features.planned]
 items = [
     "Live STOQ API with real packet routing end-to-end",
-    "NGauge capacity metrics integration (feature-gated)",
     "Caesar SDK for third-party payment integration",
     "Caesar CLI for packet operations and node management",
     "caesar.hypermesh.online clearnet gateway",

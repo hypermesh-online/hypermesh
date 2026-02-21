@@ -78,7 +78,8 @@ export const crateStatuses: CrateStatus[] = [
         "Packet-centric storage (PacketRecord, SettlementRecord, metrics, JSON persistence)",
         "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
         "STOQ API handlers (route_packet, node_status, governor_params, effective_rate, health)",
-        "Cross-chain bridge types (8 networks)"
+        "Cross-chain bridge types (8 networks)",
+        "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)"
       ],
       "inDevelopment": [
         "Banking provider STOQ migration",
@@ -87,7 +88,6 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": [
         "Live STOQ API with real packet routing end-to-end",
-        "NGauge capacity metrics integration (feature-gated)",
         "Caesar SDK for third-party payment integration",
         "Caesar CLI for packet operations and node management",
         "caesar.hypermesh.online clearnet gateway",
@@ -95,7 +95,7 @@ export const crateStatuses: CrateStatus[] = [
         "Fiat UPI payment processing"
       ]
     },
-    "completion": 68
+    "completion": 71
   },
   {
     "id": "catalog",
@@ -127,6 +127,31 @@ export const crateStatuses: CrateStatus[] = [
       ]
     },
     "completion": 44
+  },
+  {
+    "id": "engauge",
+    "name": "engauge",
+    "description": "Work tracking, content receipts, and capacity metrics for HyperMesh",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
+        "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
+        "KYC compliance checker (self-sovereign attestation on Device chain, tier-based levels)",
+        "Organic vs speculative traffic detection (pattern-based aggregate flow analysis, whitepaper §16.5)",
+        "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio feedback)",
+        "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)"
+      ],
+      "inDevelopment": [],
+      "planned": [
+        "Caesar Governor integration (feature-gated throttle signal consumption)",
+        "Caesar fee distribution with capacity weights",
+        "Caesar routing with capacity-based next-hop selection",
+        "Real-time metrics streaming via STOQ transport",
+        "Multi-epoch capacity aggregation and trending"
+      ]
+    },
+    "completion": 55
   },
   {
     "id": "gateway",
@@ -272,16 +297,13 @@ export const crateStatuses: CrateStatus[] = [
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
         "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
-        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)"
-      ],
-      "inDevelopment": [
+        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
       ],
-      "planned": [
-        "HSM key storage integration"
-      ]
+      "inDevelopment": [],
+      "planned": []
     },
-    "completion": 90
+    "completion": 100
   },
   {
     "id": "ui",

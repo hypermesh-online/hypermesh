@@ -482,6 +482,23 @@ function findCrateDirectories(coreDir: string): string[] {
     }
   }
 
+  // Also scan sibling directories (outside core workspace)
+  const parentDir = resolve(coreDir, "..");
+  const siblingNames = ["engauge"];
+  for (const name of siblingNames) {
+    const siblingPath = join(parentDir, name);
+    if (existsSync(siblingPath)) {
+      try {
+        const stat = statSync(siblingPath);
+        if (stat.isDirectory()) {
+          dirs.push(siblingPath);
+        }
+      } catch {
+        // Skip inaccessible siblings
+      }
+    }
+  }
+
   return dirs.sort();
 }
 

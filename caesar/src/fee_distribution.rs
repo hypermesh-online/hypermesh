@@ -140,6 +140,77 @@ impl FeeDistributor {
             transit_payments,
         })
     }
+
+    /// Distribute fees weighted by engauge capacity scores instead of raw bytes.
+    ///
+    /// Transit nodes with higher capacity scores receive proportionally more of
+    /// the transit fee pool. Falls back to equal split if all scores are zero.
+    #[cfg(feature = "engauge")]
+    pub fn distribute_with_capacity_weights(
+        &self,
+        total_fee: GoldGrams,
+        egress_node: NodeId,
+        transit_nodes: &[(NodeId, engauge::CapacityMetrics)],
+    ) -> Result<FeeDistribution, FeeError> {
+        if total_fee.is_zero() {
+            return Err(FeeError::ZeroFee);
+        }
+
+        if transit_nodes.is_empty() {
+            return Ok(FeeDistribution {
+                total_fee,
+                egress_payment: NodePayment {
+                    node_id: egress_node,
+                    amount: total_fee,
+                },
+                transit_payments: Vec::new(),
+            });
+        }
+
+        let egress_amount = GoldGrams::from_decimal(total_fee.0 * self.egress_share);
+        let transit_pool = GoldGrams::from_decimal(total_fee.0 * self.transit_share);
+
+        let scores: Vec<f64> = transit_nodes
+            .iter()
+            .map(|(_, m)| engauge::CapacityScore::calculate(m).value())
+            .collect();
+        let total_score: f64 = scores.iter().sum();
+
+        let transit_payments: Vec<NodePayment> = if total_score < f64::EPSILON {
+            let count = Decimal::from_usize(transit_nodes.len())
+                .unwrap_or(Decimal::ONE);
+            let per_node = GoldGrams::from_decimal(transit_pool.0 / count);
+            transit_nodes
+                .iter()
+                .map(|(node_id, _)| NodePayment {
+                    node_id: node_id.clone(),
+                    amount: per_node,
+                })
+                .collect()
+        } else {
+            transit_nodes
+                .iter()
+                .zip(scores.iter())
+                .map(|((node_id, _), &score)| {
+                    let share = Decimal::from_f64(score / total_score)
+                        .unwrap_or(Decimal::ZERO);
+                    NodePayment {
+                        node_id: node_id.clone(),
+                        amount: GoldGrams::from_decimal(transit_pool.0 * share),
+                    }
+                })
+                .collect()
+        };
+
+        Ok(FeeDistribution {
+            total_fee,
+            egress_payment: NodePayment {
+                node_id: egress_node,
+                amount: egress_amount,
+            },
+            transit_payments,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,5 +326,36 @@ mod tests {
 
         assert_eq!(result.egress_payment.amount, GoldGrams(dec!(70)));
         assert_eq!(result.transit_payments[0].amount, GoldGrams(dec!(30)));
+    }
+
+    #[cfg(feature = "engauge")]
+    #[test]
+    fn distribute_with_capacity_weights_proportional() {
+        let dist = distributor();
+        let high_cap = engauge::CapacityMetrics::new(
+            1_073_741_824, 1_000_000, 10_737_418_240, 1_000_000_000, 1.0,
+        );
+        let low_cap = engauge::CapacityMetrics::new(
+            100_000, 10_000, 100_000, 100_000, 0.5,
+        );
+        let result = dist
+            .distribute_with_capacity_weights(
+                GoldGrams(dec!(100)),
+                NodeId::from("egress"),
+                &[
+                    (NodeId::from("high-cap"), high_cap),
+                    (NodeId::from("low-cap"), low_cap),
+                ],
+            )
+            .expect("test: capacity-weighted distribution");
+
+        assert_eq!(result.egress_payment.amount, GoldGrams(dec!(80)));
+        assert_eq!(result.transit_payments.len(), 2);
+        // High-cap node should get more than low-cap
+        assert!(
+            result.transit_payments[0].amount.0 > result.transit_payments[1].amount.0,
+            "high-cap {} should exceed low-cap {}",
+            result.transit_payments[0].amount, result.transit_payments[1].amount
+        );
     }
 }
