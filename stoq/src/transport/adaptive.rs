@@ -5,6 +5,7 @@
 //! Adaptive connection optimization for live connections
 //! Provides real-time parameter adjustment based on network conditions
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
@@ -48,6 +49,325 @@ impl Default for NetworkConditions {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EWMA Bandwidth Estimation
+// ---------------------------------------------------------------------------
+
+/// A single bandwidth measurement sample
+#[derive(Debug, Clone)]
+pub struct BandwidthSample {
+    /// Bytes transferred during measurement
+    pub bytes: u64,
+    /// Duration of the measurement window
+    pub duration: Duration,
+    /// When this sample was recorded
+    pub timestamp: Instant,
+}
+
+/// Exponentially-weighted moving average bandwidth estimator.
+///
+/// Produces a smoothed bandwidth estimate from discrete transfer samples,
+/// dampening transient spikes and dips so that tier detection remains stable.
+pub struct EwmaBandwidthEstimator {
+    /// Smoothing factor (0.0 – 1.0). Higher values weight recent samples more.
+    alpha: f64,
+    /// Current smoothed estimate in bits per second
+    current_estimate_bps: f64,
+    /// Recent samples (bounded by `max_samples`)
+    samples: VecDeque<BandwidthSample>,
+    /// Maximum number of retained samples
+    max_samples: usize,
+}
+
+impl EwmaBandwidthEstimator {
+    /// Create a new estimator.
+    ///
+    /// * `alpha`       – EWMA smoothing factor (default 0.125)
+    /// * `max_samples` – rolling window size (default 20)
+    pub fn new(alpha: f64, max_samples: usize) -> Self {
+        Self {
+            alpha: alpha.clamp(0.0, 1.0),
+            current_estimate_bps: 0.0,
+            samples: VecDeque::with_capacity(max_samples),
+            max_samples,
+        }
+    }
+
+    /// Record a transfer measurement. Samples with zero duration are skipped.
+    pub fn add_sample(&mut self, bytes: u64, duration: Duration) {
+        let secs = duration.as_secs_f64();
+        if secs <= 0.0 || bytes == 0 {
+            debug!("Skipping zero-duration or zero-byte bandwidth sample");
+            return;
+        }
+
+        let sample_bps = (bytes as f64 * 8.0) / secs;
+
+        // EWMA: estimate = alpha * sample + (1 - alpha) * previous
+        if self.current_estimate_bps <= 0.0 {
+            // First valid sample seeds the estimate directly
+            self.current_estimate_bps = sample_bps;
+        } else {
+            self.current_estimate_bps =
+                self.alpha * sample_bps + (1.0 - self.alpha) * self.current_estimate_bps;
+        }
+
+        // Maintain sliding window
+        if self.samples.len() >= self.max_samples {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(BandwidthSample {
+            bytes,
+            duration,
+            timestamp: Instant::now(),
+        });
+
+        trace!(
+            "EWMA bandwidth: sample={:.2} Mbps, estimate={:.2} Mbps",
+            sample_bps / 1_000_000.0,
+            self.current_estimate_bps / 1_000_000.0,
+        );
+    }
+
+    /// Current smoothed estimate in bits per second
+    pub fn estimate_bps(&self) -> f64 {
+        self.current_estimate_bps
+    }
+
+    /// Current smoothed estimate in gigabits per second
+    pub fn estimate_gbps(&self) -> f64 {
+        self.current_estimate_bps / 1_000_000_000.0
+    }
+
+    /// Reset all state
+    pub fn reset(&mut self) {
+        self.current_estimate_bps = 0.0;
+        self.samples.clear();
+    }
+
+    /// Number of samples currently retained
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MTU Path Discovery
+// ---------------------------------------------------------------------------
+
+/// Current state of the MTU binary-search probe
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MtuProbeState {
+    /// Actively searching for the path MTU
+    Searching,
+    /// Path MTU has been confirmed at `current_mtu`
+    Confirmed,
+    /// Probing failed; fell back to minimum MTU
+    Failed,
+}
+
+/// Binary-search MTU discovery.
+///
+/// Starts at `min_mtu`, probes upward in binary-search fashion. On success
+/// the search range narrows upward; on failure it narrows downward. Converges
+/// when the search range collapses or reaches the ceiling.
+pub struct MtuDiscovery {
+    /// Best confirmed MTU so far
+    current_mtu: u16,
+    /// Minimum allowed MTU (QUIC floor = 1200)
+    min_mtu: u16,
+    /// Maximum allowed MTU (jumbo frame ceiling = 9000)
+    max_mtu: u16,
+    /// High end of current search range
+    search_high: u16,
+    /// Low end of current search range
+    search_low: u16,
+    /// Current probe state
+    probe_state: MtuProbeState,
+    /// Timestamp of last probe attempt
+    last_probe: Instant,
+    /// Minimum interval between probes
+    probe_interval: Duration,
+}
+
+impl MtuDiscovery {
+    /// Create a new MTU discovery instance.
+    ///
+    /// * `min_mtu`        – floor (typically 1200)
+    /// * `max_mtu`        – ceiling (typically 9000)
+    /// * `probe_interval` – minimum time between probes
+    pub fn new(min_mtu: u16, max_mtu: u16, probe_interval: Duration) -> Self {
+        let min = min_mtu.max(1200);
+        let max = max_mtu.max(min);
+        Self {
+            current_mtu: min,
+            min_mtu: min,
+            max_mtu: max,
+            search_low: min,
+            search_high: max,
+            probe_state: MtuProbeState::Searching,
+            last_probe: Instant::now() - probe_interval, // allow immediate first probe
+            probe_interval,
+        }
+    }
+
+    /// Returns `true` when it is time to send the next probe packet.
+    pub fn should_probe(&self) -> bool {
+        self.probe_state == MtuProbeState::Searching
+            && self.last_probe.elapsed() >= self.probe_interval
+    }
+
+    /// Returns the MTU size the next probe should attempt.
+    pub fn next_probe_size(&self) -> u16 {
+        // Midpoint of the current search range
+        let mid = self.search_low + (self.search_high - self.search_low) / 2;
+        mid.max(self.min_mtu)
+    }
+
+    /// Report that a probe at `mtu` succeeded.
+    pub fn probe_succeeded(&mut self, mtu: u16) {
+        self.last_probe = Instant::now();
+        self.current_mtu = mtu;
+        self.search_low = mtu;
+
+        if mtu >= self.max_mtu {
+            self.current_mtu = self.max_mtu;
+            self.probe_state = MtuProbeState::Confirmed;
+            info!("MTU discovery confirmed at {} bytes", self.current_mtu);
+        } else if self.search_high - self.search_low <= 1 {
+            self.probe_state = MtuProbeState::Confirmed;
+            info!("MTU discovery converged at {} bytes", self.current_mtu);
+        } else {
+            debug!("MTU probe succeeded at {}, searching [{}, {}]", mtu, self.search_low, self.search_high);
+        }
+    }
+
+    /// Report that the current probe failed.
+    pub fn probe_failed(&mut self) {
+        self.last_probe = Instant::now();
+        let mid = self.search_low + (self.search_high - self.search_low) / 2;
+        self.search_high = mid;
+
+        if self.search_high <= self.search_low || self.search_high <= self.min_mtu {
+            self.current_mtu = self.min_mtu;
+            self.probe_state = MtuProbeState::Failed;
+            info!("MTU discovery failed, fell back to minimum {} bytes", self.min_mtu);
+        } else {
+            debug!("MTU probe failed, narrowing to [{}, {}]", self.search_low, self.search_high);
+        }
+    }
+
+    /// Current best-known path MTU
+    pub fn current_mtu(&self) -> u16 {
+        self.current_mtu
+    }
+
+    /// Current probe state
+    pub fn state(&self) -> &MtuProbeState {
+        &self.probe_state
+    }
+
+    /// Reset to initial searching state
+    pub fn reset(&mut self) {
+        self.current_mtu = self.min_mtu;
+        self.search_low = self.min_mtu;
+        self.search_high = self.max_mtu;
+        self.probe_state = MtuProbeState::Searching;
+        self.last_probe = Instant::now() - self.probe_interval;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Loss-Based Tier Adjuster
+// ---------------------------------------------------------------------------
+
+/// Adjusts tier recommendations based on a sliding window of loss-rate
+/// observations. When average loss exceeds `downgrade_threshold` the
+/// connection should step down one tier; when it falls below
+/// `upgrade_threshold` it may step up.
+pub struct LossBasedAdjuster {
+    /// Rolling window of loss percentages
+    loss_window: VecDeque<f64>,
+    /// Maximum window length
+    window_size: usize,
+    /// Average loss % above which a downgrade is recommended
+    downgrade_threshold: f64,
+    /// Average loss % below which an upgrade is recommended
+    upgrade_threshold: f64,
+}
+
+impl LossBasedAdjuster {
+    /// Create a new adjuster.
+    ///
+    /// * `window_size`          – number of samples to average over (default 10)
+    /// * `downgrade_threshold`  – loss % triggering downgrade (default 5.0)
+    /// * `upgrade_threshold`    – loss % permitting upgrade  (default 0.5)
+    pub fn new(window_size: usize, downgrade_threshold: f64, upgrade_threshold: f64) -> Self {
+        Self {
+            loss_window: VecDeque::with_capacity(window_size),
+            window_size: window_size.max(1),
+            downgrade_threshold,
+            upgrade_threshold,
+        }
+    }
+
+    /// Record a loss observation (0.0 – 100.0 percent)
+    pub fn record_loss(&mut self, loss_pct: f64) {
+        if self.loss_window.len() >= self.window_size {
+            self.loss_window.pop_front();
+        }
+        self.loss_window.push_back(loss_pct);
+    }
+
+    /// `true` when average loss exceeds the downgrade threshold
+    pub fn should_downgrade(&self) -> bool {
+        if self.loss_window.is_empty() {
+            return false;
+        }
+        self.average_loss() > self.downgrade_threshold
+    }
+
+    /// `true` when average loss is below the upgrade threshold
+    pub fn should_upgrade(&self) -> bool {
+        if self.loss_window.is_empty() {
+            return false;
+        }
+        self.average_loss() < self.upgrade_threshold
+    }
+
+    /// Windowed average loss percentage
+    pub fn average_loss(&self) -> f64 {
+        if self.loss_window.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self.loss_window.iter().sum();
+        sum / self.loss_window.len() as f64
+    }
+
+    /// Clear all recorded observations
+    pub fn reset(&mut self) {
+        self.loss_window.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Congestion-control tier mapping
+// ---------------------------------------------------------------------------
+
+/// Returns the recommended congestion control algorithm for the given tier.
+///
+/// Since Quinn does not support changing CC on live connections this is intended
+/// for configuring *new* connections.
+pub fn congestion_control_for_tier(tier: &NetworkTier) -> CongestionControl {
+    match tier {
+        NetworkTier::Performance { .. }
+        | NetworkTier::Enterprise { .. }
+        | NetworkTier::DataCenter { .. } => CongestionControl::Bbr2,
+        NetworkTier::Standard { .. } | NetworkTier::Home { .. } => CongestionControl::Cubic,
+        NetworkTier::Slow { .. } => CongestionControl::NewReno,
+    }
+}
+
 /// Adaptive connection state for live parameter updates
 pub struct AdaptiveConnection {
     /// The underlying QUIC connection
@@ -66,6 +386,12 @@ pub struct AdaptiveConnection {
     parameters: Arc<RwLock<ConnectionParameters>>,
     /// Hysteresis state to prevent thrashing
     hysteresis: Arc<RwLock<HysteresisState>>,
+    /// EWMA bandwidth estimator for smoothed throughput measurements
+    bandwidth_estimator: Arc<RwLock<EwmaBandwidthEstimator>>,
+    /// MTU path discovery state
+    mtu_discovery: Arc<RwLock<MtuDiscovery>>,
+    /// Loss-based tier adjustment
+    loss_adjuster: Arc<RwLock<LossBasedAdjuster>>,
 }
 
 /// Connection-specific parameters that can be adjusted
@@ -138,6 +464,26 @@ impl Default for HysteresisState {
 impl AdaptiveConnection {
     /// Create a new adaptive connection wrapper
     pub fn new(connection: Arc<QuinnConnection>) -> Self {
+        Self::with_config(connection, 0.125, 20, 30, 10, 5.0, 0.5)
+    }
+
+    /// Create a new adaptive connection with explicit tuning parameters.
+    ///
+    /// * `ewma_alpha`           – EWMA smoothing factor
+    /// * `ewma_max_samples`     – EWMA sample window size
+    /// * `mtu_probe_interval_s` – seconds between MTU probes
+    /// * `loss_window_size`     – loss observation window length
+    /// * `loss_downgrade_pct`   – average loss % triggering downgrade
+    /// * `loss_upgrade_pct`     – average loss % permitting upgrade
+    pub fn with_config(
+        connection: Arc<QuinnConnection>,
+        ewma_alpha: f64,
+        ewma_max_samples: usize,
+        mtu_probe_interval_s: u64,
+        loss_window_size: usize,
+        loss_downgrade_pct: f64,
+        loss_upgrade_pct: f64,
+    ) -> Self {
         let initial_tier = NetworkTier::Standard { gbps: 1.0 };
 
         Self {
@@ -149,10 +495,22 @@ impl AdaptiveConnection {
             adaptation_count: AtomicU64::new(0),
             parameters: Arc::new(RwLock::new(ConnectionParameters::default())),
             hysteresis: Arc::new(RwLock::new(HysteresisState::default())),
+            bandwidth_estimator: Arc::new(RwLock::new(
+                EwmaBandwidthEstimator::new(ewma_alpha, ewma_max_samples),
+            )),
+            mtu_discovery: Arc::new(RwLock::new(
+                MtuDiscovery::new(1200, 9000, Duration::from_secs(mtu_probe_interval_s)),
+            )),
+            loss_adjuster: Arc::new(RwLock::new(
+                LossBasedAdjuster::new(loss_window_size, loss_downgrade_pct, loss_upgrade_pct),
+            )),
         }
     }
 
-    /// Update network conditions from connection statistics
+    /// Update network conditions from connection statistics.
+    ///
+    /// This also feeds the EWMA bandwidth estimator and loss adjuster so
+    /// that `detect_tier()` operates on smoothed data.
     pub fn update_conditions(&self) {
         let stats = self.connection.stats();
         let mut conditions = self.conditions.write();
@@ -172,40 +530,69 @@ impl AdaptiveConnection {
         let total = frame_stats.acks + frame_stats.stream;
         if total > 0 {
             // Use retransmits as a proxy for loss
-            conditions.packet_loss = (frame_stats.path_response as f64 / total.max(1) as f64) * 100.0;
+            conditions.packet_loss =
+                (frame_stats.path_response as f64 / total.max(1) as f64) * 100.0;
         }
 
         // Update throughput estimate
         let udp_stats = stats.udp_tx;
-        // Calculate throughput based on bytes transmitted
-        let duration = conditions.last_update.elapsed().as_secs_f64();
-        if duration > 0.0 {
-            let bytes_per_sec = udp_stats.bytes as f64 / duration;
+        let elapsed = conditions.last_update.elapsed();
+        let duration_secs = elapsed.as_secs_f64();
+        if duration_secs > 0.0 {
+            let bytes_per_sec = udp_stats.bytes as f64 / duration_secs;
             conditions.throughput_mbps = (bytes_per_sec * 8.0) / 1_000_000.0;
+
+            // Feed EWMA estimator with the raw transfer observation
+            self.bandwidth_estimator
+                .write()
+                .add_sample(udp_stats.bytes, elapsed);
         }
+
+        // Feed loss adjuster
+        self.loss_adjuster.write().record_loss(conditions.packet_loss);
 
         // Track retransmissions (using datagrams as proxy)
         conditions.retransmissions = udp_stats.datagrams;
 
+        // Update the EWMA-smoothed bandwidth estimate in conditions
+        let smoothed_mbps = self.bandwidth_estimator.read().estimate_bps() / 1_000_000.0;
+        if smoothed_mbps > 0.0 {
+            conditions.bandwidth_estimate = smoothed_mbps;
+        }
+
         conditions.last_update = Instant::now();
 
         debug!(
-            "Updated network conditions: RTT={:.2}ms, loss={:.2}%, throughput={:.2}Mbps",
-            conditions.rtt_ms, conditions.packet_loss, conditions.throughput_mbps
+            "Updated network conditions: RTT={:.2}ms, loss={:.2}%, throughput={:.2}Mbps, \
+             ewma={:.2}Mbps",
+            conditions.rtt_ms,
+            conditions.packet_loss,
+            conditions.throughput_mbps,
+            smoothed_mbps,
         );
     }
 
-    /// Detect network tier based on current conditions
+    /// Detect network tier based on current conditions.
+    ///
+    /// Tier detection uses the EWMA-smoothed bandwidth estimate rather than
+    /// raw throughput samples, and the loss-based adjuster can cap or boost
+    /// the result by one tier level.
     pub fn detect_tier(&self) -> NetworkTier {
         let conditions = self.conditions.read();
 
-        // Use multiple heuristics to determine tier
-        let mut estimated_gbps = conditions.bandwidth_estimate / 1000.0;
-
-        // Adjust estimate based on actual throughput
-        if conditions.throughput_mbps > 0.0 {
-            estimated_gbps = (estimated_gbps + (conditions.throughput_mbps / 1000.0)) / 2.0;
-        }
+        // Prefer EWMA-smoothed estimate when available
+        let ewma_gbps = self.bandwidth_estimator.read().estimate_gbps();
+        let mut estimated_gbps = if ewma_gbps > 0.0 {
+            ewma_gbps
+        } else {
+            // Fallback: blend stored estimate with raw throughput
+            let base = conditions.bandwidth_estimate / 1000.0;
+            if conditions.throughput_mbps > 0.0 {
+                (base + (conditions.throughput_mbps / 1000.0)) / 2.0
+            } else {
+                base
+            }
+        };
 
         // Penalize for high latency
         if conditions.rtt_ms > 100.0 {
@@ -230,7 +617,43 @@ impl AdaptiveConnection {
             estimated_gbps *= 0.7;
         }
 
-        NetworkTier::from_gbps(estimated_gbps)
+        let mut tier = NetworkTier::from_gbps(estimated_gbps);
+
+        // Apply loss-adjuster influence: cap or boost by one tier level
+        let loss = self.loss_adjuster.read();
+        if loss.should_downgrade() {
+            tier = Self::tier_step_down(&tier);
+            debug!("Loss adjuster capped tier down (avg loss {:.1}%)", loss.average_loss());
+        } else if loss.should_upgrade() {
+            tier = Self::tier_step_up(&tier);
+            debug!("Loss adjuster boosted tier up (avg loss {:.1}%)", loss.average_loss());
+        }
+
+        tier
+    }
+
+    /// Step a tier down by one level (for loss-adjuster downgrade)
+    fn tier_step_down(tier: &NetworkTier) -> NetworkTier {
+        match tier {
+            NetworkTier::DataCenter { .. } => NetworkTier::Enterprise { gbps: 10.0 },
+            NetworkTier::Enterprise { .. } => NetworkTier::Performance { gbps: 2.5 },
+            NetworkTier::Performance { .. } => NetworkTier::Standard { gbps: 1.0 },
+            NetworkTier::Standard { .. } => NetworkTier::Home { mbps: 100.0 },
+            NetworkTier::Home { .. } | NetworkTier::Slow { .. } => NetworkTier::Slow { mbps: 10.0 },
+        }
+    }
+
+    /// Step a tier up by one level (for loss-adjuster upgrade)
+    fn tier_step_up(tier: &NetworkTier) -> NetworkTier {
+        match tier {
+            NetworkTier::Slow { .. } => NetworkTier::Home { mbps: 100.0 },
+            NetworkTier::Home { .. } => NetworkTier::Standard { gbps: 1.0 },
+            NetworkTier::Standard { .. } => NetworkTier::Performance { gbps: 2.5 },
+            NetworkTier::Performance { .. } => NetworkTier::Enterprise { gbps: 10.0 },
+            NetworkTier::Enterprise { .. } | NetworkTier::DataCenter { .. } => {
+                NetworkTier::DataCenter { gbps: 25.0 }
+            }
+        }
     }
 
     /// Check if adaptation should trigger based on hysteresis
@@ -410,8 +833,15 @@ impl AdaptiveConnection {
         transport_config.max_concurrent_bidi_streams(VarInt::from_u32(params.max_streams));
         transport_config.max_concurrent_uni_streams(VarInt::from_u32(params.max_streams / 2));
 
-        // Set datagram size - Quinn uses initial_mtu for this
-        transport_config.initial_mtu(params.max_datagram_size);
+        // Use MTU from discovery when it has a confirmed or in-progress result;
+        // otherwise fall back to the tier's datagram size.
+        let discovered_mtu = self.mtu_discovery.read().current_mtu();
+        let mtu = if discovered_mtu > params.max_datagram_size {
+            discovered_mtu
+        } else {
+            params.max_datagram_size
+        };
+        transport_config.initial_mtu(mtu);
 
         // Set timeouts
         transport_config.max_idle_timeout(Some(params.idle_timeout.try_into()?));
@@ -419,19 +849,41 @@ impl AdaptiveConnection {
             transport_config.keep_alive_interval(Some(keep_alive));
         }
 
-        // Apply congestion control (this would need quinn support for dynamic changes)
-        // For now, we can only log the intended change
-        debug!("Would apply congestion control: {:?}", params.congestion_control);
+        // Congestion control cannot be changed on live connections; log intent
+        // and expose via `recommended_congestion_control()` for new connections.
+        debug!(
+            "Congestion control for tier: {:?} (applies to new connections only)",
+            params.congestion_control
+        );
 
-        // Apply the transport config to the connection
-        // Note: Quinn doesn't directly support updating transport config on live connections
-        // We'll need to implement this at the QUIC protocol level or use connection migration
-
-        // For now, we update what we can through the connection API
+        // Update what Quinn allows on a live connection
         self.connection.set_max_concurrent_bi_streams(VarInt::from_u32(params.max_streams));
         self.connection.set_max_concurrent_uni_streams(VarInt::from_u32(params.max_streams / 2));
 
         Ok(())
+    }
+
+    /// Returns the congestion control algorithm recommended for the current
+    /// detected tier. Useful when creating new connections that should match
+    /// the observed network conditions.
+    pub fn recommended_congestion_control(&self) -> CongestionControl {
+        let tier = self.current_tier.read();
+        congestion_control_for_tier(&tier)
+    }
+
+    /// Borrow the EWMA bandwidth estimator (read-only)
+    pub fn bandwidth_estimator(&self) -> parking_lot::RwLockReadGuard<'_, EwmaBandwidthEstimator> {
+        self.bandwidth_estimator.read()
+    }
+
+    /// Borrow the MTU discovery state (read-only)
+    pub fn mtu_discovery(&self) -> parking_lot::RwLockReadGuard<'_, MtuDiscovery> {
+        self.mtu_discovery.read()
+    }
+
+    /// Borrow the loss adjuster (read-only)
+    pub fn loss_adjuster(&self) -> parking_lot::RwLockReadGuard<'_, LossBasedAdjuster> {
+        self.loss_adjuster.read()
     }
 
     /// Enable or disable adaptation
@@ -575,9 +1027,13 @@ impl AdaptationManager {
 mod tests {
     use super::*;
 
+    // -----------------------------------------------------------------------
+    // Existing tests (preserved)
+    // -----------------------------------------------------------------------
+
     #[test]
     fn test_network_tier_detection() {
-        let conditions = NetworkConditions {
+        let _conditions = NetworkConditions {
             rtt_ms: 5.0,
             packet_loss: 0.1,
             throughput_mbps: 2500.0,
@@ -586,17 +1042,13 @@ mod tests {
             jitter_ms: 1.0,
             last_update: Instant::now(),
         };
-
         // Should detect as Performance tier based on conditions
-        // Actual detection would use the detect_tier method
     }
 
     #[test]
     fn test_hysteresis_prevents_thrashing() {
         let mut hysteresis = HysteresisState::default();
         hysteresis.required_consecutive = 3;
-
-        // Should require 3 consecutive measurements
         assert_eq!(hysteresis.consecutive_count, 0);
     }
 
@@ -613,9 +1065,258 @@ mod tests {
             send_buffer_size: 8 * 1024 * 1024,
             receive_buffer_size: 8 * 1024 * 1024,
         };
-
-        // Verify parameters are reasonable
         assert!(params.stream_window > 0);
         assert!(params.max_streams > 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // EWMA Bandwidth Estimator
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ewma_convergence() {
+        let mut est = EwmaBandwidthEstimator::new(0.125, 20);
+
+        // Feed 10 samples at ~1 Gbps (125 MB in 1 second each)
+        let bytes_per_sample: u64 = 125_000_000;
+        let dur = Duration::from_secs(1);
+        for _ in 0..10 {
+            est.add_sample(bytes_per_sample, dur);
+        }
+
+        let estimate_gbps = est.estimate_gbps();
+        // Converging toward 1.0 Gbps; after 10 samples with alpha=0.125
+        // the estimate should be within 30% of target.
+        assert!(
+            (estimate_gbps - 1.0).abs() < 0.35,
+            "expected ~1.0 Gbps, got {estimate_gbps:.4}"
+        );
+    }
+
+    #[test]
+    fn test_ewma_sample_windowing() {
+        let mut est = EwmaBandwidthEstimator::new(0.125, 5);
+
+        for i in 0..10u64 {
+            est.add_sample(1_000_000 * (i + 1), Duration::from_millis(100));
+        }
+
+        // Window is 5, so only last 5 samples retained
+        assert_eq!(est.sample_count(), 5);
+    }
+
+    #[test]
+    fn test_ewma_zero_duration() {
+        let mut est = EwmaBandwidthEstimator::new(0.125, 20);
+
+        // Zero-duration sample must not panic and must not change estimate
+        est.add_sample(1_000_000, Duration::ZERO);
+        assert_eq!(est.sample_count(), 0);
+        assert!((est.estimate_bps() - 0.0).abs() < f64::EPSILON);
+
+        // Zero-byte sample also skipped
+        est.add_sample(0, Duration::from_secs(1));
+        assert_eq!(est.sample_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // MTU Discovery
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_mtu_probe_search_confirm() {
+        let mut mtu = MtuDiscovery::new(1200, 9000, Duration::from_millis(0));
+
+        // Repeatedly succeed until confirmed at max
+        for _ in 0..20 {
+            if *mtu.state() == MtuProbeState::Confirmed {
+                break;
+            }
+            let probe = mtu.next_probe_size();
+            mtu.probe_succeeded(probe);
+        }
+
+        assert_eq!(*mtu.state(), MtuProbeState::Confirmed);
+        // Final MTU should be at or near max
+        assert!(
+            mtu.current_mtu() >= 8900,
+            "expected near-max MTU, got {}",
+            mtu.current_mtu()
+        );
+    }
+
+    #[test]
+    fn test_mtu_probe_search_fail() {
+        let mut mtu = MtuDiscovery::new(1200, 9000, Duration::from_millis(0));
+
+        // Repeatedly fail until we settle at min
+        for _ in 0..20 {
+            if *mtu.state() == MtuProbeState::Failed {
+                break;
+            }
+            mtu.probe_failed();
+        }
+
+        assert_eq!(*mtu.state(), MtuProbeState::Failed);
+        assert_eq!(mtu.current_mtu(), 1200);
+    }
+
+    #[test]
+    fn test_mtu_probe_binary_search() {
+        let mut mtu = MtuDiscovery::new(1200, 9000, Duration::from_millis(0));
+
+        // Succeed at the first midpoint
+        let first_mid = mtu.next_probe_size();
+        mtu.probe_succeeded(first_mid);
+        assert!(mtu.current_mtu() >= 1200);
+
+        // Now fail — search should narrow downward from the high side
+        let second_mid = mtu.next_probe_size();
+        assert!(second_mid > first_mid, "next probe should be higher");
+        mtu.probe_failed();
+
+        // The search range narrowed; next probe should be between first_mid and second_mid
+        let third_probe = mtu.next_probe_size();
+        assert!(
+            third_probe >= first_mid && third_probe <= second_mid,
+            "binary search should narrow: {} in [{}, {}]",
+            third_probe, first_mid, second_mid
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Loss-Based Adjuster
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_loss_downgrade_threshold() {
+        let mut adj = LossBasedAdjuster::new(10, 5.0, 0.5);
+
+        // Record 10 samples all above 5%
+        for _ in 0..10 {
+            adj.record_loss(7.0);
+        }
+
+        assert!(adj.should_downgrade(), "average 7% > threshold 5%");
+        assert!(!adj.should_upgrade());
+    }
+
+    #[test]
+    fn test_loss_upgrade_threshold() {
+        let mut adj = LossBasedAdjuster::new(10, 5.0, 0.5);
+
+        // Record 10 samples all below 0.5%
+        for _ in 0..10 {
+            adj.record_loss(0.1);
+        }
+
+        assert!(adj.should_upgrade(), "average 0.1% < threshold 0.5%");
+        assert!(!adj.should_downgrade());
+    }
+
+    #[test]
+    fn test_loss_mixed() {
+        let mut adj = LossBasedAdjuster::new(10, 5.0, 0.5);
+
+        // Mix of high and low — average = 3.0%
+        for _ in 0..5 {
+            adj.record_loss(1.0);
+        }
+        for _ in 0..5 {
+            adj.record_loss(5.0);
+        }
+
+        let avg = adj.average_loss();
+        assert!(
+            (avg - 3.0).abs() < 0.01,
+            "expected 3.0, got {avg}"
+        );
+        // 3.0 is between thresholds: neither downgrade nor upgrade
+        assert!(!adj.should_downgrade());
+        assert!(!adj.should_upgrade());
+    }
+
+    // -----------------------------------------------------------------------
+    // Congestion control tier mapping
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cc_tier_mapping() {
+        assert!(matches!(
+            congestion_control_for_tier(&NetworkTier::DataCenter { gbps: 40.0 }),
+            CongestionControl::Bbr2
+        ));
+        assert!(matches!(
+            congestion_control_for_tier(&NetworkTier::Standard { gbps: 1.0 }),
+            CongestionControl::Cubic
+        ));
+        assert!(matches!(
+            congestion_control_for_tier(&NetworkTier::Slow { mbps: 10.0 }),
+            CongestionControl::NewReno
+        ));
+    }
+
+    // -----------------------------------------------------------------------
+    // Integrated: detect_tier with EWMA + loss adjuster
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_adaptive_tier_with_ewma() {
+        // We cannot construct a real QuinnConnection in unit tests, so we
+        // exercise the sub-components directly through the same logic path.
+
+        // 1. Seed EWMA at ~2.5 Gbps (Performance tier boundary)
+        let mut est = EwmaBandwidthEstimator::new(0.125, 20);
+        let bytes = 312_500_000u64; // 2.5 Gbps = 312.5 MB/s
+        let dur = Duration::from_secs(1);
+        for _ in 0..20 {
+            est.add_sample(bytes, dur);
+        }
+        let gbps = est.estimate_gbps();
+        assert!(
+            gbps > 2.0 && gbps < 3.0,
+            "expected ~2.5 Gbps, got {gbps:.3}"
+        );
+
+        // 2. Tier from EWMA alone should be Performance
+        let tier = NetworkTier::from_gbps(gbps);
+        assert!(
+            matches!(tier, NetworkTier::Performance { .. }),
+            "expected Performance, got {tier:?}"
+        );
+
+        // 3. Loss adjuster with high loss should recommend downgrade
+        let mut adj = LossBasedAdjuster::new(10, 5.0, 0.5);
+        for _ in 0..10 {
+            adj.record_loss(8.0);
+        }
+        assert!(adj.should_downgrade());
+
+        // Simulate the tier_step_down call from detect_tier
+        let downgraded = AdaptiveConnection::tier_step_down(&tier);
+        assert!(
+            matches!(downgraded, NetworkTier::Standard { .. }),
+            "expected Standard after downgrade, got {downgraded:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Tier stepping helpers
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_tier_step_down_floor() {
+        // Stepping down from Slow should stay Slow
+        let slow = NetworkTier::Slow { mbps: 10.0 };
+        let result = AdaptiveConnection::tier_step_down(&slow);
+        assert!(matches!(result, NetworkTier::Slow { .. }));
+    }
+
+    #[test]
+    fn test_tier_step_up_ceiling() {
+        // Stepping up from DataCenter should stay DataCenter
+        let dc = NetworkTier::DataCenter { gbps: 40.0 };
+        let result = AdaptiveConnection::tier_step_up(&dc);
+        assert!(matches!(result, NetworkTier::DataCenter { .. }));
     }
 }

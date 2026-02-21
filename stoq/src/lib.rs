@@ -58,6 +58,12 @@ pub use network_isolation::{
     NetworkTunnel, TrafficType, IsolationViolation
 };
 
+// Re-export multi-path QUIC connection management
+pub use transport::multipath::{MultiPathConnection, PathPolicy, PathScheduler};
+
+// Re-export reflector pool transport for Network-scope sync
+pub use transport::reflector::{StoqBlockTransport, SyncProtocol, ReflectorMessage};
+
 // Backward compatibility: re-export modules for tests
 pub use transport::metrics as performance_monitor;
 pub use transport::adaptive as phoenix;

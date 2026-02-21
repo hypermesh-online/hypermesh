@@ -19,6 +19,7 @@ pub mod parameters;
 pub mod handshake;
 pub mod pos_validator;
 pub mod pos_integration;
+pub mod pos_fast_validator;
 
 // Re-exports for backward compatibility
 pub use pos_validator::{

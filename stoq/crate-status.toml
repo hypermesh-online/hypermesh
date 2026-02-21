@@ -17,6 +17,10 @@ items = [
     "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
     "Transport metrics collection",
     "Matrix-aware positioning via hypermesh_lib canonical types",
+    "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
+    "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
+    "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
+    "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
 ]
 
 [features.in_development]
@@ -25,8 +29,4 @@ items = [
 
 [features.planned]
 items = [
-    "Protocol-level PoS token validation at line rate",
-    "Adaptive transport tiers",
-    "Multi-path QUIC",
-    "Reflector pool transport — redundancy/sync protocol for Public and Federated blockchain scopes",
 ]

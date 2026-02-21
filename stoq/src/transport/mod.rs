@@ -17,7 +17,12 @@ pub mod stats;
 pub mod manager;
 pub mod operations;
 
+pub mod multipath;
+
+pub mod reflector;
+
 pub mod ebpf;
+pub mod pos_extension_validator;
 
 // Re-exports for backward compatibility
 pub use config::{NetworkTier, TransportConfig, CongestionControl};
@@ -26,11 +31,18 @@ pub use stats::{ConnectionPoolStats, PerformanceStats};
 pub use manager::StoqTransport;
 pub use metrics::{TransportMetrics, ProtocolMetrics, IntervalMetrics};
 pub use falcon::{FalconTransport, FalconVariant};
-pub use adaptive::{AdaptiveConnection, AdaptationManager};
+pub use adaptive::{
+    AdaptiveConnection, AdaptationManager,
+    EwmaBandwidthEstimator, MtuDiscovery, LossBasedAdjuster,
+    BandwidthSample, MtuProbeState, congestion_control_for_tier,
+};
 pub use certificate_strategy::{CertificateStrategy, NetworkType,
     AnonymousCertificateStrategy, P2PCertificateStrategy,
     FederatedCertificateStrategy, PublicCertificateStrategy};
 pub use certificates::{CertificateManager, CertificateConfig, CertificateMode, StoqNodeCertificate};
+pub use pos_extension_validator::StoqPosExtensionValidator;
+pub use multipath::{MultiPathConnection, PathPolicy, PathScheduler, MultiPathMetrics, PathInfo};
+pub use reflector::{StoqBlockTransport, SyncProtocol, SyncProtocolConfig, ReflectorMessage, ReflectorBridge};
 
 #[cfg(test)]
 mod tests {

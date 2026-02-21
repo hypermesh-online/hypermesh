@@ -26,6 +26,7 @@ use super::falcon::FalconTransport;
 use super::adaptive::{AdaptiveConnection, AdaptationManager};
 
 use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};
+use crate::protocol::pos_fast_validator::{PosFastValidator, FastValidationConfig};
 use crate::extensions::DefaultStoqExtensions;
 
 use super::ebpf::StoqEbpfTransport;
@@ -89,6 +90,8 @@ pub struct StoqTransport {
     pub(crate) af_xdp_socket: Option<Arc<super::ebpf::AfXdpSocket>>,
     /// STOQ + PoS protocol integration
     pub(crate) pos_integration: Arc<StoqPosIntegration>,
+    /// Fast PoS pre-validator for line-rate filtering
+    pub(crate) pos_fast_validator: Arc<PosFastValidator>,
 }
 
 impl StoqTransport {
@@ -301,6 +304,15 @@ impl StoqTransport {
         // Create STOQ + PoS integration with 5-minute cache TTL
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
+        // Create fast PoS pre-validator for line-rate filtering
+        let full_pos_validator = Arc::new(
+            crate::protocol::pos_validator::PosTokenValidator::new(Duration::from_secs(300)),
+        );
+        let pos_fast_validator = Arc::new(PosFastValidator::new(
+            FastValidationConfig::default(),
+            full_pos_validator,
+        ));
+
         // Resolve the network interface for eBPF XDP attachment.
         // Localhost always uses "lo"; other addresses attempt to detect the
         // outbound interface by inspecting the bind address.
@@ -363,6 +375,7 @@ impl StoqTransport {
             ebpf_transport,
             af_xdp_socket,
             pos_integration,
+            pos_fast_validator,
         })
     }
 
@@ -667,6 +680,11 @@ impl StoqTransport {
         &self.pos_integration
     }
 
+    /// Get the fast PoS pre-validator for line-rate filtering
+    pub fn pos_fast_validator(&self) -> &Arc<PosFastValidator> {
+        &self.pos_fast_validator
+    }
+
     /// Validate connection with PoS token (for public networks)
     ///
     /// After successful PoS validation, feeds the result to the eBPF layer
@@ -741,6 +759,19 @@ impl StoqTransport {
         self.pos_integration.validate_asset_hash(connection_id, asset_id, content_hash, data)
     }
 
+    /// Create a multi-path connection with this transport's PoS fast validator.
+    ///
+    /// The returned connection is pre-configured with the transport's
+    /// validator for privacy-tier-aware path validation.
+    pub fn create_multipath_connection(
+        &self,
+        peer_id: String,
+        policy: super::multipath::PathPolicy,
+    ) -> super::multipath::MultiPathConnection {
+        super::multipath::MultiPathConnection::new(peer_id, policy)
+            .with_pos_validator(self.pos_fast_validator.clone())
+    }
+
     /// Get STOQ + PoS integration statistics
     pub fn get_pos_integration_stats(&self) -> crate::protocol::IntegrationStats {
         self.pos_integration.get_stats()
@@ -813,6 +844,7 @@ impl Clone for StoqTransport {
             ebpf_transport: self.ebpf_transport.clone(),
             af_xdp_socket: self.af_xdp_socket.clone(),
             pos_integration: self.pos_integration.clone(),
+            pos_fast_validator: self.pos_fast_validator.clone(),
         }
     }
 }

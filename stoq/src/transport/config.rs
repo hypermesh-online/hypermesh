@@ -146,6 +146,12 @@ pub struct TransportConfig {
     /// When `None`, automatically resolved from `bind_address`
     /// (localhost -> "lo", unspecified/other -> system default).
     pub ebpf_interface: Option<String>,
+    /// EWMA smoothing factor for bandwidth estimation (0.0–1.0, default 0.125)
+    pub ewma_alpha: f64,
+    /// Interval in seconds between MTU path probes (default 30)
+    pub mtu_probe_interval_secs: u64,
+    /// Number of loss observations in the sliding window (default 10)
+    pub loss_window_size: usize,
 }
 
 impl Default for TransportConfig {
@@ -182,6 +188,9 @@ impl Default for TransportConfig {
             enable_falcon_crypto: true, // Quantum-resistant FALCON cryptography
             falcon_variant: FalconVariant::Falcon1024, // Maximum security level
             ebpf_interface: None, // Auto-detect from bind_address
+            ewma_alpha: 0.125,              // Conservative smoothing
+            mtu_probe_interval_secs: 30,    // Probe every 30 seconds
+            loss_window_size: 10,           // Average over 10 observations
         }
     }
 }
