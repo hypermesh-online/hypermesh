@@ -7,7 +7,7 @@ phase = "alpha"
 [features.working]
 items = [
     "Dashboard home with ecosystem overview",
-    "Module pages (STOQ, TrustChain, Catalog, Caesar, NGauge, HyperMesh)",
+    "Module pages (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
     "Component library (Radix UI primitives, Tailwind 4)",
     "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
     "TrustChain management (certificates, security, consensus, node config)",
@@ -36,5 +36,5 @@ items = [
     "Security monitoring with live alerts",
     "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
     "Caesar wallet and transaction management UI",
-    "NGauge analytics and reward distribution dashboard",
+    "Engauge analytics and reward distribution dashboard",
 ]
