@@ -13,6 +13,7 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
+rust_decimal = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

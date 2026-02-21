@@ -49,6 +49,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 rand = { workspace = true }
 hex = { workspace = true }
+sha2 = { workspace = true }
 
 # Error handling and logging
 anyhow = { workspace = true }

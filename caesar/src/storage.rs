@@ -292,26 +292,6 @@ impl CaesarStorage {
         Ok(volume)
     }
 
-    // Staking operations (stub implementations for now)
-    pub async fn get_stakes(&self, _wallet_id: &str) -> Result<Vec<StakeInfo>> {
-        // TODO: Implement actual stake storage
-        Ok(vec![])
-    }
-
-    pub async fn get_total_staked(&self, _wallet_id: &str) -> Result<Decimal> {
-        // TODO: Implement actual stake tracking
-        Ok(Decimal::ZERO)
-    }
-
-    pub async fn create_stake(&self, _stake: StakeInfo) -> Result<()> {
-        // TODO: Implement actual stake creation
-        Ok(())
-    }
-
-    pub async fn deactivate_stake(&self, _stake_id: &str) -> Result<()> {
-        // TODO: Implement actual stake deactivation
-        Ok(())
-    }
 }
 
 #[cfg(test)]

@@ -25,7 +25,6 @@ pub struct WalletResponse {
     pub wallet_id: String,
     pub balance: Decimal,
     pub pending_rewards: Decimal,
-    pub staked_amount: Decimal,
     pub total_value_usd: Decimal,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
@@ -41,7 +40,6 @@ pub struct CreateWalletRequest {
 pub struct BalanceResponse {
     pub available: Decimal,
     pub pending: Decimal,
-    pub staked: Decimal,
     pub total: Decimal,
     pub updated_at: DateTime<Utc>,
 }
@@ -132,7 +130,6 @@ pub enum RewardType {
     ResourceSharing,
     NetworkValidation,
     AssetHosting,
-    StakingReward,
     ReferralBonus,
     ActivityBonus,
 }
@@ -222,80 +219,6 @@ pub struct MultiplierInfo {
     pub reason: String,
 }
 
-// ============ Staking Models ============
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakeInfo {
-    pub stake_id: String,
-    pub wallet_id: String,
-    pub amount: Decimal,
-    pub start_date: DateTime<Utc>,
-    pub lock_period_days: Option<u32>,
-    pub apy: Decimal,
-    pub accumulated_rewards: Decimal,
-    pub is_active: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakingInfoResponse {
-    pub wallet_id: String,
-    pub total_staked: Decimal,
-    pub active_stakes: Vec<StakeInfo>,
-    pub current_apy: Decimal,
-    pub accumulated_rewards: Decimal,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakeRequest {
-    pub wallet_id: String,
-    pub amount: Decimal,
-    pub lock_period_days: Option<u32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakeResponse {
-    pub stake_id: String,
-    pub wallet_id: String,
-    pub amount: Decimal,
-    pub apy: Decimal,
-    pub estimated_rewards: Decimal,
-    pub lock_until: Option<DateTime<Utc>>,
-    pub transaction_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnstakeRequest {
-    pub wallet_id: String,
-    pub stake_id: String,
-    pub amount: Option<Decimal>, // None means unstake all
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnstakeResponse {
-    pub wallet_id: String,
-    pub unstaked_amount: Decimal,
-    pub rewards_claimed: Decimal,
-    pub transaction_id: String,
-    pub cooldown_ends: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakingRewardsResponse {
-    pub wallet_id: String,
-    pub total_rewards: Decimal,
-    pub breakdown: Vec<StakeRewardBreakdown>,
-    pub last_calculated: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakeRewardBreakdown {
-    pub stake_id: String,
-    pub principal: Decimal,
-    pub rewards: Decimal,
-    pub apy: Decimal,
-    pub days_staked: u32,
-}
-
 // ============ Exchange Models ============
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -347,49 +270,6 @@ pub struct LiquidityInfoResponse {
     pub volume_24h: Decimal,
     pub fee_24h: Decimal,
     pub apy: Decimal,
-}
-
-// ============ Analytics Models ============
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalyticsOverviewResponse {
-    pub total_supply: Decimal,
-    pub circulating_supply: Decimal,
-    pub market_cap_usd: Decimal,
-    pub total_staked: Decimal,
-    pub total_rewards_distributed: Decimal,
-    pub active_wallets_24h: u64,
-    pub transactions_24h: u64,
-    pub volume_24h: Decimal,
-    pub price_change_24h: Decimal,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EarningsBreakdownResponse {
-    pub wallet_id: String,
-    pub total_earned: Decimal,
-    pub earnings_today: Decimal,
-    pub earnings_week: Decimal,
-    pub earnings_month: Decimal,
-    pub breakdown_by_source: Vec<EarningsBySource>,
-    pub hourly_rate: Decimal,
-    pub projected_monthly: Decimal,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EarningsBySource {
-    pub source: String,
-    pub amount: Decimal,
-    pub percentage: Decimal,
-    pub trend: TrendDirection,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TrendDirection {
-    Up,
-    Down,
-    Stable,
 }
 
 // ============ System Models ============

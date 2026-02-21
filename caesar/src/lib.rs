@@ -8,8 +8,11 @@
 //! - Real-time token balance tracking
 //! - Transaction processing and validation
 //! - Reward calculation based on resource sharing
-//! - Staking mechanisms with APY calculations
 //! - Exchange operations and market rates
+//! - EVP (Economic Value Packet) protocol
+//! - Governor PID controller for monetary policy
+//! - UPI (Universal Payment Interface) ingress/egress
+//! - Settlement protocol with gravity-based clearing
 //!
 //! **API**: STOQ protocol (HTTP REMOVED)
 
@@ -33,23 +36,23 @@ use blockmatrix::assets::core::{AssetManager, AssetId, AssetType, ConsensusProof
 pub mod models;
 pub mod storage;
 pub mod rewards;
-pub mod staking;
 pub mod exchange;
 pub mod transactions;
-pub mod analytics;
 pub mod banking_interop_bridge;
 pub mod banking_providers;
 pub mod crypto_exchange_providers;
 pub mod cross_chain_bridge;
 pub mod api;
+pub mod evp;
+pub mod governor;
+pub mod upi;
+pub mod settlement;
 
 use models::*;
 use storage::CaesarStorage;
 use rewards::RewardCalculator;
-use staking::StakingManager;
 use exchange::ExchangeEngine;
 use transactions::TransactionProcessor;
-use analytics::AnalyticsEngine;
 use cross_chain_bridge::CrossChainBridge;
 
 /// Caesar Economic System Configuration
@@ -60,9 +63,6 @@ pub struct CaesarConfig {
 
     /// Reward calculation settings
     pub rewards: RewardConfig,
-
-    /// Staking configuration
-    pub staking: StakingConfig,
 
     /// Exchange settings
     pub exchange: ExchangeConfig,
@@ -111,24 +111,6 @@ pub struct RewardConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct StakingConfig {
-    /// Base APY percentage
-    pub base_apy: Decimal,
-
-    /// Minimum staking amount
-    pub min_stake: Decimal,
-
-    /// Maximum staking amount per wallet
-    pub max_stake: Decimal,
-
-    /// Unstaking cooldown period in hours
-    pub unstaking_cooldown_hours: u32,
-
-    /// Compound frequency in hours
-    pub compound_frequency_hours: u32,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExchangeConfig {
     /// CSR to USD exchange rate
     pub csr_usd_rate: Decimal,
@@ -167,17 +149,11 @@ pub struct CaesarEconomicSystem {
     /// Reward calculator
     rewards: Arc<RewardCalculator>,
 
-    /// Staking manager
-    staking: Arc<StakingManager>,
-
     /// Exchange engine
     exchange: Arc<ExchangeEngine>,
 
     /// Transaction processor
     transactions: Arc<TransactionProcessor>,
-
-    /// Analytics engine
-    analytics: Arc<AnalyticsEngine>,
 
     /// Cross-chain bridge for "mostly-stable" token
     bridge: Arc<CrossChainBridge>,
@@ -197,7 +173,6 @@ pub struct UserSession {
     pub last_update: DateTime<Utc>,
     pub cached_balance: Decimal,
     pub cached_rewards: Decimal,
-    pub active_stakes: Vec<StakeInfo>,
 }
 
 impl CaesarEconomicSystem {
@@ -212,10 +187,8 @@ impl CaesarEconomicSystem {
 
         // Initialize components
         let rewards = Arc::new(RewardCalculator::new(config.rewards.clone(), storage.clone()));
-        let staking = Arc::new(StakingManager::new(config.staking.clone(), storage.clone()).await?);
         let exchange = Arc::new(ExchangeEngine::new(config.exchange.clone()));
         let transactions = Arc::new(TransactionProcessor::new(config.economics.clone(), storage.clone()).await?);
-        let analytics = Arc::new(AnalyticsEngine::new(storage.clone()).await?);
         let bridge = Arc::new(CrossChainBridge::new().await?);
 
         let sessions = Arc::new(RwLock::new(HashMap::new()));
@@ -224,10 +197,8 @@ impl CaesarEconomicSystem {
             config,
             storage,
             rewards,
-            staking,
             exchange,
             transactions,
-            analytics,
             bridge,
             sessions,
             #[cfg(feature = "hypermesh")]
@@ -246,17 +217,15 @@ impl CaesarEconomicSystem {
             .ok_or_else(|| anyhow::anyhow!("Wallet not found"))?;
         let balance = wallet.balance;
         let pending_rewards = self.rewards.get_pending_rewards(wallet_id).await?;
-        let staked = self.staking.get_staked_amount(wallet_id).await?;
 
         // Calculate USD value
-        let total_csr = balance + pending_rewards + staked;
+        let total_csr = balance + pending_rewards;
         let usd_value = self.exchange.calculate_usd_value(total_csr)?;
 
         Ok(WalletResponse {
             wallet_id: wallet_id.to_string(),
             balance,
             pending_rewards,
-            staked_amount: staked,
             total_value_usd: usd_value,
             created_at: wallet.created_at,
             last_activity: wallet.last_activity,
@@ -268,13 +237,11 @@ impl CaesarEconomicSystem {
             .ok_or_else(|| anyhow::anyhow!("Wallet not found"))?;
         let balance = wallet.balance;
         let pending = self.rewards.get_pending_rewards(wallet_id).await?;
-        let staked = self.staking.get_staked_amount(wallet_id).await?;
 
         Ok(BalanceResponse {
             available: balance,
             pending,
-            staked,
-            total: balance + pending + staked,
+            total: balance + pending,
             updated_at: Utc::now(),
         })
     }
@@ -359,41 +326,6 @@ impl CaesarEconomicSystem {
         Ok(rewards)
     }
 
-    pub async fn get_staking_details(&self, wallet_id: &str) -> Result<StakingInfoResponse> {
-        let stakes = self.staking.get_stakes(wallet_id).await?;
-        let total_staked = self.staking.get_staked_amount(wallet_id).await?;
-        let apy = self.staking.get_current_apy();
-        let rewards = self.staking.calculate_rewards(wallet_id).await?;
-
-        Ok(StakingInfoResponse {
-            wallet_id: wallet_id.to_string(),
-            total_staked,
-            active_stakes: stakes,
-            current_apy: apy,
-            accumulated_rewards: rewards,
-        })
-    }
-
-    pub async fn stake_tokens_for_wallet(&self, request: StakeRequest) -> Result<StakeResponse> {
-        self.staking.stake(request).await
-    }
-
-    pub async fn unstake_tokens_for_wallet(&self, request: UnstakeRequest) -> Result<UnstakeResponse> {
-        self.staking.unstake(request).await
-    }
-
-    pub async fn calculate_staking_rewards(&self, wallet_id: &str) -> Result<StakingRewardsResponse> {
-        let rewards = self.staking.calculate_rewards(wallet_id).await?;
-        let breakdown = self.staking.get_rewards_breakdown(wallet_id).await?;
-
-        Ok(StakingRewardsResponse {
-            wallet_id: wallet_id.to_string(),
-            total_rewards: rewards,
-            breakdown,
-            last_calculated: Utc::now(),
-        })
-    }
-
     pub async fn get_current_exchange_rates(&self) -> Result<ExchangeRatesResponse> {
         self.exchange.get_rates().await
     }
@@ -406,13 +338,6 @@ impl CaesarEconomicSystem {
         self.exchange.get_liquidity_info().await
     }
 
-    pub async fn get_analytics_data(&self, wallet_id: Option<&String>) -> Result<AnalyticsOverviewResponse> {
-        self.analytics.get_overview(wallet_id).await
-    }
-
-    pub async fn get_earnings_details(&self, wallet_id: &str) -> Result<EarningsBreakdownResponse> {
-        self.analytics.get_earnings_breakdown(wallet_id).await
-    }
 }
 
 /// Default configuration for development
@@ -433,13 +358,6 @@ impl Default for CaesarConfig {
                 storage_multiplier: dec!(1.2),
                 validation_multiplier: dec!(3.0),
                 hosting_multiplier: dec!(1.8),
-            },
-            staking: StakingConfig {
-                base_apy: dec!(4.2),
-                min_stake: dec!(10.0),
-                max_stake: dec!(100000.0),
-                unstaking_cooldown_hours: 72,
-                compound_frequency_hours: 24,
             },
             exchange: ExchangeConfig {
                 csr_usd_rate: dec!(1.48),

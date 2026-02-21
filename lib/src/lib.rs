@@ -11,8 +11,10 @@ pub mod types;
 pub mod asset;
 pub mod error;
 pub mod crypto;
+pub mod economic;
 
 // Re-export commonly used types at crate root
 pub use types::*;
 pub use asset::*;
 pub use error::HypermeshError;
+pub use economic::*;
