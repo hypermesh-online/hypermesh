@@ -21,6 +21,9 @@ pub mod pos_validator;
 pub mod pos_integration;
 pub mod pos_fast_validator;
 
+#[cfg(feature = "engauge")]
+pub mod metrics_frame;
+
 // Re-exports for backward compatibility
 pub use pos_validator::{
     PosToken, PosTokenValidator, ProofData,
@@ -62,6 +65,10 @@ pub mod frame_types {
 
     /// FALCON public key exchange frame type
     pub const FALCON_KEY: VarInt = VarInt::from_u32(0xfe000006);
+
+    /// Engauge METRICS frame type for streaming metrics payloads
+    #[cfg(feature = "engauge")]
+    pub const STOQ_METRICS: VarInt = VarInt::from_u32(0xfe000007);
 }
 
 /// Transport parameter IDs for STOQ extensions

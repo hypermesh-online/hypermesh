@@ -22,12 +22,11 @@ items = [
     "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
     "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
     "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
+    "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
 ]
 
 [features.in_development]
 items = []
 
 [features.planned]
-items = [
-    "STOQ METRICS frame type integration (blocked by: STOQ custom frame type registry)",
-]
+items = []

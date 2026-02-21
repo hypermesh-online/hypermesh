@@ -21,6 +21,7 @@ items = [
     "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
     "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
     "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
+    "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
 ]
 
 [features.in_development]
