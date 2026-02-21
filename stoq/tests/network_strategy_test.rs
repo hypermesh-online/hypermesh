@@ -8,8 +8,7 @@ use anyhow::Result;
 use stoq::transport::{
     TransportConfig, StoqTransport, NetworkType,
     CertificateStrategy, AnonymousCertificateStrategy,
-    P2PCertificateStrategy, FederatedCertificateStrategy,
-    PublicCertificateStrategy, CertificateManager,
+    AuthenticatedCertificateStrategy, CertificateManager,
 };
 use std::net::Ipv6Addr;
 use std::sync::Arc;
@@ -80,24 +79,30 @@ async fn test_strategy_selection() -> Result<()> {
     let common_name = "test.local".to_string();
     let ipv6_addresses = vec![Ipv6Addr::LOCALHOST];
 
-    // Test each network type creates the correct strategy
-    let strategies = vec![
-        (NetworkType::Anonymous, "Anonymous"),
-        (NetworkType::P2P, "P2P"),
-        (NetworkType::Federated {
-            gateway_url: "gateway.test.internal".to_string()
-        }, "Federated"),
-        (NetworkType::Public, "Public"),
-    ];
+    // Anonymous creates AnonymousCertificateStrategy
+    let anon = NetworkType::Anonymous.create_strategy(
+        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+    )?;
+    assert_eq!(anon.strategy_name(), "Anonymous");
 
-    for (network_type, expected_name) in strategies {
-        let strategy = network_type.create_strategy(
-            node_id.clone(),
-            common_name.clone(),
-            ipv6_addresses.clone(),
-        )?;
-        assert_eq!(strategy.strategy_name(), expected_name);
-    }
+    // P2P/Federated/Public all create AuthenticatedCertificateStrategy
+    // with different labels
+    let private = NetworkType::P2P.create_strategy(
+        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+    )?;
+    assert_eq!(private.strategy_name(), "Private");
+
+    let federated = NetworkType::Federated {
+        gateway_url: "gateway.test.internal".to_string()
+    }.create_strategy(
+        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+    )?;
+    assert_eq!(federated.strategy_name(), "Federated");
+
+    let public = NetworkType::Public.create_strategy(
+        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+    )?;
+    assert_eq!(public.strategy_name(), "Public");
 
     Ok(())
 }
@@ -106,34 +111,35 @@ async fn test_strategy_selection() -> Result<()> {
 async fn test_anonymous_strategy_behavior() -> Result<()> {
     let strategy = AnonymousCertificateStrategy::new();
 
-    // Anonymous should not require certificates
+    // Anonymous should not require persistent certificates
     assert!(!strategy.requires_certificate());
 
-    // Anonymous should return no certificate
+    // Anonymous generates fresh ephemeral certs
     let cert = strategy.get_certificate().await?;
-    assert!(cert.is_none());
+    assert!(cert.is_some(), "anonymous should generate ephemeral cert");
+    let cert = cert.unwrap();
+    assert!(cert.node_id.starts_with("ephemeral-"));
+
+    // Each call generates a unique cert
+    let cert2 = strategy.get_certificate().await?.unwrap();
+    assert_ne!(cert.fingerprint_sha256, cert2.fingerprint_sha256);
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_p2p_strategy_behavior() -> Result<()> {
-    let strategy = P2PCertificateStrategy::new(
+async fn test_authenticated_strategy_behavior() -> Result<()> {
+    let strategy = AuthenticatedCertificateStrategy::new(
+        "local://trustchain".to_string(),
         "test-node".to_string(),
         "localhost".to_string(),
         vec![Ipv6Addr::LOCALHOST],
-    )?;
+        "Private".to_string(),
+    );
 
-    // P2P should require certificates
+    // Authenticated should require certificates
     assert!(strategy.requires_certificate());
-
-    // P2P should generate self-signed certificate
-    let cert = strategy.get_certificate().await?;
-    assert!(cert.is_some());
-
-    let cert = cert.unwrap();
-    assert_eq!(cert.node_id, "test-node");
-    assert!(!cert.is_expired());
+    assert_eq!(strategy.strategy_name(), "Private");
 
     Ok(())
 }
@@ -170,66 +176,15 @@ async fn test_backward_compatibility() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_p2p_peer_management() -> Result<()> {
-    let strategy = P2PCertificateStrategy::new(
-        "node1".to_string(),
-        "node1.local".to_string(),
-        vec![Ipv6Addr::LOCALHOST],
-    )?;
+async fn test_anonymous_accepts_any_certificate() -> Result<()> {
+    let anon = AnonymousCertificateStrategy::new();
 
-    // Create a dummy peer certificate
-    let peer_strategy = P2PCertificateStrategy::new(
-        "node2".to_string(),
-        "node2.local".to_string(),
-        vec![Ipv6Addr::LOCALHOST],
-    )?;
-
-    let peer_cert = peer_strategy.get_certificate().await?.unwrap();
-
-    // Add peer as trusted
-    strategy.add_trusted_peer("node2".to_string(), peer_cert.clone()).await;
-
-    // Should now validate the peer
-    assert!(strategy.validate_certificate(&peer_cert).await?);
-
-    // List trusted peers
-    let peers = strategy.list_trusted_peers().await;
-    assert_eq!(peers.len(), 1);
-    assert_eq!(peers[0].0, "node2");
-
-    // Remove peer
-    let removed = strategy.remove_trusted_peer("node2").await;
-    assert!(removed.is_some());
-
-    // Should no longer validate
-    assert!(!strategy.validate_certificate(&peer_cert).await?);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_network_specific_validation() -> Result<()> {
-    // Create strategies for different networks
-    let anon_strategy = AnonymousCertificateStrategy::new();
-    let p2p_strategy = P2PCertificateStrategy::new(
-        "test".to_string(),
-        "test.local".to_string(),
-        vec![Ipv6Addr::LOCALHOST],
-    )?;
-
-    // Get P2P certificate
-    let p2p_cert = p2p_strategy.get_certificate().await?.unwrap();
+    // Get an ephemeral cert from another anonymous instance
+    let other = AnonymousCertificateStrategy::new();
+    let cert = other.get_certificate().await?.unwrap();
 
     // Anonymous should accept any certificate
-    assert!(anon_strategy.validate_certificate(&p2p_cert).await?);
-
-    // P2P should reject untrusted certificates
-    let other_p2p = P2PCertificateStrategy::new(
-        "other".to_string(),
-        "other.local".to_string(),
-        vec![Ipv6Addr::LOCALHOST],
-    )?;
-    assert!(!other_p2p.validate_certificate(&p2p_cert).await?);
+    assert!(anon.validate_certificate(&cert).await?);
 
     Ok(())
 }

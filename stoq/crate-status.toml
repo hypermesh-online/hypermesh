@@ -8,7 +8,7 @@ phase = "alpha"
 items = [
     "QUIC/IPv6 transport — connection pooling, health checks, adaptive congestion control",
     "FALCON-1024 crypto — key generation, signing, dynamic key_id, real signature verification via FalconTrustChainClient",
-    "Certificate management (4 strategies: self-signed, CA-issued, ACME, manual)",
+    "Certificate management — two modes: Anonymous (ephemeral per-connection, no CA/CT) and Authenticated (TrustChain-issued, endpoint is configuration for Private/Federated/Public)",
     "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push and tunnel traffic type enforcement",
     "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport thin consumer wrapper",
     "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf orchestrator",

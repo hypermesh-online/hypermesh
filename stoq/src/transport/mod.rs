@@ -37,8 +37,8 @@ pub use adaptive::{
     BandwidthSample, MtuProbeState, congestion_control_for_tier,
 };
 pub use certificate_strategy::{CertificateStrategy, NetworkType,
-    AnonymousCertificateStrategy, P2PCertificateStrategy,
-    FederatedCertificateStrategy, PublicCertificateStrategy};
+    AnonymousCertificateStrategy, AuthenticatedCertificateStrategy,
+    P2PCertificateStrategy, FederatedCertificateStrategy, PublicCertificateStrategy};
 pub use certificates::{CertificateManager, CertificateConfig, CertificateMode, StoqNodeCertificate};
 pub use pos_extension_validator::StoqPosExtensionValidator;
 pub use multipath::{MultiPathConnection, PathPolicy, PathScheduler, MultiPathMetrics, PathInfo};

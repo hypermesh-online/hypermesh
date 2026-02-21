@@ -37,6 +37,11 @@ impl TrustChainClient {
         ipv6_addresses: &[Ipv6Addr],
         metadata: Option<&[u8]>,
     ) -> Result<StoqNodeCertificate> {
+        // Local TrustChain: node is its own CA — generate self-signed cert
+        if self.endpoint.starts_with("local://") {
+            return self.generate_local_certificate(common_name, ipv6_addresses, metadata);
+        }
+
         info!("Requesting certificate from TrustChain CA: {}", self.endpoint);
 
         let (host, port) = self.parse_endpoint()?;
@@ -123,6 +128,14 @@ impl TrustChainClient {
 
     /// Validate certificate with TrustChain CT logs (SECURITY HARDENED)
     pub async fn validate_certificate(&self, cert_der: &[u8]) -> Result<bool> {
+        // Local TrustChain: do local structure validation only (no remote CT check)
+        if self.endpoint.starts_with("local://") {
+            info!("Local TrustChain: validating certificate structure locally");
+            return self.validate_certificate_structure(cert_der)
+                .and_then(|ok| if ok { self.validate_certificate_expiration(cert_der) } else { Ok(false) })
+                .and_then(|ok| if ok { self.validate_certificate_crypto_strength(cert_der) } else { Ok(false) });
+        }
+
         info!("Validating certificate with TrustChain CT logs (hardened validation)");
 
         if !self.validate_certificate_structure(cert_der)? {
@@ -231,6 +244,45 @@ impl TrustChainClient {
 
         debug!("Certificate revocation check: not_revoked={}", is_not_revoked);
         Ok(is_not_revoked)
+    }
+
+    /// Generate a locally-signed certificate for P2P/local TrustChain mode.
+    /// When the endpoint is `local://`, the node acts as its own CA
+    /// (node-as-DNS-provider-first principle).
+    fn generate_local_certificate(
+        &self,
+        common_name: &str,
+        ipv6_addresses: &[Ipv6Addr],
+        metadata: Option<&[u8]>,
+    ) -> Result<StoqNodeCertificate> {
+        info!("Local TrustChain: generating self-signed certificate for {}", common_name);
+
+        let mut san_entries = vec![common_name.to_string()];
+        for addr in ipv6_addresses {
+            san_entries.push(format!("{}", addr));
+        }
+
+        let cert_key = generate_simple_self_signed(san_entries)?;
+        let cert_der = cert_key.cert.der().clone();
+        let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
+            .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
+
+        let fingerprint = self.calculate_fingerprint(cert_der.as_ref());
+        let now = SystemTime::now();
+        let expires_at = now + Duration::from_secs(24 * 60 * 60); // 24 hours
+
+        let stoq_cert = StoqNodeCertificate {
+            node_id: self.node_id.clone(),
+            certificate: cert_der,
+            private_key: private_key_der,
+            issued_at: now,
+            expires_at,
+            fingerprint_sha256: fingerprint,
+            metadata: metadata.map(|m| m.to_vec()),
+        };
+
+        info!("Local TrustChain certificate generated: {}", stoq_cert.fingerprint());
+        Ok(stoq_cert)
     }
 
     /// Calculate certificate fingerprint

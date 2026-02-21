@@ -116,13 +116,12 @@ export const crateStatuses: CrateStatus[] = [
         "Asset validation pipeline",
         "Semantic versioning and dependency resolution",
         "HyperMesh execution delegation",
-        "Scripting engine (syntax validation)"
-      ],
-      "inDevelopment": [
+        "Scripting engine (syntax validation)",
         "STOQ transport for distribution",
         "Content-addressed storage (DHT)",
-        "TrustChain security integration"
+        "TrustChain security integration (FALCON-1024 cert lifecycle)"
       ],
+      "inDevelopment": [],
       "planned": [
         "Full asset marketplace",
         "Peer-to-peer package sharing",
@@ -132,7 +131,7 @@ export const crateStatuses: CrateStatus[] = [
         "catalog.hypermesh.online clearnet registry access"
       ]
     },
-    "completion": 44
+    "completion": 63
   },
   {
     "id": "engauge",
@@ -159,32 +158,35 @@ export const crateStatuses: CrateStatus[] = [
   {
     "id": "gateway",
     "name": "Gateway",
-    "description": "HTTP/3 gateway for *.hypermesh.online domains and federated entry points",
-    "phase": "planning",
+    "description": "HTTP/3 + STOQ gateway for *.hypermesh.online domains and federated entry points",
+    "phase": "alpha",
     "features": {
       "working": [
         "QUIC/HTTP3 server setup (quinn + h3)",
-        "TLS certificate loading (PEM/DER)",
-        "Connection pool with health checks",
-        "Router with path-based backend selection",
+        "TLS certificate loading (PEM/DER/TrustChain/SelfSigned)",
+        "Connection pool with health checks (HTTP/3 + STOQ)",
+        "Router with path/domain/scope-based backend selection",
         "Circuit breaker and retry logic",
-        "CORS middleware and request logging"
-      ],
-      "inDevelopment": [
-        "Request handling (h3 API fix needed)",
-        "HTTP/3 backend proxying"
-      ],
-      "planned": [
-        "Federated gateway mesh",
-        "STOQ protocol bridge",
-        "Load balancing across backends",
+        "CORS middleware with origin matching",
+        "Request ID and structured logging",
+        "STOQ protocol bridge (dual-listener)",
+        "TrustChain CA certificate integration",
+        "PoS authentication and bootstrap tokens",
+        "Cross-scope routing (Device/Network)",
+        "Federation bridge (cross-network)",
         "Rate limiting and DDoS protection",
-        "Multi-domain routing (trust/caesar/nguage/catalog.hypermesh.online)",
-        "REST and GraphQL API layer for clearnet integration",
-        "API documentation (OpenAPI/GraphQL schema)"
-      ]
+        "Load balancing (round-robin/least-connections/health-aware)",
+        "Multi-domain SNI routing (*.hypermesh.online)",
+        "Clearnet bootstrap gateway (HTTP/3 to STOQ transition)",
+        "Inbound proxy (clearnet to HyperMesh dashboards)",
+        "Outbound proxy (HyperMesh to clearnet HTTP/3)",
+        "Privacy-mode-aware forwarding",
+        "Comprehensive health checks"
+      ],
+      "inDevelopment": [],
+      "planned": []
     },
-    "completion": 40
+    "completion": 100
   },
   {
     "id": "hypermesh-ebpf",
@@ -257,7 +259,7 @@ export const crateStatuses: CrateStatus[] = [
       "working": [
         "QUIC/IPv6 transport — connection pooling, health checks, adaptive congestion control",
         "FALCON-1024 crypto — key generation, signing, dynamic key_id, real signature verification via FalconTrustChainClient",
-        "Certificate management (4 strategies: self-signed, CA-issued, ACME, manual)",
+        "Certificate management — two modes: Anonymous (ephemeral per-connection, no CA/CT) and Authenticated (TrustChain-issued, endpoint is configuration for Private/Federated/Public)",
         "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push and tunnel traffic type enforcement",
         "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport thin consumer wrapper",
         "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf orchestrator",
@@ -300,14 +302,13 @@ export const crateStatuses: CrateStatus[] = [
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
         "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
-        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)"
-      ],
-      "inDevelopment": [
+        "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
       ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 95
+    "completion": 100
   },
   {
     "id": "ui",

@@ -4,11 +4,11 @@
 
 //! Certificate strategy pattern for network-aware trust models
 //!
-//! This module implements network-specific certificate strategies:
-//! - Anonymous: No certificates (ephemeral sessions)
-//! - P2P: Direct peer certificate exchange
-//! - Federated: Federation gateway managed certificates
-//! - Public: Global CA with blockchain registration
+//! Two certificate modes:
+//! - **Anonymous**: Ephemeral self-signed certs per connection (Tor-like, no CA/CT)
+//! - **Authenticated**: TrustChain-issued certs (the CA endpoint is configuration,
+//!   not a different strategy — P2P, Federated, and Public all use the same
+//!   TrustChain mechanism, just pointed at different CA instances)
 
 use async_trait::async_trait;
 use anyhow::{Result, anyhow};
@@ -17,8 +17,9 @@ use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
 use tokio::sync::RwLock;
-use dashmap::DashMap;
 use tracing::{info, debug, warn};
+// sha2 used by test helpers
+#[cfg(test)]
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
 
@@ -27,43 +28,93 @@ use super::certificates::{StoqNodeCertificate, TrustChainClient};
 /// Network-specific certificate strategy
 #[async_trait]
 pub trait CertificateStrategy: Send + Sync {
-    /// Get certificate for this network (None for Anonymous)
+    /// Get certificate for this network
     async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>>;
 
     /// Validate peer certificate in network context
     async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool>;
 
-    /// Exchange certificates with peer (P2P only)
-    async fn exchange_certificates(&self, _peer_cert: &StoqNodeCertificate) -> Result<Option<StoqNodeCertificate>> {
-        Err(anyhow!("Certificate exchange not supported for this network type"))
-    }
-
     /// Strategy name for debugging
     fn strategy_name(&self) -> &str;
 
-    /// Check if strategy requires certificates
+    /// Check if strategy requires persistent certificates
     fn requires_certificate(&self) -> bool {
         true
     }
 }
 
+// ---------------------------------------------------------------------------
+// Anonymous: ephemeral self-signed certs, no CA, no CT
+// ---------------------------------------------------------------------------
+
 /// Anonymous network certificate strategy
 ///
-/// No persistent identity, no trust validation, ephemeral everything
-pub struct AnonymousCertificateStrategy;
+/// Generates per-connection ephemeral self-signed certificates for QUIC TLS
+/// handshakes. No persistent identity, no CA involvement, no CT logging.
+/// Each call to `get_certificate()` produces a fresh keypair — Tor-like
+/// isolation where no two connections share the same certificate.
+pub struct AnonymousCertificateStrategy {
+    /// Optional tunnel context for tunnel-aware cert generation.
+    tunnel_id: Option<String>,
+    /// Hop number within the tunnel (0 = entry).
+    hop_number: u32,
+}
 
 impl AnonymousCertificateStrategy {
     pub fn new() -> Self {
-        info!("Initializing Anonymous certificate strategy: no certificates, ephemeral sessions");
-        Self
+        info!("Initializing Anonymous certificate strategy: ephemeral per-connection certs, no CA/CT");
+        Self { tunnel_id: None, hop_number: 0 }
+    }
+
+    /// Create a tunnel-aware anonymous strategy. The tunnel ID and hop number
+    /// are embedded in the certificate's common name so tunnel peers can
+    /// correlate hops without any CA involvement.
+    pub fn for_tunnel(tunnel_id: String, hop_number: u32) -> Self {
+        info!(
+            "Initializing Anonymous certificate strategy for tunnel {} hop {}",
+            tunnel_id, hop_number
+        );
+        Self { tunnel_id: Some(tunnel_id), hop_number }
+    }
+
+    /// Generate a fresh ephemeral self-signed certificate.
+    fn generate_ephemeral(&self) -> Result<StoqNodeCertificate> {
+        let cn = match &self.tunnel_id {
+            Some(tid) => format!("ephemeral-{}-hop{}", tid, self.hop_number),
+            None => format!("ephemeral-{}", uuid::Uuid::new_v4()),
+        };
+
+        let cert_key = rcgen::generate_simple_self_signed(vec![cn])?;
+        let cert_der = cert_key.cert.der().clone();
+        let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
+            .map_err(|e| anyhow!("Failed to serialize ephemeral private key: {}", e))?;
+
+        let fingerprint: [u8; 32] = blake3::hash(cert_der.as_ref()).into();
+
+        let now = SystemTime::now();
+        let expires_at = now + Duration::from_secs(86400); // 24 hours
+
+        let metadata = self.tunnel_id.as_ref().map(|tid| {
+            format!("EPHEMERAL:ANONYMOUS:{}:hop{}", tid, self.hop_number).into_bytes()
+        });
+
+        Ok(StoqNodeCertificate {
+            node_id: format!("ephemeral-{}", hex::encode(&fingerprint[..8])),
+            certificate: cert_der,
+            private_key: private_key_der,
+            issued_at: now,
+            expires_at,
+            fingerprint_sha256: fingerprint,
+            metadata,
+        })
     }
 }
 
 #[async_trait]
 impl CertificateStrategy for AnonymousCertificateStrategy {
     async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>> {
-        debug!("Anonymous network: no certificate requested");
-        Ok(None)
+        debug!("Anonymous network: generating fresh ephemeral certificate");
+        Ok(Some(self.generate_ephemeral()?))
     }
 
     async fn validate_certificate(&self, _cert: &StoqNodeCertificate) -> Result<bool> {
@@ -80,213 +131,96 @@ impl CertificateStrategy for AnonymousCertificateStrategy {
     }
 }
 
-/// Peer ID type for P2P networks
-pub type PeerId = String;
+// ---------------------------------------------------------------------------
+// Authenticated: TrustChain-issued certs (Private, Federated, or Public)
+// ---------------------------------------------------------------------------
 
-/// P2P network certificate strategy
+/// Authenticated certificate strategy — single implementation for all
+/// non-anonymous modes (Private/P2P, Federated, Public).
 ///
-/// Direct peer trust exchange without intermediary CA
-pub struct P2PCertificateStrategy {
-    /// Self-signed certificate for peer exchange
-    self_signed_cert: Arc<RwLock<Option<StoqNodeCertificate>>>,
-    /// Trusted peer certificates
-    trusted_peers: Arc<DashMap<PeerId, StoqNodeCertificate>>,
-    /// Node ID for this peer
-    node_id: String,
-    /// Common name for certificates
+/// The mechanism is always the same: request a certificate from a TrustChain
+/// CA instance. The only difference is *which* CA endpoint:
+/// - Private/P2P: local or peer TrustChain
+/// - Federated: federation gateway's TrustChain
+/// - Public: global TrustChain (trust.hypermesh.online)
+///
+/// Configuration, not code, determines the trust boundary.
+pub struct AuthenticatedCertificateStrategy {
+    /// TrustChain CA endpoint to request certificates from
+    trustchain_endpoint: String,
+    /// Cached TrustChain-issued certificate
+    current_cert: Arc<RwLock<Option<StoqNodeCertificate>>>,
+    /// TrustChain client for certificate operations
+    trustchain_client: Arc<TrustChainClient>,
+    /// Human-readable label for logging (e.g. "Private", "Federated", "Public")
+    label: String,
+    /// Common name for certificate requests
     common_name: String,
-    /// IPv6 addresses for this node (stored for future certificate SAN extensions)
-    #[allow(dead_code)]
+    /// IPv6 addresses for certificate SAN extensions
     ipv6_addresses: Vec<Ipv6Addr>,
 }
 
-impl P2PCertificateStrategy {
-    pub fn new(node_id: String, common_name: String, ipv6_addresses: Vec<Ipv6Addr>) -> Result<Self> {
-        info!("Initializing P2P certificate strategy: direct peer exchange");
-
-        Ok(Self {
-            self_signed_cert: Arc::new(RwLock::new(None)),
-            trusted_peers: Arc::new(DashMap::new()),
-            node_id,
-            common_name,
-            ipv6_addresses,
-        })
-    }
-
-    /// Add a trusted peer certificate
-    pub async fn add_trusted_peer(&self, peer_id: PeerId, cert: StoqNodeCertificate) {
-        info!("Adding trusted peer: {} with fingerprint: {}", peer_id, cert.fingerprint());
-        self.trusted_peers.insert(peer_id, cert);
-    }
-
-    /// Remove a trusted peer
-    pub async fn remove_trusted_peer(&self, peer_id: &str) -> Option<StoqNodeCertificate> {
-        self.trusted_peers.remove(peer_id).map(|(_, cert)| cert)
-    }
-
-    /// List all trusted peers
-    pub async fn list_trusted_peers(&self) -> Vec<(PeerId, String)> {
-        self.trusted_peers
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().fingerprint()))
-            .collect()
-    }
-
-    /// Generate self-signed certificate if not already created
-    async fn ensure_self_signed_cert(&self) -> Result<()> {
-        let mut cert_guard = self.self_signed_cert.write().await;
-        if cert_guard.is_none() {
-            debug!("Generating self-signed certificate for P2P");
-
-            let cert_key = rcgen::generate_simple_self_signed(vec![self.common_name.clone()])?;
-            let cert_der = cert_key.cert.der().clone();
-            let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
-                .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
-
-            let fingerprint = {
-                let mut hasher = Sha256::new();
-                hasher.update(cert_der.as_ref());
-                hasher.finalize().into()
-            };
-
-            let now = SystemTime::now();
-            let expires_at = now + Duration::from_secs(365 * 24 * 60 * 60); // 1 year
-
-            let stoq_cert = StoqNodeCertificate {
-                node_id: self.node_id.clone(),
-                certificate: cert_der,
-                private_key: private_key_der,
-                issued_at: now,
-                expires_at,
-                fingerprint_sha256: fingerprint,
-                metadata: Some(b"P2P_SELF_SIGNED".to_vec()),
-            };
-
-            info!("P2P self-signed certificate generated: {}", stoq_cert.fingerprint());
-            *cert_guard = Some(stoq_cert);
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl CertificateStrategy for P2PCertificateStrategy {
-    async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>> {
-        self.ensure_self_signed_cert().await?;
-        Ok(self.self_signed_cert.read().await.clone())
-    }
-
-    async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool> {
-        // Check if peer is in trusted list
-        let is_trusted = self.trusted_peers
-            .iter()
-            .any(|entry| entry.value().fingerprint_sha256 == cert.fingerprint_sha256);
-
-        if is_trusted {
-            debug!("P2P certificate validated: peer is trusted");
-        } else {
-            debug!("P2P certificate not trusted: peer not in trusted list");
-        }
-
-        Ok(is_trusted)
-    }
-
-    async fn exchange_certificates(&self, peer_cert: &StoqNodeCertificate) -> Result<Option<StoqNodeCertificate>> {
-        // Ensure we have our certificate
-        self.ensure_self_signed_cert().await?;
-
-        // Store peer certificate if not already trusted
-        let peer_id = peer_cert.node_id.clone();
-        if !self.trusted_peers.contains_key(&peer_id) {
-            info!("P2P certificate exchange: storing new peer {} certificate", peer_id);
-            self.add_trusted_peer(peer_id, peer_cert.clone()).await;
-        }
-
-        // Return our certificate for the peer
-        Ok(self.self_signed_cert.read().await.clone())
-    }
-
-    fn strategy_name(&self) -> &str {
-        "P2P"
-    }
-}
-
-/// Federated network certificate strategy
-///
-/// Federation gateway acts as trust anchor for that specific federation
-pub struct FederatedCertificateStrategy {
-    /// Federation gateway endpoint (e.g., "gateway.bank.internal")
-    federation_gateway: String,
-    /// Federation-issued certificate
-    federation_cert: Arc<RwLock<Option<StoqNodeCertificate>>>,
-    /// Federation members trust list
-    federation_members: Arc<DashMap<String, StoqNodeCertificate>>,
-    /// Node ID for this node
-    node_id: String,
-    /// Common name for certificates
-    common_name: String,
-    /// IPv6 addresses for this node
-    ipv6_addresses: Vec<Ipv6Addr>,
-}
-
-impl FederatedCertificateStrategy {
+impl AuthenticatedCertificateStrategy {
+    /// Create an authenticated strategy pointed at a specific TrustChain CA.
+    ///
+    /// * `trustchain_endpoint` — QUIC endpoint of the CA (local, gateway, or public)
+    /// * `label` — human label for logging ("Private", "Federated", "Public")
     pub fn new(
-        federation_gateway: String,
+        trustchain_endpoint: String,
         node_id: String,
         common_name: String,
         ipv6_addresses: Vec<Ipv6Addr>,
+        label: String,
     ) -> Self {
-        info!("Initializing Federated certificate strategy with gateway: {}", federation_gateway);
+        info!(
+            "Initializing {} certificate strategy: CA endpoint {}",
+            label, trustchain_endpoint
+        );
+
+        let trustchain_client = Arc::new(TrustChainClient::new(
+            trustchain_endpoint.clone(),
+            node_id,
+        ));
 
         Self {
-            federation_gateway,
-            federation_cert: Arc::new(RwLock::new(None)),
-            federation_members: Arc::new(DashMap::new()),
-            node_id,
+            trustchain_endpoint,
+            current_cert: Arc::new(RwLock::new(None)),
+            trustchain_client,
+            label,
             common_name,
             ipv6_addresses,
         }
     }
 
-    /// Request certificate from federation gateway
-    async fn request_federation_certificate(&self) -> Result<StoqNodeCertificate> {
-        info!("Requesting certificate from federation gateway: {}", self.federation_gateway);
-
-        // Create client for federation gateway (NOT trust.hypermesh.online)
-        let client = TrustChainClient::new(
-            format!("quic://{}", self.federation_gateway),
-            self.node_id.clone(),
+    /// Request a certificate from the configured TrustChain CA.
+    async fn request_certificate(&self) -> Result<StoqNodeCertificate> {
+        info!(
+            "Requesting {} certificate from TrustChain CA: {}",
+            self.label, self.trustchain_endpoint
         );
 
-        // Include federation membership proof in metadata
-        let metadata = format!("FEDERATION:{}", self.federation_gateway).into_bytes();
+        let metadata = format!("TRUSTCHAIN:{}:{}", self.label.to_uppercase(), self.trustchain_endpoint)
+            .into_bytes();
 
-        let cert = client.request_certificate(
+        let cert = self.trustchain_client.request_certificate(
             &self.common_name,
             &self.ipv6_addresses,
             Some(&metadata),
         ).await?;
 
-        info!("Federation certificate obtained: {}", cert.fingerprint());
+        info!("{} certificate obtained: {}", self.label, cert.fingerprint());
         Ok(cert)
-    }
-
-    /// Add federation member certificate
-    pub async fn add_federation_member(&self, member_id: String, cert: StoqNodeCertificate) {
-        info!("Adding federation member: {} with fingerprint: {}", member_id, cert.fingerprint());
-        self.federation_members.insert(member_id, cert);
     }
 }
 
 #[async_trait]
-impl CertificateStrategy for FederatedCertificateStrategy {
+impl CertificateStrategy for AuthenticatedCertificateStrategy {
     async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>> {
-        let mut cert_guard = self.federation_cert.write().await;
+        let mut cert_guard = self.current_cert.write().await;
 
-        // Check if we need to request a new certificate
         if cert_guard.is_none() || cert_guard.as_ref().map_or(true, |c| c.needs_renewal()) {
-            debug!("Requesting new federation certificate");
-            let cert = self.request_federation_certificate().await?;
+            debug!("Requesting new {} certificate", self.label);
+            let cert = self.request_certificate().await?;
             *cert_guard = Some(cert.clone());
             Ok(Some(cert))
         } else {
@@ -295,150 +229,65 @@ impl CertificateStrategy for FederatedCertificateStrategy {
     }
 
     async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool> {
-        // Check if certificate has federation metadata
-        if let Some(metadata) = &cert.metadata {
-            let metadata_str = String::from_utf8_lossy(metadata);
-            let expected_prefix = format!("FEDERATION:{}", self.federation_gateway);
-
-            if metadata_str.starts_with(&expected_prefix) {
-                debug!("Federation certificate validated: same federation");
-                return Ok(true);
-            }
-        }
-
-        // Check if peer is in federation members list
-        let is_member = self.federation_members
-            .iter()
-            .any(|entry| entry.value().fingerprint_sha256 == cert.fingerprint_sha256);
-
-        if is_member {
-            debug!("Federation certificate validated: known member");
-        } else {
-            debug!("Federation certificate not validated: not a member");
-        }
-
-        Ok(is_member)
-    }
-
-    fn strategy_name(&self) -> &str {
-        "Federated"
-    }
-}
-
-/// Public network certificate strategy
-///
-/// LOCAL BlockMatrix blockchain for certificate registration (NOT external trust.hypermesh.online)
-pub struct PublicCertificateStrategy {
-    /// LOCAL blockchain endpoint (BlockMatrix's own blockchain)
-    local_blockchain_endpoint: String,
-    /// Blockchain-registered certificate
-    blockchain_cert: Arc<RwLock<Option<StoqNodeCertificate>>>,
-    /// TrustChain client for LOCAL blockchain operations
-    trustchain_client: Arc<TrustChainClient>,
-    /// Node ID for this node (stored for blockchain certificate registration metadata)
-    #[allow(dead_code)]
-    node_id: String,
-    /// Common name for certificates
-    common_name: String,
-    /// IPv6 addresses for this node
-    ipv6_addresses: Vec<Ipv6Addr>,
-}
-
-impl PublicCertificateStrategy {
-    pub fn new(
-        node_id: String,
-        common_name: String,
-        ipv6_addresses: Vec<Ipv6Addr>,
-    ) -> Self {
-        let local_blockchain_endpoint = "local://blockmatrix-blockchain".to_string();
-        info!("Initializing Public certificate strategy with LOCAL BlockMatrix blockchain: {}", local_blockchain_endpoint);
-
-        let trustchain_client = Arc::new(TrustChainClient::new(
-            local_blockchain_endpoint.clone(),
-            node_id.clone(),
-        ));
-
-        Self {
-            local_blockchain_endpoint,
-            blockchain_cert: Arc::new(RwLock::new(None)),
-            trustchain_client,
-            node_id,
-            common_name,
-            ipv6_addresses,
-        }
-    }
-
-    /// Request blockchain-registered certificate from LOCAL BlockMatrix blockchain
-    async fn request_blockchain_certificate(&self) -> Result<StoqNodeCertificate> {
-        info!("Registering certificate on LOCAL BlockMatrix blockchain: {}", self.local_blockchain_endpoint);
-
-        // Include Proof of State in metadata (would be validated by BlockMatrix)
-        let metadata = b"BLOCKCHAIN:LOCAL:POS_VALIDATED:BLOCKMATRIX";
-
-        let cert = self.trustchain_client.request_certificate(
-            &self.common_name,
-            &self.ipv6_addresses,
-            Some(metadata),
-        ).await?;
-
-        info!("Certificate registered on LOCAL blockchain: {}", cert.fingerprint());
-        Ok(cert)
-    }
-}
-
-#[async_trait]
-impl CertificateStrategy for PublicCertificateStrategy {
-    async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>> {
-        let mut cert_guard = self.blockchain_cert.write().await;
-
-        // Check if we need to request a new certificate
-        if cert_guard.is_none() || cert_guard.as_ref().map_or(true, |c| c.needs_renewal()) {
-            debug!("Requesting new blockchain certificate");
-            let cert = self.request_blockchain_certificate().await?;
-            *cert_guard = Some(cert.clone());
-            Ok(Some(cert))
-        } else {
-            Ok(cert_guard.clone())
-        }
-    }
-
-    async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool> {
-        // Validate with LOCAL BlockMatrix blockchain
-        debug!("Validating certificate with LOCAL BlockMatrix blockchain");
+        debug!("Validating certificate via {} TrustChain CA", self.label);
 
         let is_valid = self.trustchain_client
             .validate_certificate(cert.certificate.as_ref())
             .await?;
 
         if is_valid {
-            debug!("Public certificate validated via LOCAL blockchain");
+            debug!("{} certificate validated", self.label);
         } else {
-            warn!("Public certificate validation failed on LOCAL blockchain");
+            warn!("{} certificate validation failed", self.label);
         }
 
         Ok(is_valid)
     }
 
     fn strategy_name(&self) -> &str {
-        "Public"
+        &self.label
     }
 }
 
-/// Network type for certificate strategy selection
+// ---------------------------------------------------------------------------
+// Backward-compatible type aliases for code that references the old names
+// ---------------------------------------------------------------------------
+
+/// Backward-compatible alias — P2P uses `AuthenticatedCertificateStrategy`
+/// pointed at the local/peer TrustChain.
+pub type P2PCertificateStrategy = AuthenticatedCertificateStrategy;
+
+/// Backward-compatible alias — Federated uses `AuthenticatedCertificateStrategy`
+/// pointed at a federation gateway's TrustChain.
+pub type FederatedCertificateStrategy = AuthenticatedCertificateStrategy;
+
+/// Backward-compatible alias — Public uses `AuthenticatedCertificateStrategy`
+/// pointed at the global TrustChain.
+pub type PublicCertificateStrategy = AuthenticatedCertificateStrategy;
+
+// ---------------------------------------------------------------------------
+// NetworkType — kept for PrivacyMode mapping in PoS integration
+// ---------------------------------------------------------------------------
+
+/// Network type for certificate strategy selection and PrivacyMode mapping.
+///
+/// The variants map 1:1 to PrivacyMode (see `pos_integration.rs`).
+/// All non-Anonymous variants create the same `AuthenticatedCertificateStrategy`
+/// pointed at different TrustChain CA endpoints.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum NetworkType {
-    /// Anonymous network - no certificates
+    /// Anonymous network — ephemeral certs, no CA/CT
     Anonymous,
-    /// P2P network - direct peer exchange
+    /// Private/P2P network — local TrustChain CA
     P2P,
-    /// Federated network - federation gateway managed
+    /// Federated network — gateway TrustChain CA
     Federated { gateway_url: String },
-    /// Public network - LOCAL BlockMatrix blockchain (NOT trust.hypermesh.online)
+    /// Public network — global TrustChain CA
     Public,
 }
 
 impl NetworkType {
-    /// Create appropriate certificate strategy for network type
+    /// Create appropriate certificate strategy for this network type.
     pub fn create_strategy(
         &self,
         node_id: String,
@@ -450,25 +299,30 @@ impl NetworkType {
                 Ok(Arc::new(AnonymousCertificateStrategy::new()))
             }
             NetworkType::P2P => {
-                Ok(Arc::new(P2PCertificateStrategy::new(
+                Ok(Arc::new(AuthenticatedCertificateStrategy::new(
+                    "local://trustchain".to_string(),
                     node_id,
                     common_name,
                     ipv6_addresses,
-                )?))
+                    "Private".to_string(),
+                )))
             }
             NetworkType::Federated { gateway_url } => {
-                Ok(Arc::new(FederatedCertificateStrategy::new(
-                    gateway_url.clone(),
+                Ok(Arc::new(AuthenticatedCertificateStrategy::new(
+                    format!("quic://{}", gateway_url),
                     node_id,
                     common_name,
                     ipv6_addresses,
+                    "Federated".to_string(),
                 )))
             }
             NetworkType::Public => {
-                Ok(Arc::new(PublicCertificateStrategy::new(
+                Ok(Arc::new(AuthenticatedCertificateStrategy::new(
+                    "quic://trust.hypermesh.online".to_string(),
                     node_id,
                     common_name,
                     ipv6_addresses,
+                    "Public".to_string(),
                 )))
             }
         }
@@ -483,14 +337,21 @@ mod tests {
     async fn test_anonymous_strategy() -> Result<()> {
         let strategy = AnonymousCertificateStrategy::new();
 
-        // Anonymous should return no certificate
-        assert!(strategy.get_certificate().await?.is_none());
+        // Anonymous generates ephemeral certs for QUIC TLS
+        let cert = strategy.get_certificate().await?;
+        assert!(cert.is_some(), "anonymous should generate ephemeral cert");
+        let cert = cert.expect("test: anonymous should produce cert");
+        assert!(cert.node_id.starts_with("ephemeral-"));
+
+        // Each call produces a unique cert
+        let cert2 = strategy.get_certificate().await?.expect("test: second cert");
+        assert_ne!(cert.fingerprint_sha256, cert2.fingerprint_sha256);
 
         // Anonymous should accept all certificates
         let dummy_cert = create_dummy_cert();
         assert!(strategy.validate_certificate(&dummy_cert).await?);
 
-        // Anonymous doesn't require certificates
+        // Anonymous doesn't require persistent certificates
         assert!(!strategy.requires_certificate());
 
         assert_eq!(strategy.strategy_name(), "Anonymous");
@@ -498,78 +359,63 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_p2p_strategy() -> Result<()> {
-        let strategy = P2PCertificateStrategy::new(
-            "test-node".to_string(),
-            "localhost".to_string(),
-            vec![Ipv6Addr::LOCALHOST],
-        )?;
+    async fn test_anonymous_tunnel_strategy() -> Result<()> {
+        let strategy = AnonymousCertificateStrategy::for_tunnel("tun-abc".to_string(), 2);
 
-        // P2P should generate self-signed certificate
         let cert = strategy.get_certificate().await?;
         assert!(cert.is_some());
+        let cert = cert.expect("test: tunnel cert should exist");
 
-        // P2P should validate trusted peers
-        let peer_cert = create_dummy_cert();
-        strategy.add_trusted_peer("peer1".to_string(), peer_cert.clone()).await;
-        assert!(strategy.validate_certificate(&peer_cert).await?);
+        // Tunnel metadata should be embedded
+        assert!(cert.node_id.starts_with("ephemeral-"));
+        let meta = cert.metadata.as_ref().expect("tunnel cert should have metadata");
+        let meta_str = String::from_utf8_lossy(meta);
+        assert!(meta_str.contains("tun-abc"));
+        assert!(meta_str.contains("hop2"));
 
-        // P2P should reject untrusted peers
-        let untrusted_cert = create_different_dummy_cert();
-        assert!(!strategy.validate_certificate(&untrusted_cert).await?);
-
-        assert_eq!(strategy.strategy_name(), "P2P");
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_network_type_strategy_creation() -> Result<()> {
+    async fn test_authenticated_strategy_labels() -> Result<()> {
         let node_id = "test-node".to_string();
-        let common_name = "localhost".to_string();
-        let ipv6_addresses = vec![Ipv6Addr::LOCALHOST];
+        let cn = "localhost".to_string();
+        let addrs = vec![Ipv6Addr::LOCALHOST];
 
-        // Test Anonymous
-        let anon_strategy = NetworkType::Anonymous.create_strategy(
-            node_id.clone(),
-            common_name.clone(),
-            ipv6_addresses.clone(),
+        // All three non-anonymous types create AuthenticatedCertificateStrategy
+        let private = NetworkType::P2P.create_strategy(
+            node_id.clone(), cn.clone(), addrs.clone(),
         )?;
-        assert_eq!(anon_strategy.strategy_name(), "Anonymous");
+        assert_eq!(private.strategy_name(), "Private");
 
-        // Test P2P
-        let p2p_strategy = NetworkType::P2P.create_strategy(
-            node_id.clone(),
-            common_name.clone(),
-            ipv6_addresses.clone(),
-        )?;
-        assert_eq!(p2p_strategy.strategy_name(), "P2P");
-
-        // Test Federated
-        let fed_strategy = NetworkType::Federated {
-            gateway_url: "gateway.test.internal".to_string(),
+        let federated = NetworkType::Federated {
+            gateway_url: "gw.test.internal".to_string(),
         }.create_strategy(
-            node_id.clone(),
-            common_name.clone(),
-            ipv6_addresses.clone(),
+            node_id.clone(), cn.clone(), addrs.clone(),
         )?;
-        assert_eq!(fed_strategy.strategy_name(), "Federated");
+        assert_eq!(federated.strategy_name(), "Federated");
 
-        // Test Public
-        let pub_strategy = NetworkType::Public.create_strategy(
-            node_id.clone(),
-            common_name.clone(),
-            ipv6_addresses.clone(),
+        let public = NetworkType::Public.create_strategy(
+            node_id.clone(), cn.clone(), addrs.clone(),
         )?;
-        assert_eq!(pub_strategy.strategy_name(), "Public");
+        assert_eq!(public.strategy_name(), "Public");
+
+        // Anonymous is distinct
+        let anon = NetworkType::Anonymous.create_strategy(
+            node_id, cn, addrs,
+        )?;
+        assert_eq!(anon.strategy_name(), "Anonymous");
 
         Ok(())
     }
 
     // Helper functions for tests
     fn create_dummy_cert() -> StoqNodeCertificate {
-        let cert_key = rcgen::generate_simple_self_signed(vec!["test".to_string()]).unwrap();
+        let cert_key = rcgen::generate_simple_self_signed(vec!["test".to_string()])
+            .expect("test: generate self-signed cert");
         let cert_der = cert_key.cert.der().clone();
-        let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der()).unwrap();
+        let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
+            .expect("test: serialize private key");
 
         let fingerprint = {
             let mut hasher = Sha256::new();
@@ -579,28 +425,6 @@ mod tests {
 
         StoqNodeCertificate {
             node_id: "test-node".to_string(),
-            certificate: cert_der,
-            private_key: private_key_der,
-            issued_at: SystemTime::now(),
-            expires_at: SystemTime::now() + Duration::from_secs(3600),
-            fingerprint_sha256: fingerprint,
-            metadata: None,
-        }
-    }
-
-    fn create_different_dummy_cert() -> StoqNodeCertificate {
-        let cert_key = rcgen::generate_simple_self_signed(vec!["different".to_string()]).unwrap();
-        let cert_der = cert_key.cert.der().clone();
-        let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der()).unwrap();
-
-        let fingerprint = {
-            let mut hasher = Sha256::new();
-            hasher.update(cert_der.as_ref());
-            hasher.finalize().into()
-        };
-
-        StoqNodeCertificate {
-            node_id: "different-node".to_string(),
             certificate: cert_der,
             private_key: private_key_der,
             issued_at: SystemTime::now(),

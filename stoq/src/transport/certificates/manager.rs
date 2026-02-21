@@ -119,21 +119,25 @@ impl CertificateManager {
         if self.config.mode == CertificateMode::NetworkStrategy {
             if let Some(ref strategy) = self.certificate_strategy {
                 if !strategy.requires_certificate() {
-                    let cert_key = generate_simple_self_signed(vec!["anonymous.local".to_string()])?;
-                    let cert_der = cert_key.cert.der().clone();
-                    let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
-                        .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
+                    // Use the strategy's ephemeral cert (tunnel-aware for Anonymous).
+                    let ephemeral = strategy.get_certificate().await?
+                        .ok_or_else(|| anyhow!("Anonymous strategy failed to generate ephemeral cert"))?;
+
+                    let fp = ephemeral.fingerprint();
 
                     let mut server_config = rustls::ServerConfig::builder()
                         .with_no_client_auth()
-                        .with_single_cert(vec![cert_der], private_key_der)?;
+                        .with_single_cert(
+                            vec![ephemeral.certificate],
+                            ephemeral.private_key.clone_key(),
+                        )?;
 
                     server_config.alpn_protocols = vec![
                         STOQ_ALPN.to_vec(),
                         b"h3".to_vec(),
                     ];
 
-                    debug!("Server crypto config created for anonymous network");
+                    debug!("Server crypto config created with ephemeral cert: {}", fp);
                     return Ok(server_config);
                 }
             }
