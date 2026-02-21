@@ -259,6 +259,9 @@ pub use privacy::{
     ValidationRequirements, PrivacyPresets,
 };
 
+// CLI module - matrix topology queries, node management, asset operations
+pub mod cli;
+
 // Module stubs - some enabled for Gate 2
 pub mod transport;
 pub mod catalog;
