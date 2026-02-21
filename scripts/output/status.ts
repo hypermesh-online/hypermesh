@@ -144,14 +144,11 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [],
       "planned": [
-        "Caesar Governor integration (feature-gated throttle signal consumption)",
-        "Caesar fee distribution with capacity weights",
-        "Caesar routing with capacity-based next-hop selection",
         "Real-time metrics streaming via STOQ transport",
         "Multi-epoch capacity aggregation and trending"
       ]
     },
-    "completion": 55
+    "completion": 75
   },
   {
     "id": "gateway",
