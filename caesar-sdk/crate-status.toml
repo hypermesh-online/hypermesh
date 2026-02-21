@@ -1,0 +1,22 @@
+[crate]
+name = "Caesar SDK"
+id = "caesar-sdk"
+description = "Universal Payment Interface SDK — adapter traits for external payment rail integration"
+phase = "alpha"
+
+[features.working]
+items = [
+    "IngressAdapter trait (7 methods: adapter_id, supported_denominations, lock_external_value, verify_lock, release_lock, liquidity_pressure, to_gold_grams)",
+    "EgressAdapter trait (5 methods: adapter_id, supported_denominations, available_capacity, settle, capacity_ratio)",
+    "UPI shared types (IngressLockProof, SettlementReceipt, SettlementFinality, LiquidityPressure, UpiError)",
+    "MeshCreditAdapter reference implementation (internal BlockMatrix ledger, 1:1 CAES denomination)",
+    "MockIngressAdapter + MockEgressAdapter (public test utilities for adapter developers)",
+]
+
+[features.in_development]
+items = []
+
+[features.planned]
+items = [
+    "Adapter development guide and examples",
+]

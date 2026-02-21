@@ -4,10 +4,12 @@ members = [
     "stoq",
     "trustchain",
     "caesar",
+    "caesar-sdk",
     "catalog",
     "blockmatrix",
     "hypermesh-ebpf",
     "gateway",
+    "engauge",
 ]
 resolver = "2"
 

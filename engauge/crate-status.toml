@@ -1,0 +1,33 @@
+[crate]
+name = "engauge"
+id = "engauge"
+description = "Work tracking, content receipts, capacity metrics, and network analytics for HyperMesh"
+phase = "alpha"
+
+[features.working]
+items = [
+    "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
+    "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
+    "KYC compliance checker (self-sovereign attestation on Device chain, tier-based levels)",
+    "Organic vs speculative traffic detection (pattern-based aggregate flow analysis, whitepaper §16.5)",
+    "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio feedback)",
+    "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)",
+    "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend, AggregatedCapacity)",
+    "Metrics streaming protocol (MetricsFrame, 4 payload types, encode/decode, privacy-mode-aware)",
+    "Differential privacy filter (Laplace noise injection, epsilon-calibrated, Anonymous/Private/Public)",
+    "Metrics publisher and subscriber (push model, per-source rolling window, sequence tracking)",
+    "Regional aggregator (multi-node metrics aggregation for routing decisions)",
+    "Routing intelligence (TensorWeightModifier, PathPolicyRecommendation, RoutingAdvisor + PathAdvisor traits)",
+    "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases, BlockMatrix asset integration)",
+    "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
+    "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
+    "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
+]
+
+[features.in_development]
+items = []
+
+[features.planned]
+items = [
+    "STOQ METRICS frame type integration (blocked by: STOQ custom frame type registry)",
+]

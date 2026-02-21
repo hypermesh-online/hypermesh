@@ -71,15 +71,15 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "ui",
-    "files": 179,
-    "linesOfCode": 40356,
+    "files": 181,
+    "linesOfCode": 40522,
     "testCount": 5
   }
 ];
 
 export const totalStats = {
-  "totalFiles": 858,
-  "totalLines": 297633,
+  "totalFiles": 860,
+  "totalLines": 297799,
   "totalTests": 1804,
   "crateCount": 11
 };

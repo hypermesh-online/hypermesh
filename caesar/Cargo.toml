@@ -68,10 +68,10 @@ stoq = { path = "../stoq" }
 hypermesh-lib = { workspace = true }
 
 # Caesar SDK (UPI adapter traits)
-caesar-sdk = { path = "../../caesar-sdk" }
+caesar-sdk = { path = "../caesar-sdk" }
 
 # Engauge integration (optional)
-engauge = { path = "../../engauge", optional = true }
+engauge = { path = "../engauge", optional = true }
 
 # Performance monitoring
 

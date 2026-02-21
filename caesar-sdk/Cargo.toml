@@ -1,0 +1,20 @@
+[package]
+name = "caesar-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hypermesh Foundation"]
+description = "Caesar Universal Payment Interface SDK — adapter traits for external payment rail integration"
+license = "BSL-1.1"
+
+[dependencies]
+hypermesh-lib = { path = "../lib" }
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.35", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "1.0"
+tokio = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+rust_decimal_macros = "1.35"
