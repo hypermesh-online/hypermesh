@@ -283,21 +283,23 @@ export const crateStatuses: CrateStatus[] = [
         "PipelineStage enum",
         "CryptoAlgorithm enum (Falcon/Kyber/AES)",
         "HypermeshError unified error type",
-        "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)"
+        "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
+        "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
+        "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
+        "KeyPairId and AssetMetadata structs"
       ],
       "inDevelopment": [
-        "Cross-crate validation helpers",
         "BlockMatrix/TrustChain migration to canonical asset types"
       ],
       "planned": [
+        "Cross-crate validation helpers",
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
-        "Canonical consensus proof types",
-        "Shared serialization formats",
+        "Shared serialization formats (canonical binary encoding via postcard/bincode)",
         "Common test utilities",
         "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 56
+    "completion": 67
   },
   {
     "id": "stoq",
