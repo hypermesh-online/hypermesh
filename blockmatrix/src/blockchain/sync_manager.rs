@@ -21,6 +21,27 @@ use crate::blockchain::propagation::PropagationStrategy;
 use crate::bootstrap::PrivacyMode;
 use hypermesh_lib::BlockchainScope;
 
+/// Provides block data to the SyncManager for responding to sync requests.
+///
+/// Implementations query the local blockchain (e.g. `NodeBlockchain`) and
+/// return block hashes for the requested height range.  The trait is
+/// intentionally synchronous -- callers are expected to pre-load data or
+/// use interior async (e.g. `block_on`) when bridging from async contexts.
+pub trait BlockProvider {
+    /// Return up to `max_blocks` block hashes starting at `from_height`.
+    ///
+    /// The second element of the tuple is the provider's current chain height.
+    fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64);
+}
+
+/// Receives notifications when the SyncManager transitions a network to
+/// `Synchronized` state.  This enables downstream components (e.g. the
+/// `BlockPropagator`) to act on newly-synced blocks.
+pub trait SyncObserver: Send {
+    /// Called when `network_id` reaches `Synchronized` state at `block_height`.
+    fn on_sync_complete(&self, network_id: &str, block_height: u64);
+}
+
 /// Manages blockchain synchronization between Device and Network scopes.
 ///
 /// Each node has exactly one Device chain (always present, created at boot).
@@ -35,6 +56,8 @@ pub struct SyncManager {
     sync_states: HashMap<String, SyncState>,
     /// Configuration
     config: SyncConfig,
+    /// Optional observer notified on sync completion (Gap 4)
+    observer: Option<Box<dyn SyncObserver>>,
 }
 
 /// Represents membership in a Network scope chain
@@ -167,7 +190,13 @@ impl SyncManager {
             network_memberships: HashMap::new(),
             sync_states: HashMap::new(),
             config,
+            observer: None,
         }
+    }
+
+    /// Register an observer that will be notified on sync completion.
+    pub fn set_observer(&mut self, observer: Box<dyn SyncObserver>) {
+        self.observer = Some(observer);
     }
 
     /// Get the device chain identifier
@@ -286,10 +315,23 @@ impl SyncManager {
         }
     }
 
-    /// Process an incoming sync message and return an optional response
+    /// Process an incoming sync message and return an optional response.
+    ///
+    /// When a `BlockProvider` is supplied, `SyncRequest` responses are
+    /// populated with real block hashes from the local chain.  Without a
+    /// provider the response contains an empty hash list (legacy behaviour).
     pub fn process_sync_message(
         &mut self,
         msg: SyncMessage,
+    ) -> Option<SyncMessage> {
+        self.process_sync_message_with_provider(msg, None)
+    }
+
+    /// Process a sync message using the given block provider for data lookup.
+    pub fn process_sync_message_with_provider(
+        &mut self,
+        msg: SyncMessage,
+        provider: Option<&dyn BlockProvider>,
     ) -> Option<SyncMessage> {
         match msg {
             SyncMessage::Request {
@@ -297,28 +339,7 @@ impl SyncManager {
                 from_height,
                 max_blocks,
             } => {
-                if !self.is_member(&network_id) {
-                    warn!(
-                        network = %network_id,
-                        "Received sync request for unknown network"
-                    );
-                    return None;
-                }
-
-                debug!(
-                    network = %network_id,
-                    from = from_height,
-                    max = max_blocks,
-                    "Processing sync request"
-                );
-
-                // Return an empty response -- actual block retrieval is
-                // handled by the caller using the blockchain storage layer
-                Some(SyncMessage::Response {
-                    network_id,
-                    block_hashes: Vec::new(),
-                    peer_height: from_height,
-                })
+                self.handle_sync_request(&network_id, from_height, max_blocks, provider)
             }
 
             SyncMessage::Announce {
@@ -326,34 +347,7 @@ impl SyncManager {
                 block_height,
                 block_hash,
             } => {
-                if !self.is_member(&network_id) {
-                    return None;
-                }
-
-                debug!(
-                    network = %network_id,
-                    height = block_height,
-                    hash = %block_hash,
-                    "Received block announcement"
-                );
-
-                // Check if we need to sync (are we lagging?)
-                if let Some(SyncState::Synchronized { last_block_height }) =
-                    self.sync_states.get(&network_id)
-                {
-                    if block_height > last_block_height + self.config.max_block_lag
-                    {
-                        self.sync_states.insert(
-                            network_id.clone(),
-                            SyncState::Syncing {
-                                progress: 0.0,
-                                peer_count: 1,
-                            },
-                        );
-                    }
-                }
-
-                None
+                self.handle_sync_announce(&network_id, block_height, &block_hash)
             }
 
             SyncMessage::Response {
@@ -361,29 +355,116 @@ impl SyncManager {
                 block_hashes,
                 peer_height,
             } => {
-                if !self.is_member(&network_id) {
-                    return None;
-                }
-
-                debug!(
-                    network = %network_id,
-                    blocks = block_hashes.len(),
-                    peer_height = peer_height,
-                    "Received sync response"
-                );
-
-                // If we received blocks, update sync progress
-                if block_hashes.is_empty() {
-                    self.sync_states.insert(
-                        network_id,
-                        SyncState::Synchronized {
-                            last_block_height: peer_height,
-                        },
-                    );
-                }
-
-                None
+                self.handle_sync_response(&network_id, block_hashes, peer_height)
             }
+        }
+    }
+
+    /// Handle a SyncRequest: return block hashes from the provider or empty.
+    fn handle_sync_request(
+        &self,
+        network_id: &str,
+        from_height: u64,
+        max_blocks: u32,
+        provider: Option<&dyn BlockProvider>,
+    ) -> Option<SyncMessage> {
+        if !self.is_member(network_id) {
+            warn!(
+                network = %network_id,
+                "Received sync request for unknown network"
+            );
+            return None;
+        }
+
+        debug!(
+            network = %network_id,
+            from = from_height,
+            max = max_blocks,
+            "Processing sync request"
+        );
+
+        let (block_hashes, peer_height) = match provider {
+            Some(bp) => bp.get_block_hashes(from_height, max_blocks),
+            None => (Vec::new(), from_height),
+        };
+
+        Some(SyncMessage::Response {
+            network_id: network_id.to_string(),
+            block_hashes,
+            peer_height,
+        })
+    }
+
+    /// Handle a SyncAnnounce: trigger resync if we are too far behind.
+    fn handle_sync_announce(
+        &mut self,
+        network_id: &str,
+        block_height: u64,
+        block_hash: &str,
+    ) -> Option<SyncMessage> {
+        if !self.is_member(network_id) {
+            return None;
+        }
+
+        debug!(
+            network = %network_id,
+            height = block_height,
+            hash = %block_hash,
+            "Received block announcement"
+        );
+
+        if let Some(SyncState::Synchronized { last_block_height }) =
+            self.sync_states.get(network_id)
+        {
+            if block_height > last_block_height + self.config.max_block_lag {
+                self.sync_states.insert(
+                    network_id.to_string(),
+                    SyncState::Syncing {
+                        progress: 0.0,
+                        peer_count: 1,
+                    },
+                );
+            }
+        }
+
+        None
+    }
+
+    /// Handle a SyncResponse: update sync progress and notify observer.
+    fn handle_sync_response(
+        &mut self,
+        network_id: &str,
+        block_hashes: Vec<String>,
+        peer_height: u64,
+    ) -> Option<SyncMessage> {
+        if !self.is_member(network_id) {
+            return None;
+        }
+
+        debug!(
+            network = %network_id,
+            blocks = block_hashes.len(),
+            peer_height = peer_height,
+            "Received sync response"
+        );
+
+        if block_hashes.is_empty() {
+            self.sync_states.insert(
+                network_id.to_string(),
+                SyncState::Synchronized {
+                    last_block_height: peer_height,
+                },
+            );
+            self.notify_sync_complete(network_id, peer_height);
+        }
+
+        None
+    }
+
+    /// Notify the registered observer (if any) of a sync completion.
+    fn notify_sync_complete(&self, network_id: &str, block_height: u64) {
+        if let Some(ref obs) = self.observer {
+            obs.on_sync_complete(network_id, block_height);
         }
     }
 

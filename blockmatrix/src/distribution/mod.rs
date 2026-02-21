@@ -56,6 +56,7 @@ pub mod pos_validator;
 pub mod matrix_optimizer;
 pub mod audit_trail;
 pub mod redistribution;
+pub mod rebalancing;
 
 // Re-exports
 pub use pos_validator::{

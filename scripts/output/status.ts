@@ -38,15 +38,15 @@ export const crateStatuses: CrateStatus[] = [
         "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)"
       ],
       "inDevelopment": [
-        "Network scope sync + reflector pooling — Device↔Network chain synchronization (foundation built)"
+        "Network scope sync + reflector pooling — Device↔Network chain synchronization (wired: SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
+        "Gateway architecture for cross-scope asset transfers and scope bridging (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
+        "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)"
       ],
       "planned": [
-        "Gateway architecture for cross-scope asset transfers and scope bridging",
         "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
         "Cross-scope proxy routing — NAT-like asset access across blockchain scope boundaries",
         "Container runtime with isolation",
         "Multi-node production deployment",
-        "Dynamic shard rebalancing",
         "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
         "CLI for matrix topology queries, node management, and asset operations"
       ]
@@ -193,25 +193,28 @@ export const crateStatuses: CrateStatus[] = [
         "PrivacyMode struct (2-axis: AccessScope + tracked)",
         "BlockchainScope enum (Device | Network)",
         "ProofType enum (PoSpace/PoStake/PoWork/PoTime)",
-        "MatrixPosition coordinate type",
+        "MatrixPosition coordinate type with distance_to and ORIGIN",
         "PipelineStage enum",
         "CryptoAlgorithm enum (Falcon/Kyber/AES)",
         "HypermeshError unified error type",
-        "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)"
+        "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
+        "Canonical Proof of State types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState)",
+        "Cross-crate validation helpers (NodeId/AssetId/ContentHash/MatrixPosition)",
+        "sanitize_identifier utility function",
+        "Validatable trait and ProofValidationResult",
+        "WorkCategory enum (Compute/Network/Storage/Cryptographic/Validation)"
       ],
       "inDevelopment": [
-        "Cross-crate validation helpers",
         "BlockMatrix/TrustChain migration to canonical asset types"
       ],
       "planned": [
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
-        "Canonical consensus proof types",
         "Shared serialization formats",
         "Common test utilities",
         "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 56
+    "completion": 74
   },
   {
     "id": "stoq",
@@ -257,22 +260,22 @@ export const crateStatuses: CrateStatus[] = [
         "DNS-over-QUIC resolver with STOQ transport, caching, TTL management, DNSSEC option",
         "STOQ-based API server with request/response types for certificate and DNS operations",
         "Deployment quality gates — 6 validators (security theater, consensus, HSM removal, mock response, production readiness, DNS)",
-        "CLI tools (trustchain_bootstrap, trustchain_ca, stoq-server, http3-server, validate-deployment)"
+        "CLI tools (trustchain_bootstrap, trustchain_ca, stoq-server, http3-server, validate-deployment)",
+        "Certificate Transparency — RFC 6962 compliant Merkle tree (MTH, inclusion proofs, consistency proofs), SCTs, SignedTreeHead",
+        "Production certificate hardening — SecurityIntegratedCA with mandatory consensus, FALCON-1024 validation, real metrics",
+        "Trust scoring / reputation system — weighted violations, time decay (24h half-life), TrustLevel classification, audit trail"
       ],
       "inDevelopment": [
-        "Certificate Transparency — basic Merkle logs and SCTs working, RFC 6962 compliance incomplete",
-        "Production certificate hardening — SecurityIntegratedCA wrapper with mandatory consensus and post-quantum validation",
         "HTTP/3 server integration — quinn/h3 infrastructure and router present, endpoint handlers incomplete"
       ],
       "planned": [
         "Cross-network CA federation — inter-node CT log sync and multi-CA trust",
         "Threshold cryptography — Shamir's Secret Sharing for distributed CA signing authority",
         "Automated certificate rotation scheduler (config field exists, logic not implemented)",
-        "OCSP responder and CRL distribution (revocation currently store-only)",
-        "Trust scoring / reputation system (Byzantine detection exists, no scoring algorithm)"
+        "OCSP responder and CRL distribution (revocation currently store-only)"
       ]
     },
-    "completion": 53
+    "completion": 71
   },
   {
     "id": "ui",

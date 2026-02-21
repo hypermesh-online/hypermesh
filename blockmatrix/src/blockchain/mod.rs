@@ -30,11 +30,11 @@ pub mod sync_manager;
 pub use block::Block;
 pub use node_chain::{NodeBlockchain, ChainStats};
 pub use validation::{ChainValidator, ValidationRules};
-pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult};
+pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult, BlockTransport, SimulatedTransport};
 pub use state::{ChainStateManager, ChainSnapshot, BlockQuery, SortOrder, StorageStats};
 pub use errors::{BlockchainError, StateError, PropagationError, Result};
 pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
-pub use sync_manager::{SyncManager, SyncConfig, SyncState, SyncMessage, NetworkMembership};
+pub use sync_manager::{SyncManager, SyncConfig, SyncState, SyncMessage, NetworkMembership, BlockProvider, SyncObserver};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use std::path::Path;

@@ -24,17 +24,17 @@ items = [
 
 [features.in_development]
 items = [
-    "Network scope sync + reflector pooling — Device↔Network chain synchronization (foundation built)",
+    "Network scope sync + reflector pooling — Device↔Network chain synchronization (wired: SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
+    "Gateway architecture for cross-scope asset transfers and scope bridging (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
+    "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
 ]
 
 [features.planned]
 items = [
-    "Gateway architecture for cross-scope asset transfers and scope bridging",
     "Tensor operations for cross-network transaction routing (NGauge↔Caesar matrix coordination)",
     "Cross-scope proxy routing — NAT-like asset access across blockchain scope boundaries",
     "Container runtime with isolation",
     "Multi-node production deployment",
-    "Dynamic shard rebalancing",
     "Cross-platform node binary (Linux/macOS/Windows) with 1-click installation",
     "CLI for matrix topology queries, node management, and asset operations",
 ]

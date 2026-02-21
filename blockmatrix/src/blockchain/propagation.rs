@@ -6,6 +6,10 @@
 //!
 //! Uses the matrix coordinate system from Sprint 1.1 to propagate blocks
 //! to neighboring nodes based on distance metrics.
+//!
+//! Transport abstraction: `BlockTransport` trait decouples propagation logic
+//! from the actual network layer. Production code supplies a STOQ-backed
+//! implementation; tests can inject a deterministic stub.
 
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
@@ -16,6 +20,42 @@ use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_neighbors, find_k_nearest};
 use crate::matrix::tensor::routing::calculate_routing_path;
 use super::block::Block;
+
+/// Abstraction over the network transport used for block propagation.
+///
+/// Implementations send serialised block data to a target matrix coordinate
+/// and return `true` on success.  The default (simulation) implementation
+/// uses a distance-based probability model for testing.
+#[async_trait::async_trait]
+pub trait BlockTransport: Send + Sync {
+    /// Send `block` to the node at `target`.
+    ///
+    /// Returns `true` when the remote node acknowledged reception.
+    async fn send_block(
+        &self,
+        block: &Block,
+        target: &MatrixCoordinate,
+        origin: &MatrixCoordinate,
+    ) -> bool;
+}
+
+/// Default simulation transport that models success probability based on
+/// distance.  Used when no real STOQ transport is wired in.
+pub struct SimulatedTransport;
+
+#[async_trait::async_trait]
+impl BlockTransport for SimulatedTransport {
+    async fn send_block(
+        &self,
+        _block: &Block,
+        target: &MatrixCoordinate,
+        origin: &MatrixCoordinate,
+    ) -> bool {
+        let distance = origin.euclidean_distance(target);
+        let success_probability = (1.0 / (1.0 + distance * 0.01)).max(0.5);
+        rand::random::<f64>() < success_probability
+    }
+}
 
 /// Propagation strategy for blocks through the matrix
 #[derive(Debug, Clone)]
@@ -51,20 +91,36 @@ pub struct BlockPropagator {
     strategy: PropagationStrategy,
     /// Nodes that have seen blocks (hash -> set of coordinates)
     seen_blocks: Arc<RwLock<HashMap<String, HashSet<MatrixCoordinate>>>>,
+    /// Network transport for sending blocks to peers
+    transport: Arc<dyn BlockTransport>,
 }
 
 use std::collections::HashMap;
 
 impl BlockPropagator {
-    /// Create a new block propagator
+    /// Create a new block propagator with the default simulated transport.
     pub fn new(
         node_coordinate: MatrixCoordinate,
         strategy: PropagationStrategy,
+    ) -> Self {
+        Self::with_transport(
+            node_coordinate,
+            strategy,
+            Arc::new(SimulatedTransport),
+        )
+    }
+
+    /// Create a block propagator backed by a real transport implementation.
+    pub fn with_transport(
+        node_coordinate: MatrixCoordinate,
+        strategy: PropagationStrategy,
+        transport: Arc<dyn BlockTransport>,
     ) -> Self {
         BlockPropagator {
             node_coordinate,
             strategy,
             seen_blocks: Arc::new(RwLock::new(HashMap::new())),
+            transport,
         }
     }
 
@@ -93,12 +149,10 @@ impl BlockPropagator {
         // Mark this block as seen by this node
         self.mark_block_seen(&block.hash, &self.node_coordinate).await;
 
-        // Simulate propagation to each target
+        // Propagate to each target via the wired transport
         for target in &targets {
             if self.should_propagate_to(&block.hash, target).await {
-                // In production, this would actually send the block
-                // For now, we simulate success/failure
-                if self.simulate_send_block(block, target).await {
+                if self.transport.send_block(block, target, &self.node_coordinate).await {
                     reached_nodes.push(target.clone());
                     self.mark_block_seen(&block.hash, target).await;
                 } else {
@@ -271,21 +325,6 @@ impl BlockPropagator {
             .insert(node.clone());
     }
 
-    /// Simulate sending a block to a node (returns success/failure)
-    async fn simulate_send_block(&self, _block: &Block, target: &MatrixCoordinate) -> bool {
-        // In production, this would:
-        // 1. Establish connection to target node
-        // 2. Send block data
-        // 3. Wait for acknowledgment
-        // 4. Handle retries
-
-        // For now, simulate 95% success rate with closer nodes more likely to succeed
-        let distance = self.node_coordinate.euclidean_distance(target);
-        let success_probability = (1.0 / (1.0 + distance * 0.01)).max(0.5);
-
-        rand::random::<f64>() < success_probability
-    }
-
     /// Flood propagation for critical blocks
     pub async fn flood_propagate(
         &self,
@@ -312,8 +351,7 @@ impl BlockPropagator {
 
             for neighbor in neighbors {
                 if !reached_nodes.contains(&neighbor) {
-                    // Try to propagate
-                    if self.simulate_send_block(block, &neighbor).await {
+                    if self.transport.send_block(block, &neighbor, &self.node_coordinate).await {
                         reached_nodes.insert(neighbor.clone());
                         queue.push_back((neighbor, hops + 1));
                     } else {
@@ -361,9 +399,10 @@ mod tests {
 
         let result = propagator.propagate_block(&block, &network).await;
 
-        // Should reach immediate neighbors
+        // Should reach immediate neighbors (distance <= 1.5 includes
+        // face-adjacent and edge-diagonal neighbours in a 3x3x3 grid)
         assert!(!result.reached_nodes.is_empty());
-        assert!(result.reached_nodes.len() <= 6); // At most 6 immediate neighbors
+        assert!(result.reached_nodes.len() <= 18); // Up to 18 within distance 1.5
     }
 
     #[tokio::test]

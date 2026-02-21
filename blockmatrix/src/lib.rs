@@ -211,6 +211,11 @@ pub mod distribution;
 /// (P2P direct, Public, Federated, Fully Federated) and blockchain registration
 pub mod dns;
 
+// Gateway - Cross-Scope Asset Transfers
+/// Orchestration layer for moving assets between Device and Network blockchain
+/// scopes. Handles locking, proof validation, and rollback.
+pub mod gateway;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
