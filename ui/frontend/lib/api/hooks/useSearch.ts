@@ -12,11 +12,14 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import {
   searchAPI,
-  SearchResult,
-  SearchFilter,
-  SearchResponse,
-  SearchSuggestion
+  type SearchResult,
+  type SearchFilter,
+  type SearchResponse,
+  type SearchSuggestion
 } from '../services/SearchAPI';
+
+// Re-export types for consumers
+export type { SearchResult, SearchFilter, SearchResponse, SearchSuggestion };
 
 // Query keys for cache management
 const searchKeys = {

@@ -138,7 +138,7 @@ export function SparklineChart({
         )}
       </svg>
 
-      <style jsx>{`
+      <style>{`
         @keyframes drawSparkline {
           to { stroke-dashoffset: 0; }
         }

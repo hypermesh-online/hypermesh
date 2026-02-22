@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LucideIcon, Settings, Maximize2, RefreshCw } from 'lucide-react';
-import { TopologyChart, TopologyNode, TopologyLink } from './TopologyChart';
-import { PerformanceChart, PerformanceMetric } from './PerformanceChart';
-import { SystemMetrics, SystemMetric } from './SystemMetrics';
+import { TopologyChart } from './TopologyChart';
+import type { TopologyNode, TopologyLink } from './TopologyChart';
+import { PerformanceChart } from './PerformanceChart';
+import type { PerformanceMetric } from './PerformanceChart';
+import { SystemMetrics } from './SystemMetrics';
 import { MetricDisplay } from './MetricDisplay';
 
 interface DashboardWidget {

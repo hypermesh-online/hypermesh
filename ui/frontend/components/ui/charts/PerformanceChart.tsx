@@ -8,14 +8,14 @@ import { LineChart } from './LineChart';
 import { AreaChart } from './AreaChart';
 import { BarChart } from './BarChart';
 
-interface PerformanceDataPoint {
+export interface PerformanceDataPoint {
   timestamp: string;
   value: number;
   label?: string;
   category?: string;
 }
 
-interface PerformanceMetric {
+export interface PerformanceMetric {
   name: string;
   data: PerformanceDataPoint[];
   unit?: string;

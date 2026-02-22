@@ -20,7 +20,7 @@ import { useCatalogApplications, useVMAssets, useVMExecutions } from '@/lib/api/
 
 export function CatalogInstalled() {
   const { installedApps, isLoading } = useCatalogApplications();
-  const { data: vmAssets } = useVMAssets();
+  const { vmAssets } = useVMAssets();
   const { data: executions } = useVMExecutions();
 
   if (isLoading) {
@@ -121,11 +121,11 @@ export function CatalogInstalled() {
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-gray-400">CPU</span>
-                        <span className="text-blue-400">{asset.resources?.cpu || 'N/A'}</span>
+                        <span className="text-blue-400">{asset.vmConfig?.resourceLimits?.maxCpu || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Memory</span>
-                        <span className="text-blue-400">{asset.resources?.memory || 'N/A'}</span>
+                        <span className="text-blue-400">{asset.vmConfig?.resourceLimits?.maxMemory || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Privacy</span>
@@ -165,7 +165,7 @@ export function CatalogInstalled() {
                       <div>
                         <h4 className="text-white font-medium">{execution.vmAssetId}</h4>
                         <p className="text-gray-400 text-sm">
-                          Operation: {execution.operation} • Status: {execution.status}
+                          Operation: {execution.request.operation} • Status: {execution.status}
                         </p>
                       </div>
                       <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
@@ -173,9 +173,9 @@ export function CatalogInstalled() {
                       </Badge>
                     </div>
                     
-                    {execution.startTime && (
+                    {execution.execution?.startTime && (
                       <div className="mt-2 text-xs text-gray-400">
-                        Started: {new Date(execution.startTime).toLocaleString()}
+                        Started: {new Date(execution.execution.startTime).toLocaleString()}
                       </div>
                     )}
                   </CardContent>

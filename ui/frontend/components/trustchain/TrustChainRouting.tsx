@@ -6,6 +6,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useSystemStatus } from '@/lib/api';
 import { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
+import type { SystemStatus as EcoSystemStatus } from './EcosystemMetricsDashboard';
 import { NetworkManagement } from './NetworkManagement';
 import { SecuritySettings } from './SecuritySettings';
 import { ConsensusMetricsPanel } from './ConsensusMetricsPanel';
@@ -24,7 +25,7 @@ const subNavigation = [
 function TrustChainOverview() {
   const { systemStatus } = useSystemStatus(true);
 
-  const systemStatuses = [
+  const systemStatuses: EcoSystemStatus[] = [
     {
       name: 'TrustChain CA',
       status: 'online' as const,
@@ -39,7 +40,7 @@ function TrustChainOverview() {
     },
     {
       name: 'STOQ Transport',
-      status: (systemStatus ? 'online' : 'offline') as const,
+      status: systemStatus ? 'online' as const : 'offline' as const,
       uptime: systemStatus?.performance?.uptime ? systemStatus.performance.uptime * 86400000 : 0,
       lastChecked: new Date().toISOString(),
       metrics: {

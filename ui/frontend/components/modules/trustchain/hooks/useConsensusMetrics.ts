@@ -63,7 +63,7 @@ export function useConsensusMetrics({
   const [validating, setValidating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (refreshInterval > 0) {

@@ -182,7 +182,7 @@ export function useServiceStatus(service: 'trustchain' | 'hypermesh' | 'stoq') {
           const hypermeshHealth = await hyperMeshAPI.getSystemStatus();
           return {
             name: 'HyperMesh',
-            status: hypermeshHealth.status,
+            status: mapToServiceStatus(hypermeshHealth.status),
             responseTime: 75,
             errorRate: 0,
             uptime: hypermeshHealth.uptime,
@@ -194,7 +194,7 @@ export function useServiceStatus(service: 'trustchain' | 'hypermesh' | 'stoq') {
           const stoqHealth = await stoqAPI.getSystemHealth();
           return {
             name: 'STOQ',
-            status: stoqHealth.status === 'optimal' ? 'healthy' : stoqHealth.status,
+            status: mapToServiceStatus(stoqHealth.status === 'optimal' ? 'healthy' : stoqHealth.status),
             responseTime: 60,
             errorRate: 0,
             uptime: stoqHealth.uptime,
@@ -261,6 +261,23 @@ export function usePerformanceMetrics(timeRange: '1h' | '24h' | '7d' = '1h') {
 /**
  * Helper functions for mapping service health data
  */
+function mapToServiceStatus(status: string): ServiceStatus['status'] {
+  switch (status) {
+    case 'healthy':
+    case 'good':
+    case 'optimal':
+      return 'healthy';
+    case 'degraded':
+    case 'warning':
+      return 'warning';
+    case 'critical':
+      return 'critical';
+    case 'offline':
+    default:
+      return 'offline';
+  }
+}
+
 function mapTrustChainHealth(result: PromiseSettledResult<any>): ServiceStatus {
   if (result.status === 'rejected') {
     return {

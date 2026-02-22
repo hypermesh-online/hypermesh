@@ -381,10 +381,9 @@ export function EcosystemMetricsDashboard({
                     <span className="text-gray-400">Uptime:</span>
                     <span className="text-white">{formatUptime(system.uptime)}</span>
                   </div>
-                  <Progress 
-                    value={getUptimePercentage(system.uptime)} 
-                    className="h-1" 
-                    indicatorClassName="bg-green-400"
+                  <Progress
+                    value={getUptimePercentage(system.uptime)}
+                    className="h-1"
                   />
                   <div className="flex justify-between">
                     <span className="text-gray-400">Last Check:</span>

@@ -294,10 +294,9 @@ export function ConsensusMetricsPanel({
                   <h4 className="font-medium text-sm text-white mb-2">{proof.name}</h4>
                   <p className="text-xs text-gray-400 mb-3">{proof.description}</p>
                   
-                  <Progress 
-                    value={coverage} 
-                    className="h-2" 
-                    indicatorClassName={proof.color.replace('text-', 'bg-')}
+                  <Progress
+                    value={coverage}
+                    className="h-2"
                   />
                   
                   <div className="mt-2 text-xs text-gray-400">

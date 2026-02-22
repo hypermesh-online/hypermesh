@@ -20,6 +20,8 @@ export interface Certificate {
   subject: string;
   issuer: string;
   serialNumber: string;
+  commonName?: string;
+  signatureAlgorithm?: string;
   validFrom: string;
   validTo: string;
   fingerprint: string;

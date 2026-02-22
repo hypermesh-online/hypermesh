@@ -14,7 +14,7 @@ import { BandwidthConfiguration } from './BandwidthConfiguration';
 import { RegionalConfiguration } from './RegionalConfiguration';
 import { useNodeConfiguration } from './hooks/useNodeConfiguration';
 
-interface NodeSettings {
+export interface NodeSettings {
   nodeId: string;
   ipv6Address: string;
   region: string;
@@ -28,7 +28,7 @@ interface NodeSettings {
   };
 }
 
-interface ConfigTestResult {
+export interface ConfigTestResult {
   success: boolean;
   tests: {
     ipv6Connectivity: boolean;

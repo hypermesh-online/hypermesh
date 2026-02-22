@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 export function getStatusColor(status: string): string {
-  const colors = {
+  const colors: Record<string, string> = {
     'Connected': 'text-green-400 bg-green-500/20 border-green-500/30',
     'Connecting': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
     'Disconnected': 'text-gray-400 bg-gray-500/20 border-gray-500/30',
@@ -19,7 +19,7 @@ export function getStatusColor(status: string): string {
 }
 
 export function getTypeColor(type: string): string {
-  const colors = {
+  const colors: Record<string, string> = {
     'Public': 'text-cyan-400 bg-cyan-500/20 border-cyan-500/30',
     'P2P': 'text-purple-400 bg-purple-500/20 border-purple-500/30',
     'Federated': 'text-blue-400 bg-blue-500/20 border-blue-500/30'
@@ -28,7 +28,7 @@ export function getTypeColor(type: string): string {
 }
 
 export function getTrustLevelColor(level: string): string {
-  const colors = {
+  const colors: Record<string, string> = {
     'root': 'text-green-400',
     'intermediate': 'text-blue-400',
     'end-entity': 'text-purple-400'

@@ -16,7 +16,7 @@ import { AlgorithmConfiguration } from './AlgorithmConfiguration';
 import { SecurityAuditResults } from './SecurityAuditResults';
 import { useQuantumSecurity } from './hooks/useQuantumSecurity';
 
-interface SecuritySettings {
+export interface SecuritySettings {
   quantumSafe: boolean;
   falconSigning: boolean;
   kyberKeyExchange: boolean;
@@ -26,7 +26,7 @@ interface SecuritySettings {
   hsts: boolean;
 }
 
-interface SecurityAuditResult {
+export interface SecurityAuditResult {
   overallScore: number;
   vulnerabilities: Array<{
     severity: 'high' | 'medium' | 'low';
@@ -42,7 +42,7 @@ interface SecurityAuditResult {
   recommendations: string[];
 }
 
-interface TestCertResult {
+export interface TestCertResult {
   success: boolean;
   certificateDetails: {
     algorithm: string;

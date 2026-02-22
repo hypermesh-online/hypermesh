@@ -400,9 +400,9 @@ export function useBenchmarkResult(testId: string) {
     queryKey: ['stoq', 'benchmark', testId],
     queryFn: () => stoqAPI.getBenchmarkResult(testId),
     enabled: !!testId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll while test is running
-      return data?.status === 'running' ? 5000 : false;
+      return query.state.data?.status === 'running' ? 5000 : false;
     },
     retry: 2
   });

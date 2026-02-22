@@ -228,7 +228,7 @@ export class StoqWasmClient {
         
       } catch (fallbackError) {
         console.error('❌ Fallback WASM loading also failed:', fallbackError);
-        throw new Error(`WASM loading failed: ${error.message}`);
+        throw new Error(`WASM loading failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -460,18 +460,18 @@ export class StoqWasmClient {
   }
 
   /**
-   * Parse connection status from string to enum
+   * Parse connection status from string to status object
    */
   private parseConnectionStatus(status: string): WasmConnectionStatus {
-    switch (status) {
-      case 'Disconnected': return 0;
-      case 'Connecting': return 1;
-      case 'Connected': return 2;
-      case 'Authenticating': return 3;
-      case 'Authenticated': return 4;
-      case 'Error': return 5;
-      default: return 0;
-    }
+    const statusMap: Record<string, WasmConnectionStatus> = {
+      'Disconnected': { is_connected: false, is_authenticated: false, connection_id: '', error_message: '', protocol_version: '' },
+      'Connecting': { is_connected: false, is_authenticated: false, connection_id: '', error_message: '', protocol_version: '' },
+      'Connected': { is_connected: true, is_authenticated: false, connection_id: '', error_message: '', protocol_version: '' },
+      'Authenticating': { is_connected: true, is_authenticated: false, connection_id: '', error_message: '', protocol_version: '' },
+      'Authenticated': { is_connected: true, is_authenticated: true, connection_id: '', error_message: '', protocol_version: '' },
+      'Error': { is_connected: false, is_authenticated: false, connection_id: '', error_message: 'Connection error', protocol_version: '' },
+    };
+    return statusMap[status] || statusMap['Disconnected'];
   }
 
   /**

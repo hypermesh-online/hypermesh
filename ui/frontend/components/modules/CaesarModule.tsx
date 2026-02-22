@@ -41,10 +41,11 @@ import {
   useClaimRewards,
   useStakeTokens
 } from '@/lib/api';
-import type {
+import {
   TransactionType,
   TransactionStatus
 } from '@/lib/api/services/CaesarAPI';
+import type { TransactionsResponse, RewardsInfo } from '@/lib/api/services/CaesarAPI';
 
 const subNavigation = [
   { name: 'Overview', href: '/caesar' },
@@ -83,6 +84,10 @@ function CaesarOverview() {
     const days = Math.floor(hours / 24);
     return `${days} day${days !== 1 ? 's' : ''} ago`;
   };
+
+  // Cast transactions data to proper type
+  const txData = transactions.data as TransactionsResponse | undefined;
+  const rewardsData = rewards.data as RewardsInfo | undefined;
 
   // Format transaction for display
   const formatTransaction = (tx: any) => {
@@ -212,7 +217,7 @@ function CaesarOverview() {
                   {rewards.data?.pending_rewards.toFixed(2) || '0.00'}
                 </div>
                 <p className="text-xs text-gray-400">
-                  {rewards.data?.pending_rewards > 0 ? 'Ready to claim' : 'Processing'}
+                  {(rewards.data?.pending_rewards ?? 0) > 0 ? 'Ready to claim' : 'Processing'}
                 </p>
               </>
             )}
@@ -289,12 +294,12 @@ function CaesarOverview() {
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
                     </div>
-                  ) : transactions.data?.transactions.length === 0 ? (
+                  ) : txData?.transactions.length === 0 ? (
                     <div className="text-center py-8 text-gray-400">
                       No transactions yet
                     </div>
                   ) : (
-                    transactions.data?.transactions.slice(0, 4).map((tx) => {
+                    txData?.transactions.slice(0, 4).map((tx) => {
                       const formatted = formatTransaction(tx);
                       const isIncoming = formatted.amount.startsWith('+');
                       return (
@@ -331,7 +336,7 @@ function CaesarOverview() {
                   {isLoading ? (
                     <Skeleton className="h-20 w-full" />
                   ) : (
-                    transactions.data?.transactions
+                    txData?.transactions
                       .filter(tx => tx.from_wallet === 'DEFAULT_WALLET')
                       .slice(0, 4)
                       .map((tx) => {
@@ -359,7 +364,7 @@ function CaesarOverview() {
                   {isLoading ? (
                     <Skeleton className="h-20 w-full" />
                   ) : (
-                    transactions.data?.transactions
+                    txData?.transactions
                       .filter(tx => tx.to_wallet === 'DEFAULT_WALLET')
                       .slice(0, 4)
                       .map((tx) => {
@@ -396,7 +401,7 @@ function CaesarOverview() {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border-yellow-500/30"
-                  disabled={!rewards.data?.pending_rewards || claimRewards.isPending}
+                  disabled={!(rewardsData?.pending_rewards) || claimRewards.isPending}
                   onClick={handleClaimRewards}
                 >
                   {claimRewards.isPending ? (

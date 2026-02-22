@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Search, Filter } from 'lucide-react';
 import { PrivacyLevel } from '@/lib/api/services/HyperMeshAPI';
 

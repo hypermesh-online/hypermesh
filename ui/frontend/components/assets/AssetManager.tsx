@@ -167,9 +167,13 @@ export function AssetManager() {
     try {
       await createAsset.mutateAsync({
         name: newAssetConfig.name,
-        type: newAssetConfig.type,
-        privacyLevel: newAssetConfig.privacyLevel,
-        metadata: newAssetConfig.resourceLimits
+        type: newAssetConfig.type as any,
+        owner: 'local',
+        status: 'available' as const,
+        privacyLevel: newAssetConfig.privacyLevel as any,
+        location: { nodeId: 'local', address: '127.0.0.1' },
+        specifications: newAssetConfig.resourceLimits,
+        allocation: { totalCapacity: 100, allocatedCapacity: 0, availableCapacity: 100, unit: '%' },
       });
       
       setCreationStep(0);
@@ -195,9 +199,11 @@ export function AssetManager() {
   const handleInstallApp = async (appId: string) => {
     try {
       await installCatalogApplication.mutateAsync({
+        catalogId: appId,
         applicationId: appId,
-        name: `VM-${appId.slice(0, 8)}`,
-        privacyLevel: 'federated'
+        config: {
+          privacyLevel: 'full_public' as const,
+        }
       });
       alert('Application installed successfully!');
     } catch (error) {
@@ -210,10 +216,9 @@ export function AssetManager() {
     try {
       await executeVMAsset.mutateAsync({
         vmAssetId,
-        executionParams: {
-          timeout: 3600,
-          resources: { cpu: 2, memory: '4GB' }
-        }
+        operation: 'execute',
+        parameters: { resources: { cpu: 2, memory: '4GB' } },
+        timeout: 3600,
       });
       alert('VM execution started!');
     } catch (error) {
@@ -608,7 +613,7 @@ export function AssetManager() {
                     {systemStatus ? 'Create your first asset to begin resource management' : 'System offline - unable to load assets'}
                   </p>
                   <Button 
-                    onClick={() => document.querySelector('[data-state="active"][value="creation"]')?.click()}
+                    onClick={() => (document.querySelector('[data-state="active"][value="creation"]') as HTMLElement | null)?.click()}
                     disabled={!systemStatus}
                     className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-400 hover:to-blue-500 text-black"
                   >
@@ -989,7 +994,7 @@ export function AssetManager() {
                           </div>
                           <div className="text-xs text-gray-400">
                             VM Asset: {execution.vmAssetId.slice(0, 8)}... • 
-                            Started: {new Date(execution.startTime).toLocaleTimeString()}
+                            Started: {execution.startTime ? new Date(execution.startTime).toLocaleTimeString() : 'Pending'}
                           </div>
                           {execution.result && (
                             <div className="mt-2 p-2 bg-gray-700/50 rounded text-xs">

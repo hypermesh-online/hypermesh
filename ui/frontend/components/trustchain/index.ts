@@ -19,10 +19,10 @@ export type {
 } from './ConsensusMetricsPanel';
 
 export { CertificateDetailsPanel } from './CertificateDetailsPanel';
-export type { 
-  CertificateExtension, 
-  EnhancedCertificate 
-} from './CertificateDetailsPanel';
+export type {
+  CertificateExtension,
+  EnhancedCertificate
+} from './shared/CertificateCard';
 
 export { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
 export type { 

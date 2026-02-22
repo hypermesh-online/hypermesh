@@ -10,8 +10,7 @@
  * certificate authentication - true Internet 2.0 architecture.
  */
 
-import { StoqWasmClient, createStoqWasmClient, type StoqWasmConfig } from './StoqWasmClient';
-import type { WasmConnectionStatus } from '../stoq-wasm';
+import { StoqWasmClient, createStoqWasmClient, type StoqWasmConfig, type WasmConnectionStatus } from './StoqWasmClient';
 import { getConfig } from '../config';
 
 export type ServiceType = 'trustchain' | 'stoq' | 'hypermesh' | 'catalog' | 'caesar' | 'integration';
@@ -330,12 +329,13 @@ export class StoqNativeClient {
    */
   private async waitForAuthentication(timeoutMs = 30000): Promise<void> {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeoutMs) {
-      if (this.stoqClient?.getStatus() === 4) { // Authenticated
+      const status = this.stoqClient?.getStatus();
+      if (status?.is_authenticated) { // Authenticated
         return;
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
@@ -346,11 +346,11 @@ export class StoqNativeClient {
    * Handle connection status changes
    */
   private handleStatusChange(status: WasmConnectionStatus, connectionId?: string): void {
-    console.log(`STOQ connection status changed: ${status}${connectionId ? ` (${connectionId})` : ''}`);
-    
-    if (status === 4) { // Authenticated
+    console.log(`STOQ connection status changed: ${JSON.stringify(status)}${connectionId ? ` (${connectionId})` : ''}`);
+
+    if (status.is_authenticated) { // Authenticated
       this.authenticated = true;
-    } else if (status === 0 || status === 5) { // Disconnected or Error
+    } else if (!status.is_connected) { // Disconnected or Error
       this.authenticated = false;
     }
   }

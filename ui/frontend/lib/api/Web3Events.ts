@@ -15,7 +15,7 @@
 
 import { Web3APIClient, ServiceType } from './Web3APIClient';
 
-export type EventChannel = 
+export type EventChannel =
   | 'system.status'
   | 'system.health'
   | 'trustchain.certificates'
@@ -24,6 +24,7 @@ export type EventChannel =
   | 'hypermesh.assets'
   | 'hypermesh.consensus'
   | 'hypermesh.byzantine'
+  | 'hypermesh.vm'
   | 'stoq.connections'
   | 'stoq.performance'
   | 'stoq.metrics'

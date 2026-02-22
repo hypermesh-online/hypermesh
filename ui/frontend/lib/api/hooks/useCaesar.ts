@@ -74,7 +74,6 @@ export function useTransactions(walletId?: string, page = 1, limit = 50) {
     queryKey: caesarKeys.transactions(walletId, page),
     queryFn: () => caesarAPI.getTransactions(walletId, page, limit),
     staleTime: 10000,
-    keepPreviousData: true, // Keep previous data while fetching new page
   });
 }
 
@@ -148,10 +147,10 @@ export function useSendTransaction() {
     mutationFn: (request: SendTransactionRequest) => caesarAPI.sendTransaction(request),
     onSuccess: (data, variables) => {
       // Invalidate balance and transactions for both sender and receiver
-      queryClient.invalidateQueries(caesarKeys.balance(variables.from_wallet));
-      queryClient.invalidateQueries(caesarKeys.transactions(variables.from_wallet));
-      queryClient.invalidateQueries(caesarKeys.balance(variables.to_wallet));
-      queryClient.invalidateQueries(caesarKeys.transactions(variables.to_wallet));
+      queryClient.invalidateQueries({ queryKey: ["caesar", "balance", variables.from_wallet || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "transactions", variables.from_wallet || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "balance", variables.to_wallet] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "transactions", variables.to_wallet] });
     },
   });
 }
@@ -166,9 +165,9 @@ export function useClaimRewards() {
     mutationFn: (request: ClaimRewardsRequest) => caesarAPI.claimRewards(request),
     onSuccess: (data, variables) => {
       // Invalidate rewards and balance
-      queryClient.invalidateQueries(caesarKeys.rewards(variables.wallet_id));
-      queryClient.invalidateQueries(caesarKeys.balance(variables.wallet_id));
-      queryClient.invalidateQueries(caesarKeys.transactions(variables.wallet_id));
+      queryClient.invalidateQueries({ queryKey: ["caesar", "rewards", variables.wallet_id || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "balance", variables.wallet_id || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "transactions", variables.wallet_id || "DEFAULT_WALLET"] });
     },
   });
 }
@@ -183,9 +182,9 @@ export function useStakeTokens() {
     mutationFn: (request: StakeRequest) => caesarAPI.stakeTokens(request),
     onSuccess: (data, variables) => {
       // Invalidate staking info and balance
-      queryClient.invalidateQueries(caesarKeys.staking(variables.wallet_id));
-      queryClient.invalidateQueries(caesarKeys.balance(variables.wallet_id));
-      queryClient.invalidateQueries(caesarKeys.transactions(variables.wallet_id));
+      queryClient.invalidateQueries({ queryKey: ["caesar", "staking", variables.wallet_id || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "balance", variables.wallet_id || "DEFAULT_WALLET"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "transactions", variables.wallet_id || "DEFAULT_WALLET"] });
     },
   });
 }
@@ -200,9 +199,9 @@ export function useUnstakeTokens() {
     mutationFn: (stakeId: string) => caesarAPI.unstakeTokens(stakeId),
     onSuccess: () => {
       // Invalidate all staking and balance data
-      queryClient.invalidateQueries(caesarKeys.staking());
-      queryClient.invalidateQueries(caesarKeys.balance());
-      queryClient.invalidateQueries(caesarKeys.transactions());
+      queryClient.invalidateQueries({ queryKey: ["caesar", "staking"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "balance"] });
+      queryClient.invalidateQueries({ queryKey: ["caesar", "transactions"] });
     },
   });
 }

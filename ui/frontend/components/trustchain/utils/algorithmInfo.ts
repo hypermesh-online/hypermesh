@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-export const algorithmInfo = {
+export const algorithmInfo: Record<string, { name: string; type: string; security: string; keySize: string; description: string; color: string; bgColor: string }> = {
   'FALCON-1024': {
     name: 'FALCON-1024',
     type: 'Post-Quantum Digital Signature',
@@ -32,7 +32,7 @@ export const algorithmInfo = {
   }
 };
 
-export const commonExtensions = {
+export const commonExtensions: Record<string, string> = {
   '2.5.29.15': 'Key Usage',
   '2.5.29.37': 'Extended Key Usage',
   '2.5.29.17': 'Subject Alternative Name',

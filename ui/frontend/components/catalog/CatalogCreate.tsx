@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useCreateVMAsset } from '@/lib/api/hooks/useAssets';
 import { PrivacyLevel } from '@/lib/api/services/HyperMeshAPI';
+import type { CatalogApplication } from '@/lib/api/services/HyperMeshAPI';
 
 export function CatalogCreate() {
   const createVMAsset = useCreateVMAsset();
@@ -34,12 +35,32 @@ export function CatalogCreate() {
 
   const handleCreateVMAsset = async () => {
     try {
-      await createVMAsset.mutateAsync({
+      const catalogApp: CatalogApplication = {
+        id: `create-${Date.now()}`,
         name: formData.name,
-        description: formData.description,
-        sourceCode: formData.sourceCode,
-        privacyLevel: formData.privacyLevel,
-        resourceLimits: formData.resourceLimits
+        version: '1.0.0',
+        type: 'Application',
+        adapter: 'Native',
+        status: 'Available',
+        description: formData.description || formData.name,
+        requirements: {
+          cpu: formData.resourceLimits.maxCpu,
+          memory: parseInt(formData.resourceLimits.maxMemory) || 1,
+          storage: parseInt(formData.resourceLimits.maxStorage) || 1,
+        },
+        dependencies: [],
+        author: 'local',
+        downloads: 0,
+        rating: 0,
+        size: '0',
+        lastUpdated: new Date().toISOString(),
+      };
+      await createVMAsset.mutateAsync({
+        catalogApp,
+        config: {
+          privacyLevel: formData.privacyLevel,
+          resourceLimits: formData.resourceLimits,
+        }
       });
       alert('VM Asset created successfully!');
       // Reset form

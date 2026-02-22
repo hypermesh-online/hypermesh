@@ -72,7 +72,8 @@ export function SecurityMonitoringDashboard() {
   const { certificates, isLoading: certsLoading } = useCertificates();
   const { data: trustHierarchy } = useTrustHierarchy();
   const { data: byzantineDetections } = useByzantineDetections();
-  const validateCertificate = useValidateCertificate();
+  const [validatingCertId, setValidatingCertId] = React.useState<string | null>(null);
+  const validateCertificate = useValidateCertificate(validatingCertId || '');
   
   // Calculate security metrics from real data
   const securityMetrics = React.useMemo((): SecurityMetrics => {
@@ -131,7 +132,7 @@ export function SecurityMonitoringDashboard() {
             type: 'certificate',
             severity: daysUntilExpiry <= 1 ? 'critical' : 'high',
             title: 'Certificate Expiring Soon',
-            description: `Certificate ${cert.commonName} expires in ${daysUntilExpiry} days`,
+            description: `Certificate ${cert.subject} expires in ${daysUntilExpiry} days`,
             timestamp: new Date().toISOString(),
             resolved: false
           });
@@ -143,13 +144,13 @@ export function SecurityMonitoringDashboard() {
     if (byzantineDetections) {
       byzantineDetections.forEach(detection => {
         alerts.push({
-          id: `byzantine-${detection.id}`,
+          id: `byzantine-${detection.nodeId}`,
           type: 'byzantine',
-          severity: detection.severity as any,
+          severity: detection.severity,
           title: 'Byzantine Behavior Detected',
           description: `Malicious behavior detected from node ${detection.nodeId?.slice(0, 8)}...`,
-          timestamp: detection.timestamp,
-          resolved: false
+          timestamp: detection.detectedAt,
+          resolved: detection.status === 'resolved'
         });
       });
     }
@@ -174,20 +175,14 @@ export function SecurityMonitoringDashboard() {
     return alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [certificates, byzantineDetections, systemStatus]);
 
-  const handleCertificateValidation = async () => {
+  const handleCertificateValidation = () => {
     if (!certificates || certificates.length === 0) {
       alert('No certificates available for validation');
       return;
     }
-    
-    try {
-      const firstCert = certificates[0];
-      await validateCertificate.mutateAsync(firstCert.id);
-      alert('Certificate validation completed successfully!');
-    } catch (error) {
-      console.error('Certificate validation failed:', error);
-      alert('Certificate validation failed. Check console for details.');
-    }
+
+    const firstCert = certificates[0];
+    setValidatingCertId(firstCert.id);
   };
 
   return (
@@ -368,10 +363,10 @@ export function SecurityMonitoringDashboard() {
                 </div>
                 <Button 
                   onClick={handleCertificateValidation}
-                  disabled={validateCertificate.isPending || certsLoading}
+                  disabled={validateCertificate.isLoading || certsLoading}
                   className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-black"
                 >
-                  {validateCertificate.isPending ? 'Validating...' : 'Validate Certificates'}
+                  {validateCertificate.isLoading ? 'Validating...' : 'Validate Certificates'}
                 </Button>
               </div>
             </CardHeader>
@@ -393,7 +388,7 @@ export function SecurityMonitoringDashboard() {
                       <div key={cert.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-white font-medium">{cert.commonName}</h4>
+                            <h4 className="text-white font-medium">{cert.subject}</h4>
                             <Badge variant="outline" className={cn(
                               'text-xs',
                               cert.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
@@ -418,7 +413,7 @@ export function SecurityMonitoringDashboard() {
                             Expires: {new Date(cert.validTo).toLocaleDateString()} ({daysUntilExpiry} days)
                           </div>
                           <div className="text-xs text-gray-500">
-                            Issuer: {cert.issuer || 'TrustChain CA'} • Algorithm: {cert.signatureAlgorithm || 'FALCON-1024'}
+                            Issuer: {cert.issuer || 'TrustChain CA'} • Trust Level: {cert.trustLevel || 'leaf'}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -455,7 +450,7 @@ export function SecurityMonitoringDashboard() {
               {byzantineDetections && byzantineDetections.length > 0 ? (
                 <div className="space-y-3">
                   {byzantineDetections.map((detection) => (
-                    <div key={detection.id} className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div key={detection.nodeId} className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <AlertTriangle className="h-4 w-4 text-red-400" />
@@ -465,17 +460,17 @@ export function SecurityMonitoringDashboard() {
                           </Badge>
                         </div>
                         <div className="text-sm text-gray-400">
-                          Node: {detection.nodeId?.slice(0, 12)}... • 
-                          Type: {detection.behaviorType} • 
-                          Confidence: {detection.confidence}%
+                          Node: {detection.nodeId?.slice(0, 12)}... •
+                          Type: {detection.behaviour} •
+                          Status: {detection.status}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          Evidence: {detection.evidence || 'Consensus deviation, invalid proofs'} • 
-                          Action: {detection.action || 'Node quarantined, peers notified'}
+                          Evidence: {detection.evidence?.invalidOperations?.join(', ') || 'Consensus deviation, invalid proofs'} •
+                          Action: {detection.mitigation?.actions?.join(', ') || 'Node quarantined, peers notified'}
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(detection.timestamp).toLocaleTimeString()}
+                        {new Date(detection.detectedAt).toLocaleTimeString()}
                       </div>
                     </div>
                   ))}

@@ -198,7 +198,7 @@ export function LineChart({
           return null;
         })}
       </svg>
-      <style jsx>{`
+      <style>{`
         @keyframes drawLine {
           to { stroke-dashoffset: 0; }
         }

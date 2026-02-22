@@ -241,7 +241,7 @@ export function BarChart({
         {axisLabels}
         {bars}
       </svg>
-      <style jsx>{`
+      <style>{`
         @keyframes scaleY {
           from { transform: scaleY(0); }
           to { transform: scaleY(1); }

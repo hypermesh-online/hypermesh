@@ -179,7 +179,7 @@ export function PieChart({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes growSlice {
           from { transform: scale(0); }
           to { transform: scale(1); }

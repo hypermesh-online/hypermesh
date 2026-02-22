@@ -5,7 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-interface TopologyNode {
+export interface TopologyNode {
   id: string;
   label: string;
   type: 'core' | 'edge' | 'endpoint' | 'gateway' | 'service';
@@ -20,7 +20,7 @@ interface TopologyNode {
   groups?: string[];
 }
 
-interface TopologyLink {
+export interface TopologyLink {
   source: string;
   target: string;
   type: 'physical' | 'logical' | 'data' | 'control' | 'tunnel';

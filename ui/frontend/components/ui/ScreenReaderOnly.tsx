@@ -6,7 +6,7 @@ import React from 'react';
 
 interface ScreenReaderOnlyProps {
   children: React.ReactNode;
-  as?: keyof JSX.IntrinsicElements;
+  as?: React.ElementType;
 }
 
 export function ScreenReaderOnly({ children, as: Component = 'span' }: ScreenReaderOnlyProps) {

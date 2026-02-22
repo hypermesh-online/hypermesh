@@ -15,9 +15,9 @@
 import { web3ApiClient } from '../index';
 import type { ServiceType } from '../Web3APIClient';
 
-export type AssetType = 'cpu' | 'gpu' | 'memory' | 'storage' | 'network' | 'service' | 'container' | 'vm' | 'application';
+export type AssetType = 'cpu' | 'gpu' | 'memory' | 'storage' | 'network' | 'service' | 'container' | 'vm' | 'application' | 'compute';
 
-export type PrivacyLevel = 'private' | 'private_network' | 'p2p' | 'public_network' | 'full_public';
+export type PrivacyLevel = 'private' | 'private_network' | 'p2p' | 'public_network' | 'full_public' | 'federated' | 'public';
 
 export type ProofType = 'PoSp' | 'PoSt' | 'PoWk' | 'PoTm';
 
@@ -27,7 +27,7 @@ export interface Asset {
   name: string;
   description?: string;
   owner: string;
-  status: 'available' | 'allocated' | 'busy' | 'maintenance' | 'offline';
+  status: 'available' | 'allocated' | 'busy' | 'maintenance' | 'offline' | 'active';
   privacyLevel: PrivacyLevel;
   location: {
     nodeId: string;
@@ -35,6 +35,7 @@ export interface Asset {
     region?: string;
   };
   specifications: Record<string, any>;
+  metadata?: Record<string, any>;
   allocation: {
     totalCapacity: number;
     allocatedCapacity: number;
@@ -72,31 +73,34 @@ export interface ConsensusProof {
 export interface FourProofConsensus {
   blockId: string;
   assetId: string;
-  proofs: {
-    space: ConsensusProof;  // PoSp - WHERE (storage/network location)
-    stake: ConsensusProof;   // PoSt - WHO (ownership/access rights)
-    work: ConsensusProof;    // PoWk - WHAT/HOW (computational resources)
-    time: ConsensusProof;    // PoTm - WHEN (temporal ordering)
-  };
+  proofs: ConsensusProof[];
   combinedProof: {
     hash: string;
     signature: string;
     validatedAt: string;
     consensusReached: boolean;
   };
+  status: 'pending' | 'validated' | 'rejected' | 'failed';
+  timestamp: string;
+  validationTime: number; // ms
 }
 
 export interface ByzantineDetection {
+  id: string;
   nodeId: string;
   detectedAt: string;
   behaviour: 'double_spending' | 'invalid_proof' | 'consensus_attack' | 'network_partition' | 'timing_attack';
+  behaviorType: 'double_spending' | 'invalid_proof' | 'consensus_attack' | 'network_partition' | 'timing_attack';
   severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number; // 0-100
   evidence: {
     conflictingProofs?: ConsensusProof[];
     invalidOperations?: string[];
     networkAnomalies?: any[];
   };
   status: 'detected' | 'investigating' | 'confirmed' | 'resolved' | 'false_positive';
+  action?: string;
+  timestamp: string;
   mitigation?: {
     actions: string[];
     executedAt: string;
@@ -106,6 +110,7 @@ export interface ByzantineDetection {
 
 export interface RemoteProxy {
   id: string;
+  assetId: string;
   address: string;
   type: 'memory' | 'storage' | 'compute' | 'network';
   targetAssetId: string;
@@ -131,6 +136,7 @@ export interface RemoteProxy {
 export interface NodeHealth {
   nodeId: string;
   status: 'healthy' | 'warning' | 'critical' | 'offline';
+  overall: 'healthy' | 'warning' | 'critical' | 'offline';
   metrics: {
     cpuUsage: number;
     memoryUsage: number;
@@ -182,6 +188,8 @@ export interface VMExecution {
   vmAssetId: string;
   allocationId: string;
   status: 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
+  operation?: string;
+  startTime?: string;
   request: {
     operation: string;
     parameters: any;
@@ -201,6 +209,7 @@ export interface VMExecution {
       storageIO: number;
     };
   };
+  result?: { output: string; exitCode: number; duration: number };
   consensusProofs?: ConsensusProof[];
   proxyAddress?: string;
 }
@@ -213,6 +222,7 @@ export interface CatalogApplication {
   adapter: 'Docker' | 'WASM' | 'Native' | 'Python' | 'Node.js' | 'Julia';
   status: 'Available' | 'Installed' | 'Installing' | 'Failed' | 'Updating';
   description: string;
+  category?: string;
   requirements: {
     cpu?: number;
     memory?: number;
@@ -222,9 +232,12 @@ export interface CatalogApplication {
   dependencies: string[];
   author: string;
   downloads: number;
+  downloadCount?: number;
   rating: number;
   size: string;
   lastUpdated: string;
+  tags?: string[];
+  performance?: { latency: number; throughput: number };
   // HyperMesh integration
   assetId?: string; // Links to HyperMesh asset when installed
   privacyLevel?: PrivacyLevel;
@@ -395,6 +408,7 @@ export class HyperMeshAPI {
     remoteAddress: string;
     protocol: 'tcp' | 'udp' | 'quic';
     port?: number;
+    virtualAddress?: string;
   }): Promise<RemoteProxy> {
     return web3ApiClient.request<RemoteProxy>(this.service, '/api/v1/hypermesh/proxy/create', {
       method: 'POST',
@@ -470,6 +484,7 @@ export class HyperMeshAPI {
     operation: string;
     parameters: any;
     timeout?: number;
+    proxyAddress?: string;
   }): Promise<{
     success: boolean;
     result?: any;
@@ -502,11 +517,19 @@ export class HyperMeshAPI {
   /**
    * Create VM asset from Catalog application
    */
-  async createVMAsset(catalogApp: CatalogApplication, config: {
-    privacyLevel: PrivacyLevel;
-    resourceLimits?: Partial<VMAsset['vmConfig']['resourceLimits']>;
-    securityPolicy?: Partial<VMAsset['vmConfig']['securityPolicy']>;
+  async createVMAsset(request: {
+    catalogApp: CatalogApplication;
+    config: {
+      privacyLevel: PrivacyLevel;
+      resourceLimits?: Partial<VMAsset['vmConfig']['resourceLimits']>;
+      securityPolicy?: Partial<VMAsset['vmConfig']['securityPolicy']>;
+    };
+    name?: string;
+    type?: AssetType;
+    privacyLevel?: PrivacyLevel;
   }): Promise<VMAsset> {
+    const catalogApp = request.catalogApp;
+    const config = request.config;
     const vmAssetData: Omit<VMAsset, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'vm',
       name: `VM: ${catalogApp.name}`,

@@ -101,14 +101,13 @@ class SearchAPI {
       description: asset.description || `${asset.type} asset`,
       metadata: {
         type: asset.type,
-        privacyLevel: asset.privacy_level,
-        consensusRequired: asset.consensus_requirements,
+        privacyLevel: asset.privacyLevel,
         status: asset.status,
       },
       relevance: 100, // Server should provide relevance score
       path: `/hypermesh/assets/${asset.id}`,
-      timestamp: new Date(asset.created_at).toISOString(),
-      tags: [asset.type, asset.privacy_level],
+      timestamp: new Date(asset.createdAt).toISOString(),
+      tags: [asset.type, asset.privacyLevel],
       source: 'hypermesh' as const,
     }));
   }
@@ -147,21 +146,21 @@ class SearchAPI {
     const response = await get<Certificate[]>(`/api/v1/trustchain/certificates/search?q=${encodeURIComponent(query)}`);
 
     return response.map(cert => ({
-      id: cert.serial_number,
+      id: cert.serialNumber,
       type: 'certificate' as const,
-      title: cert.common_name || 'TrustChain Certificate',
+      title: cert.commonName || cert.subject || 'TrustChain Certificate',
       description: `Certificate for ${cert.subject}`,
       metadata: {
         issuer: cert.issuer,
-        validFrom: cert.not_before,
-        validUntil: cert.not_after,
-        algorithm: cert.signature_algorithm,
-        status: new Date(cert.not_after) > new Date() ? 'valid' : 'expired',
+        validFrom: cert.validFrom,
+        validUntil: cert.validTo,
+        algorithm: cert.signatureAlgorithm,
+        status: new Date(cert.validTo) > new Date() ? 'valid' : 'expired',
       },
       relevance: 100,
-      path: `/trustchain/certificates/${cert.serial_number}`,
-      timestamp: cert.not_before,
-      tags: ['certificate', 'trustchain', cert.signature_algorithm],
+      path: `/trustchain/certificates/${cert.serialNumber}`,
+      timestamp: cert.validFrom,
+      tags: ['certificate', 'trustchain', cert.signatureAlgorithm || 'unknown'],
       source: 'trustchain' as const,
     }));
   }

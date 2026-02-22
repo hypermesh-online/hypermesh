@@ -221,9 +221,12 @@ export {
 
 // Import individual classes and create instances here to avoid circular dependency
 import { Web3APIClient } from './Web3APIClient';
+import type { ServiceType } from './Web3APIClient';
 import { Web3Events } from './Web3Events';
 import { stoqNativeClient, isStoqNativeAvailable } from './StoqNativeClient';
 import { stoqDataProvider } from './StoqDataProvider';
+import type { SystemStatus } from './hooks/useSystemStatus';
+import type { PerformanceMetrics } from './services/STOQAPI';
 
 // Create singleton instances locally
 export const web3ApiClient = new Web3APIClient();
@@ -352,7 +355,7 @@ export function getSystemHealthSummary(systemStatus: SystemStatus | undefined) {
     };
   }
 
-  const services = Object.values(systemStatus.services);
+  const services = Object.values(systemStatus.services) as Array<{ status: string }>;
   const healthyCount = services.filter(s => s.status === 'healthy').length;
   const totalCount = services.length;
   const score = Math.round((healthyCount / totalCount) * 100);

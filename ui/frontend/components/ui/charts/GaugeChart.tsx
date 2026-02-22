@@ -217,7 +217,7 @@ export function GaugeChart({
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes drawGauge {
           to { stroke-dashoffset: 0; }
         }

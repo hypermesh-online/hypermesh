@@ -44,11 +44,6 @@ const meta = {
       control: { type: 'range', min: 0, max: 100, step: 1 },
       description: 'Progress percentage (0-100) to show progress bar',
     },
-    theme: {
-      control: 'select',
-      options: ['cyan', 'green', 'purple', 'red', 'yellow'],
-      description: 'Color theme for the card',
-    },
   },
 } satisfies Meta<typeof ModuleCard>;
 
@@ -61,7 +56,7 @@ export const Default: Story = {
     value: 'node-7f8a9b2c',
     subtitle: 'Cryptographically verified',
     icon: Shield,
-    theme: 'cyan',
+    iconColor: 'text-cyan-400',
   },
 };
 
@@ -72,11 +67,16 @@ export const WithProgress: Story = {
     subtitle: 'All systems operational',
     icon: Shield,
     progress: 99.9,
-    theme: 'green',
+    iconColor: 'text-green-400',
   },
 };
 
 export const StatusVariants: Story = {
+  args: {
+    title: 'Status Variants',
+    value: 'Running',
+    icon: Network,
+  },
   render: () => (
     <div className="grid grid-cols-2 gap-4 max-w-2xl">
       <ModuleCard
@@ -85,7 +85,7 @@ export const StatusVariants: Story = {
         subtitle="All systems operational"
         icon={Network}
         status="active"
-        theme="green"
+        iconColor="text-green-400"
       />
       <ModuleCard
         title="Warning State"
@@ -93,7 +93,7 @@ export const StatusVariants: Story = {
         subtitle="Performance issues detected"
         icon={Zap}
         status="warning"
-        theme="yellow"
+        iconColor="text-yellow-400"
       />
       <ModuleCard
         title="Error State"
@@ -101,7 +101,7 @@ export const StatusVariants: Story = {
         subtitle="Connection lost"
         icon={Network}
         status="error"
-        theme="red"
+        iconColor="text-red-400"
       />
       <ModuleCard
         title="Inactive Service"
@@ -109,7 +109,7 @@ export const StatusVariants: Story = {
         subtitle="Service not running"
         icon={Zap}
         status="inactive"
-        theme="cyan"
+        iconColor="text-cyan-400"
       />
     </div>
   ),
@@ -123,21 +123,35 @@ export const StatusVariants: Story = {
 };
 
 export const ThemeVariants: Story = {
-  render: () => (
-    <div className="grid grid-cols-3 gap-4 max-w-3xl">
-      {(['cyan', 'green', 'purple', 'red', 'yellow'] as const).map((theme) => (
-        <ModuleCard
-          key={theme}
-          title={`${theme.charAt(0).toUpperCase() + theme.slice(1)} Theme`}
-          value="42.5K"
-          subtitle="Sample metric"
-          icon={Shield}
-          theme={theme}
-          progress={75}
-        />
-      ))}
-    </div>
-  ),
+  args: {
+    title: 'Theme Variants',
+    value: '42.5K',
+    icon: Shield,
+  },
+  render: () => {
+    const themes = [
+      { key: 'cyan', color: 'text-cyan-400' },
+      { key: 'green', color: 'text-green-400' },
+      { key: 'purple', color: 'text-purple-400' },
+      { key: 'red', color: 'text-red-400' },
+      { key: 'yellow', color: 'text-yellow-400' },
+    ] as const;
+    return (
+      <div className="grid grid-cols-3 gap-4 max-w-3xl">
+        {themes.map((theme) => (
+          <ModuleCard
+            key={theme.key}
+            title={`${theme.key.charAt(0).toUpperCase() + theme.key.slice(1)} Theme`}
+            value="42.5K"
+            subtitle="Sample metric"
+            icon={Shield}
+            iconColor={theme.color}
+            progress={75}
+          />
+        ))}
+      </div>
+    );
+  },
   parameters: {
     docs: {
       description: {
@@ -153,7 +167,7 @@ export const Interactive: Story = {
     value: '1,247',
     subtitle: 'Active connections',
     icon: Network,
-    theme: 'cyan',
+    iconColor: 'text-cyan-400',
     progress: 85,
   },
   parameters: {
@@ -171,7 +185,7 @@ export const Accessibility: Story = {
     value: '99.9%',
     subtitle: 'Uptime monitoring',
     icon: Shield,
-    theme: 'green',
+    iconColor: 'text-green-400',
     progress: 99.9,
   },
   parameters: {

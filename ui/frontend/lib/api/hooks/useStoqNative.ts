@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stoqNativeClient, isStoqNativeAvailable, type StoqAuthResult } from '../StoqNativeClient';
-import type { WasmConnectionStatus } from '../../stoq-wasm';
+import type { WasmConnectionStatus } from '../StoqWasmClient';
 
 export interface StoqConnectionState {
   isAvailable: boolean;
@@ -131,7 +131,7 @@ export function useStoqNative(certificatePem?: string) {
       setConnectionState(prev => ({
         ...prev,
         status,
-        isConnected: status !== null && status !== 0, // Not disconnected
+        isConnected: status !== null && status.is_connected, // Not disconnected
         isAuthenticated,
         connectionId,
       }));

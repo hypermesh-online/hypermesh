@@ -62,5 +62,5 @@ export function CertificateDetailsPanel({
   );
 }
 
-// Export legacy interface for compatibility
-export type { EnhancedCertificate } from './shared/CertificateCard';
+// Export legacy interfaces for compatibility
+export type { EnhancedCertificate, CertificateExtension } from './shared/CertificateCard';

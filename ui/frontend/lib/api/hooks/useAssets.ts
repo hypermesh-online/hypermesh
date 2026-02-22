@@ -460,11 +460,14 @@ export function useCreateRemoteProxy() {
   return useMutation({
     mutationFn: (config: {
       assetId: string;
-      type: RemoteProxy['type'];
-      remoteAddress: string;
-      protocol: 'tcp' | 'udp' | 'quic';
+      type?: RemoteProxy['type'];
+      remoteAddress?: string;
+      protocol?: 'tcp' | 'udp' | 'quic';
       port?: number;
-    }) => hyperMeshAPI.createRemoteProxy(config),
+      virtualAddress?: string;
+      accessLevel?: string;
+      trustRequirement?: string;
+    }) => hyperMeshAPI.createRemoteProxy(config as Parameters<typeof hyperMeshAPI.createRemoteProxy>[0]),
     onSuccess: (newProxy) => {
       // Update proxies cache
       queryClient.setQueryData(['proxies'], (oldData: RemoteProxy[] | undefined) => {
@@ -483,8 +486,16 @@ export function useUpdateRemoteProxy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ proxyId, updates }: { proxyId: string; updates: Partial<RemoteProxy> }) =>
-      hyperMeshAPI.updateRemoteProxy(proxyId, updates),
+    mutationFn: (args: string | { proxyId: string; updates: Partial<RemoteProxy> } | { proxyAddress: string; trustLevel?: string }) => {
+      if (typeof args === 'string') {
+        return hyperMeshAPI.updateRemoteProxy(args, {});
+      }
+      if ('proxyId' in args) {
+        return hyperMeshAPI.updateRemoteProxy(args.proxyId, args.updates);
+      }
+      // Handle { proxyAddress, trustLevel } pattern
+      return hyperMeshAPI.updateRemoteProxy(args.proxyAddress, { trust: { level: 50, validatedBy: [], lastValidation: new Date().toISOString() } });
+    },
     onSuccess: (updatedProxy) => {
       // Update proxy in cache
       queryClient.setQueryData(['proxies'], (oldData: RemoteProxy[] | undefined) => {
@@ -501,7 +512,10 @@ export function useUpdateRemoteProxy() {
  */
 export function useValidateProxyTrust() {
   return useMutation({
-    mutationFn: (proxyId: string) => hyperMeshAPI.validateProxyTrust(proxyId)
+    mutationFn: (args: string | { proxyAddress: string; trustLevel?: string }) => {
+      const proxyId = typeof args === 'string' ? args : args.proxyAddress;
+      return hyperMeshAPI.validateProxyTrust(proxyId);
+    }
   });
 }
 
@@ -537,11 +551,19 @@ export function useNetworkTopology() {
 export function useExecuteRemoteOperation() {
   return useMutation({
     mutationFn: (operation: {
-      proxyId: string;
+      proxyId?: string;
+      proxyAddress?: string;
       operation: string;
-      parameters: any;
+      parameters?: any;
+      params?: any;
       timeout?: number;
-    }) => hyperMeshAPI.executeRemoteOperation(operation)
+    }) => hyperMeshAPI.executeRemoteOperation({
+      proxyId: operation.proxyId || '',
+      operation: operation.operation,
+      parameters: operation.parameters || operation.params,
+      timeout: operation.timeout,
+      proxyAddress: operation.proxyAddress,
+    })
   });
 }
 
@@ -595,14 +617,18 @@ export function useCreateVMAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ catalogApp, config }: {
+    mutationFn: ({ catalogApp, config, ...rest }: {
       catalogApp: CatalogApplication;
       config: {
         privacyLevel: PrivacyLevel;
         resourceLimits?: Partial<VMAsset['vmConfig']['resourceLimits']>;
         securityPolicy?: Partial<VMAsset['vmConfig']['securityPolicy']>;
       };
-    }) => hyperMeshAPI.createVMAsset(catalogApp, config),
+      name?: string;
+      type?: AssetType;
+      privacyLevel?: PrivacyLevel;
+      [key: string]: any;
+    }) => hyperMeshAPI.createVMAsset({ catalogApp, config }),
     onSuccess: (newVMAsset) => {
       // Update assets list
       queryClient.setQueryData(['assets'], (oldData: Asset[] | undefined) => {
@@ -632,29 +658,31 @@ export function useInstallCatalogApplication() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ catalogId, config }: {
+    mutationFn: ({ catalogId, config, ...rest }: {
       catalogId: string;
+      applicationId?: string;
       config: {
         privacyLevel: PrivacyLevel;
         autoStart?: boolean;
         resourceLimits?: Partial<VMAsset['vmConfig']['resourceLimits']>;
       };
-    }) => hyperMeshAPI.installCatalogApplication(catalogId, config),
-    onSuccess: (result) => {
+      [key: string]: any;
+    }) => hyperMeshAPI.installCatalogApplication(catalogId || rest.applicationId || '', config),
+    onSuccess: (result, variables) => {
       // Update assets list with new VM asset
       queryClient.setQueryData(['assets'], (oldData: Asset[] | undefined) => {
         return oldData ? [...oldData, result.vmAsset] : [result.vmAsset];
       });
-      
+
       // Update catalog application status
       queryClient.setQueryData(['catalog', 'applications'], (oldData: CatalogApplication[] | undefined) => {
-        return oldData?.map(app => 
-          app.id === catalogId 
+        return oldData?.map(app =>
+          app.id === variables.catalogId
             ? { ...app, status: 'Installed' as const, assetId: result.vmAsset.id }
             : app
         );
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['catalog'] });
     }
@@ -675,6 +703,7 @@ export function useExecuteVMAsset() {
       timeout?: number;
       requiresConsensus?: boolean;
       allocationDuration?: number;
+      executionParams?: any;
     }) => hyperMeshAPI.executeVMAsset(request),
     onSuccess: (execution) => {
       // Update executions cache

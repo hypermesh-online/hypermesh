@@ -24,7 +24,7 @@ import { ConsensusHistory } from './ConsensusHistory';
 import { BlockValidation } from './BlockValidation';
 import { useConsensusMetrics } from './hooks/useConsensusMetrics';
 
-interface ConsensusMetrics {
+export interface ConsensusMetrics {
   blockHeight: number;
   blockTime: number;
   validators: number;
@@ -38,7 +38,7 @@ interface ConsensusMetrics {
   };
 }
 
-interface HistoricalConsensusData {
+export interface HistoricalConsensusData {
   timestamp: Date;
   blockHeight: number;
   tps: number;
@@ -59,7 +59,7 @@ interface ProofType {
   bgColor: string;
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   success: boolean;
   proofValidation: {
     space: { valid: boolean; coverage: number; issues: string[] };

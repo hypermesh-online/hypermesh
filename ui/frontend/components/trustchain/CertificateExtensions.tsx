@@ -48,25 +48,25 @@ function CertificateKeyUsage({ certificate }: { certificate: EnhancedCertificate
       </CardHeader>
       <CardContent className="space-y-4">
         {hasKeyUsage && (
-          <KeyUsageSection 
+          <KeyUsageSection
             title="Key Usage"
-            items={certificate.keyUsage}
+            items={certificate.keyUsage!}
             color="text-blue-400"
           />
         )}
-        
+
         {hasExtendedKeyUsage && (
-          <KeyUsageSection 
+          <KeyUsageSection
             title="Extended Key Usage"
-            items={certificate.extendedKeyUsage}
+            items={certificate.extendedKeyUsage!}
             color="text-purple-400"
           />
         )}
-        
+
         {hasSubjectAltNames && (
-          <KeyUsageSection 
+          <KeyUsageSection
             title="Subject Alternative Names"
-            items={certificate.subjectAltNames}
+            items={certificate.subjectAltNames!}
             color="text-green-400"
           />
         )}

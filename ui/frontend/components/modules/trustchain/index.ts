@@ -7,26 +7,22 @@ export { NodeConfigurationSettings } from './NodeConfigurationSettings';
 export { QuantumSecuritySettings } from './QuantumSecuritySettings';
 export { ConsensusMetricsPanel } from './ConsensusMetricsPanel';
 
-// Component Types
+// Types from NodeConfigurationSettings
 export type {
   NodeSettings,
   ConfigTestResult,
+} from './NodeConfigurationSettings';
+
+// Types from QuantumSecuritySettings
+export type {
   SecuritySettings,
   SecurityAuditResult,
   TestCertResult,
-  ConsensusMetrics,
-  HistoricalConsensusData,
-  ValidationResult
-} from './NodeConfigurationSettings';
-
-export type {
-  SecuritySettings as QuantumSecuritySettings,
-  SecurityAuditResult as QuantumSecurityAuditResult,
-  TestCertResult as QuantumTestCertResult
 } from './QuantumSecuritySettings';
 
+// Types from ConsensusMetricsPanel
 export type {
-  ConsensusMetrics as ConsensusMetricsType,
-  HistoricalConsensusData as HistoricalConsensusDataType,
-  ValidationResult as ConsensusValidationResult
+  ConsensusMetrics,
+  HistoricalConsensusData,
+  ValidationResult,
 } from './ConsensusMetricsPanel';

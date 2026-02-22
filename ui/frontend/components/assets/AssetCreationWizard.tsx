@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useCreateAsset, useCreateVMAsset } from '@/lib/api';
+import type { CatalogApplication } from '@/lib/api/services/HyperMeshAPI';
 import { 
   Plus,
   Lock,
@@ -42,8 +43,8 @@ interface WizardStep {
 
 interface AssetConfiguration {
   name: string;
-  type: 'compute' | 'storage' | 'network' | 'vm';
-  privacyLevel: 'private' | 'federated' | 'public';
+  type: 'cpu' | 'storage' | 'network' | 'vm';
+  privacyLevel: 'private' | 'private_network' | 'p2p' | 'public_network' | 'full_public';
   resourceLimits: {
     cpu: number;
     memory: string;
@@ -73,8 +74,8 @@ export function AssetCreationWizard({
   const [currentStep, setCurrentStep] = React.useState(0);
   const [config, setConfig] = React.useState<AssetConfiguration>({
     name: '',
-    type: 'compute',
-    privacyLevel: 'federated',
+    type: 'cpu',
+    privacyLevel: 'private_network',
     resourceLimits: {
       cpu: 2,
       memory: '4GB',
@@ -134,17 +135,38 @@ export function AssetCreationWizard({
       let assetId: string;
       
       if (config.type === 'vm') {
-        const result = await createVMAsset.mutateAsync({
+        // Build a CatalogApplication stub for the VM creation
+        const catalogApp = {
+          id: `wizard-${Date.now()}`,
           name: config.name,
-          privacyLevel: config.privacyLevel,
-          vmConfig: {
-            runtime: config.vmConfig?.runtime || 'julia',
+          version: '1.0.0',
+          type: 'Application' as const,
+          adapter: (config.vmConfig?.runtime === 'python' ? 'Python' :
+                    config.vmConfig?.runtime === 'javascript' ? 'Node.js' :
+                    config.vmConfig?.runtime === 'rust' ? 'Native' : 'Julia') as CatalogApplication['adapter'],
+          status: 'Available' as const,
+          description: config.name,
+          requirements: {
+            cpu: config.resourceLimits.cpu,
+            memory: parseInt(config.resourceLimits.memory) || 4,
+            storage: parseInt(config.resourceLimits.storage) || 50,
+          },
+          dependencies: [],
+          author: 'local',
+          downloads: 0,
+          rating: 0,
+          size: '0',
+          lastUpdated: new Date().toISOString(),
+        };
+        const result = await createVMAsset.mutateAsync({
+          catalogApp,
+          config: {
+            privacyLevel: config.privacyLevel,
             resourceLimits: {
               maxCpu: config.resourceLimits.cpu,
               maxMemory: config.resourceLimits.memory,
               maxStorage: config.resourceLimits.storage
             },
-            environmentVariables: config.vmConfig?.environmentVariables || {}
           }
         });
         assetId = result.id;
@@ -153,7 +175,11 @@ export function AssetCreationWizard({
           name: config.name,
           type: config.type,
           privacyLevel: config.privacyLevel,
-          metadata: config.resourceLimits
+          owner: 'local',
+          status: 'available',
+          location: { nodeId: 'local', address: 'localhost' },
+          specifications: config.resourceLimits,
+          allocation: { totalCapacity: 0, allocatedCapacity: 0, availableCapacity: 0, unit: 'units' },
         });
         assetId = result.id;
       }
@@ -232,10 +258,10 @@ export function AssetCreationWizard({
               <h3 className="text-white font-medium text-lg">Choose Asset Type</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 {[
-                  { 
-                    type: 'compute' as const, 
-                    icon: Cpu, 
-                    title: 'Compute Resource', 
+                  {
+                    type: 'cpu' as const,
+                    icon: Cpu,
+                    title: 'Compute Resource',
                     desc: 'CPU and processing power for computational tasks',
                     color: 'blue'
                   },
@@ -346,26 +372,26 @@ export function AssetCreationWizard({
               <h3 className="text-white font-medium text-lg">Privacy & Sharing Configuration</h3>
               <div className="space-y-4">
                 {[
-                  { 
-                    level: 'private' as const, 
-                    icon: Lock, 
-                    title: 'Private', 
+                  {
+                    level: 'private' as const,
+                    icon: Lock,
+                    title: 'Private',
                     desc: 'Resources available only to your local applications and trusted processes',
                     color: 'red',
                     features: ['Local access only', 'Maximum security', 'No external sharing']
                   },
-                  { 
-                    level: 'federated' as const, 
-                    icon: Users, 
-                    title: 'Federated', 
+                  {
+                    level: 'private_network' as const,
+                    icon: Users,
+                    title: 'Private Network',
                     desc: 'Shared with trusted networks, verified peers, and federated partners',
                     color: 'blue',
                     features: ['Trusted network sharing', 'Verified peer access', 'Balanced security']
                   },
-                  { 
-                    level: 'public' as const, 
-                    icon: Globe, 
-                    title: 'Public', 
+                  {
+                    level: 'full_public' as const,
+                    icon: Globe,
+                    title: 'Public',
                     desc: 'Available to the global HyperMesh network with full consensus validation',
                     color: 'green',
                     features: ['Global network access', 'Maximum rewards', 'Full consensus required']

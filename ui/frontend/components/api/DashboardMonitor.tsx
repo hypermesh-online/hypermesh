@@ -49,7 +49,7 @@ export function DashboardMonitor() {
     undefined, undefined, true
   );
 
-  const healthSummary = getSystemHealthSummary(systemStatus);
+  const healthSummary = getSystemHealthSummary(systemStatus as any);
 
   // Calculate key metrics
   const keyMetrics = React.useMemo(() => {

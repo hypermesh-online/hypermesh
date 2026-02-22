@@ -67,7 +67,7 @@ export function ApplicationCard({ app, onInstall, onRun, isInstalling, isRunning
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
-            {getCategoryIcon(app.category)}
+            {getCategoryIcon(app.type)}
             <CardTitle className="text-lg text-white">{app.name}</CardTitle>
           </div>
           <Badge className={`text-xs border ${getStatusColor(app.status)}`}>
@@ -108,15 +108,15 @@ export function ApplicationCard({ app, onInstall, onRun, isInstalling, isRunning
           </div>
         )}
 
-        {/* Performance Metrics */}
-        {app.performance && (
+        {/* Rating */}
+        {app.rating > 0 && (
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Performance</span>
-              <span className="text-green-400">{app.performance}ms avg</span>
+              <span className="text-gray-400">Rating</span>
+              <span className="text-green-400">{app.rating}/5</span>
             </div>
-            <Progress 
-              value={Math.min((1000 / (app.performance || 1000)) * 100, 100)} 
+            <Progress
+              value={Math.min((app.rating / 5) * 100, 100)}
               className="h-1"
             />
           </div>
@@ -153,16 +153,16 @@ export function ApplicationCard({ app, onInstall, onRun, isInstalling, isRunning
           </Button>
         </div>
 
-        {/* Tags */}
-        {app.tags && app.tags.length > 0 && (
+        {/* Dependencies */}
+        {app.dependencies && app.dependencies.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {app.tags.slice(0, 3).map((tag) => (
-              <Badge 
-                key={tag} 
-                variant="secondary" 
+            {app.dependencies.slice(0, 3).map((dep: string) => (
+              <Badge
+                key={dep}
+                variant="secondary"
                 className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/30"
               >
-                {tag}
+                {dep}
               </Badge>
             ))}
           </div>

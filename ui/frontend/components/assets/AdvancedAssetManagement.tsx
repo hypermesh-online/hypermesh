@@ -120,7 +120,8 @@ export function AdvancedAssetManagement() {
     
     const totalActiveResources = activeAllocationsCount + runningVMExecutions;
     const utilizationRate = allAssets.length > 0 ? (totalActiveResources / allAssets.length) * 100 : 0;
-    const performanceScore = nodeHealth?.overall || Math.random() * 30 + 70; // Mock if no real data
+    const singleHealth = nodeHealth && !Array.isArray(nodeHealth) ? nodeHealth : Array.isArray(nodeHealth) ? nodeHealth[0] : undefined;
+    const performanceScore = singleHealth?.overall === 'healthy' ? 95 : singleHealth?.overall === 'warning' ? 75 : singleHealth?.overall === 'critical' ? 40 : Math.random() * 30 + 70;
     const proxyConnections = remoteProxies?.length || 0;
     
     return {
@@ -153,14 +154,13 @@ export function AdvancedAssetManagement() {
     try {
       await createAsset.mutateAsync({
         name: `Asset-${Date.now()}`,
-        type: 'compute',
-        metadata: {
-          cpu: 4,
-          memory: '8GB',
-          storage: '100GB',
-          network: '1Gbps'
-        },
-        privacyLevel: 'federated'
+        type: 'compute' as const,
+        owner: 'local',
+        status: 'available' as const,
+        privacyLevel: 'full_public' as const,
+        location: { nodeId: 'local', address: '127.0.0.1' },
+        specifications: { cpu: 4, memory: '8GB', storage: '100GB', network: '1Gbps' },
+        allocation: { totalCapacity: 100, allocatedCapacity: 0, availableCapacity: 100, unit: '%' },
       });
       alert('Asset created successfully!');
     } catch (error) {

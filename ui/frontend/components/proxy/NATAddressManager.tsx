@@ -61,7 +61,7 @@ interface ProxyMapping {
   proxyAddress: string;
   virtualAddress: string;
   trustLevel: 'low' | 'medium' | 'high';
-  accessLevel: 'private' | 'federated' | 'public';
+  accessLevel: string;
   bandwidth: number;
   latency: number;
   status: 'active' | 'inactive' | 'connecting' | 'error';

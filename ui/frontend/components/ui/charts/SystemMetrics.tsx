@@ -11,7 +11,7 @@ import { LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { GaugeChart } from './GaugeChart';
 import { SparklineChart } from './SparklineChart';
 
-interface MetricValue {
+export interface MetricValue {
   current: number;
   previous?: number;
   target?: number;
@@ -23,7 +23,7 @@ interface MetricValue {
   format?: 'number' | 'percentage' | 'bytes' | 'duration' | 'currency';
 }
 
-interface SystemMetric {
+export interface SystemMetric {
   id: string;
   name: string;
   icon?: LucideIcon;
