@@ -27,13 +27,12 @@ use super::{
 
 // --- Discovery Providers ---
 
-#[allow(dead_code)]
 pub(crate) struct TraditionalDNS {
-    servers: Vec<String>,
+    _servers: Vec<String>,
 }
 
 impl TraditionalDNS {
-    pub fn new(servers: Vec<String>) -> Self { Self { servers } }
+    pub fn new(servers: Vec<String>) -> Self { Self { _servers: servers } }
 }
 
 #[async_trait]
@@ -51,15 +50,14 @@ impl ServiceDiscovery for TraditionalDNS {
     fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
 }
 
-#[allow(dead_code)]
 pub(crate) struct HybridDiscovery {
-    traditional_dns: Vec<String>,
+    _traditional_dns: Vec<String>,
     trustchain_addr: SocketAddr,
 }
 
 impl HybridDiscovery {
     pub fn new(traditional_dns: Vec<String>, trustchain_addr: SocketAddr) -> Self {
-        Self { traditional_dns, trustchain_addr }
+        Self { _traditional_dns: traditional_dns, trustchain_addr }
     }
 }
 
@@ -78,7 +76,6 @@ impl ServiceDiscovery for HybridDiscovery {
     fn phase(&self) -> BootstrapPhase { BootstrapPhase::Hybrid }
 }
 
-#[allow(dead_code)]
 pub(crate) struct FederatedDiscovery {
     hypermesh_addr: SocketAddr,
     fallback_dns: Option<Vec<String>>,
@@ -137,13 +134,12 @@ impl CertificateProvider for SelfSignedProvider {
     fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
 }
 
-#[allow(dead_code)]
 pub(crate) struct TrustChainProvider {
-    trustchain_addr: SocketAddr,
+    _trustchain_addr: SocketAddr,
 }
 
 impl TrustChainProvider {
-    pub fn new(trustchain_addr: SocketAddr) -> Self { Self { trustchain_addr } }
+    pub fn new(trustchain_addr: SocketAddr) -> Self { Self { _trustchain_addr: trustchain_addr } }
 }
 
 #[async_trait]
@@ -234,13 +230,12 @@ impl ConsensusProvider for NoOpConsensus {
     fn is_required(&self) -> bool { false }
 }
 
-#[allow(dead_code)]
 pub(crate) struct OptionalConsensus {
-    hypermesh_addr: SocketAddr,
+    _hypermesh_addr: SocketAddr,
 }
 
 impl OptionalConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
 }
 
 #[async_trait]
@@ -261,13 +256,12 @@ impl ConsensusProvider for OptionalConsensus {
     fn is_required(&self) -> bool { false }
 }
 
-#[allow(dead_code)]
 pub(crate) struct RequiredConsensus {
-    hypermesh_addr: SocketAddr,
+    _hypermesh_addr: SocketAddr,
 }
 
 impl RequiredConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
 }
 
 #[async_trait]
@@ -290,13 +284,12 @@ impl ConsensusProvider for RequiredConsensus {
     fn is_required(&self) -> bool { true }
 }
 
-#[allow(dead_code)]
 pub(crate) struct FullConsensus {
-    hypermesh_addr: SocketAddr,
+    _hypermesh_addr: SocketAddr,
 }
 
 impl FullConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
 }
 
 #[async_trait]

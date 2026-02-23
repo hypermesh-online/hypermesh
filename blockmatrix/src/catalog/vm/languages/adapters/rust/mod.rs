@@ -32,10 +32,9 @@ use super::super::{
 };
 
 /// Rust language adapter using RustCall integration
-#[allow(dead_code)]
 pub struct RustAdapter {
     base: BaseAdapter,
-    consensus_bridge: Arc<ConsensusBridge>,
+    _consensus_bridge: Arc<ConsensusBridge>,
     rust_config: RustAdapterConfig,
 }
 
@@ -72,7 +71,7 @@ impl RustAdapter {
 
         let rust_config = RustAdapterConfig::from_language_config(config);
 
-        Ok(Self { base, consensus_bridge, rust_config })
+        Ok(Self { base, _consensus_bridge: consensus_bridge, rust_config })
     }
 
     /// Execute Rust code through RustCall with consensus validation
@@ -484,7 +483,7 @@ fn parallel_compute() {
                 Arc::clone(&consensus_bridge),
                 None,
             ),
-            consensus_bridge,
+            _consensus_bridge: consensus_bridge,
             rust_config: RustAdapterConfig::default(),
         }
     }

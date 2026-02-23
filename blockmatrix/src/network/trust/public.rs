@@ -55,30 +55,28 @@ struct BlockchainState {
 
 /// DNS asset registration details
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during DNS asset registration
 struct DnsAsset {
     /// DNS name registered
     dns_name: String,
     /// Asset ID on blockchain
     asset_id: String,
     /// Registration block height
-    registered_at_block: u64,
+    _registered_at_block: u64,
     /// Registration timestamp
-    registered_at_time: u64,
+    _registered_at_time: u64,
 }
 
 /// Proof of State submission record
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during proof submission
 struct ProofSubmission {
     /// Submission timestamp
-    timestamp: u64,
+    _timestamp: u64,
     /// Block height
-    block_height: u64,
+    _block_height: u64,
     /// Proof type
-    proof_type: String,
+    _proof_type: String,
     /// Validation result
-    validated: bool,
+    _validated: bool,
 }
 
 impl PublicNetworkHandler {
@@ -117,13 +115,13 @@ impl PublicNetworkHandler {
         let current_block_height = self.blockchain_state.read().await.current_block_height;
         let mut state = self.blockchain_state.write().await;
         state.proof_submissions.push(ProofSubmission {
-            timestamp: std::time::SystemTime::now()
+            _timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            block_height: current_block_height,
-            proof_type: "PoSpace+PoStake+PoWork+PoTime".to_string(),
-            validated: true,
+            _block_height: current_block_height,
+            _proof_type: "PoSpace+PoStake+PoWork+PoTime".to_string(),
+            _validated: true,
         });
 
         info!("Proof of State validated and certificate registered on LOCAL blockchain");
@@ -170,8 +168,8 @@ impl PublicNetworkHandler {
         let dns_asset = DnsAsset {
             dns_name: dns_name.to_string(),
             asset_id: format!("dns:{}", dns_name), // Placeholder
-            registered_at_block: self.blockchain_state.read().await.current_block_height,
-            registered_at_time: std::time::SystemTime::now()
+            _registered_at_block: self.blockchain_state.read().await.current_block_height,
+            _registered_at_time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),

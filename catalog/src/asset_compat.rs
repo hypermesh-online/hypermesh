@@ -15,7 +15,7 @@ use blockmatrix::assets::core::{AssetType, AssetCategory, BaseSystemType};
 /// `UserDefined` maps to `AssetType::Container` (executed as containers in blockmatrix runtime).
 /// `Blockchain` and `Dns` map to `VirtualMachine` and `Library` respectively until
 /// blockmatrix adds the dedicated variants.
-pub fn asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
+pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
     match kind {
         AssetKind::System(sys) => match sys {
             SystemAssetKind::Cpu => AssetType::Cpu,
@@ -37,7 +37,7 @@ pub fn asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
 ///
 /// `VirtualMachine` maps to `Blockchain` and `Library` maps to `Dns` as temporary
 /// reverse mappings until blockmatrix adds the dedicated variants.
-pub fn bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
+pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
     AssetKind::System(match bm_type {
         AssetType::Cpu => SystemAssetKind::Cpu,
         AssetType::Gpu => SystemAssetKind::Gpu,
@@ -53,9 +53,9 @@ pub fn bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
 }
 
 /// Convert blockmatrix `AssetCategory` -> canonical `AssetKind`.
-pub fn bm_category_to_asset_kind(category: &AssetCategory) -> AssetKind {
+pub fn _bm_category_to_asset_kind(category: &AssetCategory) -> AssetKind {
     match category {
-        AssetCategory::BaseSystem(base) => AssetKind::System(bm_base_to_system_kind(base)),
+        AssetCategory::BaseSystem(base) => AssetKind::System(_bm_base_to_system_kind(base)),
         AssetCategory::Application(app) => {
             let mut hash_bytes = [0u8; 32];
             hash_bytes.copy_from_slice(&app.domain_hash);
@@ -71,7 +71,7 @@ pub fn bm_category_to_asset_kind(category: &AssetCategory) -> AssetKind {
 ///
 /// `BaseSystemType::Blockchain` maps directly to `SystemAssetKind::Blockchain`.
 /// `Dns` is not yet a `BaseSystemType` variant; it only exists as `SystemAssetKind`.
-pub fn bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
+pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
     match base {
         BaseSystemType::Cpu => SystemAssetKind::Cpu,
         BaseSystemType::Gpu => SystemAssetKind::Gpu,
@@ -88,7 +88,7 @@ pub fn bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
 ///
 /// Recognises the same labels as `HyperMeshAssetRegistry::map_asset_type` plus
 /// canonical system kind names.
-pub fn parse_asset_kind(s: &str) -> AssetKind {
+pub fn _parse_asset_kind(s: &str) -> AssetKind {
     match s.to_lowercase().as_str() {
         "cpu" | "compute" => AssetKind::System(SystemAssetKind::Cpu),
         "gpu" => AssetKind::System(SystemAssetKind::Gpu),
@@ -131,8 +131,8 @@ mod tests {
 
         for kind in &kinds {
             let asset_kind = AssetKind::System(*kind);
-            let bm = asset_kind_to_bm_asset_type(&asset_kind);
-            let back = bm_asset_type_to_asset_kind(&bm);
+            let bm = _asset_kind_to_bm_asset_type(&asset_kind);
+            let back = _bm_asset_type_to_asset_kind(&bm);
             assert_eq!(back, asset_kind, "Roundtrip failed for {:?}", kind);
         }
     }
@@ -140,24 +140,24 @@ mod tests {
     #[test]
     fn test_parse_asset_kind() {
         assert_eq!(
-            parse_asset_kind("cpu"),
+            _parse_asset_kind("cpu"),
             AssetKind::System(SystemAssetKind::Cpu)
         );
         assert_eq!(
-            parse_asset_kind("compute"),
+            _parse_asset_kind("compute"),
             AssetKind::System(SystemAssetKind::Cpu)
         );
         assert_eq!(
-            parse_asset_kind("GPU"),
+            _parse_asset_kind("GPU"),
             AssetKind::System(SystemAssetKind::Gpu)
         );
         assert_eq!(
-            parse_asset_kind("dns"),
+            _parse_asset_kind("dns"),
             AssetKind::System(SystemAssetKind::Dns)
         );
 
         // Unknown -> UserDefined
-        match parse_asset_kind("custom_widget") {
+        match _parse_asset_kind("custom_widget") {
             AssetKind::UserDefined(u) => assert_eq!(u.type_name, "custom_widget"),
             other => unreachable!("test: expected UserDefined, got {:?}", other),
         }
@@ -166,14 +166,14 @@ mod tests {
     #[test]
     fn test_bm_category_to_asset_kind() {
         let base = AssetCategory::BaseSystem(BaseSystemType::Blockchain);
-        let kind = bm_category_to_asset_kind(&base);
+        let kind = _bm_category_to_asset_kind(&base);
         assert_eq!(kind, AssetKind::System(SystemAssetKind::Blockchain));
 
         let app = AssetCategory::Application(blockmatrix::assets::core::ApplicationDomain {
             domain_name: "myapp".to_string(),
             domain_hash: [99u8; 32],
         });
-        match bm_category_to_asset_kind(&app) {
+        match _bm_category_to_asset_kind(&app) {
             AssetKind::UserDefined(u) => {
                 assert_eq!(u.type_name, "myapp");
                 assert_eq!(u.type_hash, ContentHash::from_bytes([99u8; 32]));

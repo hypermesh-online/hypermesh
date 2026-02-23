@@ -16,8 +16,7 @@ use crate::errors::{DnsError, Result as TrustChainResult};
 #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]
 pub struct DnsOverQuicClient {
     /// Server identifier (retained for API compatibility)
-    #[allow(dead_code)]
-    server_id: String,
+    _server_id: String,
 }
 
 #[allow(deprecated)]
@@ -26,7 +25,7 @@ impl DnsOverQuicClient {
     #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]
     pub fn new(server_id: String) -> Self {
         warn!("DNS-over-QUIC is deprecated, use STOQ transport instead");
-        Self { server_id }
+        Self { _server_id: server_id }
     }
 
     /// Send DNS query over QUIC

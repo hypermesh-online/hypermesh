@@ -141,16 +141,15 @@ impl Default for AddressUsageStats {
 
 /// Address allocation management
 #[derive(Debug)]
-#[allow(dead_code)] // Fields for address space management
 pub(crate) struct AddressAllocator {
     /// Next available local address
-    pub next_local_address: usize,
+    pub _next_local_address: usize,
     /// Address space size
-    pub address_space_size: u64,
+    pub _address_space_size: u64,
     /// Allocated address ranges
-    pub allocated_ranges: Vec<AddressRange>,
+    pub _allocated_ranges: Vec<AddressRange>,
     /// Free address ranges
-    pub free_ranges: Vec<AddressRange>,
+    pub _free_ranges: Vec<AddressRange>,
 }
 
 /// Address range specification
@@ -166,12 +165,11 @@ pub(crate) struct AddressRange {
 
 /// Network configuration for NAT translation
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Config fields for NAT network setup
 pub(crate) struct NetworkConfig {
     /// HyperMesh network prefix
     pub network_prefix: [u8; 8],
     /// Local node identifier
-    pub local_node_id: [u8; 8],
+    pub _local_node_id: [u8; 8],
     /// Address space start
     pub address_space_start: usize,
     /// Address space size

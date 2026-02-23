@@ -90,19 +90,18 @@ impl AssemblyStats {
 
 /// Fetched shard data
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during shard retrieval
 struct FetchedShard {
     /// Shard hash
-    hash: Hash,
+    _hash: Hash,
 
     /// Shard data
     data: Vec<u8>,
 
     /// Position it was fetched from
-    source: MatrixCoordinate,
+    _source: MatrixCoordinate,
 
     /// Time taken to fetch (milliseconds)
-    fetch_time_ms: u64,
+    _fetch_time_ms: u64,
 }
 
 /// Client assembler for reconstructing files from instructions
@@ -241,10 +240,10 @@ impl ClientAssembler {
 
                     // Store fetched shard
                     let fetched = FetchedShard {
-                        hash: shard_hash,
+                        _hash: shard_hash,
                         data: data.clone(),
-                        source: location.position.clone(),
-                        fetch_time_ms: fetch_time,
+                        _source: location.position.clone(),
+                        _fetch_time_ms: fetch_time,
                     };
 
                     let data_size = data.len();
@@ -741,10 +740,10 @@ mod tests {
                 let position = MatrixCoordinate::new(i as i64, 0, 0)
                     .expect("test: create coordinate");
                 fetched.insert(i, FetchedShard {
-                    hash: [0u8; 32],
+                    _hash: [0u8; 32],
                     data: shard.data.clone(),
-                    source: position,
-                    fetch_time_ms: 0,
+                    _source: position,
+                    _fetch_time_ms: 0,
                 });
             }
 
@@ -829,10 +828,10 @@ mod tests {
                 let position = MatrixCoordinate::new(i as i64, 0, 0)
                     .expect("test: coordinate");
                 fetched.insert(i, FetchedShard {
-                    hash: [0u8; 32],
+                    _hash: [0u8; 32],
                     data: shard.data.clone(),
-                    source: position,
-                    fetch_time_ms: 0,
+                    _source: position,
+                    _fetch_time_ms: 0,
                 });
             }
 

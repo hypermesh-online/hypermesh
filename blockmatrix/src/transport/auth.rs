@@ -27,21 +27,19 @@ pub struct CertificateValidation {
 
 /// Cached certificate information
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during certificate caching
 struct CachedCertInfo {
-    node_id: String,
-    fingerprint: String,
-    expires_at: chrono::DateTime<chrono::Utc>,
+    _node_id: String,
+    _fingerprint: String,
+    _expires_at: chrono::DateTime<chrono::Utc>,
     cached_at: Instant,
     validation_result: bool,
 }
 
 /// Node authenticator for certificate-based authentication
-#[allow(dead_code)] // Fields used during authentication
 pub struct NodeAuthenticator {
     config: AuthenticationConfig,
     cert_cache: Arc<RwLock<HashMap<String, CachedCertInfo>>>,
-    trust_store: Arc<RwLock<HashMap<String, Vec<u8>>>>,
+    _trust_store: Arc<RwLock<HashMap<String, Vec<u8>>>>,
 }
 
 /// Auth manager (alias for NodeAuthenticator for compatibility)
@@ -56,7 +54,7 @@ impl NodeAuthenticator {
         Self {
             config,
             cert_cache,
-            trust_store,
+            _trust_store: trust_store,
         }
     }
 
@@ -87,9 +85,9 @@ impl NodeAuthenticator {
         {
             let mut cache = self.cert_cache.write();
             cache.insert(node_id.to_string(), CachedCertInfo {
-                node_id: node_id.to_string(),
-                fingerprint: self.generate_fingerprint(node_id),
-                expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+                _node_id: node_id.to_string(),
+                _fingerprint: self.generate_fingerprint(node_id),
+                _expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
                 cached_at: Instant::now(),
                 validation_result: is_valid,
             });

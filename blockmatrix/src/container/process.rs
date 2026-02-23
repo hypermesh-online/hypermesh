@@ -21,7 +21,6 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Tracks a single managed process.
-#[allow(dead_code)] // memory_budget and cpu_budget used by platform-specific usage estimation
 struct ManagedProcess {
     /// OS child process handle.
     child: Child,
@@ -30,9 +29,9 @@ struct ManagedProcess {
     /// Time the process was started.
     started_at: SystemTime,
     /// Memory budget (bytes) -- tracked, not enforced by OS.
-    memory_budget: u64,
+    _memory_budget: u64,
     /// CPU budget (millicores) -- tracked, not enforced by OS.
-    cpu_budget: u64,
+    _cpu_budget: u64,
 }
 
 /// Resource budget entry for a registered (but not necessarily started) container.
@@ -188,8 +187,8 @@ impl ProcessIsolation {
             child,
             pid,
             started_at: SystemTime::now(),
-            memory_budget,
-            cpu_budget,
+            _memory_budget: memory_budget,
+            _cpu_budget: cpu_budget,
         };
 
         let mut processes = self.processes.write().await;
@@ -457,8 +456,8 @@ impl ProcessIsolation {
     fn estimate_usage(managed: &ManagedProcess) -> ResourceUsage {
         let uptime = managed.started_at.elapsed().unwrap_or_default();
         ResourceUsage {
-            memory_usage: managed.memory_budget / 10, // ~10% estimate
-            memory_peak: managed.memory_budget / 10,
+            memory_usage: managed._memory_budget / 10, // ~10% estimate
+            memory_peak: managed._memory_budget / 10,
             cpu_usage_percent: 1.0,
             cpu_time_ns: uptime.as_nanos() as u64 / 100, // ~1% CPU estimate
             io_bandwidth_current: 0,

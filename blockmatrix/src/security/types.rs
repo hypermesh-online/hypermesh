@@ -34,7 +34,6 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 /// Security framework main orchestrator
-#[allow(dead_code)] // Fields used during security operations
 pub struct HyperMeshSecurity {
     /// eBPF security manager
     pub ebpf_manager: EBPFSecurityManager,
@@ -49,7 +48,7 @@ pub struct HyperMeshSecurity {
     /// Security monitor
     pub monitor: SecurityMonitor,
     /// Configuration
-    config: SecurityConfig,
+    _config: SecurityConfig,
 }
 
 impl HyperMeshSecurity {
@@ -69,7 +68,7 @@ impl HyperMeshSecurity {
             ids,
             policy_engine,
             monitor,
-            config,
+            _config: config,
         })
     }
     

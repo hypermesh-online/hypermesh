@@ -37,14 +37,13 @@ pub struct OperationResult {
 }
 
 /// Package manager for lifecycle operations
-#[allow(dead_code)] // Manager fields for package lifecycle
 pub struct AssetPackageManager {
     /// Core library
     library: Arc<AssetLibrary>,
     /// Dependency resolver
     resolver: Arc<DependencyResolver>,
     /// Catalog registry for type storage
-    registry: Arc<CatalogRegistry>,
+    _registry: Arc<CatalogRegistry>,
     /// Installed packages tracking
     installed: Arc<RwLock<HashMap<Arc<str>, InstalledPackage>>>,
     /// Installation locks to prevent concurrent installs
@@ -54,7 +53,6 @@ pub struct AssetPackageManager {
 }
 
 /// Installed package information
-#[allow(dead_code)] // Installation tracking fields
 #[derive(Debug, Clone)]
 struct InstalledPackage {
     /// Package ID
@@ -72,17 +70,16 @@ struct InstalledPackage {
 }
 
 /// Installation source
-#[allow(dead_code)] // Install source variants
 #[derive(Debug, Clone)]
 enum InstallSource {
     /// From library
     Library,
     /// From remote registry
-    Registry(String),
+    _Registry(String),
     /// From local file
-    Local(String),
-    /// As dependency
-    Dependency(Arc<str>),
+    _Local(String),
+    /// As dependency (inner value stored for future use but not yet read)
+    Dependency,
 }
 
 /// Package manager configuration
@@ -127,7 +124,7 @@ impl AssetPackageManager {
         Self {
             library,
             resolver,
-            registry,
+            _registry: registry,
             installed: Arc::new(RwLock::new(HashMap::new())),
             install_locks: Arc::new(RwLock::new(HashSet::new())),
             config,
@@ -145,7 +142,7 @@ impl AssetPackageManager {
         Self {
             library,
             resolver,
-            registry,
+            _registry: registry,
             installed: Arc::new(RwLock::new(HashMap::new())),
             install_locks: Arc::new(RwLock::new(HashSet::new())),
             config,
@@ -255,7 +252,7 @@ impl AssetPackageManager {
                 source: if pkg_id.as_ref() == package_id {
                     InstallSource::Library
                 } else {
-                    InstallSource::Dependency(Arc::from(package_id))
+                    InstallSource::Dependency
                 },
             };
 
@@ -458,7 +455,7 @@ impl AssetPackageManager {
             .values()
             .filter(|pkg| {
                 pkg.dependents.is_empty() &&
-                matches!(pkg.source, InstallSource::Dependency(_))
+                matches!(pkg.source, InstallSource::Dependency)
             })
             .map(|pkg| pkg.id.to_string())
             .collect()

@@ -143,12 +143,11 @@ impl TopologyBackupData {
 }
 
 /// Handles topology backup and restore operations
-#[allow(dead_code)] // Fields used during backup operations
 pub struct TopologyBackup {
     /// Storage directory
     storage_dir: PathBuf,
     /// Node ID
-    node_id: String,
+    _node_id: String,
     /// Compression enabled
     compress: bool,
 }
@@ -161,7 +160,7 @@ impl TopologyBackup {
 
         Ok(Self {
             storage_dir: backup_dir,
-            node_id,
+            _node_id: node_id,
             compress: true,
         })
     }

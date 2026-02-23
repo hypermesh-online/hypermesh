@@ -141,7 +141,7 @@ impl EbpfLoader {
     }
 
     /// Compile a single C file to BPF bytecode
-    #[allow(dead_code)]
+    #[cfg(feature = "ebpf-loader")]
     fn compile_single(&self, source: &Path, output: &Path) -> Result<()> {
         if !source.exists() {
             tracing::warn!(

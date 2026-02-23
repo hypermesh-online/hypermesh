@@ -12,8 +12,7 @@ use crate::assets::core::{
 use std::time::Duration;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
-fn create_test_gpu_request() -> AssetAllocationRequest {
+fn _create_test_gpu_request() -> AssetAllocationRequest {
     AssetAllocationRequest {
         asset_type: AssetType::Gpu,
         requested_resources: crate::assets::core::ResourceRequirements {

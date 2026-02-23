@@ -59,10 +59,9 @@ pub struct CaStoqConfig {
 
 /// Cached certificate entry
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct CachedCertificate {
-    certificate_der: Bytes,
-    chain: Option<Vec<Bytes>>,
+    _certificate_der: Bytes,
+    _chain: Option<Vec<Bytes>>,
     cached_at: SystemTime,
     expires_at: SystemTime,
     fingerprint: String,
@@ -379,8 +378,8 @@ impl CaStoqClient {
         // Cache validation result
         if response.is_valid {
             let cache_entry = CachedCertificate {
-                certificate_der: validation.certificate,
-                chain: validation.chain,
+                _certificate_der: validation.certificate,
+                _chain: validation.chain,
                 cached_at: SystemTime::now(),
                 expires_at: response.expires_at,
                 fingerprint: response.fingerprint.clone(),
@@ -487,8 +486,8 @@ impl CaStoqClient {
     /// Cache certificate after issuance
     async fn cache_certificate(&self, response: &StoqCertificateResponse) {
         let cache_entry = CachedCertificate {
-            certificate_der: response.certificate.clone(),
-            chain: Some(response.chain.clone()),
+            _certificate_der: response.certificate.clone(),
+            _chain: Some(response.chain.clone()),
             cached_at: SystemTime::now(),
             expires_at: response.not_after,
             fingerprint: response.fingerprint.clone(),

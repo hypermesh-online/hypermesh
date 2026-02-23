@@ -25,8 +25,7 @@ pub struct CertificateTransparencyLog {
     /// S3-backed storage for persistence
     storage: Arc<S3BackedStorage>,
     /// Performance monitoring (for CT log health tracking)
-    #[allow(dead_code)]
-    performance_monitor: Arc<CTPerformanceMonitor>,
+    _performance_monitor: Arc<CTPerformanceMonitor>,
     /// Certificate entries cache
     entries_cache: Arc<DashMap<String, CTEntry>>,
     /// Log configuration
@@ -34,13 +33,11 @@ pub struct CertificateTransparencyLog {
     /// Metrics tracking
     metrics: Arc<CTMetrics>,
     /// Consistency checker (for Merkle tree consistency verification)
-    #[allow(dead_code)]
-    consistency_checker: Arc<ConsistencyChecker>,
+    _consistency_checker: Arc<ConsistencyChecker>,
     /// Cryptographic signing key for CT log entries
     signing_key: SigningKey,
     /// Verifying key for signature validation
-    #[allow(dead_code)]
-    verifying_key: VerifyingKey,
+    _verifying_key: VerifyingKey,
 }
 
 impl CertificateTransparencyLog {
@@ -68,13 +65,13 @@ impl CertificateTransparencyLog {
         let ct_log = Self {
             merkle_tree,
             storage,
-            performance_monitor,
+            _performance_monitor: performance_monitor,
             entries_cache,
             config: Arc::new(config),
             metrics,
-            consistency_checker,
+            _consistency_checker: consistency_checker,
             signing_key,
-            verifying_key,
+            _verifying_key: verifying_key,
         };
 
         info!("Certificate Transparency log initialized successfully");
@@ -192,8 +189,7 @@ impl CertificateTransparencyLog {
     }
 
     /// Sign CT entry with cryptographic signature (used for SCT generation)
-    #[allow(dead_code)]
-    async fn sign_entry(&self, entry: &CTEntry) -> TrustChainResult<Vec<u8>> {
+    async fn _sign_entry(&self, entry: &CTEntry) -> TrustChainResult<Vec<u8>> {
         let mut data_to_sign = Vec::new();
         data_to_sign.extend_from_slice(&entry.log_id);
         data_to_sign.extend_from_slice(&entry.sequence_number.to_be_bytes());
@@ -206,8 +202,7 @@ impl CertificateTransparencyLog {
     }
 
     /// Sign tree head with cryptographic signature (used for STH generation)
-    #[allow(dead_code)]
-    pub(crate) async fn sign_tree_head(&self, tree_size: u64) -> TrustChainResult<Vec<u8>> {
+    pub(crate) async fn _sign_tree_head(&self, tree_size: u64) -> TrustChainResult<Vec<u8>> {
         let tree_root = {
             let _tree = self.merkle_tree.read().await;
             [0u8; 32]
@@ -225,8 +220,7 @@ impl CertificateTransparencyLog {
     }
 
     /// Sign arbitrary data with CT log signing key (used for cross-log signing)
-    #[allow(dead_code)]
-    pub(crate) async fn sign_data(&self, data: &[u8]) -> TrustChainResult<Vec<u8>> {
+    pub(crate) async fn _sign_data(&self, data: &[u8]) -> TrustChainResult<Vec<u8>> {
         let signature = self.signing_key.sign(data);
         Ok(signature.to_bytes().to_vec())
     }

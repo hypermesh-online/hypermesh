@@ -25,39 +25,35 @@ pub struct HyperMeshTrustValidator {
 }
 
 /// HyperMesh asset client for trust validation
-#[allow(dead_code)]
 pub struct HyperMeshAssetClient {
-    network_client: Arc<HyperMeshNetworkClient>,
-    asset_cache: Arc<DashMap<AssetId, AssetMetadata>>,
-    verification_engine: Arc<AssetVerificationEngine>,
+    _network_client: Arc<HyperMeshNetworkClient>,
+    _asset_cache: Arc<DashMap<AssetId, AssetMetadata>>,
+    _verification_engine: Arc<AssetVerificationEngine>,
 }
 
 /// Byzantine fault detector for malicious nodes
-#[allow(dead_code)]
 pub struct ByzantineDetector {
-    node_behaviors: Arc<DashMap<NodeId, NodeBehavior>>,
-    patterns: Arc<ByzantinePatterns>,
-    algorithms: Arc<DetectionAlgorithms>,
-    reputation: Arc<ReputationSystem>,
-    alert_system: Arc<AlertSystem>,
+    _node_behaviors: Arc<DashMap<NodeId, NodeBehavior>>,
+    _patterns: Arc<ByzantinePatterns>,
+    _algorithms: Arc<DetectionAlgorithms>,
+    _reputation: Arc<ReputationSystem>,
+    _alert_system: Arc<AlertSystem>,
 }
 
 /// Remote proxy manager for NAT-like asset addressing
-#[allow(dead_code)]
 pub struct RemoteProxyManager {
-    proxy_connections: Arc<DashMap<ProxyId, ProxyConnection>>,
-    selection_strategy: Arc<ProxySelectionStrategy>,
-    trust_router: Arc<TrustBasedRouter>,
-    performance_monitor: Arc<ProxyPerformanceMonitor>,
+    _proxy_connections: Arc<DashMap<ProxyId, ProxyConnection>>,
+    _selection_strategy: Arc<ProxySelectionStrategy>,
+    _trust_router: Arc<TrustBasedRouter>,
+    _performance_monitor: Arc<ProxyPerformanceMonitor>,
 }
 
 /// Trust scoring engine for assets and nodes
-#[allow(dead_code)]
 pub struct TrustScoringEngine {
-    trust_history: Arc<DashMap<EntityId, TrustHistory>>,
-    scoring_algorithms: Arc<ScoringAlgorithms>,
-    thresholds: TrustThresholds,
-    consensus_validator: Arc<FourProofValidator>,
+    _trust_history: Arc<DashMap<EntityId, TrustHistory>>,
+    _scoring_algorithms: Arc<ScoringAlgorithms>,
+    _thresholds: TrustThresholds,
+    _consensus_validator: Arc<FourProofValidator>,
 }
 
 impl HyperMeshTrustValidator {
@@ -154,9 +150,9 @@ impl HyperMeshTrustValidator {
 impl HyperMeshAssetClient {
     pub(crate) async fn new() -> TrustChainResult<Self> {
         Ok(Self {
-            network_client: Arc::new(HyperMeshNetworkClient {}),
-            asset_cache: Arc::new(DashMap::new()),
-            verification_engine: Arc::new(AssetVerificationEngine {}),
+            _network_client: Arc::new(HyperMeshNetworkClient {}),
+            _asset_cache: Arc::new(DashMap::new()),
+            _verification_engine: Arc::new(AssetVerificationEngine {}),
         })
     }
     pub(crate) async fn get_asset_metadata(&self, _asset_id: &AssetId) -> TrustChainResult<AssetMetadata> {
@@ -167,11 +163,11 @@ impl HyperMeshAssetClient {
 impl ByzantineDetector {
     pub(crate) async fn new(_config: &TrustValidatorConfig) -> TrustChainResult<Self> {
         Ok(Self {
-            node_behaviors: Arc::new(DashMap::new()),
-            patterns: Arc::new(ByzantinePatterns {}),
-            algorithms: Arc::new(DetectionAlgorithms {}),
-            reputation: Arc::new(ReputationSystem {}),
-            alert_system: Arc::new(AlertSystem {}),
+            _node_behaviors: Arc::new(DashMap::new()),
+            _patterns: Arc::new(ByzantinePatterns {}),
+            _algorithms: Arc::new(DetectionAlgorithms {}),
+            _reputation: Arc::new(ReputationSystem {}),
+            _alert_system: Arc::new(AlertSystem {}),
         })
     }
     pub(crate) async fn analyze_node_behavior(&self, _node_id: &NodeId) -> TrustChainResult<ByzantineBehaviorAnalysis> {
@@ -192,10 +188,10 @@ impl ByzantineDetector {
 impl RemoteProxyManager {
     pub(crate) async fn new() -> TrustChainResult<Self> {
         Ok(Self {
-            proxy_connections: Arc::new(DashMap::new()),
-            selection_strategy: Arc::new(ProxySelectionStrategy {}),
-            trust_router: Arc::new(TrustBasedRouter {}),
-            performance_monitor: Arc::new(ProxyPerformanceMonitor {}),
+            _proxy_connections: Arc::new(DashMap::new()),
+            _selection_strategy: Arc::new(ProxySelectionStrategy {}),
+            _trust_router: Arc::new(TrustBasedRouter {}),
+            _performance_monitor: Arc::new(ProxyPerformanceMonitor {}),
         })
     }
     pub(crate) async fn find_proxy_candidates(&self, _target: &Ipv6Addr) -> TrustChainResult<Vec<ProxyCandidate>> {
@@ -228,15 +224,15 @@ impl RemoteProxyManager {
 impl TrustScoringEngine {
     pub(crate) async fn new(_config: &TrustValidatorConfig) -> TrustChainResult<Self> {
         Ok(Self {
-            trust_history: Arc::new(DashMap::new()),
-            scoring_algorithms: Arc::new(ScoringAlgorithms {}),
-            thresholds: TrustThresholds {
+            _trust_history: Arc::new(DashMap::new()),
+            _scoring_algorithms: Arc::new(ScoringAlgorithms {}),
+            _thresholds: TrustThresholds {
                 asset_access: 0.7,
                 consensus_participation: 0.8,
                 proxy_establishment: 0.6,
                 data_validation: 0.75,
             },
-            consensus_validator: Arc::new(FourProofValidator::new()),
+            _consensus_validator: Arc::new(FourProofValidator::new()),
         })
     }
     pub(crate) async fn calculate_trust_score(

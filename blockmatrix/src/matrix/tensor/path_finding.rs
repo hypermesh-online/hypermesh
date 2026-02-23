@@ -30,10 +30,9 @@ pub enum PathError {
 
 /// Node in the A* search with cost information
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Fields used in A* algorithm
 struct SearchNode {
     coordinate: MatrixCoordinate,
-    g_cost: f64, // Cost from start to this node
+    _g_cost: f64, // Cost from start to this node
     f_cost: f64, // Total estimated cost (g + h)
 }
 
@@ -133,7 +132,7 @@ impl PathFinder {
         g_score.insert(start.clone(), 0.0);
         open_set.push(SearchNode {
             coordinate: start.clone(),
-            g_cost: 0.0,
+            _g_cost: 0.0,
             f_cost: (self.heuristic)(start, goal),
         });
 
@@ -177,7 +176,7 @@ impl PathFinder {
                     let f_score = tentative_g_score + (self.heuristic)(&neighbor, goal);
                     open_set.push(SearchNode {
                         coordinate: neighbor,
-                        g_cost: tentative_g_score,
+                        _g_cost: tentative_g_score,
                         f_cost: f_score,
                     });
                 }

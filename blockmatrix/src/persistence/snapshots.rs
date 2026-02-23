@@ -68,12 +68,11 @@ pub enum SnapshotType {
 }
 
 /// Manages snapshot creation and lifecycle
-#[allow(dead_code)] // Fields used during snapshot operations
 pub struct SnapshotManager {
     /// Storage directory
     storage_dir: PathBuf,
     /// Node ID
-    node_id: String,
+    _node_id: String,
     /// Current schedule
     schedule: Arc<RwLock<SnapshotSchedule>>,
     /// Snapshot metadata index
@@ -103,7 +102,7 @@ impl SnapshotManager {
 
         Ok(Self {
             storage_dir: snapshot_dir,
-            node_id,
+            _node_id: node_id,
             schedule: Arc::new(RwLock::new(schedule)),
             snapshots: Arc::new(RwLock::new(snapshots)),
             event_counter: Arc::new(RwLock::new(0)),

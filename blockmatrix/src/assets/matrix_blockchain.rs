@@ -490,14 +490,13 @@ impl EntityBlockchain {
 }
 
 /// Matrix blockchain manager for managing multiple entity chains
-#[allow(dead_code)] // Fields used during blockchain management
 pub struct MatrixBlockchainManager {
     /// All entity blockchains in the matrix
     entity_chains: HashMap<String, EntityBlockchain>,
     /// Matrix routing table
     routing_table: HashMap<String, BlockchainMatrixCoordinate>,
     /// Cross-chain validation protocols
-    validation_protocols: HashMap<String, ValidationProtocol>,
+    _validation_protocols: HashMap<String, ValidationProtocol>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -521,7 +520,7 @@ impl MatrixBlockchainManager {
         Self {
             entity_chains: HashMap::new(),
             routing_table: HashMap::new(),
-            validation_protocols: HashMap::new(),
+            _validation_protocols: HashMap::new(),
         }
     }
 

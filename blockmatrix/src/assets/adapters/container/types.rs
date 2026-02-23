@@ -227,9 +227,8 @@ pub struct ContainerUsageStats {
 
 /// Container operations for statistics
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub(crate) enum ContainerOperation {
     Create,
     Destroy,
-    Restart,
+    _Restart,
 }

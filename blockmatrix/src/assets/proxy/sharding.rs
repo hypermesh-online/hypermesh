@@ -31,16 +31,15 @@ pub struct ShardedDataAccess {
 }
 
 /// Shard manager for handling encrypted shards
-#[allow(dead_code)] // Fields used during shard operations
 pub struct ShardManager {
     /// Available shards by shard key
     available_shards: Arc<RwLock<HashMap<String, EncryptedShard>>>,
 
     /// Shard locations (node_id -> shard_keys)
-    shard_locations: Arc<RwLock<HashMap<String, Vec<String>>>>,
+    _shard_locations: Arc<RwLock<HashMap<String, Vec<String>>>>,
 
     /// Shard reconstruction cache
-    reconstruction_cache: Arc<RwLock<HashMap<String, Vec<u8>>>>,
+    _reconstruction_cache: Arc<RwLock<HashMap<String, Vec<u8>>>>,
 
     /// Kyber-1024 public key bytes for encryption
     kyber_public_key: Vec<u8>,
@@ -182,25 +181,24 @@ pub struct SessionProgress {
 
 /// Shard access configuration
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Config fields for shard access control
 struct ShardAccessConfig {
     /// Maximum concurrent shard sessions
     max_concurrent_sessions: u32,
-    
+
     /// Session timeout duration
     session_timeout: Duration,
-    
+
     /// Maximum shard size in bytes
-    max_shard_size: u64,
-    
+    _max_shard_size: u64,
+
     /// Enable shard reconstruction caching
-    enable_reconstruction_cache: bool,
-    
+    _enable_reconstruction_cache: bool,
+
     /// Cache timeout duration
-    cache_timeout: Duration,
-    
+    _cache_timeout: Duration,
+
     /// Maximum cache size in bytes
-    max_cache_size: u64,
+    _max_cache_size: u64,
 }
 
 impl Default for ShardAccessConfig {
@@ -208,30 +206,29 @@ impl Default for ShardAccessConfig {
         Self {
             max_concurrent_sessions: 100,
             session_timeout: Duration::from_secs(300), // 5 minutes
-            max_shard_size: 64 * 1024 * 1024, // 64MB
-            enable_reconstruction_cache: true,
-            cache_timeout: Duration::from_secs(3600), // 1 hour
-            max_cache_size: 1024 * 1024 * 1024, // 1GB
+            _max_shard_size: 64 * 1024 * 1024, // 64MB
+            _enable_reconstruction_cache: true,
+            _cache_timeout: Duration::from_secs(3600), // 1 hour
+            _max_cache_size: 1024 * 1024 * 1024, // 1GB
         }
     }
 }
 
 /// Shard manager configuration
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Config fields for shard management
 struct ShardManagerConfig {
     /// Redundancy factor (how many copies of each shard)
-    redundancy_factor: u32,
-    
+    _redundancy_factor: u32,
+
     /// Minimum shards required for reconstruction
-    min_shards_required: u32,
-    
+    _min_shards_required: u32,
+
     /// Enable integrity checking
     enable_integrity_checking: bool,
-    
+
     /// Enable compression before encryption
-    enable_compression: bool,
-    
+    _enable_compression: bool,
+
     /// Shard size target in bytes
     target_shard_size: u64,
 }
@@ -239,10 +236,10 @@ struct ShardManagerConfig {
 impl Default for ShardManagerConfig {
     fn default() -> Self {
         Self {
-            redundancy_factor: 3,
-            min_shards_required: 2,
+            _redundancy_factor: 3,
+            _min_shards_required: 2,
             enable_integrity_checking: true,
-            enable_compression: true,
+            _enable_compression: true,
             target_shard_size: 16 * 1024 * 1024, // 16MB
         }
     }
@@ -487,8 +484,8 @@ impl ShardManager {
 
         Ok(Self {
             available_shards: Arc::new(RwLock::new(HashMap::new())),
-            shard_locations: Arc::new(RwLock::new(HashMap::new())),
-            reconstruction_cache: Arc::new(RwLock::new(HashMap::new())),
+            _shard_locations: Arc::new(RwLock::new(HashMap::new())),
+            _reconstruction_cache: Arc::new(RwLock::new(HashMap::new())),
             kyber_public_key: pk.as_bytes().to_vec(),
             kyber_secret_key: sk.as_bytes().to_vec(),
             config: ShardManagerConfig::default(),

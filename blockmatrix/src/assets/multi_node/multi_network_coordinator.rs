@@ -118,10 +118,9 @@ impl StoqIsolationManager {
 }
 
 /// Network asset router - matrix-based routing for assets
-#[allow(dead_code)] // Fields used during asset routing
 pub struct NetworkAssetRouter {
     /// Network ID
-    network_id: NetworkId,
+    _network_id: NetworkId,
     /// Assets visible in this network
     visible_assets: HashSet<AssetRegistration>,
     /// Matrix positions for assets
@@ -146,7 +145,7 @@ pub struct IntegerMatrixPosition {
 impl NetworkAssetRouter {
     pub fn new(network_id: NetworkId) -> Self {
         Self {
-            network_id,
+            _network_id: network_id,
             visible_assets: HashSet::new(),
             asset_positions: HashMap::new(),
             routing_table: HashMap::new(),

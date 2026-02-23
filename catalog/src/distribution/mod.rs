@@ -27,10 +27,9 @@ use package_manager::PackageManager;
 use peer_discovery::PeerDiscovery;
 
 /// P2P Distribution system for Catalog assets
-#[allow(dead_code)] // Distribution system fields for P2P operations
 pub struct P2PDistribution {
     /// Catalog registry for asset discovery
-    registry: Arc<crate::registry::CatalogRegistry>,
+    _registry: Arc<crate::registry::CatalogRegistry>,
     /// STOQ transport layer for P2P communication
     transport: Arc<StoqTransportLayer>,
     /// DHT network for package discovery
@@ -310,7 +309,7 @@ impl P2PDistribution {
         );
 
         Ok(Self {
-            registry,
+            _registry: registry,
             transport,
             dht,
             content_store,

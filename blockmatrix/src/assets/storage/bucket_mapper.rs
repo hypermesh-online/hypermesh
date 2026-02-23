@@ -59,7 +59,6 @@ impl Default for MatrixConstraints {
 
 /// Access pattern analysis for intelligent placement
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // Fields used in access pattern analysis
 struct AccessPattern {
     /// Positions that frequently request this bucket
     requester_positions: HashMap<MatrixCoordinate, usize>,
@@ -68,7 +67,7 @@ struct AccessPattern {
     total_accesses: usize,
 
     /// Average access interval (seconds)
-    avg_interval: f64,
+    _avg_interval: f64,
 
     /// Last access timestamp
     last_access: i64,
@@ -114,10 +113,9 @@ impl AccessPattern {
 }
 
 /// Bucket to matrix position mapper
-#[allow(dead_code)] // Fields used during bucket mapping
 pub struct BucketMapper {
     /// Matrix foundation for tensor operations
-    foundation: Arc<MatrixFoundation>,
+    _foundation: Arc<MatrixFoundation>,
 
     /// Bucket location cache
     bucket_locations: Arc<RwLock<HashMap<BucketId, Vec<MatrixCoordinate>>>>,
@@ -185,7 +183,7 @@ impl BucketMapper {
         }
 
         Ok(Self {
-            foundation,
+            _foundation: foundation,
             bucket_locations: Arc::new(RwLock::new(HashMap::new())),
             access_patterns: Arc::new(RwLock::new(HashMap::new())),
             available_positions: Arc::new(RwLock::new(available_positions)),

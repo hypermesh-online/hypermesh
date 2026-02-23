@@ -66,8 +66,7 @@ pub struct HybridEncryption {
 /// Hybrid cryptography operations handler
 pub struct HybridCrypto {
     /// Algorithm identifier (retained for algorithm negotiation)
-    #[allow(dead_code)]
-    algorithm_id: String,
+    _algorithm_id: String,
     /// FALCON-1024 handler
     falcon: super::falcon::FalconCrypto,
     /// Kyber handler
@@ -83,7 +82,7 @@ impl HybridCrypto {
         let kyber = super::kyber::KyberCrypto::new()?;
         
         Ok(Self {
-            algorithm_id: "Hybrid-PQC".to_string(),
+            _algorithm_id: "Hybrid-PQC".to_string(),
             falcon,
             kyber,
         })
@@ -439,7 +438,7 @@ mod tests {
     #[tokio::test]
     async fn test_hybrid_crypto_initialization() {
         let hybrid = HybridCrypto::new().unwrap();
-        assert_eq!(hybrid.algorithm_id, "Hybrid-PQC");
+        assert_eq!(hybrid._algorithm_id, "Hybrid-PQC");
     }
     
     #[tokio::test]

@@ -42,12 +42,11 @@ pub struct LinuxAbstraction {
 }
 
 /// State of an active eBPF program
-#[allow(dead_code)] // Fields populated during eBPF program lifecycle
 struct EbpfProgramState {
-    program_type: EbpfProgramType,
+    _program_type: EbpfProgramType,
     attached: bool,
     attach_type: Option<EbpfAttachType>,
-    bytecode: Vec<u8>,
+    _bytecode: Vec<u8>,
     metrics: HashMap<String, u64>,
     last_update: std::time::SystemTime,
 }
@@ -106,8 +105,7 @@ impl LinuxAbstraction {
     }
 
     /// Check if kernel supports advanced eBPF features
-    #[allow(dead_code)] // Will be used for advanced eBPF feature detection
-    fn kernel_supports_btf(&self) -> bool {
+    fn _kernel_supports_btf(&self) -> bool {
         let (major, _, _) = self.kernel_version;
         major >= 5
     }
@@ -397,8 +395,7 @@ impl LinuxAbstraction {
     }
 
     /// Get process count from /proc
-    #[allow(dead_code)] // Will be used for resource monitoring
-    fn get_process_count(&self) -> Option<usize> {
+    fn _get_process_count(&self) -> Option<usize> {
         fs::read_dir("/proc")
             .ok()?
             .filter_map(|entry| entry.ok())
@@ -508,10 +505,10 @@ impl OsAbstraction for LinuxAbstraction {
         // NOTE: Actual kernel loading would use aya::Bpf::load_file() or similar
         // For now, we store the bytecode and mark it as loaded
         let state = EbpfProgramState {
-            program_type: EbpfProgramType::Generic,
+            _program_type: EbpfProgramType::Generic,
             attached: false,
             attach_type: None,
-            bytecode: program.to_vec(),
+            _bytecode: program.to_vec(),
             metrics: HashMap::new(),
             last_update: std::time::SystemTime::now(),
         };

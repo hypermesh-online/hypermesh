@@ -22,7 +22,7 @@ impl CaesarRewardCalculator {
             base_config: base_config.clone(),
             reward_tiers: Self::create_default_tiers(),
             performance_bonuses: Self::create_default_bonuses(),
-            penalty_configs: Self::create_default_penalties(),
+            _penalty_configs: Self::create_default_penalties(),
             dynamic_factors: DynamicAdjustmentFactors::default(),
         })
     }

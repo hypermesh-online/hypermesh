@@ -175,9 +175,9 @@ impl TrustChainStoqClient {
 
         let cache_entry = CertificateValidationResult {
             is_valid,
-            validated_at: SystemTime::now(),
+            _validated_at: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(3600),
-            fingerprint: fingerprint.clone(),
+            _fingerprint: fingerprint.clone(),
         };
         let fingerprint_for_log = fingerprint.clone();
         self.cert_cache.insert(fingerprint, cache_entry);

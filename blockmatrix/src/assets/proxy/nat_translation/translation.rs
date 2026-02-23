@@ -15,14 +15,13 @@ use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ProxyAddre
 use super::types::*;
 
 /// The main NAT translator for memory addressing
-#[allow(dead_code)] // Fields used during NAT translation operations
 pub struct NATTranslator {
     /// Global to local address mappings
     global_to_local: Arc<RwLock<HashMap<GlobalAddress, LocalAddressMapping>>>,
     /// Local to global address mappings (reverse lookup)
     local_to_global: Arc<RwLock<HashMap<usize, GlobalAddress>>>,
     /// Address allocation tracking
-    address_allocator: Arc<RwLock<AddressAllocator>>,
+    _address_allocator: Arc<RwLock<AddressAllocator>>,
     /// Network configuration
     network_config: NetworkConfig,
     /// Translation statistics
@@ -34,16 +33,16 @@ impl NATTranslator {
     pub async fn new() -> AssetResult<Self> {
         let network_config = NetworkConfig {
             network_prefix: [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad],
-            local_node_id: Self::generate_local_node_id(),
+            _local_node_id: Self::generate_local_node_id(),
             address_space_start: 0x1000_0000,
             address_space_size: 0x4000_0000,
         };
 
         let address_allocator = AddressAllocator {
-            next_local_address: network_config.address_space_start,
-            address_space_size: network_config.address_space_size,
-            allocated_ranges: Vec::new(),
-            free_ranges: vec![AddressRange {
+            _next_local_address: network_config.address_space_start,
+            _address_space_size: network_config.address_space_size,
+            _allocated_ranges: Vec::new(),
+            _free_ranges: vec![AddressRange {
                 start: network_config.address_space_start,
                 end: network_config.address_space_start + network_config.address_space_size as usize - 1,
                 size: network_config.address_space_size,
@@ -53,7 +52,7 @@ impl NATTranslator {
         Ok(Self {
             global_to_local: Arc::new(RwLock::new(HashMap::new())),
             local_to_global: Arc::new(RwLock::new(HashMap::new())),
-            address_allocator: Arc::new(RwLock::new(address_allocator)),
+            _address_allocator: Arc::new(RwLock::new(address_allocator)),
             network_config,
             translation_stats: Arc::new(RwLock::new(TranslationStats::default())),
         })

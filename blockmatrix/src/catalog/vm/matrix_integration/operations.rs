@@ -281,9 +281,9 @@ impl MatrixAwareVM {
         response: PublicValidationResponse,
     ) {
         let cached = CachedValidation {
-            validation_request: validation,
+            _validation_request: validation,
             validation_response: response,
-            cached_at: std::time::SystemTime::now(),
+            _cached_at: std::time::SystemTime::now(),
             expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(300),
         };
         self.validation_cache.lock().expect("mutex poisoned").insert(cache_key, cached);

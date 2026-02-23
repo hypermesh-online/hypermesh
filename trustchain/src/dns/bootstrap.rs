@@ -28,8 +28,7 @@ pub enum DnsBackend {
     },
 
     /// Phase 3: BlockMatrix assets (optional upgrade after BlockMatrix is running)
-    #[allow(dead_code)]
-    BlockMatrixAsset {
+    _BlockMatrixAsset {
         asset_id: String,
         // Note: This variant is intentionally not implemented yet
         // to avoid circular dependency. Will be added after BlockMatrix integration.
@@ -51,8 +50,7 @@ pub struct TrustChainBootstrap {
     /// DNS backend storage
     dns_backend: DnsBackend,
     /// Bootstrap configuration (retained for phase-based bootstrap operations)
-    #[allow(dead_code)]
-    config: BootstrapConfig,
+    _config: BootstrapConfig,
     /// Bootstrap state
     state: Arc<RwLock<BootstrapState>>,
 }
@@ -168,7 +166,7 @@ impl TrustChainBootstrap {
 
         let mut bootstrap = Self {
             dns_backend,
-            config: config.clone(),
+            _config: config.clone(),
             state,
         };
 
@@ -211,7 +209,7 @@ impl TrustChainBootstrap {
 
         let mut bootstrap = Self {
             dns_backend,
-            config: config.clone(),
+            _config: config.clone(),
             state,
         };
 
@@ -246,7 +244,7 @@ impl TrustChainBootstrap {
                 // Persist to disk
                 self.persist_to_disk(path).await?;
             }
-            DnsBackend::BlockMatrixAsset { .. } => {
+            DnsBackend::_BlockMatrixAsset { .. } => {
                 // Not implemented yet - would require BlockMatrix dependency
                 return Err(anyhow::anyhow!("BlockMatrix backend not yet implemented"));
             }
@@ -263,7 +261,7 @@ impl TrustChainBootstrap {
             DnsBackend::FileSystem { cache, .. } => {
                 Ok(cache.read().await.get(name).cloned())
             }
-            DnsBackend::BlockMatrixAsset { .. } => {
+            DnsBackend::_BlockMatrixAsset { .. } => {
                 // Not implemented yet
                 Err(anyhow::anyhow!("BlockMatrix backend not yet implemented"))
             }
@@ -279,7 +277,7 @@ impl TrustChainBootstrap {
             DnsBackend::FileSystem { cache, .. } => {
                 Ok(cache.read().await.values().cloned().collect())
             }
-            DnsBackend::BlockMatrixAsset { .. } => {
+            DnsBackend::_BlockMatrixAsset { .. } => {
                 Err(anyhow::anyhow!("BlockMatrix backend not yet implemented"))
             }
         }

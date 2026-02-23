@@ -171,8 +171,7 @@ pub struct SyncProtocol {
     /// Quorum tracking for block heights.
     quorum_state: Arc<RwLock<QuorumState>>,
     /// Flag indicating whether a sync operation is currently active.
-    #[allow(dead_code)]
-    sync_in_progress: RwLock<bool>,
+    _sync_in_progress: RwLock<bool>,
 }
 
 impl SyncProtocol {
@@ -198,7 +197,7 @@ impl SyncProtocol {
             local_block_height: AtomicU64::new(0),
             health_tracker: Arc::new(DashMap::new()),
             quorum_state: Arc::new(RwLock::new(QuorumState::new())),
-            sync_in_progress: RwLock::new(false),
+            _sync_in_progress: RwLock::new(false),
         }
     }
 

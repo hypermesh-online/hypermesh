@@ -34,7 +34,6 @@ pub const PLUGIN_VERSION: &str = "1.0.0";
 pub const REQUIRED_HYPERMESH_VERSION: &str = "1.0.0";
 
 /// Catalog plugin wrapper for HyperMesh integration
-#[allow(dead_code)] // Plugin fields used during lifecycle
 pub struct CatalogPlugin {
     /// Inner catalog extension
     inner: Arc<RwLock<CatalogExtension>>,
@@ -46,7 +45,7 @@ pub struct CatalogPlugin {
     initialized: bool,
 
     /// Asset handlers
-    handlers: HashMap<AssetType, Box<dyn AssetExtensionHandler>>,
+    _handlers: HashMap<AssetType, Box<dyn AssetExtensionHandler>>,
 }
 
 impl CatalogPlugin {
@@ -64,7 +63,7 @@ impl CatalogPlugin {
                 debug_mode: false,
             },
             initialized: false,
-            handlers: HashMap::new(),
+            _handlers: HashMap::new(),
         }
     }
 }

@@ -17,9 +17,8 @@ use super::super::super::execution::{ExecutionContext, ExecutionResult};
 use super::{LanguageRuntime, BaseAdapter, LanguageSpecificConfig, ConsensusBridge};
 use super::super::{ConsensusRequirements, ConsensusConstruct, AssetRequirements, TranslatedError};
 
-#[allow(dead_code)] // Fields used during C adapter operations
 pub struct CAdapter {
-    base: BaseAdapter,
+    _base: BaseAdapter,
 }
 
 impl CAdapter {
@@ -35,7 +34,7 @@ impl CAdapter {
             consensus_bridge,
             config,
         );
-        Ok(Self { base })
+        Ok(Self { _base: base })
     }
 }
 

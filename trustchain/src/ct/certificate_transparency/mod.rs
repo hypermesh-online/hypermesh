@@ -67,7 +67,7 @@ mod tests {
         let ct_log = CertificateTransparencyLog::new().await.expect("test");
 
         let test_data = b"test signing data";
-        let signature = ct_log.sign_data(test_data).await.expect("test");
+        let signature = ct_log._sign_data(test_data).await.expect("test");
 
         assert!(!signature.iter().all(|&b| b == 0));
         assert_eq!(signature.len(), 64);
@@ -78,7 +78,7 @@ mod tests {
         let ct_log = CertificateTransparencyLog::new().await.expect("test");
 
         let tree_size = 100;
-        let signature = ct_log.sign_tree_head(tree_size).await.expect("test");
+        let signature = ct_log._sign_tree_head(tree_size).await.expect("test");
 
         assert!(!signature.iter().all(|&b| b == 0));
         assert_eq!(signature.len(), 64);

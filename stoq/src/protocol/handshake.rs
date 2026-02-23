@@ -346,8 +346,7 @@ impl StoqHandshakeExtension {
 /// STOQ-enhanced QUIC crypto session
 pub struct StoqCryptoSession {
     /// Base crypto session (retained for future QUIC crypto trait integration)
-    #[allow(dead_code)]
-    inner: Box<dyn Session>,
+    _inner: Box<dyn Session>,
 
     /// STOQ handshake extension
     extension: Arc<StoqHandshakeExtension>,
@@ -364,7 +363,7 @@ impl StoqCryptoSession {
         conn_id: String,
     ) -> Self {
         Self {
-            inner,
+            _inner: inner,
             extension,
             conn_id,
         }

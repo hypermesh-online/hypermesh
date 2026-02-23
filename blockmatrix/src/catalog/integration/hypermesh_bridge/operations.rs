@@ -22,7 +22,6 @@ use crate::container::{ContainerSpec, ResourceRequirements};
 use super::types::*;
 
 /// Catalog-HyperMesh deployment bridge
-#[allow(dead_code)] // Fields used during deployment bridging
 pub struct CatalogHyperMeshBridge {
     /// VM runtime for code execution
     vm_runtime: Arc<ConsensusProofVM>,
@@ -33,7 +32,7 @@ pub struct CatalogHyperMeshBridge {
     /// Bridge metrics
     metrics: Arc<Mutex<BridgeMetrics>>,
     /// Configuration
-    config: BridgeConfiguration,
+    _config: BridgeConfiguration,
 }
 
 impl CatalogHyperMeshBridge {
@@ -48,7 +47,7 @@ impl CatalogHyperMeshBridge {
             container_orchestrator,
             active_deployments: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(Mutex::new(BridgeMetrics::default())),
-            config,
+            _config: config,
         })
     }
 

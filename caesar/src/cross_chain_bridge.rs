@@ -141,14 +141,13 @@ pub struct NetworkConfig {
 }
 
 /// Cross-chain bridge manager
-#[allow(dead_code)] // Bridge fields for cross-chain operations
 pub struct CrossChainBridge {
     /// Network configurations
     networks: Arc<RwLock<HashMap<NetworkType, NetworkConfig>>>,
     /// Active bridge transactions
     transactions: Arc<RwLock<HashMap<String, BridgeTransaction>>>,
     /// Bridge liquidity pools
-    liquidity_pools: Arc<RwLock<HashMap<NetworkType, Decimal>>>,
+    _liquidity_pools: Arc<RwLock<HashMap<NetworkType, Decimal>>>,
     /// Stability mechanism settings
     stability_config: StabilityConfig,
     /// Fee calculation engine
@@ -248,7 +247,7 @@ impl CrossChainBridge {
         Ok(Self {
             networks: Arc::new(RwLock::new(networks)),
             transactions: Arc::new(RwLock::new(HashMap::new())),
-            liquidity_pools: Arc::new(RwLock::new(HashMap::new())),
+            _liquidity_pools: Arc::new(RwLock::new(HashMap::new())),
             stability_config,
             fee_calculator,
         })

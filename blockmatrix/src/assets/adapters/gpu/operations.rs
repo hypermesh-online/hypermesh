@@ -162,10 +162,10 @@ impl GpuAssetAdapter {
                 stats.active_allocations = stats.active_allocations.saturating_sub(1);
                 stats.total_memory_allocated = stats.total_memory_allocated.saturating_sub(memory_bytes);
             },
-            GpuOperation::Compute => {
+            GpuOperation::_Compute => {
                 stats.compute_operations += 1;
             },
-            GpuOperation::MemoryTransfer => {
+            GpuOperation::_MemoryTransfer => {
                 stats.memory_transfers += 1;
             },
         }

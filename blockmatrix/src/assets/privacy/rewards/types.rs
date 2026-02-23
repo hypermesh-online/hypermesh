@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::assets::privacy::CaesarRewardConfig;
 
 /// CAESAR reward calculator and manager
-#[allow(dead_code)] // Fields used during reward calculation
 pub struct CaesarRewardCalculator {
     /// Base reward configuration
     pub(crate) base_config: CaesarRewardConfig,
@@ -23,7 +22,7 @@ pub struct CaesarRewardCalculator {
     pub(crate) performance_bonuses: Vec<PerformanceBonus>,
 
     /// Penalty configurations
-    pub(crate) penalty_configs: Vec<PenaltyConfig>,
+    pub(crate) _penalty_configs: Vec<PenaltyConfig>,
 
     /// Dynamic adjustment factors
     pub(crate) dynamic_factors: DynamicAdjustmentFactors,

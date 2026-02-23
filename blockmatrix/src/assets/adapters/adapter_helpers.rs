@@ -19,8 +19,7 @@ use crate::assets::core::privacy::{AllocationConfig, AccessConfig, ResourceAlloc
 use crate::assets::core::status::{AssetHealthStatus, AssetPerformanceMetrics};
 
 /// Create a standard AssetAllocation for adapter responses
-#[allow(dead_code)] // Public API for adapter implementations
-pub fn create_asset_allocation(
+pub fn _create_asset_allocation(
     asset_id: AssetRegistration,
     request: &AssetAllocationRequest,
     proxy_address: Option<ProxyAddress>,
@@ -87,8 +86,7 @@ pub fn create_asset_allocation(
 }
 
 /// Create a standard AssetStatus for adapter responses
-#[allow(dead_code)] // Public API for adapter implementations
-pub fn create_asset_status(
+pub fn _create_asset_status(
     asset_id: AssetRegistration,
     state: AssetState,
     privacy_level: PrivacyMode,
@@ -125,8 +123,7 @@ pub fn create_asset_status(
 }
 
 /// Get supported privacy levels for all adapters
-#[allow(dead_code)] // Public API for adapter implementations
-pub fn get_supported_privacy_levels() -> Vec<PrivacyMode> {
+pub fn _get_supported_privacy_levels() -> Vec<PrivacyMode> {
     vec![
         PrivacyMode::PRIVATE,
         PrivacyMode::PRIVATE,

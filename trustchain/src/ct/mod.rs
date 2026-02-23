@@ -57,8 +57,7 @@ pub struct CertificateTransparency {
     /// Configuration
     config: Arc<CTConfig>,
     /// Consensus validation context (retained for CT log consensus operations)
-    #[allow(dead_code)]
-    consensus_context: Arc<ConsensusContext>,
+    _consensus_context: Arc<ConsensusContext>,
     /// Background task handles
     task_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
@@ -173,7 +172,7 @@ impl CertificateTransparency {
             fingerprint_tracker,
             storage,
             config: Arc::new(config),
-            consensus_context,
+            _consensus_context: consensus_context,
             task_handles: Arc::new(Mutex::new(Vec::new())),
         };
 

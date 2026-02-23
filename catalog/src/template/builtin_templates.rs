@@ -1,0 +1,207 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
+//! Built-in template definitions for the Catalog template generator.
+
+use std::collections::HashMap;
+use chrono::Utc;
+
+use super::{
+    CatalogTemplateGenerator, TemplateDefinition, TemplateRuntime,
+    TemplateParameter, ParameterConstraints, TemplateMetadata,
+};
+
+use anyhow::Result;
+
+impl CatalogTemplateGenerator {
+    /// Load built-in templates
+    pub(super) fn load_builtin_templates(&mut self) -> Result<()> {
+        // Lua script template
+        self.register_template(TemplateDefinition {
+            name: "lua-script".to_string(),
+            description: "Basic Lua script asset template".to_string(),
+            version: "1.0.0".to_string(),
+            runtime: TemplateRuntime {
+                runtime_type: "lua".to_string(),
+                version: "5.4".to_string(),
+            },
+            parameters: vec![
+                TemplateParameter {
+                    name: "script_name".to_string(),
+                    param_type: "string".to_string(),
+                    default: None,
+                    description: Some("Name of the Lua script".to_string()),
+                    required: true,
+                    constraints: Some(ParameterConstraints {
+                        min: None,
+                        max: None,
+                        min_length: Some(1),
+                        max_length: Some(64),
+                        pattern: Some(r"^[a-zA-Z][a-zA-Z0-9_-]*$".to_string()),
+                        allowed_values: None,
+                    }),
+                },
+                TemplateParameter {
+                    name: "sandbox_level".to_string(),
+                    param_type: "string".to_string(),
+                    default: Some(serde_json::Value::String("standard".to_string())),
+                    description: Some("Security sandbox level".to_string()),
+                    required: false,
+                    constraints: Some(ParameterConstraints {
+                        min: None,
+                        max: None,
+                        min_length: None,
+                        max_length: None,
+                        pattern: None,
+                        allowed_values: Some(vec![
+                            serde_json::Value::String("minimal".to_string()),
+                            serde_json::Value::String("standard".to_string()),
+                            serde_json::Value::String("strict".to_string()),
+                            serde_json::Value::String("paranoid".to_string()),
+                        ]),
+                    }),
+                },
+            ],
+            files: get_lua_template_files(),
+            post_actions: vec![],
+            metadata: TemplateMetadata {
+                author: "Catalog Team".to_string(),
+                created: Utc::now(),
+                updated: Utc::now(),
+                tags: vec!["lua".to_string(), "script".to_string(), "logic".to_string()],
+                compatible_versions: vec!["^1.0.0".to_string()],
+                required_tools: vec!["lua".to_string()],
+            },
+        })?;
+
+        Ok(())
+    }
+}
+
+/// Get Lua template files
+fn get_lua_template_files() -> HashMap<String, String> {
+    let mut files = HashMap::new();
+
+    files.insert("asset.yaml".to_string(), r#"
+apiVersion: "catalog.v1"
+kind: "Asset"
+metadata:
+  name: "{{asset_name}}"
+  version: "{{asset_version}}"
+  tags: ["lua", "script", "logic"]
+  keywords: []
+  description: "{{description}}"
+  author: "{{author}}"
+  license: "MIT"
+
+spec:
+  type: "lua-script"
+  content:
+    main: "{{script_name}}.lua"
+    files: []
+    binary: []
+    templates: []
+
+  security:
+    consensus_required: false
+    certificate_pinning: false
+    hash_validation: "sha256"
+    sandbox_level: "{{sandbox_level}}"
+    allowed_syscalls: []
+    network_access:
+      enabled: false
+      allowed_domains: []
+      allowed_ports: []
+      require_tls: true
+    file_access:
+      level: "read_only"
+      allowed_paths: []
+      denied_paths: []
+      allow_temp: false
+    permissions: []
+
+  resources:
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    execution_timeout: "30s"
+    gpu_required: false
+    hardware_requirements: []
+
+  execution:
+    delegation_strategy: "load_balanced"
+    minimum_consensus: 1
+    retry_policy: "simple"
+    priority: "normal"
+    timeout_config:
+      execution: "30s"
+      network: "10s"
+      io: "5s"
+    scheduling:
+      timing: "immediate"
+      allocation_strategy: "first_fit"
+      node_affinity: []
+      anti_affinity: []
+
+  dependencies: []
+  environment: {}
+"#.to_string());
+
+    files.insert("{{script_name}}.lua".to_string(), r#"
+-- {{script_name}} - {{description}}
+-- Generated by Catalog Template Generator on {{date "Y-m-d H:M:S"}}
+
+local {{script_name}} = {}
+
+-- Main function
+function {{script_name}}.main()
+    print("Starting {{script_name}}...")
+
+    -- Your Lua code goes here
+    local result = {{script_name}}.process_data()
+
+    print("{{script_name}} completed successfully!")
+    return result
+end
+
+-- Core processing logic
+function {{script_name}}.process_data()
+    -- Example data processing - replace with your actual logic
+    local data = {
+        values = {1, 2, 3, 4, 5},
+        metadata = {
+            created = os.date("%Y-%m-%d %H:%M:%S"),
+            source = "{{script_name}}"
+        }
+    }
+
+    -- Process the data
+    local sum = 0
+    for i, value in ipairs(data.values) do
+        sum = sum + value
+    end
+
+    return {
+        sum = sum,
+        count = #data.values,
+        average = sum / #data.values,
+        metadata = data.metadata
+    }
+end
+
+-- Utility function
+function {{script_name}}.validate_input(input)
+    return type(input) == "table" and input ~= nil
+end
+
+-- Execute if run directly
+if debug.getinfo(2) == nil then
+    local result = {{script_name}}.main()
+    print("Result:", result.sum, result.average)
+end
+
+return {{script_name}}
+"#.to_string());
+
+    files
+}

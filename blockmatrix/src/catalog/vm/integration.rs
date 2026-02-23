@@ -27,10 +27,9 @@ impl Default for VMIntegrationConfig {
     }
 }
 
-#[allow(dead_code)] // Fields used during VM integration management
 pub struct VMIntegrationManager {
-    config: VMIntegrationConfig,
-    active_vms: HashMap<String, VMInstance>,
+    _config: VMIntegrationConfig,
+    _active_vms: HashMap<String, VMInstance>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,8 +49,8 @@ pub enum VMStatus {
 impl VMIntegrationManager {
     pub fn new(config: VMIntegrationConfig) -> Self {
         Self {
-            config,
-            active_vms: HashMap::new(),
+            _config: config,
+            _active_vms: HashMap::new(),
         }
     }
 }

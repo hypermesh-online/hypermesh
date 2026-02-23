@@ -15,13 +15,12 @@ use super::BootstrapPhase;
 
 /// Bootstrap metrics tracking
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct BootstrapMetrics {
     phase_start_times: DashMap<BootstrapPhase, Instant>,
     phase_completion_times: DashMap<BootstrapPhase, Instant>,
-    component_startup_times: DashMap<String, Duration>,
-    error_counts: DashMap<String, u32>,
-    bootstrap_start: Option<Instant>,
+    _component_startup_times: DashMap<String, Duration>,
+    _error_counts: DashMap<String, u32>,
+    _bootstrap_start: Option<Instant>,
 }
 
 impl BootstrapMetrics {
@@ -29,9 +28,9 @@ impl BootstrapMetrics {
         Self {
             phase_start_times: DashMap::new(),
             phase_completion_times: DashMap::new(),
-            component_startup_times: DashMap::new(),
-            error_counts: DashMap::new(),
-            bootstrap_start: None,
+            _component_startup_times: DashMap::new(),
+            _error_counts: DashMap::new(),
+            _bootstrap_start: None,
         }
     }
 

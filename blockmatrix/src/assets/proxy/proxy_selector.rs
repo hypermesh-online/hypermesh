@@ -151,10 +151,9 @@ pub enum ProxyNodeStatus {
 }
 
 /// Proxy selector with trust validation
-#[allow(dead_code)] // Fields used during proxy selection
 pub struct ProxySelector {
     /// TrustChain integration
-    trust_chain: Arc<TrustChainIntegration>,
+    _trust_chain: Arc<TrustChainIntegration>,
 
     /// Certificate validator
     validator: Arc<CertificateValidator>,
@@ -220,7 +219,7 @@ impl ProxySelector {
         config: ProxySelectorConfig,
     ) -> Self {
         Self {
-            trust_chain,
+            _trust_chain: trust_chain,
             validator,
             proxy_nodes: Arc::new(RwLock::new(HashMap::new())),
             selection_cache: Arc::new(RwLock::new(HashMap::new())),

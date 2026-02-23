@@ -231,8 +231,7 @@ struct TrustChainConfig {
     enable_online_revocation_check: bool,
     
     /// Revocation check timeout
-    #[allow(dead_code)] // Config field for future revocation checking
-    revocation_check_timeout: Duration,
+    _revocation_check_timeout: Duration,
 }
 
 impl Default for TrustChainConfig {
@@ -243,7 +242,7 @@ impl Default for TrustChainConfig {
             max_chain_length: 5,
             min_trust_level: 0.5,
             enable_online_revocation_check: true,
-            revocation_check_timeout: Duration::from_secs(30),
+            _revocation_check_timeout: Duration::from_secs(30),
         }
     }
 }
@@ -251,19 +250,18 @@ impl Default for TrustChainConfig {
 
 /// Validation configuration
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Config fields for future certificate validation
 struct ValidationConfig {
     /// Strict validation mode
     strict_mode: bool,
-    
+
     /// Allow self-signed certificates in development
     allow_self_signed: bool,
-    
+
     /// Signature algorithm whitelist
-    allowed_signature_algorithms: Vec<String>,
-    
+    _allowed_signature_algorithms: Vec<String>,
+
     /// Minimum key length
-    min_key_length: u32,
+    _min_key_length: u32,
 }
 
 impl Default for ValidationConfig {
@@ -271,13 +269,13 @@ impl Default for ValidationConfig {
         Self {
             strict_mode: true,
             allow_self_signed: false,
-            allowed_signature_algorithms: vec![
+            _allowed_signature_algorithms: vec![
                 "FALCON-1024".to_string(),
                 "Ed25519".to_string(),
                 "ECDSA-P256".to_string(),
                 "RSA-PSS".to_string(),
             ],
-            min_key_length: 2048,
+            _min_key_length: 2048,
         }
     }
 }

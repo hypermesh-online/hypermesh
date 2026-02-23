@@ -292,12 +292,11 @@ pub(crate) struct ByzantineBehaviorAnalysis {
 }
 
 /// Proxy candidate for selection
-#[allow(dead_code)]
 pub(crate) struct ProxyCandidate {
-    pub(crate) node_id: NodeId,
-    pub(crate) trust_score: TrustScore,
-    pub(crate) performance_metrics: ProxyPerformanceMetrics,
-    pub(crate) distance_hops: u32,
+    pub(crate) _node_id: NodeId,
+    pub(crate) _trust_score: TrustScore,
+    pub(crate) _performance_metrics: ProxyPerformanceMetrics,
+    pub(crate) _distance_hops: u32,
 }
 
 impl Default for TrustValidatorConfig {

@@ -12,10 +12,9 @@ use hypermesh_ebpf::policy_maps::{ValidationPolicy, PolicyManager as EbpfPolicyM
 use std::sync::Arc;
 
 /// Privacy-aware eBPF integration
-#[allow(dead_code)] // Fields used during eBPF policy enforcement
 pub struct PrivacyEbpfBridge {
     /// Privacy policy manager
-    privacy_manager: Arc<PrivacyPolicyManager>,
+    _privacy_manager: Arc<PrivacyPolicyManager>,
     /// eBPF policy manager
     ebpf_manager: Arc<EbpfPolicyManager>,
 }
@@ -24,7 +23,7 @@ impl PrivacyEbpfBridge {
     /// Create a new privacy-eBPF bridge
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self {
-            privacy_manager: Arc::new(PrivacyPolicyManager::new()),
+            _privacy_manager: Arc::new(PrivacyPolicyManager::new()),
             ebpf_manager: Arc::new(EbpfPolicyManager::new()?),
         })
     }

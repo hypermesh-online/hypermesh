@@ -146,10 +146,9 @@ impl PopularityMetrics {
 }
 
 /// Replication strategy manager
-#[allow(dead_code)] // Fields used during replication operations
 pub struct ReplicationStrategy {
     /// Matrix foundation for geospatial operations
-    foundation: Arc<MatrixFoundation>,
+    _foundation: Arc<MatrixFoundation>,
 
     /// Replication configuration
     config: ReplicationConfig,
@@ -221,7 +220,7 @@ impl ReplicationStrategy {
     /// Create new replication strategy
     pub fn new(foundation: Arc<MatrixFoundation>) -> Self {
         Self {
-            foundation,
+            _foundation: foundation,
             config: ReplicationConfig::default(),
             popularity: Arc::new(RwLock::new(HashMap::new())),
             decisions: Arc::new(RwLock::new(HashMap::new())),
@@ -232,7 +231,7 @@ impl ReplicationStrategy {
     /// Create with custom configuration
     pub fn with_config(foundation: Arc<MatrixFoundation>, config: ReplicationConfig) -> Self {
         Self {
-            foundation,
+            _foundation: foundation,
             config,
             popularity: Arc::new(RwLock::new(HashMap::new())),
             decisions: Arc::new(RwLock::new(HashMap::new())),

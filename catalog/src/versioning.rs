@@ -52,12 +52,11 @@ pub struct VersionManager {
 }
 
 /// Dependency resolver for asset packages
-#[allow(dead_code)] // Resolver fields for dependency operations
 pub struct DependencyResolver {
     /// Version manager
     version_manager: VersionManager,
     /// Dependency cache
-    dependency_cache: HashMap<String, Vec<ResolvedDependency>>,
+    _dependency_cache: HashMap<String, Vec<ResolvedDependency>>,
 }
 
 /// Resolved dependency information
@@ -356,7 +355,7 @@ impl DependencyResolver {
     pub fn new() -> Self {
         Self {
             version_manager: VersionManager::new(),
-            dependency_cache: HashMap::new(),
+            _dependency_cache: HashMap::new(),
         }
     }
     
@@ -436,8 +435,7 @@ impl DependencyResolver {
     }
     
     /// Get transitive dependencies (placeholder implementation)
-    #[allow(dead_code)] // Pending transitive dependency resolution
-    async fn get_transitive_dependencies(
+    async fn _get_transitive_dependencies(
         &self,
         _package_name: &str,
         _version: &SemanticVersion,

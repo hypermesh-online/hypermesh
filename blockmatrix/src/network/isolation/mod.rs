@@ -163,7 +163,6 @@ impl std::fmt::Display for ViolationType {
 
 /// Connection pool for isolated network connections
 #[derive(Debug)]
-#[allow(dead_code)] // Fields used during connection pooling
 pub struct ConnectionPool {
     /// Network this pool belongs to
     pub network_id: NetworkId,
@@ -172,7 +171,7 @@ pub struct ConnectionPool {
     /// Maximum connections allowed
     max_connections: usize,
     /// Connection timeout in seconds
-    timeout_seconds: u64,
+    _timeout_seconds: u64,
 }
 
 impl ConnectionPool {
@@ -182,7 +181,7 @@ impl ConnectionPool {
             network_id,
             connections: Arc::new(RwLock::new(Vec::new())),
             max_connections: 100,
-            timeout_seconds: 300,
+            _timeout_seconds: 300,
         }
     }
 
@@ -192,7 +191,7 @@ impl ConnectionPool {
             network_id,
             connections: Arc::new(RwLock::new(Vec::new())),
             max_connections,
-            timeout_seconds,
+            _timeout_seconds: timeout_seconds,
         }
     }
 

@@ -393,8 +393,7 @@ impl ApiHandler for TrustChainHealthHandler {
 pub struct TrustChainStoqApi {
     server: Arc<StoqApiServer>,
     /// Configuration (retained for runtime access)
-    #[allow(dead_code)]
-    config: TrustChainStoqConfig,
+    _config: TrustChainStoqConfig,
 }
 
 impl TrustChainStoqApi {
@@ -460,7 +459,7 @@ impl TrustChainStoqApi {
 
         info!("TrustChain STOQ API handlers registered");
 
-        Ok(Self { server, config })
+        Ok(Self { server, _config: config })
     }
 
     /// Start the API server

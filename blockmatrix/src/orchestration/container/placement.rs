@@ -18,12 +18,11 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// CPE-powered placement engine for predictive optimization
-#[allow(dead_code)] // Fields used during placement optimization
 pub struct CpePlacementEngine {
     /// Placement history for learning
     placement_history: Arc<RwLock<Vec<PlacementRecord>>>,
     /// Placement strategies cache
-    strategy_cache: Arc<RwLock<HashMap<String, CachedStrategy>>>,
+    _strategy_cache: Arc<RwLock<HashMap<String, CachedStrategy>>>,
     /// Placement engine metrics
     metrics: Arc<RwLock<PlacementMetrics>>,
 }
@@ -285,7 +284,7 @@ impl CpePlacementEngine {
 
         Ok(Self {
             placement_history: Arc::new(RwLock::new(Vec::new())),
-            strategy_cache: Arc::new(RwLock::new(HashMap::new())),
+            _strategy_cache: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(PlacementMetrics {
                 total_decisions: 0,
                 cpe_enhanced_decisions: 0,
@@ -441,8 +440,7 @@ impl CpePlacementEngine {
     }
     
     /// Prepare context history for CPE prediction
-    #[allow(dead_code)] // Will be used for CPE-enhanced placement
-    async fn prepare_context_history(
+    async fn _prepare_context_history(
         &self,
         spec: &ContainerSpec,
         placement_context: &PlacementContext,
@@ -499,8 +497,7 @@ impl CpePlacementEngine {
     }
     
     /// Select optimal node from CPE predictions
-    #[allow(dead_code)] // Will be used for CPE-enhanced placement
-    async fn select_node_from_predictions(
+    async fn _select_node_from_predictions(
         &self,
         predictions: &[f64],
         node_candidates: &[NodeCandidate],
@@ -527,8 +524,7 @@ impl CpePlacementEngine {
     }
     
     /// Generate placement reasoning
-    #[allow(dead_code)] // Will be used for CPE-enhanced placement
-    async fn generate_placement_reasoning(
+    async fn _generate_placement_reasoning(
         &self,
         selected_node: &NodeId,
         node_candidates: &[NodeCandidate],

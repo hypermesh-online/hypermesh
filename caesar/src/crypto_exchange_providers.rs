@@ -25,12 +25,11 @@ use std::sync::Arc;
 use crate::banking_interop_bridge::*;
 
 /// Uniswap V3 Exchange Provider
-#[allow(dead_code)] // Provider fields for DEX operations
 pub struct UniswapV3Provider {
     provider: Arc<Provider<Http>>,
     router_contract: Arc<Contract<SignerMiddleware<Provider<Http>, LocalWallet>>>,
     quoter_contract: Arc<Contract<SignerMiddleware<Provider<Http>, LocalWallet>>>,
-    chain_id: u64,
+    _chain_id: u64,
 }
 
 impl UniswapV3Provider {
@@ -112,7 +111,7 @@ impl UniswapV3Provider {
             provider: Arc::new(provider),
             router_contract,
             quoter_contract,
-            chain_id,
+            _chain_id: chain_id,
         })
     }
 
@@ -267,11 +266,10 @@ impl CryptoExchangeProvider for UniswapV3Provider {
 }
 
 /// LayerZero Bridge Provider
-#[allow(dead_code)] // Bridge provider fields for cross-chain operations
 pub struct LayerZeroBridgeProvider {
     provider: Arc<Provider<Http>>,
     endpoint_contract: Arc<Contract<SignerMiddleware<Provider<Http>, LocalWallet>>>,
-    chain_id: u64,
+    _chain_id: u64,
 }
 
 impl LayerZeroBridgeProvider {
@@ -331,7 +329,7 @@ impl LayerZeroBridgeProvider {
         Ok(Self {
             provider: Arc::new(provider),
             endpoint_contract,
-            chain_id,
+            _chain_id: chain_id,
         })
     }
 

@@ -23,8 +23,7 @@ use super::{
 /// Kyber-1024 cryptographic operations handler
 pub struct KyberCrypto {
     /// Algorithm identifier (retained for algorithm negotiation)
-    #[allow(dead_code)]
-    algorithm_id: String,
+    _algorithm_id: String,
 }
 
 /// Kyber encryption result containing ciphertext and shared secret
@@ -57,7 +56,7 @@ impl KyberCrypto {
         info!("🔐 Initializing Kyber-1024 post-quantum encryption system");
         
         Ok(Self {
-            algorithm_id: "Kyber-1024".to_string(),
+            _algorithm_id: "Kyber-1024".to_string(),
         })
     }
     
@@ -405,7 +404,7 @@ mod tests {
     #[tokio::test]
     async fn test_kyber_crypto_initialization() {
         let kyber = KyberCrypto::new().unwrap();
-        assert_eq!(kyber.algorithm_id, "Kyber-1024");
+        assert_eq!(kyber._algorithm_id, "Kyber-1024");
     }
     
     #[tokio::test]

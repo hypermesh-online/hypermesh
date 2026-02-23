@@ -29,7 +29,6 @@ use super::{AssetManagementConfig, PrivacyMode};
 // Already imported above, no need to import again
 
 /// Main VM executor with consensus-native execution
-#[allow(dead_code)] // Fields used during VM execution
 pub struct VMExecutor {
     /// Consensus VM for proof validation
     consensus_vm: Arc<RwLock<ConsensusVM>>,
@@ -38,7 +37,7 @@ pub struct VMExecutor {
     /// Runtime environment with consensus integration
     runtime: Arc<ConsensusRuntime>,
     /// Asset management configuration
-    asset_config: AssetManagementConfig,
+    _asset_config: AssetManagementConfig,
     /// Active execution contexts
     active_contexts: Arc<std::sync::RwLock<HashMap<String, Arc<ExecutionContext>>>>,
 }
@@ -189,7 +188,7 @@ impl VMExecutor {
             consensus_vm,
             scheduler,
             runtime,
-            asset_config,
+            _asset_config: asset_config,
             active_contexts: Arc::new(std::sync::RwLock::new(HashMap::new())),
         })
     }

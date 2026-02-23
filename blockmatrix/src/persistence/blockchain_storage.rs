@@ -74,12 +74,11 @@ pub enum BlockQuery {
 }
 
 /// Manages blockchain storage for a single node
-#[allow(dead_code)] // Fields used during blockchain persistence
 pub struct BlockchainStorage {
     /// Storage directory
     storage_dir: PathBuf,
     /// Node ID
-    node_id: String,
+    _node_id: String,
     /// Block index: hash -> (file_id, offset, size)
     block_index: Arc<RwLock<HashMap<String, (u32, u64, u32)>>>,
     /// Index by block number: index -> hash
@@ -127,7 +126,7 @@ impl BlockchainStorage {
 
         Ok(Self {
             storage_dir: blockchain_dir,
-            node_id,
+            _node_id: node_id,
             block_index: Arc::new(RwLock::new(block_index)),
             index_map: Arc::new(RwLock::new(index_map)),
             metadata: Arc::new(RwLock::new(metadata)),

@@ -139,14 +139,13 @@ impl Default for RequiredChecks {
 }
 
 /// Policy engine for evaluating trust policies
-#[allow(dead_code)] // Policy engine fields for trust evaluation
 pub struct PolicyEngine {
     /// Active policies by name
     policies: Arc<RwLock<HashMap<String, TrustPolicy>>>,
     /// Default trust level
     default_level: TrustLevel,
     /// Policy templates
-    templates: Arc<RwLock<HashMap<String, PolicyTemplate>>>,
+    _templates: Arc<RwLock<HashMap<String, PolicyTemplate>>>,
 }
 
 /// Policy template for common scenarios
@@ -166,7 +165,7 @@ impl PolicyEngine {
         let engine = Self {
             policies: Arc::new(RwLock::new(HashMap::new())),
             default_level,
-            templates: Arc::new(RwLock::new(HashMap::new())),
+            _templates: Arc::new(RwLock::new(HashMap::new())),
         };
 
         // Initialize default policies

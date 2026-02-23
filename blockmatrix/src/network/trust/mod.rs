@@ -259,12 +259,11 @@ pub struct ProofOfState {
 
 /// STOQ transport abstraction
 #[derive(Clone)]
-#[allow(dead_code)] // Fields used during STOQ transport operations
 pub struct StoqTransport {
     /// Network type this transport is configured for
     network_type: NetworkType,
     /// Actual STOQ transport (placeholder)
-    inner: Arc<RwLock<Option<stoq::StoqTransport>>>,
+    _inner: Arc<RwLock<Option<stoq::StoqTransport>>>,
 }
 
 impl std::fmt::Debug for StoqTransport {
@@ -281,7 +280,7 @@ impl StoqTransport {
     pub fn new_for_network(network_type: NetworkType) -> Result<Arc<Self>> {
         Ok(Arc::new(StoqTransport {
             network_type,
-            inner: Arc::new(RwLock::new(None)),
+            _inner: Arc::new(RwLock::new(None)),
         }))
     }
 
@@ -382,9 +381,8 @@ pub async fn register_dns_asset(_dns_name: &str, _cert: &Certificate) -> Result<
 }
 
 // Placeholder for stoq module integration
-#[allow(dead_code)] // Placeholder types for future STOQ integration
 mod stoq {
     pub struct StoqTransport;
-    pub struct Connection;
+    pub struct _Connection;
 }
 

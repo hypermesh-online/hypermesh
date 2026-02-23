@@ -58,8 +58,7 @@ pub struct TrustChainCA {
     /// Certificate policies
     policy_engine: Arc<PolicyEngine>,
     /// Consensus validation context (retained for consensus proof operations)
-    #[allow(dead_code)]
-    consensus_context: Arc<ConsensusContext>,
+    _consensus_context: Arc<ConsensusContext>,
     /// HyperMesh consensus client for validation
     hypermesh_client: Arc<HyperMeshConsensusClient>,
     /// Four-proof consensus validator (wrapped in Mutex for mutability)
@@ -349,7 +348,7 @@ impl TrustChainCA {
             root_ca: Arc::new(RwLock::new(root_ca)),
             certificate_store,
             policy_engine,
-            consensus_context,
+            _consensus_context: consensus_context,
             hypermesh_client,
             consensus,
             config: Arc::new(config),

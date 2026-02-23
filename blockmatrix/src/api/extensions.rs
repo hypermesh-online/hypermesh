@@ -51,7 +51,7 @@ pub fn create_extension_handlers(
     vec![
         Arc::new(ListExtensionsHandler { manager: Arc::clone(&manager) }),
         Arc::new(GetExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(LoadExtensionHandler { manager: Arc::clone(&manager) }),
+        Arc::new(LoadExtensionHandler { _manager: Arc::clone(&manager) }),
         Arc::new(UnloadExtensionHandler { manager: Arc::clone(&manager) }),
         Arc::new(ReloadExtensionHandler { manager: Arc::clone(&manager) }),
         Arc::new(PauseExtensionHandler { manager: Arc::clone(&manager) }),
@@ -151,18 +151,19 @@ impl ApiHandler for GetExtensionHandler {
 }
 
 /// Load extension handler
-#[allow(dead_code)] // API handler fields used at runtime
 struct LoadExtensionHandler {
-    manager: Arc<UnifiedExtensionManager>,
+    _manager: Arc<UnifiedExtensionManager>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)] // Deserialized from request payload
 struct LoadExtensionRequest {
     source: String,
-    force: Option<bool>,
-    skip_verification: Option<bool>,
-    config: Option<serde_json::Value>,
+    #[serde(rename = "force")]
+    _force: Option<bool>,
+    #[serde(rename = "skip_verification")]
+    _skip_verification: Option<bool>,
+    #[serde(rename = "config")]
+    _config: Option<serde_json::Value>,
 }
 
 #[async_trait::async_trait]
@@ -470,14 +471,13 @@ pub mod streaming {
     }
 
     /// Event stream handler for real-time extension events
-    #[allow(dead_code)] // API handler - manager used at runtime
     pub struct ExtensionEventStreamHandler {
-        manager: Arc<UnifiedExtensionManager>,
+        _manager: Arc<UnifiedExtensionManager>,
     }
 
     impl ExtensionEventStreamHandler {
         pub fn new(manager: Arc<UnifiedExtensionManager>) -> Self {
-            Self { manager }
+            Self { _manager: manager }
         }
 
         /// Create an event stream for a specific extension

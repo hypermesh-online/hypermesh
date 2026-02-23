@@ -25,14 +25,13 @@ pub struct ValidationResult {
 }
 
 /// DNS validator with PoS integration
-#[allow(dead_code)] // Fields used during DNS validation
 pub struct DnsValidator {
     /// Consensus validator
     consensus_validator: Arc<dyn ConsensusValidator>,
     /// Consensus requirements for DNS operations
     requirements: ConsensusRequirements,
     /// Enable strict validation
-    strict_mode: bool,
+    _strict_mode: bool,
 }
 
 impl DnsValidator {
@@ -53,7 +52,7 @@ impl DnsValidator {
                 requirements.clone(),
             )),
             requirements,
-            strict_mode,
+            _strict_mode: strict_mode,
         }
     }
 

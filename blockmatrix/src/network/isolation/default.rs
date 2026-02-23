@@ -18,18 +18,17 @@ use tracing::{info, warn, debug};
 
 /// Network-specific isolation configuration
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used during network isolation
 struct NetworkIsolationConfig {
     /// Network identifier
-    network_id: NetworkId,
+    _network_id: NetworkId,
     /// Network type (Anonymous, P2P, Federated, Public)
-    network_type: NetworkType,
+    _network_type: NetworkType,
     /// Isolated connection pool for this network
-    connection_pool: Arc<ConnectionPool>,
+    _connection_pool: Arc<ConnectionPool>,
     /// Packet filter for boundary enforcement
     packet_filter: PacketFilter,
     /// Creation timestamp
-    created_at: Timestamp,
+    _created_at: Timestamp,
 }
 
 /// Packet filter for network boundary enforcement
@@ -203,11 +202,11 @@ impl IsolationManager for DefaultIsolationManager {
 
         // Create network configuration
         let config = NetworkIsolationConfig {
-            network_id: network_id.clone(),
-            network_type: network_type.clone(),
-            connection_pool: connection_pool.clone(),
+            _network_id: network_id.clone(),
+            _network_type: network_type.clone(),
+            _connection_pool: connection_pool.clone(),
             packet_filter: PacketFilter::new(network_id.clone()),
-            created_at: Utc::now(),
+            _created_at: Utc::now(),
         };
 
         // Store configuration

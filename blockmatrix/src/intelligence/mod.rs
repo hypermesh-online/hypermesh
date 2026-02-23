@@ -28,55 +28,17 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 use anyhow::{Result, Context as AnyhowContext};
 use tracing::{info, debug, warn, instrument};
-use serde::{Serialize, Deserialize};
 
 // Sub-modules for integration layer
 pub mod workflows;
 pub mod integration;
 pub mod validation;
 pub mod performance;
-// Inline stub for TrustChainClient (trustchain_stub module removed - was zeroed-key placeholder)
-mod inline_trustchain_stub {
-    use async_trait::async_trait;
-    use crate::assets::multi_node::network_membership::{
-        TrustChainClient, NetworkCredentials, NetworkDiscovery,
-    };
-    use crate::assets::multi_node::NetworkId;
-    use crate::assets::core::AssetResult;
+pub mod types;
 
-    pub struct StubTrustChainClient;
-
-    impl StubTrustChainClient {
-        pub fn new() -> Self {
-            Self
-        }
-    }
-
-    #[async_trait]
-    impl TrustChainClient for StubTrustChainClient {
-        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
-            Ok(NetworkCredentials {
-                certificate: vec![],
-                public_key: vec![],
-                private_key_encrypted: vec![],
-                session_tokens: vec![],
-                expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(86400),
-            })
-        }
-
-        async fn revoke_credentials(&self, _network_id: NetworkId) -> AssetResult<()> {
-            Ok(())
-        }
-
-        async fn validate_certificate(&self, _cert: &[u8]) -> AssetResult<bool> {
-            Ok(true)
-        }
-
-        async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
-            Ok(vec![])
-        }
-    }
-}
+// Re-exports from types module
+pub use types::{AssetHandle, IntelligenceLayerConfig, IntelligenceMetrics};
+use types::inline_trustchain_stub;
 
 // Re-exports for external use
 pub use workflows::{
@@ -126,83 +88,16 @@ use crate::assets::multi_node::{
 use crate::assets::pipeline::{
     AssetPipeline, Asset, AssetMetadata, ProcessedAsset,
     CompressionConfig, EncryptionConfig, ShardingConfig,
-    DistributionConfig, PipelineStats
+    DistributionConfig,
 };
 use crate::assets::pipeline::orchestrator::PipelineStages;
 
 // Import Sprint 2.5: Content-Addressed Storage
 use crate::assets::storage::{
-    ContentAddressedStorage, ContentAddress,
+    ContentAddressedStorage,
     DeduplicationResult,
 };
 
-/// Asset handle returned after processing
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssetHandle {
-    /// Asset identifier
-    pub asset_id: String,
-
-    /// Content address for retrieval
-    pub content_address: ContentAddress,
-
-    /// Privacy tier used for processing
-    pub privacy_tier: PrivacyMode,
-
-    /// Networks where asset is available
-    pub networks: Vec<NetworkId>,
-
-    /// Processing timestamp
-    pub processed_at: SystemTime,
-
-    /// Deduplication result
-    pub deduplication: DeduplicationResult,
-
-    /// Pipeline statistics
-    pub pipeline_stats: PipelineStats,
-}
-
-/// Configuration for IntelligenceLayer
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct IntelligenceLayerConfig {
-    /// Enable performance monitoring
-    pub enable_monitoring: bool,
-
-    /// Maximum concurrent asset processing
-    pub max_concurrent_processing: usize,
-
-    /// Asset processing timeout
-    pub processing_timeout: Duration,
-
-    /// Retrieval timeout
-    pub retrieval_timeout: Duration,
-
-    /// Enable cross-network validation
-    pub enable_cross_network_validation: bool,
-
-    /// Default compression level (1-11)
-    pub default_compression_level: u32,
-
-    /// Enable quantum-resistant encryption
-    pub enable_quantum_encryption: bool,
-
-    /// Reed-Solomon configuration (data shards, parity shards)
-    pub sharding_config: (usize, usize),
-}
-
-impl Default for IntelligenceLayerConfig {
-    fn default() -> Self {
-        Self {
-            enable_monitoring: true,
-            max_concurrent_processing: 100,
-            processing_timeout: Duration::from_secs(30),
-            retrieval_timeout: Duration::from_secs(10),
-            enable_cross_network_validation: true,
-            default_compression_level: 4,
-            enable_quantum_encryption: true,
-            sharding_config: (10, 4), // 10 data, 4 parity
-        }
-    }
-}
 
 /// Phase 2 Intelligence Layer - Unified Integration
 pub struct IntelligenceLayer {
@@ -218,8 +113,7 @@ pub struct IntelligenceLayer {
     stoq_transport: Arc<StoqTransport>,
 
     /// Network isolation manager
-    #[allow(dead_code)] // Used for future network isolation enforcement
-    network_isolation: Arc<NetworkIsolationManager>,
+    _network_isolation: Arc<NetworkIsolationManager>,
 
     // Sprint 2.2: Privacy Tiers
     /// Privacy manager for tier enforcement
@@ -233,8 +127,7 @@ pub struct IntelligenceLayer {
     network_coordinator: Arc<MultiNetworkCoordinator>,
 
     /// Cross-network validator
-    #[allow(dead_code)] // Used for future cross-network asset validation
-    cross_validator: Arc<CrossNetworkValidator>,
+    _cross_validator: Arc<CrossNetworkValidator>,
 
     // Sprint 2.4: Asset Pipeline
     /// Asset processing pipeline
@@ -246,12 +139,10 @@ pub struct IntelligenceLayer {
 
     // Integration Components
     /// Component integration manager
-    #[allow(dead_code)] // Used for future component health monitoring
-    component_integration: Arc<ComponentIntegration>,
+    _component_integration: Arc<ComponentIntegration>,
 
     /// Performance monitor
-    #[allow(dead_code)] // Used for future performance tracking dashboard
-    performance_monitor: Arc<PerformanceMonitor>,
+    _performance_monitor: Arc<PerformanceMonitor>,
 
     /// Integration validator
     integration_validator: Arc<IntegrationValidator>,
@@ -260,36 +151,6 @@ pub struct IntelligenceLayer {
     metrics: Arc<RwLock<IntelligenceMetrics>>,
 }
 
-/// Intelligence layer metrics
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct IntelligenceMetrics {
-    /// Total assets processed
-    pub total_assets_processed: u64,
-
-    /// Total assets retrieved
-    pub total_assets_retrieved: u64,
-
-    /// Average processing time (ms)
-    pub avg_processing_time_ms: u64,
-
-    /// Average retrieval time (ms)
-    pub avg_retrieval_time_ms: u64,
-
-    /// Deduplication rate (0.0 to 1.0)
-    pub deduplication_rate: f64,
-
-    /// Cross-network validations
-    pub cross_network_validations: u64,
-
-    /// Privacy tier distribution
-    pub privacy_tier_distribution: HashMap<String, u64>,
-
-    /// Network participation count
-    pub active_networks: usize,
-
-    /// Component health status
-    pub component_health: HashMap<String, bool>,
-}
 
 impl IntelligenceLayer {
     /// Create new intelligence layer
@@ -398,15 +259,15 @@ impl IntelligenceLayer {
             config,
             matrix_foundation,
             stoq_transport,
-            network_isolation,
+            _network_isolation: network_isolation,
             privacy_manager,
             reward_calculator,
             network_coordinator,
-            cross_validator,
+            _cross_validator: cross_validator,
             asset_pipeline,
             content_storage,
-            component_integration,
-            performance_monitor,
+            _component_integration: component_integration,
+            _performance_monitor: performance_monitor,
             integration_validator,
             metrics: Arc::new(RwLock::new(IntelligenceMetrics::default())),
         })
@@ -728,8 +589,7 @@ impl IntelligenceLayer {
     /// Map privacy mode to STOQ-compatible PrivacyMode (identity mapping).
     ///
     /// Kept for API stability — both crates use the canonical `PrivacyMode` type.
-    #[allow(dead_code)] // Used for future STOQ protocol integration
-    fn map_privacy_tier_to_stoq(&self, tier: &PrivacyMode) -> PrivacyMode {
+    fn _map_privacy_tier_to_stoq(&self, tier: &PrivacyMode) -> PrivacyMode {
         *tier
     }
 
@@ -781,8 +641,7 @@ impl IntelligenceLayer {
     }
 
     /// Retrieve shard via STOQ protocol
-    #[allow(dead_code)] // Used for future STOQ shard retrieval
-    async fn retrieve_shard_via_stoq(
+    async fn _retrieve_shard_via_stoq(
         &self,
         _connection: Connection,
         _shard_id: String,
@@ -848,13 +707,12 @@ impl IntelligenceLayer {
     }
 }
 // Extension trait for MatrixCoordinate to create endpoint
-#[allow(dead_code)] // Used for future matrix-to-network endpoint mapping
-trait MatrixCoordinateExt {
-    fn to_endpoint(&self) -> Endpoint;
+trait _MatrixCoordinateExt {
+    fn _to_endpoint(&self) -> Endpoint;
 }
 
-impl MatrixCoordinateExt for MatrixCoordinate {
-    fn to_endpoint(&self) -> Endpoint {
+impl _MatrixCoordinateExt for MatrixCoordinate {
+    fn _to_endpoint(&self) -> Endpoint {
         // Convert matrix coordinate to network endpoint
         // This would map matrix positions to actual network addresses
         Endpoint {

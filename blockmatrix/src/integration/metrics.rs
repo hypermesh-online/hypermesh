@@ -54,12 +54,11 @@ struct MetricsInner {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during component lifecycle
 struct ComponentMetrics {
     status: String,
-    start_time: Instant,
+    _start_time: Instant,
     ready_time: Option<Instant>,
-    error_count: u64,
+    _error_count: u64,
 }
 
 impl IntegrationMetrics {
@@ -120,9 +119,9 @@ impl IntegrationMetrics {
 
         let component = statuses.entry(name).or_insert_with(|| ComponentMetrics {
             status: status.clone(),
-            start_time: Instant::now(),
+            _start_time: Instant::now(),
             ready_time: None,
-            error_count: 0,
+            _error_count: 0,
         });
 
         component.status = status.clone();

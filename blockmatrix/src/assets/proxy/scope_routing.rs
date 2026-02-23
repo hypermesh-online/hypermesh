@@ -130,11 +130,10 @@ pub struct ScopeRoutingStats {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // fields retained for audit/debug inspection
 struct ScopeTransition {
-    from: BlockchainScope,
-    to: BlockchainScope,
-    gateway: Option<String>,
+    _from: BlockchainScope,
+    _to: BlockchainScope,
+    _gateway: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -373,9 +372,9 @@ impl ScopeAwareRouter {
         }
 
         self.transition_log.push(ScopeTransition {
-            from,
-            to,
-            gateway: gateway.map(String::from),
+            _from: from,
+            _to: to,
+            _gateway: gateway.map(String::from),
         });
     }
 }

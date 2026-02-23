@@ -21,10 +21,9 @@ use super::migration::{ContainerMigrator, MigrationDecision, MigrationReason};
 use super::types::*;
 
 /// Container orchestration engine with MFN integration
-#[allow(dead_code)] // Fields used during container orchestration
 pub struct ContainerOrchestrator {
     /// Configuration
-    config: ContainerConfig,
+    _config: ContainerConfig,
     /// DSR-powered scheduler
     scheduler: Arc<DsrScheduler>,
     /// CPE placement engine
@@ -48,9 +47,9 @@ pub struct ContainerOrchestrator {
     /// IFR resource lookup enabled (default configuration)
     ifr_resource_lookup_enabled: bool,
     /// Maximum scheduling candidates (default configuration)
-    max_scheduling_candidates: usize,
+    _max_scheduling_candidates: usize,
     /// Scheduling timeout in milliseconds (default configuration)
-    scheduling_timeout_ms: u64,
+    _scheduling_timeout_ms: u64,
 }
 
 impl ContainerOrchestrator {
@@ -85,7 +84,7 @@ impl ContainerOrchestrator {
         info!("  - Scheduling timeout: 100ms (default)");
 
         Ok(Self {
-            config,
+            _config: config,
             scheduler,
             placement_engine,
             predictive_scaler,
@@ -97,8 +96,8 @@ impl ContainerOrchestrator {
             node_registry: Arc::new(RwLock::new(HashMap::new())),
             dsr_scheduling_enabled: true,
             ifr_resource_lookup_enabled: true,
-            max_scheduling_candidates: 10,
-            scheduling_timeout_ms: 100,
+            _max_scheduling_candidates: 10,
+            _scheduling_timeout_ms: 100,
         })
     }
 

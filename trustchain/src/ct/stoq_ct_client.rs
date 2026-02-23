@@ -59,12 +59,11 @@ pub struct CtStoqConfig {
 
 /// Cached CT entry
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct CachedCtEntry {
     entry: StoqCtEntry,
     cached_at: SystemTime,
     expires_at: SystemTime,
-    fingerprint: String,
+    _fingerprint: String,
 }
 
 /// Performance metrics for CT STOQ operations
@@ -545,7 +544,7 @@ impl CtStoqClient {
             entry: ct_entry,
             cached_at: SystemTime::now(),
             expires_at: SystemTime::now() + self.config.cache_ttl,
-            fingerprint: fingerprint.clone(),
+            _fingerprint: fingerprint.clone(),
         };
 
         // Ensure cache doesn't exceed max size

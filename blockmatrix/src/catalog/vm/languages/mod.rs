@@ -51,14 +51,13 @@ const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
 ];
 
 /// Multi-language support coordinator
-#[allow(dead_code)] // Fields used during multi-language execution
 pub struct MultiLanguageSupport {
     /// Consensus VM for proof validation
     consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Language runtime adapters
     language_adapters: HashMap<String, Arc<dyn LanguageRuntime>>,
     /// Consensus bridge for translation
-    consensus_bridge: Arc<ConsensusBridge>,
+    _consensus_bridge: Arc<ConsensusBridge>,
     /// Runtime configuration
     config: LanguageConfig,
 }
@@ -417,7 +416,7 @@ impl MultiLanguageSupport {
         Ok(Self {
             consensus_vm,
             language_adapters,
-            consensus_bridge,
+            _consensus_bridge: consensus_bridge,
             config,
         })
     }

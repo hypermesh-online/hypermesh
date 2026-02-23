@@ -86,8 +86,7 @@ pub struct AssetWorkflow {
     processing_timeout: Duration,
 
     /// Retrieval timeout
-    #[allow(dead_code)] // Stored for future retrieval timeout enforcement
-    retrieval_timeout: Duration,
+    _retrieval_timeout: Duration,
 }
 
 impl AssetWorkflow {
@@ -97,7 +96,7 @@ impl AssetWorkflow {
             concurrency_limit: Arc::new(Semaphore::new(max_concurrent)),
             metrics: Arc::new(RwLock::new(WorkflowMetrics::default())),
             processing_timeout,
-            retrieval_timeout,
+            _retrieval_timeout: retrieval_timeout,
         }
     }
 

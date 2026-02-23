@@ -124,7 +124,6 @@ pub struct LoadedExtension {
 }
 
 /// Dynamic extension loader
-#[allow(dead_code)] // Fields used during extension loading
 pub struct ExtensionLoader {
     /// Configuration
     config: LoaderConfig,
@@ -133,7 +132,7 @@ pub struct ExtensionLoader {
     loaded: Arc<RwLock<HashMap<String, LoadedExtension>>>,
 
     /// Extension manifests cache
-    manifests: Arc<RwLock<HashMap<String, ExtensionManifest>>>,
+    _manifests: Arc<RwLock<HashMap<String, ExtensionManifest>>>,
 
     /// Security verifier
     verifier: Option<Arc<SecurityVerifier>>,
@@ -153,7 +152,7 @@ impl ExtensionLoader {
         Self {
             config,
             loaded: Arc::new(RwLock::new(HashMap::new())),
-            manifests: Arc::new(RwLock::new(HashMap::new())),
+            _manifests: Arc::new(RwLock::new(HashMap::new())),
             verifier,
         }
     }
@@ -558,16 +557,15 @@ pub struct ResourceRequirements {
 }
 
 /// Security verifier for extension signatures
-#[allow(dead_code)] // Fields used during signature verification
 pub struct SecurityVerifier {
     /// TrustChain certificate path
-    cert_path: Option<PathBuf>,
+    _cert_path: Option<PathBuf>,
 }
 
 impl SecurityVerifier {
     /// Create new security verifier
     pub fn new(cert_path: Option<PathBuf>) -> Self {
-        Self { cert_path }
+        Self { _cert_path: cert_path }
     }
 
     /// Verify extension signature
@@ -607,10 +605,9 @@ impl SecurityVerifier {
 }
 
 /// Extension sandbox for resource isolation
-#[allow(dead_code)] // Fields used during extension sandboxing
 pub struct ExtensionSandbox {
     /// Extension ID
-    extension_id: String,
+    _extension_id: String,
 
     /// Resource limits
     limits: ResourceLimits,
@@ -639,7 +636,7 @@ impl ExtensionSandbox {
     /// Create new sandbox for extension
     pub fn new(extension_id: String, limits: ResourceLimits) -> Self {
         Self {
-            extension_id,
+            _extension_id: extension_id,
             limits,
             usage: Arc::new(RwLock::new(ResourceUsage::default())),
         }

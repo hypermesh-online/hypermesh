@@ -23,12 +23,11 @@ use super::context::ExecutionContext;
 use super::super::AssetManagementConfig;
 
 /// Execution scheduler with consensus-aware resource allocation
-#[allow(dead_code)] // Fields used during execution scheduling
 pub struct ExecutionScheduler {
     /// Consensus VM for validation
-    consensus_vm: Arc<RwLock<ConsensusVM>>,
+    _consensus_vm: Arc<RwLock<ConsensusVM>>,
     /// Asset management configuration
-    asset_config: AssetManagementConfig,
+    _asset_config: AssetManagementConfig,
     /// Pending execution queue
     pending_queue: Arc<RwLock<BinaryHeap<ScheduledExecution>>>,
     /// Running executions tracker
@@ -38,7 +37,7 @@ pub struct ExecutionScheduler {
     /// Scheduler metrics
     metrics: Arc<Mutex<SchedulerMetrics>>,
     /// Concurrency limits
-    execution_semaphore: Arc<Semaphore>,
+    _execution_semaphore: Arc<Semaphore>,
     /// Configuration
     config: SchedulerConfig,
 }
@@ -266,13 +265,13 @@ impl ExecutionScheduler {
         let execution_semaphore = Arc::new(Semaphore::new(config.max_concurrent_executions as usize));
         
         Ok(Self {
-            consensus_vm,
-            asset_config,
+            _consensus_vm: consensus_vm,
+            _asset_config: asset_config,
             pending_queue: Arc::new(RwLock::new(BinaryHeap::new())),
             running_executions: Arc::new(RwLock::new(HashMap::new())),
             resource_tracker: Arc::new(RwLock::new(ResourceTracker::default())),
             metrics: Arc::new(Mutex::new(SchedulerMetrics::default())),
-            execution_semaphore,
+            _execution_semaphore: execution_semaphore,
             config,
         })
     }

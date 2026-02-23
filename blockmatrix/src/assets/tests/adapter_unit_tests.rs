@@ -22,8 +22,7 @@ use hypermesh_assets::core::{
 /// Create a consensus proof for testing.
 /// Currently unused - adapters are tested without consensus validation.
 /// When needed, use ConsensusProof::new_for_testing() from the trustchain crate.
-#[allow(dead_code)]
-fn create_mock_consensus_proof() -> hypermesh_assets::core::ConsensusProof {
+fn _create_mock_consensus_proof() -> hypermesh_assets::core::ConsensusProof {
     panic!("Consensus proof creation requires trustchain integration - use ConsensusProof::new_for_testing()")
 }
 

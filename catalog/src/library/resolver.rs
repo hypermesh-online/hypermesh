@@ -138,7 +138,6 @@ enum VersionConstraint {
 }
 
 /// Resolution context for tracking state
-#[allow(dead_code)] // Context fields for dependency resolution
 struct ResolutionContext {
     /// Resolved packages
     resolved: HashMap<Arc<str>, ResolvedPackage>,
@@ -151,19 +150,18 @@ struct ResolutionContext {
     /// Missing packages
     missing: Vec<String>,
     /// Current depth
-    current_depth: u32,
+    _current_depth: u32,
     /// Maximum depth
-    max_depth: u32,
+    _max_depth: u32,
 }
 
 /// Resolved package information
-#[allow(dead_code)] // Package resolution fields
 struct ResolvedPackage {
     name: Arc<str>,
     version: Arc<str>,
     source: Arc<str>,
     dependencies: Vec<Arc<str>>,
-    depth: u32,
+    _depth: u32,
 }
 
 impl ResolvedPackage {
@@ -173,8 +171,7 @@ impl ResolvedPackage {
     }
 
     /// Get package dependencies (compatibility method - returns borrowed slice)
-    #[allow(dead_code)] // Compatibility method for dependency resolution
-    pub fn dependencies(&self) -> Vec<PackageDependency> {
+    pub fn _dependencies(&self) -> Vec<PackageDependency> {
         // Convert Arc<str> dependencies to PackageDependency structs
         self.dependencies.iter().map(|name| PackageDependency {
             name: Arc::clone(name),
@@ -186,11 +183,10 @@ impl ResolvedPackage {
 }
 
 /// Pending package to resolve
-#[allow(dead_code)] // Package resolution tracking
 struct PendingPackage {
     name: Arc<str>,
     constraint: Arc<str>,
-    parent: Option<Arc<str>>,
+    _parent: Option<Arc<str>>,
     depth: u32,
 }
 
@@ -270,8 +266,8 @@ impl DependencyResolver {
             visited: HashSet::new(),
             conflicts: Vec::new(),
             missing: Vec::new(),
-            current_depth: 0,
-            max_depth,
+            _current_depth: 0,
+            _max_depth: max_depth,
         };
 
         // Add initial dependencies to pending
@@ -281,7 +277,7 @@ impl DependencyResolver {
                     context.pending.push_back(PendingPackage {
                         name: Arc::clone(&dep.name),
                         constraint: Arc::clone(&dep.version_constraint),
-                        parent: Some(Arc::clone(&package.id)),
+                        _parent: Some(Arc::clone(&package.id)),
                         depth: 1,
                     });
                 }
@@ -393,7 +389,7 @@ impl DependencyResolver {
                         .map(|d| Arc::clone(&d.name))
                         .collect())
                     .unwrap_or_else(Vec::new),
-                depth: pending.depth,
+                _depth: pending.depth,
             }
         );
 
@@ -404,7 +400,7 @@ impl DependencyResolver {
                     context.pending.push_back(PendingPackage {
                         name: Arc::clone(&dep.name),
                         constraint: Arc::clone(&dep.version_constraint),
-                        parent: Some(Arc::clone(&package.id)),
+                        _parent: Some(Arc::clone(&package.id)),
                         depth: pending.depth + 1,
                     });
                 }

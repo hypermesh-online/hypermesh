@@ -23,10 +23,9 @@ use super::{
 };
 
 /// Package manager for handling package storage and transfers
-#[allow(dead_code)] // Fields used during P2P distribution operations
 pub struct PackageManager {
     /// Catalog registry for asset discovery
-    registry: Arc<CatalogRegistry>,
+    _registry: Arc<CatalogRegistry>,
     /// Content store for chunks
     content_store: Arc<ContentStore>,
     /// Storage directory
@@ -38,7 +37,7 @@ pub struct PackageManager {
     /// Download semaphore for concurrency control
     download_semaphore: Arc<Semaphore>,
     /// Upload semaphore for concurrency control
-    upload_semaphore: Arc<Semaphore>,
+    _upload_semaphore: Arc<Semaphore>,
     /// Content chunker
     chunker: ContentChunker,
     // /// Instruction generator for IBR
@@ -74,13 +73,13 @@ impl PackageManager {
         // let instruction_generator = Arc::new(InstructionGenerator::new(generator_config));
 
         Ok(Self {
-            registry,
+            _registry: registry,
             content_store,
             storage_dir,
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             chunk_cache: Arc::new(RwLock::new(ChunkCache::new(100 * 1024 * 1024))), // 100MB cache
             download_semaphore: Arc::new(Semaphore::new(10)), // Max 10 concurrent downloads
-            upload_semaphore: Arc::new(Semaphore::new(10)),   // Max 10 concurrent uploads
+            _upload_semaphore: Arc::new(Semaphore::new(10)),   // Max 10 concurrent uploads
             chunker: ContentChunker::new(1024 * 1024, CompressionType::Zstd), // 1MB chunks with Zstd
             // instruction_generator,  // Commented until BlockMatrix integration
         })

@@ -1,0 +1,159 @@
+# Plan: Canonical Asset Types in hypermesh-lib + Catalog Integration
+
+## Problem
+
+Three crates define overlapping asset types independently:
+- **blockmatrix**: `AssetType`, `AssetState`, `AssetAdapter` trait, `ResourceRequirements`, `AssetStatus`, `AssetError` (50+ types)
+- **trustchain**: Its own `AssetType` enum + `AssetId { uuid, asset_type, network_id }` in `trust/hypermesh_integration/types.rs` (conflicts with lib's `AssetId(String)`)
+- **catalog**: Its own `ResourceRequirements`, imports blockmatrix types directly
+
+This creates duplication, type conflicts, and tight coupling between crates that should share a common vocabulary.
+
+## Principle
+
+From CLAUDE.md: "lib holds identifiers (names, hashes, network IDs). Crates hold contexts (rich structs containing lib identifiers)."
+
+We extend this: lib holds **identifiers + universal enums + core traits**. Crates hold **rich implementations and domain-specific context**.
+
+## What Moves to hypermesh-lib
+
+### 1. `AssetType` enum (from blockmatrix `assets/core/asset_id.rs:119-142`)
+```rust
+pub enum AssetType {
+    Cpu, Gpu, Memory, Storage, Network, Container, Economic, Dns, Service,
+}
+```
+- Add `Dns` variant (trustchain DNS-as-asset needs this, currently using its own enum)
+- Add `Service` variant (generic service asset for future extensibility)
+- Remove `VirtualMachine` and `Library` stubs (these are catalog package categories, not base asset types)
+
+### 2. `AssetState` enum (from blockmatrix `assets/core/status.rs:48-61`)
+```rust
+pub enum AssetState {
+    Available, Allocated, InUse, Maintenance, Failed,
+}
+```
+- Universal lifecycle states, no domain-specific logic attached
+- Methods like `is_operational()`, `is_active()` move with it
+
+### 3. `AssetAdapter` trait (from blockmatrix `assets/core/adapter.rs:21-61`)
+```rust
+pub trait AssetAdapter: Send + Sync {
+    fn asset_type(&self) -> AssetType;
+    async fn allocate(&self, request: &AllocationRequest) -> Result<AllocationResult, AssetError>;
+    async fn deallocate(&self, asset_id: &AssetId) -> Result<(), AssetError>;
+    async fn status(&self, asset_id: &AssetId) -> Result<AssetState, AssetError>;
+    async fn health_check(&self) -> Result<AdapterHealth, AssetError>;
+}
+```
+- Simplified core trait in lib — just the essential interface
+- blockmatrix's full `AssetAdapter` extends this with privacy, proxy, consensus, resource monitoring
+- catalog implements this for package assets
+- trustchain implements this for DNS assets
+
+### 4. `AssetError` enum (from blockmatrix `assets/core/mod.rs:64-142`)
+```rust
+pub enum AssetError {
+    NotFound, ValidationFailed, AllocationFailed, PermissionDenied,
+    ResourceUnavailable, Timeout, Internal(String),
+}
+```
+- Core error variants only — crates can wrap with domain-specific variants
+
+### 5. `ResourceRequirements` struct (from blockmatrix `assets/core/adapter.rs:82-99`)
+```rust
+pub struct ResourceRequirements {
+    pub cpu_cores: Option<u32>,
+    pub memory_bytes: Option<u64>,
+    pub storage_bytes: Option<u64>,
+    pub gpu_units: Option<u32>,
+    pub network_bandwidth_mbps: Option<u64>,
+}
+```
+- Simplified common struct — just the quantities
+- blockmatrix extends with `CpuRequirements`, `GpuRequirements` etc. (detailed specs)
+- catalog uses this directly instead of its own duplicate
+
+## What Stays in blockmatrix
+
+Everything that requires blockchain context, proxy/NAT, consensus proofs, or runtime state:
+- `AssetRegistration` (content-addressed blockchain record)
+- `AssetStatus` (rich struct with proofs, proxy, health, performance)
+- `AssetAllocation`, `AllocationConfig`, `AccessConfig`
+- `NetworkScope`, `NodeFingerprint`, `RegistryId`, `FederationId`
+- `AssetCategory`, `BaseSystemType`, `ApplicationDomain`
+- `ProofScope`, `ProofRequirements`, `ScopeBinding`
+- Full `AssetAdapter` extension (privacy, proxy, consensus validation methods)
+- All 6 adapter implementations (Cpu/Gpu/Memory/Storage/Network/Container)
+- Entire proxy/NAT system
+- `AssetManager` orchestrator
+
+## What Changes in catalog
+
+1. **Remove** duplicate `ResourceRequirements` from `catalog/src/assets/types.rs` — import from `hypermesh_lib`
+2. **Remove** direct blockmatrix imports where lib types suffice — use `hypermesh_lib::AssetType` instead of `blockmatrix::assets::core::AssetType`
+3. **Keep** catalog-specific package types (`AssetPackage`, `AssetSpec`, `AssetContent`, `AssetSecurity`, `AssetExecution`, `AssetDependency`) — these are package distribution concerns, not asset identity
+4. **Implement** `AssetAdapter` from lib for catalog packages (packages are assets too)
+
+## What Changes in trustchain
+
+1. **Remove** duplicate `AssetType` enum from `trust/hypermesh_integration/types.rs` — use `hypermesh_lib::AssetType`
+2. **Remove** conflicting `AssetId` struct (uuid + asset_type + network_id) — use `hypermesh_lib::AssetId(String)` as identifier, keep rich context locally
+3. **Implement** `AssetAdapter` from lib for DNS assets (DNS names are assets)
+
+## Implementation Steps (Parallel Agent Deployment)
+
+### Agent 1: @developer — hypermesh-lib asset types (FOUNDATION)
+**Files**: `lib/src/types.rs`, `lib/src/error.rs`, `lib/src/lib.rs`
+- Add `AssetType` enum with `Cpu, Gpu, Memory, Storage, Network, Container, Economic, Dns, Service`
+- Add `AssetState` enum with `Available, Allocated, InUse, Maintenance, Failed` + methods
+- Add `AssetError` enum (core variants)
+- Add `ResourceRequirements` struct (simplified)
+- Add `AssetAdapter` trait (core interface, async)
+- Add `AdapterHealth` struct
+- Update `lib.rs` exports
+- Run `cargo check -p hypermesh-lib`
+
+### Agent 2: @developer — blockmatrix migration (DEPENDS ON Agent 1)
+**Files**: `blockmatrix/src/assets/core/asset_id.rs`, `adapter.rs`, `status.rs`, `mod.rs`
+- Import `AssetType`, `AssetState`, `AssetError`, `ResourceRequirements` from `hypermesh_lib`
+- Remove local definitions, replace with re-exports or extensions
+- blockmatrix's `AssetAdapter` trait becomes `BlockMatrixAssetAdapter: hypermesh_lib::AssetAdapter` (extends core)
+- Update all 6 adapter implementations to implement both traits
+- Run `cargo check -p blockmatrix`
+
+### Agent 3: @developer — catalog integration (DEPENDS ON Agent 1)
+**Files**: `catalog/src/assets/types.rs`, `catalog/src/hypermesh_integration.rs`, `catalog/src/hypermesh_bridge.rs`
+- Replace catalog's `ResourceRequirements` with import from `hypermesh_lib`
+- Replace any `blockmatrix::AssetType` imports with `hypermesh_lib::AssetType`
+- Implement `hypermesh_lib::AssetAdapter` for catalog package assets
+- Update `HyperMeshAssetAdapter` to use canonical types
+- Run `cargo check -p catalog`
+
+### Agent 4: @developer — trustchain migration (DEPENDS ON Agent 1)
+**Files**: `trustchain/src/trust/hypermesh_integration/types.rs`, `trustchain/src/consensus/asset_integration.rs`
+- Remove duplicate `AssetType` enum — use `hypermesh_lib::AssetType`
+- Remove conflicting `AssetId` struct — use `hypermesh_lib::AssetId`
+- Update `AssetProofRequirements` to use `hypermesh_lib::ProofType`
+- Implement `hypermesh_lib::AssetAdapter` for DNS assets
+- Run `cargo check -p trustchain`
+
+### Agent 5: @qa — workspace verification (DEPENDS ON Agents 2, 3, 4)
+- `cargo check --workspace` — 0 errors
+- `cargo test -p hypermesh-lib` — new types tested
+- `cargo test -p blockmatrix -- assets` — existing tests still pass
+- `cargo test -p catalog` — no regressions
+- `cargo test -p trustchain` — no regressions
+- Grep for any remaining duplicate `AssetType` definitions
+- Verify zero type conflicts across workspace
+
+## Execution Order
+
+```
+Agent 1 (lib foundation)
+    ├──→ Agent 2 (blockmatrix migration)  ─┐
+    ├──→ Agent 3 (catalog integration)    ─┤──→ Agent 5 (QA verification)
+    └──→ Agent 4 (trustchain migration)   ─┘
+```
+
+Agent 1 runs first (sequential dependency). Agents 2, 3, 4 run in parallel after Agent 1 completes. Agent 5 runs after all three finish.

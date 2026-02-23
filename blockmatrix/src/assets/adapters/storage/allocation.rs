@@ -116,12 +116,11 @@ pub struct StorageUsageStats {
 
 /// Storage operations for statistics
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Variants for future storage operation tracking
 pub enum StorageOperation {
     Allocate,
     Deallocate,
-    Read,
-    Write,
+    _Read,
+    _Write,
 }
 
 /// Allocate storage from devices
@@ -245,11 +244,11 @@ pub async fn update_usage_stats(
             stats.active_allocations = stats.active_allocations.saturating_sub(1);
             stats.total_bytes_allocated = stats.total_bytes_allocated.saturating_sub(bytes);
         },
-        StorageOperation::Read => {
+        StorageOperation::_Read => {
             stats.total_read_ops += 1;
             stats.total_bytes_read += bytes;
         },
-        StorageOperation::Write => {
+        StorageOperation::_Write => {
             stats.total_write_ops += 1;
             stats.total_bytes_written += bytes;
         },

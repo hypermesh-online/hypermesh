@@ -7,12 +7,11 @@
 // Stream management utilities
 
 pub struct StreamManager {
-    #[allow(dead_code)]
-    max_streams: u32,
+    _max_streams: u32,
 }
 
 impl StreamManager {
     pub fn new(max_streams: u32) -> Self {
-        Self { max_streams }
+        Self { _max_streams: max_streams }
     }
 }

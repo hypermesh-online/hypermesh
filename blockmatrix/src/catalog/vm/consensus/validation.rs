@@ -17,14 +17,13 @@ use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, Acce
 use super::{ProofValidator, ProofRequirement, VMConsensusContext};
 
 /// Validator for Proof of Space - WHERE operations occur
-#[allow(dead_code)] // Fields used during space proof validation
 pub struct SpaceProofValidator {
     /// Minimum space commitment required (bytes)
     min_space_commitment: u64,
     /// Maximum acceptable storage location distance
     max_location_distance: u32,
     /// Required storage utilization percentage
-    min_utilization_percentage: f64,
+    _min_utilization_percentage: f64,
 }
 
 impl SpaceProofValidator {
@@ -33,7 +32,7 @@ impl SpaceProofValidator {
         Ok(Self {
             min_space_commitment,
             max_location_distance: 1000, // Maximum routing distance
-            min_utilization_percentage: 0.1, // 10% minimum utilization
+            _min_utilization_percentage: 0.1, // 10% minimum utilization
         })
     }
     
@@ -237,14 +236,13 @@ impl ProofValidator<StakeProof> for StakeProofValidator {
 }
 
 /// Validator for Proof of Work - WHAT/HOW computational work was done
-#[allow(dead_code)] // Fields used during work proof validation
 pub struct WorkProofValidator {
     /// Minimum difficulty required
     min_difficulty: u32,
     /// Maximum age for work proofs (seconds)
     max_work_age: u64,
     /// Valid resource types
-    valid_resource_types: Vec<String>,
+    _valid_resource_types: Vec<String>,
 }
 
 impl WorkProofValidator {
@@ -253,7 +251,7 @@ impl WorkProofValidator {
         Ok(Self {
             min_difficulty,
             max_work_age: 3600, // 1 hour
-            valid_resource_types: vec![
+            _valid_resource_types: vec![
                 "cpu".to_string(),
                 "gpu".to_string(),
                 "memory".to_string(),
@@ -281,8 +279,7 @@ impl WorkProofValidator {
     }
     
     /// Count leading zero bits in hash
-    #[allow(dead_code)] // Will be used for difficulty validation
-    fn count_leading_zeros(&self, hash: &[u8; 32]) -> usize {
+    fn _count_leading_zeros(&self, hash: &[u8; 32]) -> usize {
         let mut zeros = 0;
         for byte in hash {
             if *byte == 0 {
@@ -296,9 +293,8 @@ impl WorkProofValidator {
     }
     
     /// Validate resource type is supported
-    #[allow(dead_code)] // Will be used for resource type validation
-    async fn validate_resource_type(&self, resource_type: &str) -> Result<bool> {
-        Ok(self.valid_resource_types.contains(&resource_type.to_string()))
+    async fn _validate_resource_type(&self, resource_type: &str) -> Result<bool> {
+        Ok(self._valid_resource_types.contains(&resource_type.to_string()))
     }
 }
 
@@ -514,7 +510,7 @@ mod tests {
         assert!(valid_difficulty);
         
         // Test invalid resource type would fail
-        let result = validator.validate_resource_type("invalid").await;
+        let result = validator._validate_resource_type("invalid").await;
         assert!(result.is_ok());
         assert!(!result.unwrap());
     }

@@ -491,8 +491,7 @@ impl DnsResolver {
     }
 
     /// Convert DNS record to trust-dns Record format (used for DNS response construction)
-    #[allow(dead_code)]
-    fn dns_record_to_trust_dns(&self, record: &DnsRecord) -> AnyhowResult<Record> {
+    fn _dns_record_to_trust_dns(&self, record: &DnsRecord) -> AnyhowResult<Record> {
         let name = Name::from_utf8(&record.name)?;
         let rdata = match &record.data {
             DnsRecordData::A(addr) => RData::A(trust_dns_proto::rr::rdata::A(*addr)),
@@ -643,7 +642,7 @@ mod tests {
             data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
         };
 
-        let trust_dns_record = resolver.dns_record_to_trust_dns(&dns_record)
+        let trust_dns_record = resolver._dns_record_to_trust_dns(&dns_record)
             .expect("Failed to convert DNS record to trust-dns format");
         assert_eq!(trust_dns_record.record_type(), RecordType::AAAA);
         assert_eq!(trust_dns_record.ttl(), 300);

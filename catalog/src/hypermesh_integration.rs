@@ -12,20 +12,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// HyperMesh client for catalog operations
-#[allow(dead_code)] // Client fields for HyperMesh integration
 pub struct HyperMeshClient {
     /// HyperMesh network address
     network_address: String,
     /// TrustChain certificate path
     trustchain_cert_path: Option<String>,
     /// Asset adapter for HyperMesh integration
-    asset_adapter: HyperMeshAssetAdapter,
+    _asset_adapter: HyperMeshAssetAdapter,
 }
 
 /// HyperMesh Asset Adapter for catalog assets
 pub struct HyperMeshAssetAdapter {
     /// Asset type mappings to HyperMesh resources
-    asset_mappings: HashMap<String, HyperMeshResource>,
+    _asset_mappings: HashMap<String, HyperMeshResource>,
 }
 
 /// HyperMesh resource types that catalog can utilize
@@ -139,7 +138,7 @@ impl Default for HyperMeshClient {
         Self {
             network_address: "catalog.hypermesh.online".to_string(),
             trustchain_cert_path: None,
-            asset_adapter: HyperMeshAssetAdapter::default(),
+            _asset_adapter: HyperMeshAssetAdapter::default(),
         }
     }
 }
@@ -150,7 +149,7 @@ impl HyperMeshClient {
         Self {
             network_address,
             trustchain_cert_path: None,
-            asset_adapter: HyperMeshAssetAdapter::default(),
+            _asset_adapter: HyperMeshAssetAdapter::default(),
         }
     }
 
@@ -239,7 +238,7 @@ impl HyperMeshClient {
 impl Default for HyperMeshAssetAdapter {
     fn default() -> Self {
         Self {
-            asset_mappings: HashMap::new(),
+            _asset_mappings: HashMap::new(),
         }
     }
 }
@@ -251,17 +250,17 @@ impl HyperMeshAssetAdapter {
     }
 
     /// Register asset mapping to HyperMesh resource
-    pub fn register_asset_mapping(
+    pub fn _register_asset_mapping(
         &mut self,
         asset_type: String,
         resource: HyperMeshResource,
     ) {
-        self.asset_mappings.insert(asset_type, resource);
+        self._asset_mappings.insert(asset_type, resource);
     }
 
     /// Get resource requirements for asset type
-    pub fn get_resource_requirements(&self, asset_type: &str) -> Option<&HyperMeshResource> {
-        self.asset_mappings.get(asset_type)
+    pub fn _get_resource_requirements(&self, asset_type: &str) -> Option<&HyperMeshResource> {
+        self._asset_mappings.get(asset_type)
     }
 
     /// Map catalog asset to HyperMesh resources
@@ -339,7 +338,7 @@ mod tests {
     fn test_asset_adapter_resource_mapping() {
         let mut adapter = HyperMeshAssetAdapter::new();
 
-        adapter.register_asset_mapping(
+        adapter._register_asset_mapping(
             "lua_computation".to_string(),
             HyperMeshResource::Cpu {
                 cores: 4,
@@ -347,7 +346,7 @@ mod tests {
             },
         );
 
-        let resource = adapter.get_resource_requirements("lua_computation");
+        let resource = adapter._get_resource_requirements("lua_computation");
         assert!(resource.is_some());
     }
 

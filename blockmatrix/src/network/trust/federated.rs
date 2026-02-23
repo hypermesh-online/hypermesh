@@ -36,7 +36,6 @@ pub struct FederatedNetworkHandler {
 
 /// Federation information and policies
 #[derive(Debug, Default)]
-#[allow(dead_code)] // Fields populated during federation setup
 struct FederationInfo {
     /// Federation name
     name: String,
@@ -47,9 +46,9 @@ struct FederationInfo {
     /// Join timestamp
     joined_at: Option<u64>,
     /// Federation policies
-    policies: Vec<String>,
+    _policies: Vec<String>,
     /// Required proof levels
-    required_proofs: Vec<String>,
+    _required_proofs: Vec<String>,
 }
 
 impl FederatedNetworkHandler {

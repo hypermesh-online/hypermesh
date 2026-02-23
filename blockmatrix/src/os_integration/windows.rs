@@ -25,67 +25,63 @@ use windows::{
 
 /// CPU sample for delta calculations
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used in CPU usage calculation
 struct CpuSample {
-    idle_time: u64,
-    kernel_time: u64,
-    user_time: u64,
-    timestamp: Instant,
+    _idle_time: u64,
+    _kernel_time: u64,
+    _user_time: u64,
+    _timestamp: Instant,
 }
 
 /// Network interface statistics
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used in network rate calculation
 struct NetworkStats {
-    bytes_received: u64,
-    bytes_sent: u64,
-    timestamp: Instant,
+    _bytes_received: u64,
+    _bytes_sent: u64,
+    _timestamp: Instant,
 }
 
 impl Default for NetworkStats {
     fn default() -> Self {
         Self {
-            bytes_received: 0,
-            bytes_sent: 0,
-            timestamp: Instant::now(),
+            _bytes_received: 0,
+            _bytes_sent: 0,
+            _timestamp: Instant::now(),
         }
     }
 }
 
 /// Disk I/O statistics
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used in disk rate calculation
 struct DiskStats {
-    bytes_read: u64,
-    bytes_written: u64,
-    timestamp: Instant,
+    _bytes_read: u64,
+    _bytes_written: u64,
+    _timestamp: Instant,
 }
 
 impl Default for DiskStats {
     fn default() -> Self {
         Self {
-            bytes_read: 0,
-            bytes_written: 0,
-            timestamp: Instant::now(),
+            _bytes_read: 0,
+            _bytes_written: 0,
+            _timestamp: Instant::now(),
         }
     }
 }
 
 /// Windows OS Abstraction with Performance Counter support
-#[allow(dead_code)] // Fields used during resource monitoring
 pub struct WindowsAbstraction {
     /// Previous CPU sample for delta calculation
-    previous_cpu_sample: Mutex<Option<CpuSample>>,
+    _previous_cpu_sample: Mutex<Option<CpuSample>>,
 
     /// Previous network stats for rate calculation
-    previous_network_stats: Mutex<Option<NetworkStats>>,
+    _previous_network_stats: Mutex<Option<NetworkStats>>,
 
     /// Previous disk stats for rate calculation
-    previous_disk_stats: Mutex<Option<DiskStats>>,
+    _previous_disk_stats: Mutex<Option<DiskStats>>,
 
     /// WMI connection (if available)
     #[cfg(target_os = "windows")]
-    wmi_connection: Option<wmi::WMIConnection>,
+    _wmi_connection: Option<wmi::WMIConnection>,
 }
 
 impl WindowsAbstraction {
@@ -100,19 +96,19 @@ impl WindowsAbstraction {
             ).ok();
 
             Ok(Self {
-                previous_cpu_sample: Mutex::new(None),
-                previous_network_stats: Mutex::new(None),
-                previous_disk_stats: Mutex::new(None),
-                wmi_connection,
+                _previous_cpu_sample: Mutex::new(None),
+                _previous_network_stats: Mutex::new(None),
+                _previous_disk_stats: Mutex::new(None),
+                _wmi_connection: wmi_connection,
             })
         }
 
         #[cfg(not(target_os = "windows"))]
         {
             Ok(Self {
-                previous_cpu_sample: Mutex::new(None),
-                previous_network_stats: Mutex::new(None),
-                previous_disk_stats: Mutex::new(None),
+                _previous_cpu_sample: Mutex::new(None),
+                _previous_network_stats: Mutex::new(None),
+                _previous_disk_stats: Mutex::new(None),
             })
         }
     }
@@ -219,7 +215,7 @@ impl WindowsAbstraction {
         let mut total_written = 0u64;
 
         // Use WMI to get disk performance data
-        if let Some(ref conn) = self.wmi_connection {
+        if let Some(ref conn) = self._wmi_connection {
             #[derive(serde::Deserialize)]
             struct Win32_PerfRawData_PerfDisk_LogicalDisk {
                 DiskReadBytesPerSec: Option<u64>,
@@ -254,7 +250,7 @@ impl OsAbstraction for WindowsAbstraction {
     fn detect_cpu(&self) -> Result<CpuInfo> {
         #[cfg(target_os = "windows")]
         {
-            if let Some(ref conn) = self.wmi_connection {
+            if let Some(ref conn) = self._wmi_connection {
                 #[derive(serde::Deserialize)]
                 struct Win32_Processor {
                     Name: String,
@@ -301,7 +297,7 @@ impl OsAbstraction for WindowsAbstraction {
     fn detect_gpu(&self) -> Result<Vec<GpuInfo>> {
         #[cfg(target_os = "windows")]
         {
-            if let Some(ref conn) = self.wmi_connection {
+            if let Some(ref conn) = self._wmi_connection {
                 #[derive(serde::Deserialize)]
                 struct Win32_VideoController {
                     Name: String,
@@ -385,7 +381,7 @@ impl OsAbstraction for WindowsAbstraction {
     fn detect_storage(&self) -> Result<Vec<StorageInfo>> {
         #[cfg(target_os = "windows")]
         {
-            if let Some(ref conn) = self.wmi_connection {
+            if let Some(ref conn) = self._wmi_connection {
                 #[derive(serde::Deserialize)]
                 struct Win32_LogicalDisk {
                     DeviceID: String,
@@ -439,7 +435,7 @@ impl OsAbstraction for WindowsAbstraction {
             // Get CPU usage
             let cpu_usage_percent = {
                 let current_sample = self.get_cpu_sample()?;
-                let mut prev_guard = self.previous_cpu_sample.lock().unwrap();
+                let mut prev_guard = self._previous_cpu_sample.lock().unwrap();
 
                 let usage = if let Some(ref prev_sample) = *prev_guard {
                     self.calculate_cpu_usage(prev_sample, &current_sample)
@@ -458,7 +454,7 @@ impl OsAbstraction for WindowsAbstraction {
             // Get network I/O rates
             let (network_rx_bytes_per_sec, network_tx_bytes_per_sec) = {
                 let current_stats = self.get_network_stats()?;
-                let mut prev_guard = self.previous_network_stats.lock().unwrap();
+                let mut prev_guard = self._previous_network_stats.lock().unwrap();
 
                 let (rx_rate, tx_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);
@@ -486,7 +482,7 @@ impl OsAbstraction for WindowsAbstraction {
             // Get disk I/O rates
             let (disk_read_bytes_per_sec, disk_write_bytes_per_sec) = {
                 let current_stats = self.get_disk_stats()?;
-                let mut prev_guard = self.previous_disk_stats.lock().unwrap();
+                let mut prev_guard = self._previous_disk_stats.lock().unwrap();
 
                 let (read_rate, write_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);
@@ -512,7 +508,7 @@ impl OsAbstraction for WindowsAbstraction {
             };
 
             // Get process count via WMI
-            let process_count = if let Some(ref conn) = self.wmi_connection {
+            let process_count = if let Some(ref conn) = self._wmi_connection {
                 #[derive(serde::Deserialize)]
                 struct Win32_Process {
                     ProcessId: u32,

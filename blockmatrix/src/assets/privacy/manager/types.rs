@@ -124,7 +124,6 @@ impl Default for super::super::RewardDistributionConfig {
 }
 
 /// Core privacy manager
-#[allow(dead_code)] // Fields used during privacy management operations
 pub struct PrivacyManager {
     /// Manager configuration
     pub(crate) config: PrivacyManagerConfig,
@@ -136,7 +135,7 @@ pub struct PrivacyManager {
     pub(crate) active_allocations: Arc<RwLock<HashMap<String, PrivacyAllocationResult>>>,
 
     /// Remote proxy manager reference
-    pub(crate) proxy_manager: Option<Arc<RemoteProxyManager>>,
+    pub(crate) _proxy_manager: Option<Arc<RemoteProxyManager>>,
 
     /// Privacy enforcement engine
     pub(crate) enforcer: Arc<super::super::PrivacyEnforcer>,

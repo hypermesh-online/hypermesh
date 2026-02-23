@@ -113,20 +113,19 @@ pub trait HyperMeshTransportTrait: Send + Sync {
 }
 
 /// HyperMesh transport implementation
-#[allow(dead_code)] // Config field used in transport operations
 pub struct HyperMeshTransport {
-    config: TransportConfig,
+    _config: TransportConfig,
 }
 
 impl HyperMeshTransport {
     /// Create new transport instance
     pub fn new(config: TransportConfig) -> Self {
-        Self { config }
+        Self { _config: config }
     }
 
     /// Create new transport instance with HyperMeshTransportConfig
     pub async fn new_async(config: HyperMeshTransportConfig) -> Result<Self> {
-        Ok(Self { config })
+        Ok(Self { _config: config })
     }
 
     /// Get connection count

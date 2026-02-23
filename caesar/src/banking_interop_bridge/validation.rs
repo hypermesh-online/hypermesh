@@ -103,7 +103,7 @@ impl BankingInteropBridge {
     }
 
     /// Calculate gold price deviation-based adjustment for market stability
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn calculate_economic_adjustment(&self, indicators: &EconomicIndicators, amount: Decimal) -> Decimal {
         let current_gold = indicators.current_gold_price_usd;
         let target_gold = indicators.target_gold_price_usd;

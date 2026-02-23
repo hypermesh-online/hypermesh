@@ -127,10 +127,8 @@ pub struct MultiPathConnection {
     next_path_id: AtomicU32,
     policy: Arc<PathPolicy>,
     selector: Arc<RwLock<PathSelector>>,
-    #[allow(dead_code)]
-    pos_fast_validator: Option<Arc<PosFastValidator>>,
-    #[allow(dead_code)]
-    isolation_manager: Option<Arc<NetworkIsolationManager>>,
+    _pos_fast_validator: Option<Arc<PosFastValidator>>,
+    _isolation_manager: Option<Arc<NetworkIsolationManager>>,
     metrics: Arc<MultiPathMetrics>,
 }
 
@@ -144,21 +142,21 @@ impl MultiPathConnection {
             next_path_id: AtomicU32::new(0),
             policy: Arc::new(policy),
             selector: Arc::new(RwLock::new(PathSelector::new(PathScheduler::RoundRobin))),
-            pos_fast_validator: None,
-            isolation_manager: None,
+            _pos_fast_validator: None,
+            _isolation_manager: None,
             metrics: Arc::new(MultiPathMetrics::new()),
         }
     }
 
     /// Attach a PoS fast validator for privacy-tier-aware validation.
     pub fn with_pos_validator(mut self, validator: Arc<PosFastValidator>) -> Self {
-        self.pos_fast_validator = Some(validator);
+        self._pos_fast_validator = Some(validator);
         self
     }
 
     /// Attach a network isolation manager for tunnel verification.
     pub fn with_isolation_manager(mut self, manager: Arc<NetworkIsolationManager>) -> Self {
-        self.isolation_manager = Some(manager);
+        self._isolation_manager = Some(manager);
         self
     }
 

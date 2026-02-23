@@ -16,8 +16,7 @@ use super::types::*;
 /// Resource monitor for tracking extension resource usage
 pub struct ResourceMonitor {
     /// Extension ID
-    #[allow(dead_code)]
-    pub(crate) extension_id: String,
+    pub(crate) _extension_id: String,
 
     /// Resource quotas
     pub(crate) quotas: ResourceQuotas,
@@ -38,7 +37,7 @@ impl ResourceMonitor {
         let rate_limiter = Arc::new(Semaphore::new(quotas.ops_per_second as usize));
 
         Self {
-            extension_id,
+            _extension_id: extension_id,
             quotas,
             usage: Arc::new(RwLock::new(ResourceUsage::default())),
             rate_limiter,

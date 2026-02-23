@@ -38,7 +38,6 @@ use super::encryption::create_kyber_encryption_key;
 use super::distribution::generate_proxy_address;
 
 /// Storage Asset Adapter implementation
-#[allow(dead_code)] // Fields used in adapter trait implementation
 pub struct StorageAssetAdapter {
     /// Active storage allocations by asset ID
     allocations: Arc<RwLock<HashMap<AssetRegistration, StorageAllocation>>>,
@@ -47,7 +46,7 @@ pub struct StorageAssetAdapter {
     /// Device allocation mapping (device_id -> asset_id)
     device_allocations: Arc<RwLock<HashMap<String, AssetRegistration>>>,
     /// Storage pools for distributed management
-    storage_pools: Arc<RwLock<HashMap<String, StoragePool>>>,
+    _storage_pools: Arc<RwLock<HashMap<String, StoragePool>>>,
     /// Proxy address mappings
     proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     /// Total storage capacity in bytes
@@ -72,7 +71,7 @@ impl StorageAssetAdapter {
             allocations: Arc::new(RwLock::new(HashMap::new())),
             storage_devices: Arc::new(RwLock::new(storage_devices)),
             device_allocations: Arc::new(RwLock::new(HashMap::new())),
-            storage_pools: Arc::new(RwLock::new(storage_pools)),
+            _storage_pools: Arc::new(RwLock::new(storage_pools)),
             proxy_mappings: Arc::new(RwLock::new(HashMap::new())),
             total_capacity,
             available_capacity: Arc::new(RwLock::new(total_capacity)),

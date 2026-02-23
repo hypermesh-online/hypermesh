@@ -32,10 +32,9 @@ pub struct HyperMeshConfig {
 }
 
 /// HyperMesh system with asset management
-#[allow(dead_code)] // API surface - fields used in future integration
 pub struct HyperMeshSystem {
     /// System configuration
-    config: HyperMeshConfig,
+    _config: HyperMeshConfig,
     /// Asset manager instance
     asset_manager: Arc<AssetManager>,
     /// Asset adapter registry
@@ -68,7 +67,7 @@ impl HyperMeshSystem {
         tracing::info!("HyperMesh Asset System initialized with all adapters");
 
         Ok(Self {
-            config,
+            _config: config,
             asset_manager,
             adapter_registry,
             extension_manager,

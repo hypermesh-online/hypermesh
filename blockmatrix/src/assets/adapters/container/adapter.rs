@@ -22,13 +22,12 @@ use crate::assets::core::{
 use super::types::*;
 
 /// Container Asset Adapter implementation
-#[allow(dead_code)]
 pub struct ContainerAssetAdapter {
     allocations: Arc<RwLock<HashMap<AssetRegistration, ContainerAllocation>>>,
-    runtime: Arc<ContainerRuntime>,
+    _runtime: Arc<ContainerRuntime>,
     proxy_mappings: Arc<RwLock<HashMap<ProxyAddress, AssetRegistration>>>,
     allocated_ports: Arc<RwLock<HashMap<u16, AssetRegistration>>>,
-    image_registry: Arc<RwLock<HashMap<String, ImageInfo>>>,
+    _image_registry: Arc<RwLock<HashMap<String, ImageInfo>>>,
     usage_stats: Arc<RwLock<ContainerUsageStats>>,
 }
 
@@ -38,10 +37,10 @@ impl ContainerAssetAdapter {
         let runtime = Arc::new(Self::detect_container_runtime().await);
         Self {
             allocations: Arc::new(RwLock::new(HashMap::new())),
-            runtime,
+            _runtime: runtime,
             proxy_mappings: Arc::new(RwLock::new(HashMap::new())),
             allocated_ports: Arc::new(RwLock::new(HashMap::new())),
-            image_registry: Arc::new(RwLock::new(HashMap::new())),
+            _image_registry: Arc::new(RwLock::new(HashMap::new())),
             usage_stats: Arc::new(RwLock::new(ContainerUsageStats::default())),
         }
     }
@@ -153,7 +152,7 @@ impl ContainerAssetAdapter {
                 stats.total_deallocations += 1;
                 stats.active_containers = stats.active_containers.saturating_sub(1);
             },
-            ContainerOperation::Restart => { stats.container_restarts += 1; },
+            ContainerOperation::_Restart => { stats.container_restarts += 1; },
         }
     }
 }

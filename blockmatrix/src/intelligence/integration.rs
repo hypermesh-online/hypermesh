@@ -562,7 +562,7 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
         ))
     }
 
-    async fn deduplicate_shard(&self, shard: Shard) -> Result<DeduplicationResult> {
+    async fn _deduplicate_shard(&self, shard: Shard) -> Result<DeduplicationResult> {
         // Implementation would deduplicate the shard
         // This is a placeholder implementation
         use crate::assets::storage::{BucketId, compute_hash};
@@ -580,7 +580,6 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
 }
 
 #[async_trait]
-#[allow(dead_code)] // Extension trait for network-specific storage operations
 trait ContentAddressedStorageExt {
     async fn create_network_specific_address(
         &self,
@@ -588,15 +587,14 @@ trait ContentAddressedStorageExt {
         network_config: &NetworkConfig,
     ) -> Result<ContentAddress>;
 
-    async fn deduplicate_shard(&self, shard: Shard) -> Result<DeduplicationResult>;
+    async fn _deduplicate_shard(&self, shard: Shard) -> Result<DeduplicationResult>;
 }
 
 /// Network configuration placeholder
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Configuration struct for network-specific operations
 struct NetworkConfig {
-    network_id: NetworkId,
-    privacy_tier: PrivacyMode,
+    _network_id: NetworkId,
+    _privacy_tier: PrivacyMode,
 }
 
 /// Extension methods for MultiNetworkCoordinator
@@ -605,8 +603,8 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
     async fn get_network_config(&self, network: &NetworkId) -> Result<NetworkConfig> {
         // Placeholder implementation
         Ok(NetworkConfig {
-            network_id: network.clone(),
-            privacy_tier: PrivacyMode::PUBLIC,
+            _network_id: network.clone(),
+            _privacy_tier: PrivacyMode::PUBLIC,
         })
     }
 

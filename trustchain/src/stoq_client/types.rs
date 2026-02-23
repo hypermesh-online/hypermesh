@@ -94,12 +94,11 @@ pub struct StoqClientMetrics {
 
 /// Certificate validation result
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct CertificateValidationResult {
     pub(crate) is_valid: bool,
-    pub(crate) validated_at: SystemTime,
+    pub(crate) _validated_at: SystemTime,
     pub(crate) expires_at: SystemTime,
-    pub(crate) fingerprint: String,
+    pub(crate) _fingerprint: String,
 }
 
 /// DNS query request over STOQ

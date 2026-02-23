@@ -152,8 +152,7 @@ impl RealSpaceValidator {
 /// Real Proof of Stake validator
 pub struct RealStakeValidator {
     /// Minimum stake requirements by network tier (used for tier-based validation)
-    #[allow(dead_code)]
-    stake_thresholds: HashMap<String, u64>,
+    _stake_thresholds: HashMap<String, u64>,
     /// Stake verification
     crypto_verifier: CryptoVerifier,
     /// Known stake balances (in production, query blockchain)
@@ -168,7 +167,7 @@ impl RealStakeValidator {
         thresholds.insert("premium".to_string(), 100000);
 
         Self {
-            stake_thresholds: thresholds,
+            _stake_thresholds: thresholds,
             crypto_verifier: CryptoVerifier::new(),
             stake_registry: HashMap::new(),
         }
@@ -322,19 +321,17 @@ pub struct RealTimeValidator {
     /// Maximum allowed time drift
     maximum_time_drift: Duration,
     /// Time synchronization checker (for NTP-based drift detection)
-    #[allow(dead_code)]
-    last_ntp_sync: Option<Instant>,
+    _last_ntp_sync: Option<Instant>,
     /// Time verification (for cryptographic timestamp validation)
-    #[allow(dead_code)]
-    crypto_verifier: CryptoVerifier,
+    _crypto_verifier: CryptoVerifier,
 }
 
 impl RealTimeValidator {
     pub fn new() -> Self {
         Self {
             maximum_time_drift: Duration::from_secs(30),
-            last_ntp_sync: None,
-            crypto_verifier: CryptoVerifier::new(),
+            _last_ntp_sync: None,
+            _crypto_verifier: CryptoVerifier::new(),
         }
     }
 

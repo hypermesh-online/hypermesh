@@ -49,7 +49,6 @@ use crate::assets::pipeline::Shard;
 pub type Hash = [u8; 32];
 
 /// Content-addressed storage system
-#[allow(dead_code)] // Fields used during storage operations
 pub struct ContentAddressedStorage {
     /// Deduplication engine
     deduplication: Arc<RwLock<DeduplicationEngine>>,
@@ -61,7 +60,7 @@ pub struct ContentAddressedStorage {
     replication: Arc<ReplicationStrategy>,
 
     /// Matrix foundation (Phase 1)
-    foundation: Arc<MatrixFoundation>,
+    _foundation: Arc<MatrixFoundation>,
 
     /// Storage statistics
     stats: Arc<RwLock<StorageStats>>,
@@ -103,7 +102,7 @@ impl ContentAddressedStorage {
             deduplication,
             mapper,
             replication,
-            foundation,
+            _foundation: foundation,
             stats: Arc::new(RwLock::new(StorageStats::default())),
         })
     }

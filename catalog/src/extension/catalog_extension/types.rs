@@ -31,14 +31,13 @@ use super::super::asset_handlers::{
 use super::super::config::CatalogExtensionConfig;
 
 /// CatalogExtension - HyperMesh plugin for asset library management
-#[allow(dead_code)]
 pub struct CatalogExtension {
     pub(crate) metadata: ExtensionMetadata,
     pub(crate) catalog: Option<Arc<Catalog>>,
     pub(crate) library_manager: Arc<RwLock<AssetLibrary>>,
-    pub(crate) asset_registry: Option<Arc<HyperMeshAssetRegistry>>,
+    pub(crate) _asset_registry: Option<Arc<HyperMeshAssetRegistry>>,
     pub(crate) sharing_manager: Option<Arc<SharingManager>>,
-    pub(crate) asset_handlers: HashMap<AssetType, Box<dyn AssetExtensionHandler>>,
+    pub(crate) _asset_handlers: HashMap<AssetType, Box<dyn AssetExtensionHandler>>,
     pub(crate) config: CatalogExtensionConfig,
     pub(crate) state: Arc<RwLock<ExtensionStateData>>,
     pub(crate) health: Arc<RwLock<ExtensionHealth>>,
@@ -131,9 +130,9 @@ impl CatalogExtension {
             metadata: metadata.clone(),
             catalog: None,
             library_manager,
-            asset_registry,
+            _asset_registry: asset_registry,
             sharing_manager: None,
-            asset_handlers,
+            _asset_handlers: asset_handlers,
             config,
             state: Arc::new(RwLock::new(ExtensionStateData {
                 version: 1,

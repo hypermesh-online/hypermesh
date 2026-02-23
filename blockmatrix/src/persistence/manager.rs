@@ -127,10 +127,9 @@ pub struct StorageStats {
 }
 
 /// Persistence transaction handle
-#[allow(dead_code)] // Fields used during transaction lifecycle
 pub struct PersistenceTransaction {
     /// Transaction ID
-    id: String,
+    _id: String,
     /// Operations to commit
     operations: Vec<PersistenceOperation>,
     /// Rollback data
@@ -183,12 +182,11 @@ pub enum PersistenceOperation {
 
 /// Rollback data
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used during transaction rollback
 struct RollbackData {
     /// Component affected
-    component: String,
+    _component: String,
     /// Previous data (serialized)
-    data: Vec<u8>,
+    _data: Vec<u8>,
 }
 
 /// Unified persistence manager
@@ -388,7 +386,7 @@ impl PersistenceManager {
         *counter += 1;
 
         Ok(PersistenceTransaction {
-            id: format!("txn_{}", counter),
+            _id: format!("txn_{}", counter),
             operations: Vec::new(),
             rollback: Vec::new(),
             committed: false,

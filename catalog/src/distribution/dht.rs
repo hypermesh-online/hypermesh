@@ -92,7 +92,6 @@ impl Distance {
 }
 
 /// DHT Network implementation using Kademlia algorithm
-#[allow(dead_code)] // DHT fields for Kademlia operations
 pub struct DhtNetwork {
     /// Our node ID
     local_id: DhtNodeId,
@@ -103,7 +102,7 @@ pub struct DhtNetwork {
     /// Value store (package announcements)
     value_store: Arc<RwLock<ValueStore>>,
     /// Pending queries
-    pending_queries: Arc<RwLock<HashMap<QueryId, PendingQuery>>>,
+    _pending_queries: Arc<RwLock<HashMap<QueryId, PendingQuery>>>,
     /// Configuration
     config: DhtConfig,
 }
@@ -235,30 +234,28 @@ enum ValueData {
 type QueryId = [u8; 16];
 
 /// Pending query information
-#[allow(dead_code)] // Query tracking fields for DHT operations
 struct PendingQuery {
     /// Query type
-    query_type: QueryType,
+    _query_type: QueryType,
     /// Target key
-    target: ValueKey,
+    _target: ValueKey,
     /// Nodes to query
-    to_query: Vec<DhtNodeId>,
+    _to_query: Vec<DhtNodeId>,
     /// Nodes already queried
-    queried: HashSet<DhtNodeId>,
+    _queried: HashSet<DhtNodeId>,
     /// Best nodes found so far
-    best_nodes: BTreeMap<Distance, NodeInfo>,
+    _best_nodes: BTreeMap<Distance, NodeInfo>,
     /// Values found
-    values: Vec<StoredValue>,
+    _values: Vec<StoredValue>,
     /// Query start time
-    started_at: std::time::Instant,
+    _started_at: std::time::Instant,
 }
 
 /// Query types
-#[allow(dead_code)] // DHT query type variants
 enum QueryType {
-    FindNode,
-    FindValue,
-    Store,
+    _FindNode,
+    _FindValue,
+    _Store,
 }
 
 impl DhtNetwork {
@@ -278,7 +275,7 @@ impl DhtNetwork {
             transport,
             routing_table,
             value_store,
-            pending_queries: Arc::new(RwLock::new(HashMap::new())),
+            _pending_queries: Arc::new(RwLock::new(HashMap::new())),
             config,
         };
 
@@ -689,8 +686,7 @@ impl ValueStore {
 }
 
 // Helper function for AssetPackageId
-#[allow(dead_code)] // Utility for DHT key operations
-fn asset_package_id_as_bytes(id: &AssetPackageId) -> &[u8] {
+fn _asset_package_id_as_bytes(id: &AssetPackageId) -> &[u8] {
     id.as_bytes()
 }
 

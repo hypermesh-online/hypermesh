@@ -26,14 +26,13 @@ use super::dht::DhtNodeId;
 /// pooling, FALCON quantum-resistant crypto, adaptive optimization, and eBPF
 /// acceleration. Each connection yields `quinn::SendStream`/`quinn::RecvStream`
 /// bidirectional streams that implement `AsyncWrite`/`AsyncRead`.
-#[allow(dead_code)] // Transport fields used during P2P operations
 pub struct StoqTransportLayer {
     /// Real STOQ transport (manages quinn endpoint, connection pools, crypto)
     transport: Arc<stoq::StoqTransport>,
     /// Active connections keyed by peer DhtNodeId
     connections: Arc<RwLock<HashMap<DhtNodeId, Arc<stoq::Connection>>>>,
     /// Incoming connection handler
-    incoming_handler: Arc<RwLock<Option<mpsc::Sender<IncomingRequest>>>>,
+    _incoming_handler: Arc<RwLock<Option<mpsc::Sender<IncomingRequest>>>>,
     /// Transport configuration
     config: TransportLayerConfig,
     /// Connection pool for multiplexing
@@ -246,7 +245,7 @@ impl StoqTransportLayer {
         Ok(Self {
             transport,
             connections: Arc::new(RwLock::new(HashMap::new())),
-            incoming_handler: Arc::new(RwLock::new(None)),
+            _incoming_handler: Arc::new(RwLock::new(None)),
             config,
             connection_pool,
             bandwidth_manager,
@@ -523,15 +522,13 @@ impl ConnectionPool {
     }
 
     /// Get a connection from the pool
-    #[allow(dead_code)] // Pool access method for P2P operations
-    async fn get_connection(&self, node_id: &DhtNodeId) -> Option<Arc<stoq::Connection>> {
+    async fn _get_connection(&self, node_id: &DhtNodeId) -> Option<Arc<stoq::Connection>> {
         let pools = self.pools.read().await;
         pools.get(node_id)?.first().cloned()
     }
 
     /// Remove all connections for a peer
-    #[allow(dead_code)] // Cleanup method for connection management
-    async fn remove_peer(&self, node_id: &DhtNodeId) {
+    async fn _remove_peer(&self, node_id: &DhtNodeId) {
         let mut pools = self.pools.write().await;
         pools.remove(node_id);
     }

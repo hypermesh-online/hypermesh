@@ -25,8 +25,7 @@ pub struct TrustChainResolver {
     /// Upstream resolvers (IPv6 only)
     upstream_resolvers: Vec<Ipv6Addr>,
     /// TrustChain domains (for domain-based routing decisions)
-    #[allow(dead_code)]
-    trustchain_domains: Vec<String>,
+    _trustchain_domains: Vec<String>,
     /// Resolver statistics
     stats: Arc<RwLock<ResolverStats>>,
     /// Client pool
@@ -70,7 +69,7 @@ impl TrustChainResolver {
 
         let resolver = Self {
             upstream_resolvers,
-            trustchain_domains,
+            _trustchain_domains: trustchain_domains,
             stats: Arc::new(RwLock::new(ResolverStats::default())),
             client_pool,
         };

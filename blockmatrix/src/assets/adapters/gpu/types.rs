@@ -145,10 +145,9 @@ pub struct GpuUsageStats {
 
 /// GPU operations for statistics
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Variants for future GPU operation tracking
 pub(crate) enum GpuOperation {
     Allocate,
     Deallocate,
-    Compute,
-    MemoryTransfer,
+    _Compute,
+    _MemoryTransfer,
 }

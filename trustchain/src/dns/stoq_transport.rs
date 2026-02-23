@@ -394,8 +394,7 @@ pub struct DNSConnection {
     /// Service endpoint for DNS
     endpoint: ServiceEndpoint,
     /// STOQ client for transport (retained for connection reuse)
-    #[allow(dead_code)]
-    stoq_client: Arc<TrustChainStoqClient>,
+    _stoq_client: Arc<TrustChainStoqClient>,
     /// Connection established time
     established_at: SystemTime,
 }
@@ -405,7 +404,7 @@ impl DNSConnection {
     pub fn new(endpoint: ServiceEndpoint, stoq_client: Arc<TrustChainStoqClient>) -> Self {
         Self {
             endpoint,
-            stoq_client,
+            _stoq_client: stoq_client,
             established_at: SystemTime::now(),
         }
     }

@@ -36,16 +36,15 @@ pub struct P2PNetworkHandler {
 
 /// Trust decision for a peer
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during trust evaluation
 struct TrustDecision {
     /// Peer being decided on
-    peer_id: PeerId,
+    _peer_id: PeerId,
     /// Decision (accept/reject)
     accepted: bool,
     /// Timestamp of decision
-    timestamp: u64,
+    _timestamp: u64,
     /// Reason for decision
-    reason: String,
+    _reason: String,
 }
 
 impl P2PNetworkHandler {
@@ -127,13 +126,13 @@ impl P2PNetworkHandler {
 
         // Log trust decision
         self.trust_decisions.write().await.push(TrustDecision {
-            peer_id: peer_id.clone(),
+            _peer_id: peer_id.clone(),
             accepted: true,
-            timestamp: std::time::SystemTime::now()
+            _timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            reason: reason.to_string(),
+            _reason: reason.to_string(),
         });
 
         info!("Peer {} approved and added to trusted list", peer_id);
@@ -149,13 +148,13 @@ impl P2PNetworkHandler {
 
         // Log trust decision
         self.trust_decisions.write().await.push(TrustDecision {
-            peer_id: peer_id.clone(),
+            _peer_id: peer_id.clone(),
             accepted: false,
-            timestamp: std::time::SystemTime::now()
+            _timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            reason: reason.to_string(),
+            _reason: reason.to_string(),
         });
 
         warn!("Peer {} rejected", peer_id);

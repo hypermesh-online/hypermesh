@@ -42,13 +42,12 @@ use std::collections::HashMap;
 
 /// Cached validation entry
 #[derive(Clone)]
-#[allow(dead_code)] // Fields used during validation caching
 struct CachedValidation {
-    coordinate: MatrixCoordinate,
+    _coordinate: MatrixCoordinate,
     node_id: String,
     is_valid: bool,
     timestamp: SystemTime,
-    confidence: f64,
+    _confidence: f64,
 }
 
 impl NetworkPositionValidator {
@@ -272,11 +271,11 @@ impl NetworkPositionValidator {
         cache.entries.insert(
             coordinate.clone(),
             CachedValidation {
-                coordinate,
+                _coordinate: coordinate,
                 node_id,
                 is_valid,
                 timestamp: SystemTime::now(),
-                confidence,
+                _confidence: confidence,
             }
         );
 

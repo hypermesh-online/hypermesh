@@ -182,10 +182,9 @@ pub enum ApprovalProcess {
 }
 
 /// Multi-network coordinator - manages membership across networks
-#[allow(dead_code)] // Fields used during network membership management
 pub struct MultiNetworkMembership {
     /// Node ID
-    local_node: PeerIdentity,
+    _local_node: PeerIdentity,
     /// Current memberships
     memberships: Arc<RwLock<HashMap<NetworkId, NetworkMembership>>>,
     /// Discovered networks
@@ -214,7 +213,7 @@ impl MultiNetworkMembership {
     /// Create new multi-network membership manager
     pub fn new(local_node: PeerIdentity, trustchain_client: Arc<dyn TrustChainClient>) -> Self {
         Self {
-            local_node,
+            _local_node: local_node,
             memberships: Arc::new(RwLock::new(HashMap::new())),
             discovered_networks: Arc::new(RwLock::new(HashMap::new())),
             trustchain_client,

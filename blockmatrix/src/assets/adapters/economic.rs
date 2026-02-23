@@ -81,14 +81,13 @@ pub struct EconomicAssetAdapter {
 
 /// Internal state for economic assets
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Fields populated during asset lifecycle
 struct EconomicAssetState {
     /// Asset metadata
-    asset_id: AssetRegistration,
+    _asset_id: AssetRegistration,
     /// Current economic state
-    usage: EconomicUsage,
+    _usage: EconomicUsage,
     /// Resource limits
-    limits: EconomicLimits,
+    _limits: EconomicLimits,
     /// Privacy configuration
     privacy: EconomicPrivacy,
     /// Proxy address for remote access
@@ -250,9 +249,9 @@ impl AssetAdapter for EconomicAssetAdapter {
         };
 
         let asset_state = EconomicAssetState {
-            asset_id: asset_id.clone(),
-            usage: usage.clone(),
-            limits,
+            _asset_id: asset_id.clone(),
+            _usage: usage.clone(),
+            _limits: limits,
             privacy: Self::map_privacy_level(request.privacy_level.clone()),
             proxy_address: None, // Will be assigned if needed
             status: AssetStatus {

@@ -18,14 +18,13 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 /// DSR-powered container scheduler
-#[allow(dead_code)] // Fields used during scheduling operations
 pub struct DsrScheduler {
     /// DSR scheduling enabled
     dsr_enabled: bool,
     /// Maximum candidates to evaluate
     max_candidates: usize,
     /// Learned scheduling patterns
-    scheduling_patterns: Arc<RwLock<HashMap<String, SchedulingPattern>>>,
+    _scheduling_patterns: Arc<RwLock<HashMap<String, SchedulingPattern>>>,
     /// Node scoring cache
     node_scoring_cache: Arc<RwLock<HashMap<String, CachedNodeScore>>>,
     /// Scheduler metrics
@@ -321,7 +320,7 @@ impl DsrScheduler {
         Ok(Self {
             dsr_enabled,
             max_candidates,
-            scheduling_patterns: Arc::new(RwLock::new(HashMap::new())),
+            _scheduling_patterns: Arc::new(RwLock::new(HashMap::new())),
             node_scoring_cache: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(RwLock::new(SchedulerMetrics {
                 total_decisions: 0,

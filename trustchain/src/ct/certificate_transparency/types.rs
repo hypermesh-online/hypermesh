@@ -13,10 +13,9 @@ use tokio::sync::Mutex;
 
 /// SHA256 algorithm for MerkleTree (used via Hasher trait implementation)
 #[derive(Clone, Debug, Default)]
-#[allow(dead_code)]
-pub(crate) struct Sha256Algorithm;
+pub(crate) struct _Sha256Algorithm;
 
-impl std::hash::Hasher for Sha256Algorithm {
+impl std::hash::Hasher for _Sha256Algorithm {
     fn finish(&self) -> u64 {
         0 // Not used in this context
     }
@@ -188,8 +187,7 @@ impl Default for CTConfig {
 /// S3-backed storage for certificate transparency logs
 pub struct S3BackedStorage {
     /// S3 client (for persistence backend)
-    #[allow(dead_code)]
-    s3_client: Arc<S3Client>,
+    _s3_client: Arc<S3Client>,
     /// Bucket configuration
     pub(crate) bucket_config: S3BucketConfig,
     /// Local cache for recent entries
@@ -199,14 +197,13 @@ pub struct S3BackedStorage {
 }
 
 /// Certificate Transparency performance monitor
-#[allow(dead_code)]
 pub struct CTPerformanceMonitor {
     /// Performance metrics
-    metrics: Arc<CTMetrics>,
+    _metrics: Arc<CTMetrics>,
     /// Alert thresholds
-    thresholds: PerformanceThresholds,
+    _thresholds: PerformanceThresholds,
     /// Monitoring tasks
-    monitoring_tasks: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    _monitoring_tasks: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
 
 /// Consistency checker placeholder
@@ -219,7 +216,7 @@ impl S3BackedStorage {
         tracing::info!("Initializing S3-backed storage: bucket={}", config.bucket_name);
         let s3_client = Arc::new(S3Client {});
         Ok(Self {
-            s3_client,
+            _s3_client: s3_client,
             bucket_config: config,
             local_cache: Arc::new(DashMap::new()),
             write_queue: Arc::new(Mutex::new(VecDeque::new())),
@@ -264,9 +261,9 @@ impl CTPerformanceMonitor {
             memory_critical_mb: targets.max_memory_usage_mb,
         };
         Ok(Self {
-            metrics,
-            thresholds,
-            monitoring_tasks: Arc::new(Mutex::new(Vec::new())),
+            _metrics: metrics,
+            _thresholds: thresholds,
+            _monitoring_tasks: Arc::new(Mutex::new(Vec::new())),
         })
     }
 }

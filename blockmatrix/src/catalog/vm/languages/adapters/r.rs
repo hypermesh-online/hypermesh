@@ -18,9 +18,8 @@ use super::super::super::execution::{ExecutionContext, ExecutionResult};
 use super::{LanguageRuntime, BaseAdapter, LanguageSpecificConfig, ConsensusBridge};
 use super::super::{ConsensusRequirements, ConsensusConstruct, AssetRequirements, TranslatedError};
 
-#[allow(dead_code)] // Fields used during R adapter operations
 pub struct RAdapter {
-    base: BaseAdapter,
+    _base: BaseAdapter,
 }
 
 impl RAdapter {
@@ -36,7 +35,7 @@ impl RAdapter {
             consensus_bridge,
             config,
         );
-        Ok(Self { base })
+        Ok(Self { _base: base })
     }
 }
 

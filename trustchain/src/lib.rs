@@ -53,8 +53,7 @@ pub struct TrustChain {
     /// Security monitoring system
     security_monitor: Arc<SecurityMonitor>,
     /// Configuration (retained for runtime configuration access)
-    #[allow(dead_code)]
-    config: Arc<TrustChainConfig>,
+    _config: Arc<TrustChainConfig>,
 }
 
 /// TrustChain initialization configuration
@@ -160,7 +159,7 @@ impl TrustChain {
             stoq_api,
             stoq_client,
             security_monitor,
-            config: Arc::new(config),
+            _config: Arc::new(config),
         };
 
         info!("✅ TrustChain service initialized with MANDATORY SECURITY INTEGRATION");

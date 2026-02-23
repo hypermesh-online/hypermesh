@@ -13,12 +13,11 @@ use super::types::*;
 use super::traits::{HyperMeshExtension, AssetExtensionHandler};
 
 /// Extension manager for loading and managing extensions
-#[allow(dead_code)] // Fields used during extension management
 pub struct ExtensionManager {
     extensions: Arc<RwLock<HashMap<String, Box<dyn HyperMeshExtension>>>>,
     registry: Arc<RwLock<HashMap<String, ExtensionMetadata>>>,
     asset_handlers: Arc<RwLock<HashMap<AssetType, Box<dyn AssetExtensionHandler>>>>,
-    dependencies: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+    _dependencies: Arc<RwLock<HashMap<String, HashSet<String>>>>,
     load_order: Arc<RwLock<Vec<String>>>,
     asset_manager: Arc<AssetManager>,
     config: ExtensionManagerConfig,
@@ -31,7 +30,7 @@ impl ExtensionManager {
             extensions: Arc::new(RwLock::new(HashMap::new())),
             registry: Arc::new(RwLock::new(HashMap::new())),
             asset_handlers: Arc::new(RwLock::new(HashMap::new())),
-            dependencies: Arc::new(RwLock::new(HashMap::new())),
+            _dependencies: Arc::new(RwLock::new(HashMap::new())),
             load_order: Arc::new(RwLock::new(Vec::new())),
             asset_manager,
             config,

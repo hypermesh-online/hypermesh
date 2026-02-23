@@ -33,10 +33,9 @@ pub enum ThreatType {
 }
 
 /// Intrusion detection system
-#[allow(dead_code)] // Fields used during intrusion detection
 pub struct IntrusionDetectionSystem {
     threat_indicators: RwLock<Vec<ThreatIndicator>>,
-    detection_rules: RwLock<Vec<DetectionRule>>,
+    _detection_rules: RwLock<Vec<DetectionRule>>,
     statistics: RwLock<IDSStats>,
 }
 
@@ -63,7 +62,7 @@ impl IntrusionDetectionSystem {
     pub fn new() -> Self {
         Self {
             threat_indicators: RwLock::new(Vec::new()),
-            detection_rules: RwLock::new(Vec::new()),
+            _detection_rules: RwLock::new(Vec::new()),
             statistics: RwLock::new(IDSStats::default()),
         }
     }

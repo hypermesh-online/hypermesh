@@ -176,13 +176,12 @@ pub struct Certificate {
 }
 
 /// Bootstrap manager for coordinating multi-component startup
-#[allow(dead_code)]
 pub struct BootstrapManager {
     current_phase: Arc<AtomicU8>,
     components: Arc<DashMap<String, ComponentState>>,
     discovery: Arc<RwLock<Box<dyn ServiceDiscovery>>>,
     certificates: Arc<RwLock<Box<dyn CertificateProvider>>>,
-    transport: Arc<RwLock<Box<dyn TransportProvider>>>,
+    _transport: Arc<RwLock<Box<dyn TransportProvider>>>,
     consensus: Arc<RwLock<Box<dyn ConsensusProvider>>>,
     phase_notifications: Arc<DashMap<BootstrapPhase, Arc<Notify>>>,
     config: Arc<BootstrapConfig>,
@@ -203,7 +202,7 @@ impl BootstrapManager {
             components: Arc::new(DashMap::new()),
             discovery: Arc::new(RwLock::new(Box::new(TraditionalDNS::new(config.network_usage.traditional_dns.clone())))),
             certificates: Arc::new(RwLock::new(Box::new(SelfSignedProvider::new()))),
-            transport: Arc::new(RwLock::new(Box::new(BasicTransport::new()))),
+            _transport: Arc::new(RwLock::new(Box::new(BasicTransport::new()))),
             consensus: Arc::new(RwLock::new(Box::new(NoOpConsensus::new()))),
             phase_notifications: Arc::new(phase_notifications),
             config: Arc::new(config),

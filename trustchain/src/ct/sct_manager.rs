@@ -20,8 +20,7 @@ use super::{LogEntry, SignedCertificateTimestamp};
 /// SCT Manager for generating and validating Signed Certificate Timestamps
 pub struct SCTManager {
     /// Log identifier (used in SCT metadata)
-    #[allow(dead_code)]
-    log_id: String,
+    _log_id: String,
     /// Log ID hash (32 bytes)
     log_id_hash: [u8; 32],
     /// Signing key for SCTs
@@ -31,8 +30,7 @@ pub struct SCTManager {
     /// SCT version
     sct_version: u8,
     /// Random number generator (for cryptographic operations)
-    #[allow(dead_code)]
-    rng: SystemRandom,
+    _rng: SystemRandom,
 }
 
 /// SCT signing request
@@ -77,12 +75,12 @@ impl SCTManager {
         let (signing_key, verifying_key) = Self::generate_keypair(&rng)?;
 
         Ok(Self {
-            log_id,
+            _log_id: log_id,
             log_id_hash,
             signing_key,
             verifying_key,
             sct_version: 1, // SCT v1
-            rng,
+            _rng: rng,
         })
     }
 
@@ -464,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn test_sct_manager_creation() {
         let manager = SCTManager::new("test-log".to_string()).await.unwrap();
-        assert_eq!(manager.log_id, "test-log");
+        assert_eq!(manager._log_id, "test-log");
         assert_ne!(manager.log_id_hash, [0u8; 32]);
     }
 

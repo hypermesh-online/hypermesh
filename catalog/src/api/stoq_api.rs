@@ -470,10 +470,9 @@ impl ApiHandler for CatalogHealthHandler {
 // ---------------------------------------------------------------------------
 
 /// Catalog STOQ API Server
-#[allow(dead_code)]
 pub struct CatalogStoqApi {
     server: Arc<StoqApiServer>,
-    config: CatalogStoqConfig,
+    _config: CatalogStoqConfig,
 }
 
 impl CatalogStoqApi {
@@ -543,7 +542,7 @@ impl CatalogStoqApi {
 
         info!("Catalog STOQ API handlers registered (6 endpoints)");
 
-        Ok(Self { server, config })
+        Ok(Self { server, _config: config })
     }
 
     /// Start the API server

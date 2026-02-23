@@ -48,15 +48,14 @@ struct CertificateCache {
 }
 
 /// Cached certificate entry
-#[allow(dead_code)] // Certificate cache fields
 #[derive(Clone)]
 struct CachedCertificate {
     /// Certificate data
-    certificate: Certificate,
+    _certificate: Certificate,
     /// Validation result
     validation: CertificateValidation,
     /// Cache timestamp
-    cached_at: std::time::Instant,
+    _cached_at: std::time::Instant,
 }
 
 /// Certificate representation
@@ -113,13 +112,12 @@ pub struct CertificateValidation {
 }
 
 /// CA root certificate
-#[allow(dead_code)] // CA cert fields
 #[derive(Debug, Clone)]
 struct CACertificate {
     /// Root certificate
     certificate: Certificate,
     /// Last update time
-    last_updated: std::time::Instant,
+    _last_updated: std::time::Instant,
 }
 
 /// TrustChain API request/response types
@@ -215,7 +213,7 @@ impl TrustChainIntegration {
         let mut ca_root = self.ca_root_cert.write().await;
         *ca_root = Some(CACertificate {
             certificate: cert_data,
-            last_updated: std::time::Instant::now(),
+            _last_updated: std::time::Instant::now(),
         });
 
         info!("Successfully fetched TrustChain CA root certificate");
@@ -334,12 +332,11 @@ impl TrustChainIntegration {
         //     return Err(anyhow!("Revocation check failed: {}", response.status()));
         // }
 
-        #[allow(dead_code)] // Deserialization target for revocation response
         #[derive(Deserialize)]
         struct RevocationStatus {
             revoked: bool,
             reason: Option<String>,
-            revoked_at: Option<chrono::DateTime<chrono::Utc>>,
+            _revoked_at: Option<chrono::DateTime<chrono::Utc>>,
         }
 
         // let status: RevocationStatus = response.json().await?;
@@ -348,7 +345,7 @@ impl TrustChainIntegration {
         let status = RevocationStatus {
             revoked: false,
             reason: None,
-            revoked_at: None,
+            _revoked_at: None,
         };
 
         if status.revoked {
@@ -380,9 +377,9 @@ impl TrustChainIntegration {
 
         let fingerprint = cert.fingerprint.clone();
         let cached_cert = CachedCertificate {
-            certificate: cert,
+            _certificate: cert,
             validation,
-            cached_at: std::time::Instant::now(),
+            _cached_at: std::time::Instant::now(),
         };
 
         let expiry = std::time::Instant::now() +

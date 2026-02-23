@@ -33,7 +33,7 @@ impl PrivacyManager {
             config,
             user_configs: Arc::new(RwLock::new(HashMap::new())),
             active_allocations: Arc::new(RwLock::new(HashMap::new())),
-            proxy_manager,
+            _proxy_manager: proxy_manager,
             enforcer,
             reward_calculator,
             audit_logger: Arc::new(RwLock::new(Vec::new())),

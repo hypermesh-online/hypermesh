@@ -70,13 +70,12 @@ const WEIGHT_LOAD: Decimal = dec!(0.15);
 /// Capacity-only packet router.
 #[derive(Debug, Clone)]
 pub struct PacketRouter {
-    #[allow(dead_code)]
-    max_candidates: usize,
+    _max_candidates: usize,
 }
 
 impl Default for PacketRouter {
     fn default() -> Self {
-        Self { max_candidates: 5 }
+        Self { _max_candidates: 5 }
     }
 }
 

@@ -47,7 +47,6 @@ use super::{
 };
 
 /// Base adapter functionality shared across all language adapters
-#[allow(dead_code)] // Fields used during adapter operations
 pub struct BaseAdapter {
     /// Language identifier
     language_id: String,
@@ -58,7 +57,7 @@ pub struct BaseAdapter {
     /// Language-specific configuration
     config: AdapterConfig,
     /// Consensus bridge for translation
-    consensus_bridge: Arc<ConsensusBridge>,
+    _consensus_bridge: Arc<ConsensusBridge>,
 }
 
 /// Adapter configuration
@@ -105,7 +104,7 @@ impl BaseAdapter {
             adapter_type,
             consensus_vm,
             config: adapter_config,
-            consensus_bridge,
+            _consensus_bridge: consensus_bridge,
         }
     }
     
@@ -204,12 +203,11 @@ impl BaseAdapter {
 }
 
 /// Execution environment for language adapter
-#[allow(dead_code)] // Fields populated during execution setup
 pub struct ExecutionEnvironment {
     /// Language identifier
-    language_id: String,
+    _language_id: String,
     /// Process ID if applicable
-    process_id: Option<u32>,
+    _process_id: Option<u32>,
     /// Working directory
     working_directory: String,
     /// Environment variables
@@ -268,8 +266,8 @@ impl ExecutionEnvironment {
         env_vars.insert("HYPERMESH_WORKDIR".to_string(), working_directory.clone());
         
         Ok(Self {
-            language_id: language_id.to_string(),
-            process_id: None,
+            _language_id: language_id.to_string(),
+            _process_id: None,
             working_directory,
             env_vars,
             resource_allocations,

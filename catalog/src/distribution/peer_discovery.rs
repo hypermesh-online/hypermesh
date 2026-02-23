@@ -132,12 +132,11 @@ pub enum DiscoverySource {
 }
 
 /// mDNS discovery for local network
-#[allow(dead_code)] // mDNS config fields for local network discovery
 struct MdnsDiscovery {
     /// Service name
-    service_name: String,
+    _service_name: String,
     /// Local addresses
-    local_addresses: Vec<SocketAddr>,
+    _local_addresses: Vec<SocketAddr>,
 }
 
 impl PeerDiscovery {
@@ -480,8 +479,8 @@ impl PeerRegistry {
 impl MdnsDiscovery {
     async fn new() -> Result<Self> {
         Ok(Self {
-            service_name: "_catalog-p2p._tcp.local".to_string(),
-            local_addresses: Vec::new(),
+            _service_name: "_catalog-p2p._tcp.local".to_string(),
+            _local_addresses: Vec::new(),
         })
     }
 
@@ -493,8 +492,7 @@ impl MdnsDiscovery {
 }
 
 // Helper for parsing IPv6 addresses
-#[allow(dead_code)] // Utility for IPv6 parsing in discovery
-fn parse_ipv6_addr(s: &str) -> Result<Ipv6Addr> {
+fn _parse_ipv6_addr(s: &str) -> Result<Ipv6Addr> {
     s.parse().context("Invalid IPv6 address")
 }
 

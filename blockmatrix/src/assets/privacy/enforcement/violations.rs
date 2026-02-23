@@ -13,16 +13,15 @@ use serde::{Deserialize, Serialize};
 use crate::assets::core::AssetResult;
 
 /// Violation tracker for managing violations
-#[allow(dead_code)] // Fields used during violation tracking
 pub struct ViolationTracker {
     /// Recent violations
-    recent_violations: Vec<PrivacyViolation>,
+    _recent_violations: Vec<PrivacyViolation>,
 
     /// Violation patterns
-    violation_patterns: HashMap<String, ViolationPattern>,
+    _violation_patterns: HashMap<String, ViolationPattern>,
 
     /// User violation history
-    user_violations: HashMap<String, UserViolationHistory>,
+    _user_violations: HashMap<String, UserViolationHistory>,
 }
 
 /// Privacy violation details
@@ -236,9 +235,9 @@ pub enum ComplianceStatus {
 impl ViolationTracker {
     pub fn new() -> Self {
         Self {
-            recent_violations: Vec::new(),
-            violation_patterns: HashMap::new(),
-            user_violations: HashMap::new(),
+            _recent_violations: Vec::new(),
+            _violation_patterns: HashMap::new(),
+            _user_violations: HashMap::new(),
         }
     }
 

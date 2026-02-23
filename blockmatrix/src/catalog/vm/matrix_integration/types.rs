@@ -192,11 +192,10 @@ pub struct EntityVMConfig {
 
 /// Cached cross-chain validation result
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during validation caching
 pub(crate) struct CachedValidation {
-    pub validation_request: CrossEntityValidation,
+    pub _validation_request: CrossEntityValidation,
     pub validation_response: PublicValidationResponse,
-    pub cached_at: std::time::SystemTime,
+    pub _cached_at: std::time::SystemTime,
     pub expires_at: std::time::SystemTime,
 }
 
@@ -212,15 +211,14 @@ pub(crate) struct EntityAssetPool {
 
 /// Active asset allocation tracking
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields populated during allocation tracking
 pub(crate) struct ActiveAllocation {
     pub allocation_id: Uuid,
-    pub entity_domain: String,
+    pub _entity_domain: String,
     pub asset_type: String,
     pub allocated_amount: u64,
-    pub start_time: std::time::SystemTime,
-    pub expires_at: std::time::SystemTime,
-    pub executing_workflow: Option<String>,
+    pub _start_time: std::time::SystemTime,
+    pub _expires_at: std::time::SystemTime,
+    pub _executing_workflow: Option<String>,
 }
 
 /// Matrix execution result with entity-aware information

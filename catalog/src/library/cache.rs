@@ -154,8 +154,7 @@ impl LRUCache {
         self.current_size = 0;
     }
 
-    #[allow(dead_code)] // Cache size accessor
-    fn len(&self) -> usize {
+    fn _len(&self) -> usize {
         self.entries.len()
     }
 }
@@ -495,7 +494,7 @@ mod tests {
         cache.insert(key2.clone(), Arc::new(package2.clone()));
 
         // Cache should have 2 items
-        assert_eq!(cache.len(), 2);
+        assert_eq!(cache._len(), 2);
 
         // Get pkg1 (moves it to most recently used)
         assert!(cache.get(&key1).is_some());

@@ -14,13 +14,12 @@ use crate::assets::core::AssetResult;
 use super::super::PrivacyAllocationResult;
 
 /// Access pattern analyzer
-#[allow(dead_code)] // Fields used during pattern analysis
 pub struct AccessPatternAnalyzer {
     /// Current baselines
-    baselines: HashMap<String, AccessBaseline>,
+    _baselines: HashMap<String, AccessBaseline>,
 
     /// Anomaly detection models
-    models: Vec<AnomalyDetectionModel>,
+    _models: Vec<AnomalyDetectionModel>,
 }
 
 /// Access baseline for pattern analysis
@@ -139,13 +138,12 @@ pub struct AnomalyDetectionModel {
 }
 
 /// Risk assessment engine
-#[allow(dead_code)] // Fields used during risk assessment
 pub struct RiskAssessmentEngine {
     /// Risk models
-    risk_models: Vec<RiskModel>,
+    _risk_models: Vec<RiskModel>,
 
     /// Current risk scores
-    risk_scores: HashMap<String, RiskScore>,
+    _risk_scores: HashMap<String, RiskScore>,
 }
 
 /// Risk assessment model
@@ -339,8 +337,8 @@ pub struct DetectedAnomaly {
 impl AccessPatternAnalyzer {
     pub fn new() -> Self {
         Self {
-            baselines: HashMap::new(),
-            models: Vec::new(),
+            _baselines: HashMap::new(),
+            _models: Vec::new(),
         }
     }
 
@@ -362,8 +360,8 @@ impl AccessPatternAnalyzer {
 impl RiskAssessmentEngine {
     pub fn new() -> Self {
         Self {
-            risk_models: Vec::new(),
-            risk_scores: HashMap::new(),
+            _risk_models: Vec::new(),
+            _risk_scores: HashMap::new(),
         }
     }
 

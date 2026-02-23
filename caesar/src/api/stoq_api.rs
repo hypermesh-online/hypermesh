@@ -397,10 +397,9 @@ fn format_pressure(p: &governor::PressureQuadrant) -> String {
 // ---------------------------------------------------------------------------
 
 /// Caesar STOQ API Server
-#[allow(dead_code)]
 pub struct CaesarStoqApi {
     server: Arc<StoqApiServer>,
-    config: CaesarStoqConfig,
+    _config: CaesarStoqConfig,
 }
 
 impl CaesarStoqApi {
@@ -461,7 +460,7 @@ impl CaesarStoqApi {
 
         info!("Caesar STOQ API handlers registered (5 endpoints)");
 
-        Ok(Self { server, config })
+        Ok(Self { server, _config: config })
     }
 
     /// Start the API server

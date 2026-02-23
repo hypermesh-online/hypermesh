@@ -90,8 +90,7 @@ pub struct CAMetrics {
 /// Certificate rotation manager
 pub struct CertificateRotationManager {
     /// Scheduled certificate rotation times (for automated rotation)
-    #[allow(dead_code)]
-    rotation_schedule: Arc<RwLock<HashMap<String, SystemTime>>>,
+    _rotation_schedule: Arc<RwLock<HashMap<String, SystemTime>>>,
     rotation_in_progress: Arc<Mutex<bool>>,
 }
 
@@ -372,7 +371,7 @@ impl TrustChainCA {
 impl CertificateRotationManager {
     pub async fn new() -> TrustChainResult<Self> {
         Ok(Self {
-            rotation_schedule: Arc::new(RwLock::new(HashMap::new())),
+            _rotation_schedule: Arc::new(RwLock::new(HashMap::new())),
             rotation_in_progress: Arc::new(Mutex::new(false)),
         })
     }

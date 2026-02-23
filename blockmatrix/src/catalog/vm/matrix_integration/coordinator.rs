@@ -13,14 +13,13 @@ use super::super::PrivacyMode;
 use super::types::*;
 
 /// Entity asset allocation coordinator
-#[allow(dead_code)] // Fields used during asset coordination
 pub struct EntityAssetCoordinator {
     /// Available assets per entity
     entity_assets: Arc<std::sync::Mutex<HashMap<String, EntityAssetPool>>>,
     /// Active asset allocations
     active_allocations: Arc<std::sync::Mutex<HashMap<String, Vec<ActiveAllocation>>>>,
     /// Asset request queue
-    request_queue: Arc<std::sync::Mutex<Vec<EntityAssetRequest>>>,
+    _request_queue: Arc<std::sync::Mutex<Vec<EntityAssetRequest>>>,
 }
 
 impl EntityAssetCoordinator {
@@ -28,7 +27,7 @@ impl EntityAssetCoordinator {
         Self {
             entity_assets: Arc::new(std::sync::Mutex::new(HashMap::new())),
             active_allocations: Arc::new(std::sync::Mutex::new(HashMap::new())),
-            request_queue: Arc::new(std::sync::Mutex::new(Vec::new())),
+            _request_queue: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -102,12 +101,12 @@ impl EntityAssetCoordinator {
 
         let active_allocation = ActiveAllocation {
             allocation_id,
-            entity_domain: request.entity_domain.clone(),
+            _entity_domain: request.entity_domain.clone(),
             asset_type: request.asset_type.clone(),
             allocated_amount: request.requested_amount,
-            start_time: std::time::SystemTime::now(),
-            expires_at: allocation.expires_at,
-            executing_workflow: None,
+            _start_time: std::time::SystemTime::now(),
+            _expires_at: allocation.expires_at,
+            _executing_workflow: None,
         };
 
         self.active_allocations.lock().expect("mutex poisoned")

@@ -132,20 +132,19 @@ pub enum ForwardingMode {
 
 /// Forwarding configuration
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // Config fields used when forwarding is active
 pub struct ForwardingConfig {
     /// Maximum concurrent connections per proxy
-    max_connections_per_proxy: u32,
-    
+    _max_connections_per_proxy: u32,
+
     /// Connection timeout duration
-    connection_timeout: Duration,
-    
+    _connection_timeout: Duration,
+
     /// Buffer size for data transfer
-    buffer_size: usize,
-    
+    _buffer_size: usize,
+
     /// Enable connection pooling
-    enable_connection_pooling: bool,
-    
+    _enable_connection_pooling: bool,
+
     /// Maximum idle time before closing connection
     max_idle_time: Duration,
 }
@@ -153,10 +152,10 @@ pub struct ForwardingConfig {
 impl Default for ForwardingConfig {
     fn default() -> Self {
         Self {
-            max_connections_per_proxy: 1000,
-            connection_timeout: Duration::from_secs(30),
-            buffer_size: 64 * 1024, // 64KB
-            enable_connection_pooling: true,
+            _max_connections_per_proxy: 1000,
+            _connection_timeout: Duration::from_secs(30),
+            _buffer_size: 64 * 1024, // 64KB
+            _enable_connection_pooling: true,
             max_idle_time: Duration::from_secs(300), // 5 minutes
         }
     }

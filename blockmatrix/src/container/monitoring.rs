@@ -59,11 +59,10 @@ pub struct DefaultContainerMonitor {
 
 /// Monitoring session
 #[derive(Debug)]
-#[allow(dead_code)] // Fields used during container monitoring
 struct MonitoringSession {
-    container_id: ContainerId,
+    _container_id: ContainerId,
     started_at: Instant,
-    collection_interval: Duration,
+    _collection_interval: Duration,
     alert_thresholds: HashMap<String, f64>,
 }
 
@@ -117,9 +116,9 @@ impl DefaultContainerMonitor {
 impl ContainerMonitor for DefaultContainerMonitor {
     async fn start_monitoring(&self, id: &ContainerId) -> Result<()> {
         let session = MonitoringSession {
-            container_id: *id,
+            _container_id: *id,
             started_at: Instant::now(),
-            collection_interval: Duration::from_secs(10),
+            _collection_interval: Duration::from_secs(10),
             alert_thresholds: HashMap::new(),
         };
 

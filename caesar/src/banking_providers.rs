@@ -30,23 +30,21 @@ use std::collections::HashMap;
 use crate::banking_interop_bridge::*;
 
 // Common types used by multiple providers
-#[allow(dead_code)] // Deserialization target for API responses
 #[derive(Deserialize)]
-struct BalanceAmount {
+struct _BalanceAmount {
     #[serde(rename = "Amount")]
-    amount: String,
+    _amount: String,
     #[serde(rename = "Currency")]
-    currency: String,
+    _currency: String,
 }
 
 /// Stripe Banking Provider Implementation
 ///
 /// TODO: Migrate to STOQ protocol for HTTP calls
-#[allow(dead_code)] // Provider config fields pending STOQ migration
 pub struct StripeProvider {
     // client: Client, // REMOVED: pending STOQ migration
-    api_key: String,
-    base_url: String,
+    _api_key: String,
+    _base_url: String,
 }
 
 impl StripeProvider {
@@ -59,8 +57,8 @@ impl StripeProvider {
 
         Self {
             // client: Client::new(), // REMOVED: pending STOQ migration
-            api_key,
-            base_url,
+            _api_key: api_key,
+            _base_url: base_url,
         }
     }
 }
@@ -146,12 +144,11 @@ impl BankingApiProvider for StripeProvider {
 /// Plaid Banking Provider Implementation
 ///
 /// TODO: Migrate to STOQ protocol for HTTP calls
-#[allow(dead_code)] // Provider config fields pending STOQ migration
 pub struct PlaidProvider {
     // client: Client, // REMOVED: pending STOQ migration
-    client_id: String,
-    secret: String,
-    base_url: String,
+    _client_id: String,
+    _secret: String,
+    _base_url: String,
 }
 
 impl PlaidProvider {
@@ -165,9 +162,9 @@ impl PlaidProvider {
 
         Self {
             // client: Client::new(), // REMOVED: pending STOQ migration
-            client_id,
-            secret,
-            base_url: base_url.to_string(),
+            _client_id: client_id,
+            _secret: secret,
+            _base_url: base_url.to_string(),
         }
     }
 }
@@ -225,19 +222,18 @@ impl BankingApiProvider for PlaidProvider {
 /// OpenBanking Provider Implementation (Generic implementation for OpenBanking standard)
 ///
 /// TODO: Migrate to STOQ protocol for HTTP calls
-#[allow(dead_code)] // Provider config fields pending STOQ migration
 pub struct OpenBankingProvider {
     // client: Client, // REMOVED: pending STOQ migration
-    base_url: String,
-    certificate_path: Option<String>, // For MTLS authentication
+    _base_url: String,
+    _certificate_path: Option<String>, // For MTLS authentication
 }
 
 impl OpenBankingProvider {
     pub fn new(base_url: String, certificate_path: Option<String>) -> Self {
         Self {
             // client: Client::new(), // REMOVED: pending STOQ migration
-            base_url,
-            certificate_path,
+            _base_url: base_url,
+            _certificate_path: certificate_path,
         }
     }
 }
@@ -295,7 +291,7 @@ mod test_mocks {
     }
 
     impl MockBankingProvider {
-        pub fn new() -> Self {
+        pub fn _new() -> Self {
             let mut accounts = HashMap::new();
             let mut transactions = HashMap::new();
 
