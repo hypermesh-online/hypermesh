@@ -2,19 +2,12 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! HyperMesh Catalog - VM Integration
+//! HyperMesh Catalog - Asset Package Registry
 //!
-//! The catalog provides the core virtual machine systems for HyperMesh,
-//! integrating Julia VM execution with consensus validation.
+//! The catalog provides asset package management for HyperMesh,
+//! handling package definitions, versioning, and distribution.
 
-pub mod vm;
 pub mod integration;
-
-// Re-exports for convenience
-pub use vm::{
-    ConsensusProofVM, VMConfig, ConsensusRequirements,
-    PrivacyMode, ResourceSharingConfig,
-};
 
 pub use integration::{
     CatalogHyperMeshBridge, CatalogDeploymentSpec, CatalogAssetType,

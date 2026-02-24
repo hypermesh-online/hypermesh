@@ -93,9 +93,6 @@ pub trait BlockchainIntegration: Send + Sync {
 
     /// Check if blockchain is connected
     fn is_connected(&self) -> bool;
-
-    /// Get blockchain execution context
-    async fn get_context(&self) -> anyhow::Result<crate::catalog::vm::execution::context::BlockchainExecutionContext>;
 }
 
 /// P2P router trait
@@ -106,9 +103,6 @@ pub trait P2PRouter: Send + Sync {
 
     /// Get peer count
     fn peer_count(&self) -> usize;
-
-    /// Get P2P execution context
-    async fn get_routing_context(&self) -> anyhow::Result<crate::catalog::vm::execution::context::P2PExecutionContext>;
 }
 
 /// Integration manager

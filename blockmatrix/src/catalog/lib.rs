@@ -4,24 +4,10 @@
 
 //! HyperMesh Catalog Library
 //!
-//! A blockchain-native compute integration system for JuliaVM and other language
-//! runtimes, providing direct blockchain storage without smart contract abstraction.
+//! Asset package management for HyperMesh, handling package definitions,
+//! versioning, distribution, and deployment orchestration.
 
-pub mod blockchain;
-pub mod vm;
 pub mod integration;
-
-// Re-export main types
-pub use blockchain::{
-    BlockchainNativeCompute, ComputeAsset, ComputeRequest, ExecutionResult,
-    P2PHost, MatrixRouter, CaesarTokenManager, ComputeAssetType,
-    PaymentToken, ResourcePayment,
-};
-
-pub use vm::{
-    ConsensusProofVM, VMConfig, ConsensusRequirements, AssetRegistration,
-    PrivacyMode, ResourceSharingConfig, AssetAllocation,
-};
 
 pub use integration::{
     CatalogHyperMeshBridge, CatalogDeploymentSpec, CatalogDeploymentResult,

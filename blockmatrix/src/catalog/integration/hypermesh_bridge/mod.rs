@@ -4,9 +4,10 @@
 
 //! Catalog-HyperMesh Integration Bridge
 //!
-//! This module bridges the Catalog system with HyperMesh's VM and container runtime,
-//! enabling Catalog assets to be deployed as containers or VM executions with
-//! full consensus validation and resource management.
+//! This module bridges the Catalog system with HyperMesh's container runtime,
+//! enabling Catalog assets to be deployed as containers with full consensus
+//! validation and resource management. Code execution is delegated to remote
+//! HyperMesh nodes via STOQ protocol.
 
 pub mod types;
 pub mod config;

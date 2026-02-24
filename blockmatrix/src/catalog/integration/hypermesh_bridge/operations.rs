@@ -11,7 +11,6 @@ use anyhow::{Result, anyhow};
 use tokio::sync::{RwLock, Mutex};
 use uuid::Uuid;
 
-use crate::catalog::vm::ConsensusProofVM;
 use crate::orchestration::hypermesh_integration::{
     HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
     PrivacyRequirements, PerformanceRequirements, ContainerMetadata,
@@ -23,8 +22,6 @@ use super::types::*;
 
 /// Catalog-HyperMesh deployment bridge
 pub struct CatalogHyperMeshBridge {
-    /// VM runtime for code execution
-    vm_runtime: Arc<ConsensusProofVM>,
     /// Container orchestrator
     container_orchestrator: Arc<HyperMeshContainerOrchestrator>,
     /// Active deployments tracking
@@ -38,12 +35,10 @@ pub struct CatalogHyperMeshBridge {
 impl CatalogHyperMeshBridge {
     /// Create new Catalog-HyperMesh bridge
     pub async fn new(
-        vm_runtime: Arc<ConsensusProofVM>,
         container_orchestrator: Arc<HyperMeshContainerOrchestrator>,
         config: BridgeConfiguration,
     ) -> Result<Self> {
         Ok(Self {
-            vm_runtime,
             container_orchestrator,
             active_deployments: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(Mutex::new(BridgeMetrics::default())),
@@ -76,17 +71,23 @@ impl CatalogHyperMeshBridge {
         }
 
         let deployment_result = match &deployment_spec.deployment_strategy {
-            DeploymentStrategy::VMExecution { vm_config } => {
-                self.deploy_as_vm(&deployment_spec.asset, vm_config, &consensus_proof).await?
+            DeploymentStrategy::VMExecution { .. } => {
+                return Err(anyhow!(
+                    "VM execution not supported; use remote HyperMesh execution via STOQ"
+                ));
             },
             DeploymentStrategy::Container { container_config } => {
                 self.deploy_as_container(&deployment_spec.asset, container_config, &consensus_proof).await?
             },
-            DeploymentStrategy::Serverless { function_config } => {
-                self.deploy_as_function(&deployment_spec.asset, function_config, &consensus_proof).await?
+            DeploymentStrategy::Serverless { .. } => {
+                return Err(anyhow!(
+                    "Serverless execution not supported; use remote HyperMesh execution via STOQ"
+                ));
             },
-            DeploymentStrategy::Hybrid { vm_config, container_config } => {
-                self.deploy_as_hybrid(&deployment_spec.asset, vm_config, container_config, &consensus_proof).await?
+            DeploymentStrategy::Hybrid { .. } => {
+                return Err(anyhow!(
+                    "Hybrid VM execution not supported; use container deployment or remote HyperMesh execution via STOQ"
+                ));
             },
         };
 
@@ -105,11 +106,8 @@ impl CatalogHyperMeshBridge {
             let mut metrics = self.metrics.lock().await;
             metrics.total_deployments += 1;
 
-            match deployment_spec.deployment_strategy {
-                DeploymentStrategy::VMExecution { .. } => metrics.vm_deployments += 1,
-                DeploymentStrategy::Container { .. } => metrics.container_deployments += 1,
-                DeploymentStrategy::Hybrid { .. } => metrics.hybrid_deployments += 1,
-                _ => {},
+            if let DeploymentStrategy::Container { .. } = deployment_spec.deployment_strategy {
+                metrics.container_deployments += 1;
             }
 
             if deployment_result.success {
@@ -133,42 +131,6 @@ impl CatalogHyperMeshBridge {
             resource_allocations: deployment_result.resource_allocations,
             performance_metrics: PerformanceMetrics::default(),
         })
-    }
-
-    /// Deploy asset as VM execution
-    async fn deploy_as_vm(
-        &self,
-        asset: &CatalogAssetType,
-        _vm_config: &VMDeploymentConfig,
-        consensus_proof: &ConsensusProof,
-    ) -> Result<InternalDeploymentResult> {
-        match asset {
-            CatalogAssetType::PythonApp { code, .. } => {
-                let result = self.vm_runtime.execute_with_consensus(
-                    code, "python", consensus_proof.clone(),
-                ).await?;
-
-                Ok(InternalDeploymentResult {
-                    success: result.success,
-                    output: result.output,
-                    error_message: result.error_message,
-                    resource_allocations: HashMap::new(),
-                })
-            },
-            CatalogAssetType::RustBinary { source_code, .. } => {
-                let result = self.vm_runtime.execute_with_consensus(
-                    source_code, "rust", consensus_proof.clone(),
-                ).await?;
-
-                Ok(InternalDeploymentResult {
-                    success: result.success,
-                    output: result.output,
-                    error_message: result.error_message,
-                    resource_allocations: HashMap::new(),
-                })
-            },
-            _ => Err(anyhow!("Asset type not supported for VM deployment")),
-        }
     }
 
     /// Deploy asset as container
@@ -223,56 +185,6 @@ impl CatalogHyperMeshBridge {
             },
             _ => Err(anyhow!("Asset type not supported for container deployment")),
         }
-    }
-
-    /// Deploy asset as serverless function
-    async fn deploy_as_function(
-        &self,
-        asset: &CatalogAssetType,
-        function_config: &FunctionDeploymentConfig,
-        consensus_proof: &ConsensusProof,
-    ) -> Result<InternalDeploymentResult> {
-        let vm_config = VMDeploymentConfig {
-            language_runtime: function_config.runtime.clone(),
-            execution_timeout: function_config.timeout,
-            memory_limit: function_config.memory_size,
-            cpu_limit: 1,
-            enable_gpu: false,
-            environment_variables: HashMap::new(),
-        };
-
-        self.deploy_as_vm(asset, &vm_config, consensus_proof).await
-    }
-
-    /// Deploy asset as hybrid (VM + Container)
-    async fn deploy_as_hybrid(
-        &self,
-        asset: &CatalogAssetType,
-        vm_config: &VMDeploymentConfig,
-        container_config: &ContainerDeploymentConfig,
-        consensus_proof: &ConsensusProof,
-    ) -> Result<InternalDeploymentResult> {
-        let vm_result = self.deploy_as_vm(asset, vm_config, consensus_proof).await?;
-        let container_result = self.deploy_as_container(asset, container_config, consensus_proof).await?;
-
-        let success = vm_result.success && container_result.success;
-        let combined_output = serde_json::json!({
-            "vm_result": vm_result.output,
-            "container_result": container_result.output
-        });
-
-        Ok(InternalDeploymentResult {
-            success,
-            output: Some(combined_output),
-            error_message: if success { None } else {
-                Some(format!("VM: {:?}, Container: {:?}", vm_result.error_message, container_result.error_message))
-            },
-            resource_allocations: {
-                let mut allocations = vm_result.resource_allocations;
-                allocations.extend(container_result.resource_allocations);
-                allocations
-            },
-        })
     }
 
     /// Get asset type name for tracking

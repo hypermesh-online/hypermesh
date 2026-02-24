@@ -26,16 +26,12 @@ use crate::assets::core::{
     AssetManager, AssetRegistration, AssetType, AssetAllocationRequest,
     AssetAllocation, ConsensusProof, ResourceRequirements, PrivacyMode,
 };
-use crate::catalog::vm::ConsensusProofVM;
-
 /// HyperMesh-integrated container orchestrator
 pub struct HyperMeshContainerOrchestrator {
     /// Core container runtime
     container_runtime: Arc<ContainerRuntime>,
     /// Asset management system
     asset_manager: Arc<AssetManager>,
-    /// Consensus VM for validation
-    consensus_vm: Arc<ConsensusProofVM>,
     /// Container-to-asset mapping
     container_assets: Arc<RwLock<HashMap<ContainerId, Vec<AssetRegistration>>>>,
     /// Asset-to-container mapping
@@ -51,13 +47,11 @@ impl HyperMeshContainerOrchestrator {
     pub async fn new(
         container_runtime: Arc<ContainerRuntime>,
         asset_manager: Arc<AssetManager>,
-        consensus_vm: Arc<ConsensusProofVM>,
         config: HyperMeshIntegrationConfig,
     ) -> Result<Self> {
         Ok(Self {
             container_runtime,
             asset_manager,
-            consensus_vm,
             container_assets: Arc::new(RwLock::new(HashMap::new())),
             asset_containers: Arc::new(RwLock::new(HashMap::new())),
             metrics: Arc::new(Mutex::new(OrchestrationMetrics::default())),
@@ -155,17 +149,12 @@ impl HyperMeshContainerOrchestrator {
             return Err(anyhow!("Invalid consensus proof for container deployment"));
         }
 
-        let vm_config = self.consensus_vm.config();
-        if vm_config.consensus_requirements.require_proof_of_space {
-            if consensus_proof.space_proof.total_size == 0 {
-                return Err(anyhow!("Space proof required but not provided"));
-            }
+        if consensus_proof.space_proof.total_size == 0 {
+            return Err(anyhow!("Space proof required but not provided"));
         }
 
-        if vm_config.consensus_requirements.require_proof_of_stake {
-            if consensus_proof.stake_proof.stake_amount == 0 {
-                return Err(anyhow!("Stake proof required but not provided"));
-            }
+        if consensus_proof.stake_proof.stake_amount == 0 {
+            return Err(anyhow!("Stake proof required but not provided"));
         }
 
         Ok(())
@@ -450,7 +439,6 @@ impl HyperMeshContainerOrchestrator {
 mod tests {
     use super::*;
     use crate::container::ContainerConfig;
-    use crate::catalog::vm::VMConfig;
 
     #[tokio::test]
     async fn test_orchestrator_creation() {
@@ -459,16 +447,11 @@ mod tests {
             ContainerRuntime::new(container_config).await.expect("test: runtime"),
         );
         let asset_manager = Arc::new(AssetManager::new());
-        let vm_config = VMConfig::default();
-        let consensus_vm = Arc::new(
-            ConsensusProofVM::new(vm_config).await.expect("test: vm"),
-        );
         let integration_config = HyperMeshIntegrationConfig::default();
 
         let orchestrator = HyperMeshContainerOrchestrator::new(
             container_runtime,
             asset_manager,
-            consensus_vm,
             integration_config,
         ).await;
 
@@ -495,14 +478,11 @@ mod tests {
         let container_config = ContainerConfig::default();
         let container_runtime = Arc::new(ContainerRuntime::new(container_config).await?);
         let asset_manager = Arc::new(AssetManager::new());
-        let vm_config = VMConfig::default();
-        let consensus_vm = Arc::new(ConsensusProofVM::new(vm_config).await?);
         let integration_config = HyperMeshIntegrationConfig::default();
 
         HyperMeshContainerOrchestrator::new(
             container_runtime,
             asset_manager,
-            consensus_vm,
             integration_config,
         ).await
     }

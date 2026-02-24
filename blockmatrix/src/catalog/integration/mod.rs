@@ -5,7 +5,7 @@
 //! Catalog Integration Module - Bridge between Catalog and HyperMesh systems
 //!
 //! This module provides the integration layer between the Catalog system
-//! and HyperMesh's VM and container runtime, enabling seamless deployment
+//! and HyperMesh's container runtime, enabling seamless deployment
 //! of Catalog assets across the distributed computing platform.
 
 pub mod hypermesh_bridge;
