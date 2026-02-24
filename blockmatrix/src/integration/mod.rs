@@ -126,7 +126,7 @@ impl IntegrationManager {
 
 // Common types for integration
 pub use hypermesh_lib::NodeId;
-pub type ServiceId = String;
+pub use crate::ServiceId;
 
 pub use self::lifecycle::{
     LifecycleManager,

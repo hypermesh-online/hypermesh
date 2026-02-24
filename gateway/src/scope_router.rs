@@ -109,8 +109,7 @@ pub struct ScopeRouter {
     /// Federation trust levels keyed by `federation_id`.
     federation_trust: Arc<DashMap<String, GatewayTrustLevel>>,
     /// The scope of the local node (used for context, e.g. logging).
-    #[allow(dead_code)]
-    local_scope: BlockchainScope,
+    _local_scope: BlockchainScope,
     /// Atomic counters.
     stats: Arc<RouterStats>,
 }
@@ -121,7 +120,7 @@ impl ScopeRouter {
         Self {
             registered_gateways: Arc::new(DashMap::new()),
             federation_trust: Arc::new(DashMap::new()),
-            local_scope,
+            _local_scope: local_scope,
             stats: Arc::new(RouterStats::new()),
         }
     }

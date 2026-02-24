@@ -271,7 +271,7 @@ impl MatrixAwareVM {
     }
 
     fn get_cached_validation(&self, cache_key: &str) -> Option<CachedValidation> {
-        self.validation_cache.lock().expect("mutex poisoned").get(cache_key).cloned()
+        self.validation_cache.lock().ok()?.get(cache_key).cloned()
     }
 
     fn cache_validation(
@@ -286,7 +286,9 @@ impl MatrixAwareVM {
             _cached_at: std::time::SystemTime::now(),
             expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(300),
         };
-        self.validation_cache.lock().expect("mutex poisoned").insert(cache_key, cached);
+        if let Ok(mut cache) = self.validation_cache.lock() {
+            cache.insert(cache_key, cached);
+        }
     }
 
     fn convert_validation_type(

@@ -50,7 +50,7 @@ impl EntityAssetCoordinator {
             },
         };
 
-        self.entity_assets.lock().expect("mutex poisoned")
+        self.entity_assets.lock().map_err(|_| anyhow::anyhow!("mutex poisoned"))?
             .insert(entity_domain.to_string(), pool);
 
         Ok(())
@@ -60,7 +60,7 @@ impl EntityAssetCoordinator {
         &self,
         request: &EntityAssetRequest,
     ) -> Result<EntityAssetAllocation> {
-        let mut entity_assets = self.entity_assets.lock().expect("mutex poisoned");
+        let mut entity_assets = self.entity_assets.lock().map_err(|_| anyhow::anyhow!("mutex poisoned"))?;
         let pool = entity_assets.get_mut(&request.entity_domain)
             .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", request.entity_domain))?;
 
@@ -109,7 +109,7 @@ impl EntityAssetCoordinator {
             _executing_workflow: None,
         };
 
-        self.active_allocations.lock().expect("mutex poisoned")
+        self.active_allocations.lock().map_err(|_| anyhow::anyhow!("mutex poisoned"))?
             .entry(request.entity_domain.clone())
             .or_insert_with(Vec::new)
             .push(active_allocation);
@@ -118,13 +118,13 @@ impl EntityAssetCoordinator {
     }
 
     pub async fn release_allocation(&self, allocation_id: &Uuid) -> Result<()> {
-        let mut active_allocations = self.active_allocations.lock().expect("mutex poisoned");
+        let mut active_allocations = self.active_allocations.lock().map_err(|_| anyhow::anyhow!("mutex poisoned"))?;
 
         for (entity_domain, allocations) in active_allocations.iter_mut() {
             if let Some(pos) = allocations.iter().position(|a| &a.allocation_id == allocation_id) {
                 let allocation = allocations.remove(pos);
 
-                let mut entity_assets = self.entity_assets.lock().expect("mutex poisoned");
+                let mut entity_assets = self.entity_assets.lock().map_err(|_| anyhow::anyhow!("mutex poisoned"))?;
                 if let Some(pool) = entity_assets.get_mut(entity_domain) {
                     match allocation.asset_type.as_str() {
                         "cpu" => pool.cpu_available += allocation.allocated_amount,

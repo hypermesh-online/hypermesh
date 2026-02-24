@@ -1,10 +1,13 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
 //! Client Assembly
 //!
 //! Client-side shard fetching and file reconstruction from retrieval instructions.
+
+mod fetching;
+mod pipeline;
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -13,16 +16,8 @@ use tokio::sync::RwLock;
 
 use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
-use crate::assets::pipeline::{
-    Compressor, CompressionConfig, CompressionAlgorithm,
-    Encryptor, EncryptionConfig,
-    Sharder, ShardingConfig,
-    sharding::{Shard, ShardMetadata},
-    encryption::{KyberEncryptionResult, EncryptedData},
-    orchestrator::DecryptionKey,
-};
 
-use super::{RetrievalPlan, RetrievalMetadata, ShardLocation};
+use super::{RetrievalPlan, ShardLocation};
 
 /// Progress of assembly operation
 #[derive(Debug, Clone)]
@@ -90,36 +85,36 @@ impl AssemblyStats {
 
 /// Fetched shard data
 #[derive(Debug, Clone)]
-struct FetchedShard {
+pub(crate) struct FetchedShard {
     /// Shard hash
-    _hash: Hash,
+    pub(crate) _hash: Hash,
 
     /// Shard data
-    data: Vec<u8>,
+    pub(crate) data: Vec<u8>,
 
     /// Position it was fetched from
-    _source: MatrixCoordinate,
+    pub(crate) _source: MatrixCoordinate,
 
     /// Time taken to fetch (milliseconds)
-    _fetch_time_ms: u64,
+    pub(crate) _fetch_time_ms: u64,
 }
 
 /// Client assembler for reconstructing files from instructions
 pub struct ClientAssembler {
     /// Current retrieval plan
-    plan: Arc<RwLock<Option<RetrievalPlan>>>,
+    pub(crate) plan: Arc<RwLock<Option<RetrievalPlan>>>,
 
     /// Fetched shards storage
-    fetched_shards: Arc<RwLock<HashMap<usize, FetchedShard>>>,
+    pub(crate) fetched_shards: Arc<RwLock<HashMap<usize, FetchedShard>>>,
 
     /// Assembly progress
-    progress: Arc<RwLock<AssemblyProgress>>,
+    pub(crate) progress: Arc<RwLock<AssemblyProgress>>,
 
     /// Statistics
-    stats: Arc<RwLock<AssemblyStats>>,
+    pub(crate) stats: Arc<RwLock<AssemblyStats>>,
 
     /// Maximum parallel fetches
-    max_parallel: usize,
+    pub(crate) max_parallel: usize,
 }
 
 impl ClientAssembler {
@@ -150,15 +145,12 @@ impl ClientAssembler {
 
     /// Initialize with retrieval plan
     pub async fn initialize(&self, plan: RetrievalPlan) -> Result<()> {
-        // Validate plan
         plan.validate()?;
 
         let total_shards = plan.shard_map.entries.len();
 
-        // Set plan
         *self.plan.write().await = Some(plan);
 
-        // Initialize progress
         let mut progress = self.progress.write().await;
         progress.total_shards = total_shards;
         progress.fetched_shards = 0;
@@ -167,344 +159,6 @@ impl ClientAssembler {
         progress.percentage = 0.0;
 
         Ok(())
-    }
-
-    /// Fetch all shards according to retrieval plan
-    pub async fn fetch_shards(&self) -> Result<()> {
-        let start = std::time::Instant::now();
-
-        // Get plan data
-        let plan_data = {
-            let plan = self.plan.read().await;
-            let plan = plan.as_ref()
-                .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
-
-            plan.retrieval_order.iter()
-                .filter_map(|idx| {
-                    plan.shard_map.get_entry(*idx).map(|entry| {
-                        (*idx, entry.shard_hash, entry.locations.clone())
-                    })
-                })
-                .collect::<Vec<_>>()
-        };
-
-        // Fetch shards sequentially for simplicity (parallel version would need futures::FuturesUnordered)
-        for (shard_idx, shard_hash, locations) in plan_data {
-            Self::fetch_shard_from_locations(
-                shard_idx,
-                shard_hash,
-                locations,
-                self.fetched_shards.clone(),
-                self.progress.clone(),
-                self.stats.clone(),
-            ).await?;
-        }
-
-        // Update final stats
-        let elapsed = start.elapsed().as_millis() as u64;
-        let mut stats = self.stats.write().await;
-        stats.total_time_ms = elapsed;
-        stats.parallel_fetches = self.max_parallel;
-
-        if elapsed > 0 {
-            stats.throughput_bps = (stats.bytes_fetched as u64 * 1000) / elapsed;
-        }
-
-        Ok(())
-    }
-
-    /// Fetch a single shard from available locations
-    async fn fetch_shard_from_locations(
-        shard_idx: usize,
-        shard_hash: Hash,
-        locations: Vec<ShardLocation>,
-        fetched_shards: Arc<RwLock<HashMap<usize, FetchedShard>>>,
-        progress: Arc<RwLock<AssemblyProgress>>,
-        stats: Arc<RwLock<AssemblyStats>>,
-    ) -> Result<()> {
-        // Mark as in progress
-        {
-            let mut prog = progress.write().await;
-            prog.in_progress += 1;
-        }
-
-        // Try each location in order
-        let mut last_error = None;
-
-        for (attempt, location) in locations.iter().enumerate() {
-            let fetch_start = std::time::Instant::now();
-
-            match Self::fetch_from_location(&location.position, &shard_hash).await {
-                Ok(data) => {
-                    let fetch_time = fetch_start.elapsed().as_millis() as u64;
-
-                    // Store fetched shard
-                    let fetched = FetchedShard {
-                        _hash: shard_hash,
-                        data: data.clone(),
-                        _source: location.position.clone(),
-                        _fetch_time_ms: fetch_time,
-                    };
-
-                    let data_size = data.len();
-
-                    fetched_shards.write().await.insert(shard_idx, fetched);
-
-                    // Update progress
-                    {
-                        let mut prog = progress.write().await;
-                        prog.fetched_shards += 1;
-                        prog.in_progress -= 1;
-                        prog.percentage = prog.fetched_shards as f64 / prog.total_shards as f64;
-                    }
-
-                    // Update stats
-                    {
-                        let mut st = stats.write().await;
-                        st.bytes_fetched += data_size;
-                        st.avg_shard_time_ms =
-                            (st.avg_shard_time_ms * (st.fallback_attempts as u64) + fetch_time)
-                            / (st.fallback_attempts as u64 + 1);
-                        if attempt > 0 {
-                            st.fallback_attempts += attempt;
-                        }
-                    }
-
-                    return Ok(());
-                }
-                Err(e) => {
-                    last_error = Some(e);
-                    continue;
-                }
-            }
-        }
-
-        // All locations failed
-        {
-            let mut prog = progress.write().await;
-            prog.failed_shards += 1;
-            prog.in_progress -= 1;
-        }
-
-        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("All locations failed")))
-    }
-
-    /// Fetch shard data from a specific location (placeholder)
-    async fn fetch_from_location(
-        _position: &MatrixCoordinate,
-        _shard_hash: &Hash,
-    ) -> Result<Vec<u8>> {
-        // In production, this would:
-        // 1. Connect to node at position
-        // 2. Request shard by hash
-        // 3. Verify received data matches hash
-        // 4. Return shard data
-
-        // For now, simulate with dummy data
-        tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-        Ok(vec![0u8; 1024]) // 1KB dummy shard
-    }
-
-    /// Reconstruct file from fetched shards (basic concatenation).
-    ///
-    /// This method concatenates raw shard data without pipeline processing.
-    /// Use `reconstruct_with_pipeline()` for full reverse-pipeline
-    /// reconstruction (Reed-Solomon -> decrypt -> decompress).
-    pub async fn reconstruct(&self) -> Result<Vec<u8>> {
-        let plan = self.plan.read().await;
-        let plan = plan.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
-
-        let fetched = self.fetched_shards.read().await;
-
-        // Check if we have enough shards
-        if fetched.len() < plan.min_shards_required {
-            return Err(anyhow::anyhow!(
-                "Insufficient shards: have {}, need {}",
-                fetched.len(),
-                plan.min_shards_required
-            ));
-        }
-
-        let mut reconstructed = Vec::new();
-        for i in 0..plan.min_shards_required {
-            if let Some(shard) = fetched.get(&i) {
-                reconstructed.extend_from_slice(&shard.data);
-            }
-        }
-
-        Ok(reconstructed)
-    }
-
-    /// Reconstruct file using the full reverse pipeline.
-    ///
-    /// Applies the reverse of the asset processing pipeline:
-    /// 1. Reed-Solomon reconstruct encrypted blob from shards
-    /// 2. Decrypt blob using the provided decryption key
-    /// 3. Decompress to recover original data
-    pub async fn reconstruct_with_pipeline(
-        &self,
-        decryption_key: &DecryptionKey,
-    ) -> Result<Vec<u8>> {
-        let plan = self.plan.read().await;
-        let plan = plan.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
-
-        let fetched = self.fetched_shards.read().await;
-
-        if fetched.len() < plan.min_shards_required {
-            return Err(anyhow::anyhow!(
-                "Insufficient shards: have {}, need {}",
-                fetched.len(),
-                plan.min_shards_required
-            ));
-        }
-
-        let pipeline_shards = self.build_pipeline_shards(&fetched, plan);
-
-        // Reverse pipeline: reconstruct -> decrypt -> decompress
-        let encrypted_blob = Self::reconstruct_shards(
-            &pipeline_shards,
-            &plan.metadata,
-        )?;
-        let compressed_data = Self::decrypt_blob(
-            &encrypted_blob,
-            decryption_key,
-            &plan.metadata,
-        )?;
-        let original_data = Self::decompress_data(
-            &compressed_data,
-            &plan.metadata,
-        )?;
-
-        Ok(original_data)
-    }
-
-    /// Convert fetched shards into pipeline Shard structs.
-    fn build_pipeline_shards(
-        &self,
-        fetched: &HashMap<usize, FetchedShard>,
-        plan: &RetrievalPlan,
-    ) -> Vec<Shard> {
-        let data_shard_count = plan.metadata.erasure_coding.0;
-
-        let mut shards: Vec<Shard> = Vec::with_capacity(fetched.len());
-
-        for (&idx, fetched_shard) in fetched.iter() {
-            let is_parity = idx >= data_shard_count;
-            let hash_hex = {
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(&fetched_shard.data);
-                hex::encode(hasher.finalize())
-            };
-
-            // Last data shard stores pre-sharding blob size for Reed-Solomon
-            // padding truncation. This is the encrypted blob size, NOT the
-            // original uncompressed data size.
-            let original_size = if !is_parity && idx == data_shard_count - 1 {
-                plan.metadata.encrypted_blob_size
-            } else {
-                fetched_shard.data.len()
-            };
-
-            let metadata = ShardMetadata {
-                index: idx,
-                is_parity,
-                size: fetched_shard.data.len(),
-                original_size,
-                hash: hash_hex,
-            };
-
-            shards.push(Shard {
-                data: fetched_shard.data.clone(),
-                metadata,
-            });
-        }
-
-        // Sort by index for consistent reconstruction
-        shards.sort_by_key(|s| s.metadata.index);
-        shards
-    }
-
-    /// Stage 1: Reed-Solomon reconstruct encrypted blob from shards.
-    fn reconstruct_shards(
-        shards: &[Shard],
-        metadata: &RetrievalMetadata,
-    ) -> Result<Vec<u8>> {
-        let config = ShardingConfig {
-            data_shards: metadata.erasure_coding.0,
-            parity_shards: metadata.erasure_coding.1,
-            ..Default::default()
-        };
-        let sharder = Sharder::new(config)
-            .map_err(|e| anyhow::anyhow!("Sharder init failed: {}", e))?;
-
-        sharder.reconstruct(shards)
-            .map_err(|e| anyhow::anyhow!("Shard reconstruction failed: {}", e))
-    }
-
-    /// Stage 2: Decrypt blob using decryption key.
-    fn decrypt_blob(
-        encrypted_blob: &[u8],
-        decryption_key: &DecryptionKey,
-        metadata: &RetrievalMetadata,
-    ) -> Result<Vec<u8>> {
-        if metadata.encryption.is_empty() || metadata.encryption == "none" {
-            return Ok(encrypted_blob.to_vec());
-        }
-
-        let encryptor = Encryptor::new(EncryptionConfig::default());
-
-        match decryption_key {
-            DecryptionKey::Kyber {
-                ciphertext_kem,
-                nonce,
-                original_size,
-                secret_key,
-            } => {
-                let kyber_result = KyberEncryptionResult {
-                    ciphertext_kem: ciphertext_kem.clone(),
-                    encrypted_data: encrypted_blob.to_vec(),
-                    nonce: nonce.clone(),
-                    original_size: *original_size,
-                };
-                encryptor.decrypt(&kyber_result, secret_key)
-                    .map_err(|e| anyhow::anyhow!("Kyber decryption failed: {}", e))
-            }
-            DecryptionKey::Aes(key) => {
-                let encrypted = EncryptedData {
-                    ciphertext: encrypted_blob.to_vec(),
-                    nonce: key.nonce.clone(),
-                    original_size: 0,
-                };
-                encryptor.decrypt_aes(&encrypted, key)
-                    .map_err(|e| anyhow::anyhow!("AES decryption failed: {}", e))
-            }
-        }
-    }
-
-    /// Stage 3: Decompress data.
-    fn decompress_data(
-        compressed_data: &[u8],
-        metadata: &RetrievalMetadata,
-    ) -> Result<Vec<u8>> {
-        if metadata.compression.is_empty() || metadata.compression == "none" {
-            return Ok(compressed_data.to_vec());
-        }
-
-        let algorithm = match metadata.compression.as_str() {
-            "brotli" => CompressionAlgorithm::Brotli,
-            _ => CompressionAlgorithm::None,
-        };
-
-        let compressor = Compressor::new(CompressionConfig {
-            algorithm,
-            ..Default::default()
-        });
-
-        compressor.decompress(compressed_data)
-            .map_err(|e| anyhow::anyhow!("Decompression failed: {}", e))
     }
 
     /// Get current progress
@@ -547,13 +201,15 @@ impl ClientAssembler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::retrieval::{CompleteShardMap, ShardMapEntry};
+    use crate::retrieval::{
+        RetrievalMetadata, CompleteShardMap, ShardMapEntry, ShardLocation,
+    };
+    use crate::assets::pipeline::EncryptionConfig;
 
     fn create_test_plan() -> RetrievalPlan {
         let content_hash = [1u8; 32];
         let mut shard_map = CompleteShardMap::new();
 
-        // Create 14 shards
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
             let locations = vec![
@@ -636,7 +292,7 @@ mod tests {
 
         let progress_after = assembler.get_progress().await;
         assert!(progress_after.percentage > 0.0);
-        assert!(progress_after.is_complete(10)); // Min required is 10
+        assert!(progress_after.is_complete(10));
     }
 
     #[tokio::test]
@@ -678,7 +334,6 @@ mod tests {
             AssetPipeline,
         };
 
-        // 1. Process data through the forward pipeline
         let original_data = b"Hello, HyperMesh instruction-based retrieval! ".repeat(200);
         let asset = Asset {
             id: "test-pipeline-roundtrip".to_string(),
@@ -697,7 +352,6 @@ mod tests {
         let processed = pipeline.process_asset(asset).await
             .expect("test: process asset");
 
-        // 2. Build a retrieval plan from the processed asset
         let content_hash = [42u8; 32];
         let mut shard_map = CompleteShardMap::new();
 
@@ -730,7 +384,6 @@ mod tests {
         let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
         plan.original_size = original_data.len();
 
-        // 3. Manually inject processed shards as fetched shards
         let assembler = ClientAssembler::new(4);
         assembler.initialize(plan).await.expect("test: init plan");
 
@@ -752,7 +405,6 @@ mod tests {
             progress.percentage = 1.0;
         }
 
-        // 4. Reconstruct using the real pipeline
         let reconstructed = assembler
             .reconstruct_with_pipeline(&processed.decryption_key)
             .await
@@ -771,7 +423,6 @@ mod tests {
             AssetPipeline, PipelineConfig,
         };
 
-        // Use AES-only (non-quantum) pipeline
         let original_data = b"AES fallback test data ".repeat(100);
         let asset = Asset {
             id: "test-aes-roundtrip".to_string(),
@@ -797,7 +448,6 @@ mod tests {
         let processed = pipeline.process_asset(asset).await
             .expect("test: process asset");
 
-        // Build plan and inject shards
         let mut shard_map = CompleteShardMap::new();
         for i in 0..processed.shards.len() {
             let position = MatrixCoordinate::new(i as i64, 0, 0)

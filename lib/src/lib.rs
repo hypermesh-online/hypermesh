@@ -12,6 +12,7 @@ pub mod asset;
 pub mod error;
 pub mod crypto;
 pub mod economic;
+pub mod http;
 
 // Re-export commonly used types at crate root
 pub use types::*;

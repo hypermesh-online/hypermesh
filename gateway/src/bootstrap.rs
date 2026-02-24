@@ -33,13 +33,10 @@ pub struct BootstrapResponse {
 
 /// A stored bootstrap token with metadata and expiry.
 struct StoredToken {
-    #[allow(dead_code)]
-    token: String,
-    #[allow(dead_code)]
-    created_at: chrono::DateTime<Utc>,
+    _token: String,
+    _created_at: chrono::DateTime<Utc>,
     expires_at: chrono::DateTime<Utc>,
-    #[allow(dead_code)]
-    client_id: Option<String>,
+    _client_id: Option<String>,
 }
 
 /// Manages the HTTP/3 bootstrap flow for STOQ onboarding.
@@ -81,10 +78,10 @@ impl BootstrapHandler {
         self.tokens.insert(
             token.clone(),
             StoredToken {
-                token: token.clone(),
-                created_at: now,
+                _token: token.clone(),
+                _created_at: now,
                 expires_at,
-                client_id: client_id.map(String::from),
+                _client_id: client_id.map(String::from),
             },
         );
 

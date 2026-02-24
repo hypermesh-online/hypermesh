@@ -403,6 +403,7 @@ impl CrossChainValidationManager {
 mod tests {
     use super::*;
     use crate::assets::core::asset_id::AssetType;
+    use crate::assets::matrix_blockchain::ProofRequirement;
     use crate::test_utils::test_asset_id;
 
     #[test]

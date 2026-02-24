@@ -488,7 +488,7 @@ mod tests {
     #[tokio::test]
     async fn test_quantum_security_creation() {
         let security = QuantumSecurity::new().await.expect("Failed to create QuantumSecurity");
-        assert_eq!(security.active_tokens.len(), 0);
+        assert_eq!(security._active_tokens.len(), 0);
     }
     
     #[tokio::test]

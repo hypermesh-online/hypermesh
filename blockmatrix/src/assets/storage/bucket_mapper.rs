@@ -471,7 +471,7 @@ mod tests {
         use crate::integration::phase1_foundation::MatrixFoundationConfig;
 
         let mapper = BucketMapper {
-            foundation: Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap()),
+            _foundation: Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.expect("test: create matrix foundation")),
             bucket_locations: Arc::new(RwLock::new(HashMap::new())),
             access_patterns: Arc::new(RwLock::new(HashMap::new())),
             available_positions: Arc::new(RwLock::new(Vec::new())),

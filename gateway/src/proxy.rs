@@ -160,8 +160,7 @@ pub fn transform_backend_path(original_path: &str, backend_prefix: &str) -> Stri
 }
 
 /// Helper to build backend URI (utility for proxy routing)
-#[allow(dead_code)]
-pub fn build_backend_uri(
+pub fn _build_backend_uri(
     original_uri: &Uri,
     backend_host: &str,
     transformed_path: &str,

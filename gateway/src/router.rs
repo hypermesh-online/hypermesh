@@ -25,14 +25,11 @@ pub struct GatewayRouter {
     blockmatrix_proxy: Http3Proxy,
     caesar_proxy: Http3Proxy,
     /// TrustChain service address (retained for health check routing)
-    #[allow(dead_code)]
-    trustchain_addr: SocketAddr,
+    _trustchain_addr: SocketAddr,
     /// BlockMatrix service address (retained for health check routing)
-    #[allow(dead_code)]
-    blockmatrix_addr: SocketAddr,
+    _blockmatrix_addr: SocketAddr,
     /// Caesar service address (retained for health check routing)
-    #[allow(dead_code)]
-    caesar_addr: SocketAddr,
+    _caesar_addr: SocketAddr,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
     trustchain_breaker: Arc<CircuitBreaker>,
@@ -106,9 +103,9 @@ impl GatewayRouter {
             trustchain_proxy,
             blockmatrix_proxy,
             caesar_proxy,
-            trustchain_addr: config.trustchain_addr,
-            blockmatrix_addr: config.blockmatrix_addr,
-            caesar_addr: config.caesar_addr,
+            _trustchain_addr: config.trustchain_addr,
+            _blockmatrix_addr: config.blockmatrix_addr,
+            _caesar_addr: config.caesar_addr,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
             trustchain_breaker,

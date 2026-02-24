@@ -141,8 +141,7 @@ impl RequestIdMiddleware {
     }
 
     /// Extract request ID from headers or generate new one (utility for downstream handlers)
-    #[allow(dead_code)]
-    pub fn get_or_create_request_id(headers: &HeaderMap) -> Uuid {
+    pub fn _get_or_create_request_id(headers: &HeaderMap) -> Uuid {
         headers
             .get("x-request-id")
             .and_then(|v| v.to_str().ok())

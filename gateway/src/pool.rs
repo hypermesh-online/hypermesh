@@ -42,8 +42,7 @@ struct PooledConnection {
     connection: Arc<ArcSwap<Option<SendRequest<h3_quinn::OpenStreams, Bytes>>>>,
     last_used: Arc<ArcSwap<Instant>>,
     /// Connection creation time (for connection age tracking)
-    #[allow(dead_code)]
-    created_at: Instant,
+    _created_at: Instant,
     request_count: Arc<AtomicU64>,
     healthy: Arc<ArcSwap<bool>>,
 }
@@ -171,7 +170,7 @@ impl ConnectionPool {
         let pooled = PooledConnection {
             connection: Arc::new(ArcSwap::from_pointee(Some(send_request.clone()))),
             last_used: Arc::new(ArcSwap::from_pointee(now)),
-            created_at: now,
+            _created_at: now,
             request_count: Arc::new(AtomicU64::new(1)),
             healthy: Arc::new(ArcSwap::from_pointee(true)),
         };
@@ -208,8 +207,7 @@ impl ConnectionPool {
     }
 
     /// Mark a connection as unhealthy (for circuit breaker integration)
-    #[allow(dead_code)]
-    pub fn mark_unhealthy(&self, _conn: &SendRequest<h3_quinn::OpenStreams, Bytes>) {
+    pub fn _mark_unhealthy(&self, _conn: &SendRequest<h3_quinn::OpenStreams, Bytes>) {
         // In a real implementation, we'd track which specific connection failed
         // For now, we'll just increment the failed counter
         self.stats.failed_connections.fetch_add(1, Ordering::Relaxed);
@@ -220,7 +218,7 @@ impl ConnectionPool {
         PoolStatus {
             total_connections: self.stats.total_connections.load(Ordering::Relaxed),
             active_connections: self.stats.active_connections.load(Ordering::Relaxed),
-            failed_connections: self.stats.failed_connections.load(Ordering::Relaxed),
+            _failed_connections: self.stats.failed_connections.load(Ordering::Relaxed),
             requests_served: self.stats.requests_served.load(Ordering::Relaxed),
         }
     }
@@ -243,10 +241,9 @@ impl ConnectionPool {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct PoolStatus {
     pub total_connections: u64,
     pub active_connections: usize,
-    pub failed_connections: u64,
+    pub _failed_connections: u64,
     pub requests_served: u64,
 }
