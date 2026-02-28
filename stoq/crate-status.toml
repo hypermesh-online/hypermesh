@@ -22,6 +22,7 @@ items = [
     "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
     "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
     "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
+    "BLAKE3 content hashing (whitepaper-aligned)",
 ]
 
 [features.in_development]
@@ -30,4 +31,6 @@ items = [
 
 [features.planned]
 items = [
+    "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
+    "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
 ]

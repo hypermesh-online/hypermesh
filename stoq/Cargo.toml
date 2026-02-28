@@ -111,4 +111,12 @@ engauge = ["dep:engauge"] # Enable STOQ METRICS frame type for Engauge streaming
 name = "throughput"
 harness = false
 
+[[bench]]
+name = "ebpf_throughput"
+harness = false
+
+[[bench]]
+name = "real_throughput"
+harness = false
+
 # Profiles are managed at workspace level

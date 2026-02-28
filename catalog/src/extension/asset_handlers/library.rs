@@ -8,7 +8,7 @@ use super::{
     AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
     AssetOperation, OperationResult, DeploymentResult,
     AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof, Digest,
+    ConsensusProof,
 };
 
 /// Handler for Library assets (packages, frameworks, dependencies)
@@ -53,11 +53,7 @@ impl AssetExtensionHandler for LibraryHandler {
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
                 domain_name: "catalog_library".to_string(),
-                domain_hash: {
-                    let mut hasher = sha2::Sha256::new();
-                    hasher.update(b"catalog_library");
-                    hasher.finalize().into()
-                },
+                domain_hash: *blake3::hash(b"catalog_library").as_bytes(),
             }),
         );
 

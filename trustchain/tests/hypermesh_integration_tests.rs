@@ -11,9 +11,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
 
-use tokio::sync::RwLock;
-use tokio::time::timeout;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use tracing::{info, debug, warn};
 
 // TrustChain imports
@@ -21,8 +19,7 @@ use trustchain::ca::{TrustChainCA, CAConfig, CertificateRequest, CertificateStat
 use trustchain::consensus::{
     ConsensusProof, ConsensusRequirements,
     hypermesh_client::{
-        HyperMeshConsensusClient, HyperMeshClientConfig, ConsensusValidationRequest,
-        ValidationContext, CertificateType, FourProofSet, FourProofValidationRequest,
+        HyperMeshConsensusClient, HyperMeshClientConfig, FourProofSet,
         SpaceProofData, StakeProofData, WorkProofData, TimeProofData,
         ConsensusValidationStatus,
     },
@@ -45,7 +42,7 @@ fn init_test_tracing() {
 
 /// Create test HyperMesh consensus server
 async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
-    use bytes::Bytes;
+    
     use serde::{Serialize, Deserialize};
     use async_trait::async_trait;
     use std::collections::HashMap;

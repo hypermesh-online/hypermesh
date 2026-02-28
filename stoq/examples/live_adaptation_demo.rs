@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint, NetworkTier};
+use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
 use tokio::time::{sleep, interval};
-use tracing::{info, warn, debug};
+use tracing::{info, warn};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[tokio::main]

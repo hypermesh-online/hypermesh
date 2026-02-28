@@ -28,6 +28,10 @@ pub struct RegionalAggregate {
     pub total_bandwidth_bps: u64,
     /// Mean capacity score across sources (from Capacity payloads).
     pub avg_capacity_score: f64,
+    /// Number of nodes passing PoSPing verification in this region.
+    pub verified_node_count: usize,
+    /// Average consistency ratio across verified nodes.
+    pub avg_consistency_ratio: f64,
 }
 
 impl RegionalAggregate {
@@ -40,6 +44,8 @@ impl RegionalAggregate {
             avg_throughput_bps: 0.0,
             total_bandwidth_bps: 0,
             avg_capacity_score: 0.0,
+            verified_node_count: 0,
+            avg_consistency_ratio: 0.0,
         }
     }
 }
@@ -101,6 +107,8 @@ impl RegionalAggregator {
             avg_throughput_bps: safe_avg(accum.thr_sum, accum.thr_count),
             total_bandwidth_bps: accum.bw_total,
             avg_capacity_score: safe_avg(accum.cap_sum, accum.cap_count),
+            verified_node_count: accum.verif_count,
+            avg_consistency_ratio: safe_avg(accum.verif_sum, accum.verif_count),
         }
     }
 
@@ -125,6 +133,8 @@ struct FrameAccumulator {
     bw_total: u64,
     cap_sum: f64,
     cap_count: usize,
+    verif_sum: f64,
+    verif_count: usize,
 }
 
 /// Accumulate metric values from a slice of frames into running totals.
@@ -134,6 +144,7 @@ fn accumulate_frames(frames: &[&MetricsFrame]) -> FrameAccumulator {
         lat_sum: 0.0, lat_count: 0,
         thr_sum: 0.0, thr_count: 0,
         bw_total: 0, cap_sum: 0.0, cap_count: 0,
+        verif_sum: 0.0, verif_count: 0,
     };
 
     for frame in frames {
@@ -154,6 +165,10 @@ fn accumulate_frames(frames: &[&MetricsFrame]) -> FrameAccumulator {
                 acc.thr_count += 1;
             }
             MetricsPayload::Economic(_) => {}
+            MetricsPayload::Verification(v) => {
+                acc.verif_sum += v.consistency_ratio;
+                acc.verif_count += 1;
+            }
         }
     }
 
@@ -317,5 +332,48 @@ mod tests {
         let agg = RegionalAggregator::new(10);
         let result = agg.aggregate_for_sources(&["ghost".to_string()]);
         assert_eq!(result.node_count, 0);
+    }
+
+    #[test]
+    fn aggregate_verification_payloads() {
+        use crate::streaming::protocol::VerificationSnapshot;
+
+        let mut agg = RegionalAggregator::new(10);
+        agg.ingest(MetricsFrame {
+            source_node: NodeId::from("verif-a"),
+            timestamp_us: 1_000_000,
+            privacy_mode: PrivacyMode::PUBLIC,
+            payload: MetricsPayload::Verification(VerificationSnapshot {
+                probes_sent: 100,
+                probes_passed: 90,
+                avg_response_time_us: 1000,
+                consistency_ratio: 0.9,
+                epoch: 1,
+            }),
+            sequence: 0,
+        });
+        agg.ingest(MetricsFrame {
+            source_node: NodeId::from("verif-b"),
+            timestamp_us: 1_000_000,
+            privacy_mode: PrivacyMode::PUBLIC,
+            payload: MetricsPayload::Verification(VerificationSnapshot {
+                probes_sent: 200,
+                probes_passed: 196,
+                avg_response_time_us: 800,
+                consistency_ratio: 0.98,
+                epoch: 1,
+            }),
+            sequence: 0,
+        });
+
+        let result = agg.aggregate();
+        assert_eq!(result.node_count, 2);
+        assert_eq!(result.verified_node_count, 2);
+        // avg consistency: (0.9 + 0.98) / 2 = 0.94
+        assert!(
+            (result.avg_consistency_ratio - 0.94).abs() < 1e-9,
+            "expected avg_consistency_ratio ~0.94, got {}",
+            result.avg_consistency_ratio
+        );
     }
 }

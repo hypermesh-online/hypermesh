@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             bandwidth_mbps: 10000,
             protocols: vec!["HTTP".to_string(), "SOCKS5".to_string(), "VPN".to_string()],
         },
-        trust_score: 0.95,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "trust-cert-fingerprint-abc123".to_string(),
     };

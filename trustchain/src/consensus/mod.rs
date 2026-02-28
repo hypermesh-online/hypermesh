@@ -9,7 +9,6 @@
 
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration};
-use sha2::{Sha256, Digest};
 use anyhow::{Result, anyhow};
 
 pub mod proof;
@@ -102,7 +101,7 @@ impl ConsensusProof {
         );
         // Set total_size to a non-zero value (50GB used)
         space_proof.total_size = 50 * 1024 * 1024 * 1024;
-        space_proof.file_hash = "test_hash_1234567890".to_string();
+        space_proof.file_hash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
 
         Self {
             stake_proof: StakeProof::new(
@@ -184,12 +183,10 @@ impl ConsensusProof {
         bincode::deserialize(data).map_err(|e| anyhow!("Failed to deserialize ConsensusProof: {}", e))
     }
 
-    /// Generate cryptographic hash of the consensus proof
+    /// Generate cryptographic hash of the consensus proof (BLAKE3)
     pub fn hash(&self) -> Result<[u8; 32]> {
         let bytes = self.to_bytes()?;
-        let mut hasher = Sha256::new();
-        hasher.update(&bytes);
-        Ok(hasher.finalize().into())
+        Ok(*blake3::hash(&bytes).as_bytes())
     }
 }
 

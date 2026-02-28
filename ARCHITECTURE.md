@@ -2,296 +2,322 @@
 
 ## Overview
 
-HyperMesh is a sovereign distributed computing platform built from six composable layers. Each layer has a single responsibility, communicates through well-defined interfaces, and can be understood independently.
+HyperMesh is a sovereign distributed computing platform. Each node runs as a system-level daemon (like DHCP or DNS) on bare metal or VMs. There are no containers, no orchestrators, no cloud dependencies. Nodes communicate exclusively over STOQ (QUIC + eBPF) with FALCON-1024 quantum-resistant cryptography.
 
-**8 crates** | **575 Rust files** | **208,787 lines** | **816 tests**
+The codebase is organized into 10 Rust crates plus a Svelte UI, layered bottom-up across 9 layers.
+
+**11 workspace members** | **999 files** | **289,405 lines** | **1,885 tests**
 
 ## Design Philosophy
 
-The stack follows a **bottom-up** design. Lower layers know nothing about higher ones. Higher layers depend only on the public interface of the layer immediately below.
+Lower layers know nothing about higher ones. Higher layers depend only on the public interface of the layer below.
 
 - Transport works without knowing what is being transported.
 - Identity works without knowing where data is stored.
 - Topology works without knowing what assets exist.
 - Assets work without knowing how they are paid for.
 
-## The Six-Layer Stack
+## The Nine-Layer Stack
 
 ```
-+--------------------------------------------------+
-|  6. NGauge        Observability & Metrics          |  [planned]
-+--------------------------------------------------+
-|  5. Caesar        Payment Bridge (optional)        |  [optional]
-+--------------------------------------------------+
-|  4. Catalog       Package Registry & Discovery     |  [core]
-+--------------------------------------------------+
-|  3. BlockMatrix   Topology, Assets & Coordination  |  [core]
-+--------------------------------------------------+
-|  2. TrustChain    Identity & Certificates          |  [core]
-+--------------------------------------------------+
-|  1. STOQ          Transport Protocol               |  [core]
-+--------------------------------------------------+
-|     OS / Kernel   eBPF hooks, IPv6 stack           |
-+--------------------------------------------------+
++-----------------------------------------------------------+
+|  9. UI             Svelte Dashboard                        |
++-----------------------------------------------------------+
+|  8. Gateway        HTTP/3 + STOQ dual-listener (4 roles)   |
++-----------------------------------------------------------+
+|  7. Catalog        Asset Package Registry                  |
++-----------------------------------------------------------+
+|  6. engauge        Analytics, Metrics & Marketplace        |
++-----------------------------------------------------------+
+|  5. Caesar         EVP Gold-Gram Protocol + SDK            |
++-----------------------------------------------------------+
+|  4. BlockMatrix    Topology, Assets, Blockchain & Tensor   |
++-----------------------------------------------------------+
+|  3. TrustChain     Binary Authentication & Certificates    |
++-----------------------------------------------------------+
+|  2. STOQ + eBPF    Transport Protocol + Kernel Hooks       |
++-----------------------------------------------------------+
+|  1. hypermesh-lib   Shared Types (canonical)               |
++-----------------------------------------------------------+
 ```
 
-A minimal node runs layers 1-4. Caesar is opt-in for paid content. NGauge is planned.
+A minimal node runs layers 1-4. Caesar, engauge, Catalog, and Gateway are optional.
 
 ---
 
-## Layer 1 — STOQ (Transport)
+## Layer 1 -- hypermesh-lib (Foundation)
 
-**Crate**: `stoq/` | **14,039 lines** | **65 tests** | **Phase**: alpha
+**Crate**: `lib/` | **3,198 lines** | **97 tests**
 
-### What it does
+The single source of truth for canonical types shared across all 9 dependent crates:
+
+- `NodeId`, `AssetId`, `NetworkId`, `ContentHash` -- identity newtypes
+- `PrivacyMode` struct -- 3 presets: `ANONYMOUS`, `PRIVATE`, `PUBLIC` (2-axis: `AccessScope` + `tracked`)
+- `BlockchainScope` -- `Device` | `Network` (binary, not 6-variant)
+- `ProofType` -- `PoSpace` | `PoStake` | `PoWork` | `PoTime`
+- `MatrixPosition`, `MatrixCoordinate` -- topology primitives
+- `SystemAssetKind` -- 9 system asset types (CPU through DNS)
+- `PipelineStage`, `CryptoAlgorithm`, `HypermeshError`
+
+No circular dependencies. All other crates depend on hypermesh-lib.
+
+---
+
+## Layer 2 -- STOQ + hypermesh-ebpf (Transport)
+
+### STOQ
+
+**Crate**: `stoq/` | **17,897 lines** | **145 tests** | **Status**: complete
 
 STOQ is the OS-level transport protocol. It runs QUIC over IPv6 with eBPF kernel integration for packet-level inspection and flow classification.
 
-### Responsibilities
-
+**Responsibilities**:
 - Connection establishment, stream multiplexing, connection pooling
 - Post-quantum transport cryptography (FALCON-1024 signatures, X25519 key exchange)
-- BLAKE3 protocol-level token/hash validation
-- Network isolation enforcement at the transport level (4 privacy tiers)
-- Adaptive congestion control and transport metrics
+- BLAKE3 protocol-level token and hash validation
+- Privacy tier enforcement at the transport level (Anonymous/Private/Public)
+- Adaptive congestion control (EWMA bandwidth, MTU discovery, loss-based CC)
+- Multi-path QUIC with 4 schedulers, reflector pool (heartbeat/quorum sync)
 
-### What it does NOT do
+**Does NOT do**: Chunking, sharding, compression, deduplication, identity management, certificate issuance.
 
-- Chunking, sharding, compression, deduplication, or edge caching (BlockMatrix)
-- Federated trust networking or routing decisions (BlockMatrix)
-- Identity management or certificate issuance (TrustChain)
+### hypermesh-ebpf
 
-### Interface
+**Crate**: `hypermesh-ebpf/` | **8,203 lines** | **152 tests**
 
-Exposes a connection-oriented stream API (`TransportStream`) to TrustChain above.
+Single source of truth for all eBPF packet processing. Three execution paths at XDP:
+
+- **Zero-copy**: AF_XDP direct to STOQ (mmap UMEM, 4-ring setup)
+- **Delegate**: XDP_TX to matrix neighbor
+- **Local**: XDP_PASS to kernel stack
+
+STOQ is a thin consumer (`StoqEbpfTransport`). BlockMatrix is the policy configurator. Graceful degradation: full eBPF+AF_XDP, eBPF without AF_XDP, or userspace-only.
 
 ---
 
-## Layer 2 — TrustChain (Identity)
+## Layer 3 -- TrustChain (Trust)
 
-**Crate**: `trustchain/` | **30,027 lines** | **63 tests** | **Phase**: alpha
+**Crate**: `trustchain/` | **33,923 lines** | **95 tests** | **Status**: 95% complete
 
-### What it does
+Manages decentralized identity through a federated Certificate Authority with FALCON-1024 post-quantum signatures.
 
-TrustChain manages decentralized identity through a federated Certificate Authority, FALCON-1024 post-quantum signatures, and Certificate Transparency logs.
-
-### Responsibilities
-
-- Certificate Authority: issuance, revocation, lifecycle management
-- FALCON-1024 post-quantum signing and Kyber-1024 key encapsulation
+**Responsibilities**:
+- Certificate Authority: issuance, revocation (OCSP/CRL), lifecycle management
+- FALCON-1024 post-quantum signing
 - Certificate Transparency: Merkle logs, SCTs, audit trails
-- Proof of State four-proof consensus (WHERE/WHO/WHAT/WHEN)
+- Binary authentication (pass/fail, no trust scoring or float-based levels)
+- Threshold crypto (Shamir SSS over GF(256), wraps FALCON-1024 key splitting)
+- Federation: FederatedCA peers with Full/Conditional/Untrusted trust levels (policy gates)
 - DNS protocol resolution (serving signed DNS records over STOQ)
 - Security monitoring and Byzantine detection
 
-### What it does NOT do
-
-- Enforce network isolation (STOQ enforces transport isolation)
-- Manage federated trust networking (BlockMatrix `network/trust/`)
-- Handle DNS record registration/storage (BlockMatrix `dns/`)
-- Route, distribute, or deduplicate data (BlockMatrix)
-
-### Interface
-
-Consumes `TransportStream` from STOQ. Exposes authenticated, identity-tagged channels (`TrustedChannel`) to BlockMatrix.
+**Does NOT do**: Enforce network isolation (STOQ), manage topology (BlockMatrix), distribute data (BlockMatrix).
 
 ---
 
-## Layer 3 — BlockMatrix (Topology, Assets & Coordination)
+## Layer 4 -- BlockMatrix (Matrix)
 
-**Crate**: `blockmatrix/` | **129,696 lines** | **624 tests** | **Phase**: alpha
+**Crate**: `blockmatrix/` | **128,404 lines** | **821 tests** | **Status**: alpha
 
-### What it does
+The largest crate. Assigns every node a position in a 3D coordinate space (the Block-MATRIX) and manages the entire asset lifecycle.
 
-BlockMatrix is the largest layer. It assigns every node a position in a 3D coordinate space and manages the entire asset lifecycle — from storage to distribution.
+### Topology
 
-### Responsibilities
-
-**Topology**:
 - 3D coordinate system (x,y,z node positioning)
 - Tensor-weighted path optimization (bandwidth, latency, reliability, load)
 - Geospatial clustering (GPS-to-matrix conversion, region-aware placement)
 - A* pathfinding and neighbor discovery
 
-**Assets** (everything in the mesh is an asset):
+### Assets (everything in the mesh is an asset)
+
 - 6 asset adapters: CPU, GPU, Memory, Storage, Network, Container
-- Privacy allocation (5 levels, 4 tiers with user controls)
-- NAT-like remote proxy addressing for memory/resources
+- Privacy allocation with user controls (resource percentages, concurrent limits, duration)
+- NAT-like remote proxy addressing for memory and resources
 - Content-addressed storage with hash bucket deduplication
 
-**Distribution pipeline** (exact order):
-1. Compression (Brotli)
-2. Encryption (Kyber-1024)
-3. Sharding (Reed-Solomon)
-4. Placement (tensor-based matrix positioning)
+### IPv6 Asset Addressing
 
-**Blockchain**:
-- Every-node independent blockchain (starts on boot, no network required)
-- Proof of State four-proof validation
+Every asset gets a globally unique `AssetAddress` derived from its `AssetId`. The `TransferEngine` handles asset transfers across the mesh using IPv6-compatible addressing. A 10-node transfer simulation validates the addressing and routing under realistic conditions.
+
+### Data Pipeline (exact order)
+
+1. **Compress** -- Brotli streaming (levels 1-11)
+2. **Encrypt** -- Kyber-1024 KEM, AES-256-GCM whole-blob encryption (not per-shard)
+3. **Shard** -- Reed-Solomon erasure coding (10 data + 4 parity)
+4. **Distribute** -- Tensor-based placement at calculated matrix positions
+
+### Blockchain
+
+- Every node runs an independent Device blockchain (starts on boot, no network required)
+- Optional Network blockchain (synchronized via reflector/swarm mode)
+- Proof of State four-proof validation (PoSpace/PoStake/PoWork/PoTime)
 - Matrix persistence (WAL, snapshots, recovery)
 
-**Networking** (consensus layer, not transport):
-- Federated trust networking (`network/trust/federated.rs`)
-- DNS record registration and storage (`dns/`)
+### Networking (consensus layer, not transport)
+
+- Federated trust networking
+- DNS record registration and storage
 - Network membership and multi-network participation
-- Privacy tier enforcement at the asset/routing level
+- Privacy-aware routing at the asset level
 
-### What it does NOT do
-
-- Transport-level encryption or connection management (STOQ)
-- Certificate issuance or identity verification (TrustChain)
-- Package versioning, dependency resolution, or registry (Catalog)
-- Payment processing or reward distribution (Caesar)
-
-### Interface
-
-Consumes `TrustedChannel` from TrustChain. Exposes coordinate-aware topology (`TopologyView`) to Catalog.
+**Does NOT do**: Transport-level encryption (STOQ), certificate issuance (TrustChain), package versioning (Catalog), payment processing (Caesar).
 
 ---
 
-## Layer 4 — Catalog (Package Registry)
+## Layer 5 -- Caesar + caesar-sdk (Economy)
 
-**Crate**: `catalog/` | **25,794 lines** | **41 tests** | **Phase**: alpha
+### Caesar
 
-### What it does
+**Crate**: `caesar/` | **12,753 lines** | **220 tests** | **Status**: complete
 
-Catalog is the package registry. It defines asset specifications and provides discovery for mesh resources. Catalog is a **registry**, not an execution environment — assets belong to their owners on BlockMatrix nodes.
+The EVP (Economic Value Protocol) gold-gram payment protocol. Tracks value through CaesPackets with state machine transitions and conservation invariants.
 
-### Responsibilities
+**Responsibilities**:
+- CaesPacket state machine: Minted, InTransit, Delivered, Settling, Settled, Expired, Refunded, Dissolved
+- Governor: PID controller for fee adjustment, FeeCaps, NetworkMetrics
+- Settlement: AcceptanceCriteria, fee distribution, conservation enforcement
+- Conservation: Input = Output + Fees + Demurrage (circuit breaker, full audit)
+- OracleFeed trait for pluggable gold price feeds
+- STOQ API: 5 handlers wired to real CaesarProtocol
 
-- Asset package types, metadata, and YAML-based specs
+### caesar-sdk
+
+**Crate**: `caesar-sdk/` | **1,039 lines** | **2 tests**
+
+Extracted SDK traits with zero Caesar-internal dependencies:
+- `IngressAdapter` (7 methods), `EgressAdapter` (5 methods)
+- `MeshCreditAdapter` reference implementation
+- Public mocks for SDK consumers
+
+---
+
+## Layer 6 -- engauge (Analytics)
+
+**Crate**: `engauge/` | **5,758 lines** | **135 tests** | **Status**: complete
+
+Engagement analytics and resource marketplace. 10 modules:
+
+- **receipt, metrics, compliance** -- measurement and audit trail
+- **organic_detection** -- distinguish real vs. artificial engagement
+- **throttle, capacity** -- rate limiting and resource management
+- **trending** -- trend detection algorithms
+- **streaming** -- MetricsFrame protocol (4 payloads: Capacity/Congestion/Routing/Economic), differential privacy (Laplace noise)
+- **routing_intel** -- RoutingAdvisor + PathAdvisor traits for tensor weight modification
+- **marketplace** -- ResourcePool, LeaseContract lifecycle, PricingEngine (4 tier multipliers)
+
+Privacy-aware: Anonymous shares nothing, Private shares Capacity+Congestion within federation, Public shares all 4 payloads mesh-wide.
+
+---
+
+## Layer 7 -- Catalog (Registry)
+
+**Crate**: `catalog/` | **27,932 lines** | **52 tests** | **Status**: alpha
+
+Asset package registry. Defines asset specifications and provides discovery. Catalog is a **registry and package manager**, not a marketplace and not an execution environment.
+
+**Responsibilities**:
+- Asset package types, metadata, versioning, dependency resolution
 - Registry operations: publish, install, search
-- Semantic versioning and dependency resolution
+- DHT-based distributed discovery
+- STOQ transport and TrustChain security integration
 - Template generation framework
-- HyperMesh execution delegation (strategy-based placement)
-- Scripting engine (syntax validation only — no local execution)
+- Caesar reward integration (30% publications, 30% refs, 25% validation, 15% maintenance)
 
-### What it does NOT do
-
-- Store or own assets (BlockMatrix)
-- Execute code locally (delegates to HyperMesh nodes)
-- Handle transport, identity, or topology concerns
-
-### Interface
-
-Consumes `TopologyView` from BlockMatrix for discovery routing and TrustChain identity for access control. Exposes `AssetEvent` to Caesar.
+**Does NOT do**: Store or execute assets (BlockMatrix), handle payments (Caesar), act as a marketplace.
 
 ---
 
-## Layer 5 — Caesar (Payment Bridge) [Optional]
+## Layer 8 -- Gateway (Entry Point)
 
-**Crate**: `caesar/` | **5,654 lines** | **4 tests** | **Phase**: planning
+**Crate**: `gateway/` | **7,028 lines** | **155 tests** | **Status**: complete
 
-### What it does
+HTTP/3 + STOQ dual-listener for `trust.hypermesh.online`. 4 operational roles:
 
-Caesar is a payment bridge for paid content hosting and contract execution. It connects external payment systems to the mesh.
+1. **Clearnet Bootstrap**: HTTP/3 at port 8443 for initial STOQ connection info + bootstrap tokens
+2. **Inbound Proxy**: HTTP/3 access to HyperMesh dashboards (resource dashboard, engauge panel)
+3. **Outbound Proxy**: Bridge HyperMesh resources to non-HyperMesh clearnet endpoints
+4. **Inter-Network**: STOQ-to-STOQ bridge between federated/private/public networks
 
-### Responsibilities
-
-- Token economics and wallet management
-- Transaction processing and staking
-- Exchange rate engine
-- Cross-chain bridge types (8 networks: BTC, ETH, SOL, etc.)
-- Reward calculation framework
-
-### Why it's optional
-
-Caesar has **zero dependency** from the core protocol. Removing it changes nothing about STOQ, TrustChain, BlockMatrix, or Catalog. It exists solely for assets that require payment.
+Features: TLS (File/TrustChain/SelfSigned), PoS authentication, cross-scope routing (Device to Network), federation bridge, rate limiting (token bucket), load balancing (4 strategies), multi-domain SNI routing.
 
 ---
 
-## Layer 6 — NGauge (Observability) [Planned]
+## Layer 9 -- UI (Dashboard)
 
-Not yet implemented. Will provide unified metrics, distributed tracing, health monitoring, and alerting across all layers.
+**Crate**: `ui/` | **43,270 lines** | **11 tests**
 
----
-
-## Supporting Crates
-
-### hypermesh-lib (Shared Types)
-
-**Crate**: `lib/` | **235 lines** | **Phase**: alpha
-
-The single source of truth for canonical types shared across all crates:
-- `NodeId`, `AssetId` — identity newtypes
-- `NetworkPrivacyTier` — Anonymous | P2P | Federated | Public
-- `BlockchainScope` — Device | Network
-- `ProofType` — PoSpace | PoStake | PoWork | PoTime
-- `MatrixPosition`, `MatrixCoordinate` — topology primitives
-- `PipelineStage`, `CryptoAlgorithm`, `HypermeshError`
-
-All 7 other crates depend on hypermesh-lib. No circular dependencies.
-
-### hypermesh-ebpf (Kernel Integration)
-
-**Crate**: `hypermesh-ebpf/` | **1,904 lines** | **19 tests** | **Phase**: alpha
-
-Userspace eBPF validation framework consumed by STOQ:
-- PoS header parsing and asset hash verification (BLAKE3)
-- Matrix routing path validation
-- Policy map management
-- XDP program loading via `aya` (feature-gated)
-
-### Gateway (HTTP/3 Entry Point)
-
-**Crate**: `gateway/` | **1,438 lines** | **Phase**: planning
-
-HTTP/3 gateway for `trust.hypermesh.online` and federated entry points:
-- QUIC/HTTP3 server setup (quinn + h3)
-- Router with path-based backend selection
-- Circuit breaker and retry logic
+Svelte-based dashboard for node management, asset browsing, and network visualization.
 
 ---
 
-## Cross-Layer Interfaces
+## Cryptography
 
-| Boundary | Interface | Data Exchanged |
-|---|---|---|
-| OS to STOQ | eBPF program hooks | Raw packets, flow metadata |
-| STOQ to TrustChain | `TransportStream` | Authenticated byte streams |
-| TrustChain to BlockMatrix | `TrustedChannel` | Identity-tagged, privacy-classified channels |
-| BlockMatrix to Catalog | `TopologyView` | Coordinate positions, tensor-weighted paths |
-| Catalog to Caesar | `AssetEvent` | Asset allocation and release events |
-| All to NGauge | `MetricEmitter` | Counters, histograms, trace spans |
+| Purpose | Algorithm |
+|---------|-----------|
+| Protocol signing (TrustChain CA, STOQ handshake) | FALCON-1024 |
+| Asset encryption (whole-blob before sharding) | Kyber-1024 (KEM then AES-256-GCM) |
+| Content hashing (all content, blockchain, verification) | BLAKE3 |
+| X.509 certificate fingerprints, OCI digests | SHA-256 (industry standard) |
 
-## Key Architectural Concepts
+---
 
-### Proof of State (Four-Proof Consensus)
+## Privacy Independence
 
-Every asset requires ALL FOUR proofs:
-- **PoSpace (WHERE)**: Storage location and physical/network position
-- **PoStake (WHO)**: Ownership, access rights, economic stake
-- **PoWork (WHAT/HOW)**: Computational resources and processing
-- **PoTime (WHEN)**: Temporal ordering and timestamp validation
+`PrivacyMode` (transport layer) and `BlockchainScope` (consensus layer) are independent dimensions:
 
-This is bilateral verification, not global consensus. The mesh scales without consensus bottlenecks.
-
-### Privacy Independence
-
-Network privacy tiers (transport) and blockchain scopes (consensus) are independent dimensions:
+- **PrivacyMode**: `ANONYMOUS` (unbounded, untracked) | `PRIVATE` (bounded, tracked) | `PUBLIC` (unbounded, tracked)
+- **BlockchainScope**: `Device` (local-only, always running) | `Network` (synchronized via reflector)
 
 | | Anonymous Transport | Private Transport | Public Transport |
 |---|---|---|---|
 | **Device Scope** | Local chain, untraceable | Local chain, group-visible | Local chain, fully visible |
 | **Network Scope** | Synced state, untraceable | Synced state, group-visible | Synced state, fully visible |
 
-### Instruction-Based Retrieval
+Any combination is valid. They are configured independently.
+
+---
+
+## Proof of State (Four-Proof Consensus)
+
+Every asset requires ALL FOUR proofs -- this is binary authentication (authentic or not), not trust scoring:
+
+- **PoSpace (WHERE)**: Storage location and physical/network position
+- **PoStake (WHO)**: Ownership, access rights, economic stake
+- **PoWork (WHAT/HOW)**: Computational resources and processing
+- **PoTime (WHEN)**: Temporal ordering and timestamp validation
+
+Combined into a unified Consensus Proof answering WHERE/WHO/WHAT/WHEN. Bilateral verification, not global consensus.
+
+---
+
+## Instruction-Based Retrieval
 
 Traditional: Send raw data to receiver.
-BlockMatrix: Send shard map instructions. Receiver queries matrix positions, fetches shards from nearest nodes, reconstructs locally.
+BlockMatrix: Send shard map instructions (~748 bytes). Receiver queries matrix positions, fetches shards from nearest nodes, reconstructs locally. This gives bandwidth efficiency, distributed load, resilience, and deduplication.
 
-### Every Node = Own Blockchain
+---
 
-Each node's blockchain starts immediately on boot with a unique genesis block. No network connectivity required. Network participation is optional — a node is fully functional for local operations from the moment of creation.
+## Deployment Model
+
+Each HyperMesh node runs as a **systemd service** on the host OS. No Docker, no Kubernetes, no cloud orchestration.
+
+- Device blockchain starts on boot (no network required)
+- Network blockchains joined after connectivity is established
+- Each node is its own DNS provider before network registration
+
+---
 
 ## Crate Dependency Graph
 
 ```
-hypermesh-lib (canonical types)
+hypermesh-lib (canonical types, 9 dependents)
+    |
+    +-- hypermesh-ebpf (kernel validation)
     |
     +-- stoq (transport)
     |     |
-    |     +-- hypermesh-ebpf (kernel validation)
+    |     +-- hypermesh-ebpf
+    |     +-- engauge (optional, feature-gated)
     |
     +-- trustchain (identity)
     |     |
@@ -306,14 +332,22 @@ hypermesh-lib (canonical types)
     +-- catalog (registry)
     |     |
     |     +-- blockmatrix
-    |     +-- trustchain
+    |     +-- stoq
+    |     +-- caesar
     |
     +-- caesar (payments)
     |     |
-    |     +-- blockmatrix
+    |     +-- stoq
+    |     +-- caesar-sdk
+    |     +-- engauge (optional, feature-gated)
     |
-    +-- gateway (HTTP/3 entry)
+    +-- caesar-sdk (SDK traits)
+    |
+    +-- engauge (analytics)
+    |
+    +-- gateway (HTTP/3 + STOQ entry)
           |
-          +-- trustchain
           +-- stoq
 ```
+
+All arrows point upward from hypermesh-lib. No circular dependencies.

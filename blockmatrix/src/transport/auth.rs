@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 use tokio::time::{Instant, Duration};
 use tracing::debug;
-use sha2::{Sha256, Digest};
+use blake3;
 // X509 parsing removed for MVP simplicity
 
 use super::config::AuthenticationConfig;
@@ -108,19 +108,17 @@ impl NodeAuthenticator {
 
     /// Generate a fingerprint for a node ID
     fn generate_fingerprint(&self, node_id: &str) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(node_id.as_bytes());
         hasher.update(b"hypermesh-transport");
         let hash = hasher.finalize();
-        format!("{:x}", hash)
+        hex::encode(hash.as_bytes())
     }
 
     /// Validate a certificate (placeholder for future implementation)
     pub async fn validate_certificate(&self, cert_data: &[u8]) -> Result<CertificateValidation> {
         // For MVP, generate a mock validation result
-        let mut hasher = Sha256::new();
-        hasher.update(cert_data);
-        let fingerprint = format!("{:x}", hasher.finalize());
+        let fingerprint = hex::encode(blake3::hash(cert_data).as_bytes());
 
         Ok(CertificateValidation {
             is_valid: true,

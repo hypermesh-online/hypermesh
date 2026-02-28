@@ -39,14 +39,12 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     async fn create_test_storage_request() -> AssetAllocationRequest {
-        use sha2::{Sha256, Digest};
-
         // Create TimeProof with valid hash
         let network_time_offset = Duration::from_secs(10);
         let time_verification_timestamp = SystemTime::now();
         let nonce = 42u64;
 
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&network_time_offset.as_micros().to_le_bytes());
         let timestamp_micros = time_verification_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -54,7 +52,7 @@ mod tests {
             .unwrap_or(0);
         hasher.update(&timestamp_micros.to_le_bytes());
         hasher.update(&nonce.to_le_bytes());
-        let proof_hash = hasher.finalize().to_vec();
+        let proof_hash = hasher.finalize().as_bytes().to_vec();
 
         AssetAllocationRequest {
             asset_type: AssetType::Storage,

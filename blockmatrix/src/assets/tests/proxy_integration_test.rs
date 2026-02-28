@@ -134,7 +134,7 @@ async fn test_trust_chain_integration() {
             bandwidth_mbps: 1000,
             protocols: vec!["HTTP".to_string(), "SOCKS5".to_string()],
         },
-        trust_score: 0.8,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "test-cert-fingerprint".to_string(),
     };
@@ -211,7 +211,7 @@ async fn test_proxy_routing_system() {
             bandwidth_mbps: 1000,
             protocols: vec!["HTTP".to_string(), "SOCKS5".to_string()],
         },
-        trust_score: 0.9,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "router-cert-fingerprint".to_string(),
     };
@@ -312,7 +312,7 @@ async fn test_complete_proxy_manager_workflow() {
             bandwidth_mbps: 5000,
             protocols: vec!["HTTP".to_string(), "SOCKS5".to_string(), "VPN".to_string()],
         },
-        trust_score: 0.95,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "integration-cert-abc123".to_string(),
     };

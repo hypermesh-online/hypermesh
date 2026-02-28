@@ -418,8 +418,10 @@ impl TrustChain {
 mod tests {
     use super::*;
     use consensus::ConsensusProof;
+    use serial_test::serial;
 
     #[tokio::test]
+    #[serial]
     async fn test_trustchain_security_initialization() {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
@@ -428,6 +430,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_secure_certificate_issuance() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
@@ -447,6 +450,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_security_dashboard() {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
         
@@ -458,6 +462,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_consensus_validation() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.unwrap();
 

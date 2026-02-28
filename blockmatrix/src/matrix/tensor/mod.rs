@@ -19,20 +19,14 @@
 //! # Example
 //!
 //! ```
-//! use blockmatrix::matrix::tensor::{Vector3D, calculate_routing_vector, PathFinder};
+//! use blockmatrix::matrix::tensor::{Vector3D, calculate_routing_vector};
 //! use blockmatrix::matrix::MatrixCoordinate;
 //!
 //! // Calculate routing direction
-//! let source = MatrixCoordinate::new(0, 0, 0)?;
-//! let dest = MatrixCoordinate::new(100, 50, 25)?;
+//! let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+//! let dest = MatrixCoordinate::new(100, 50, 25).expect("test: valid coord");
 //! let direction = calculate_routing_vector(&source, &dest);
-//!
-//! // Find optimal path
-//! let finder = PathFinder::new();
-//! let path = finder.find_path(&source, &dest, |coord| {
-//!     // Return valid neighbors for coordinate
-//!     vec![]
-//! })?;
+//! assert!(direction.magnitude() > 0.0);
 //! ```
 
 pub mod vector;

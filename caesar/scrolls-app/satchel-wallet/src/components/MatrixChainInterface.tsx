@@ -157,11 +157,8 @@ const MatrixChainInterface: React.FC = () => {
     }
   };
 
-  const formatTrustScore = (score: number): string => {
-    const percentage = Math.round(score * 100);
-    const color = percentage >= 90 ? 'text-green-600' : 
-                  percentage >= 80 ? 'text-yellow-600' : 'text-red-600';
-    return `${percentage}%`;
+  const formatAuthStatus = (isAuthenticated: boolean): string => {
+    return isAuthenticated ? 'Authenticated' : 'Not Authenticated';
   };
 
   const formatConsensusProof = (proof: ConsensusProof): string => {
@@ -229,10 +226,9 @@ const MatrixChainInterface: React.FC = () => {
                       <span className="font-medium text-gray-900">{entity.domain}</span>
                     </div>
                     <span className={`text-sm font-medium ${
-                      entity.trust_score >= 0.9 ? 'text-green-600' : 
-                      entity.trust_score >= 0.8 ? 'text-yellow-600' : 'text-red-600'
+                      entity.is_authenticated ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatTrustScore(entity.trust_score)}
+                      {formatAuthStatus(entity.is_authenticated)}
                     </span>
                   </div>
                   

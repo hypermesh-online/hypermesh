@@ -116,6 +116,7 @@ criterion = { workspace = true }
 proptest = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = { workspace = true }
+serial_test = "3"
 
 [features]
 default = ["ca", "ct", "dns", "consensus", "localhost-testing"]

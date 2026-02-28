@@ -22,6 +22,8 @@ items = [
     "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
     "Caesar contribution reward integration (CatalogRewardAdapter, ContributionTracker)",
     "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
+    "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
+    "BLAKE3 content hashing (whitepaper-aligned)",
 ]
 
 [features.in_development]

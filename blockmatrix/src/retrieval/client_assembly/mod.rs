@@ -356,15 +356,7 @@ mod tests {
         let mut shard_map = CompleteShardMap::new();
 
         for (i, shard) in processed.shards.iter().enumerate() {
-            let shard_hash = {
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(&shard.data);
-                let result = hasher.finalize();
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&result);
-                hash
-            };
+            let shard_hash = *blake3::hash(&shard.data).as_bytes();
             let position = MatrixCoordinate::new(i as i64, 0, 0)
                 .expect("test: create coordinate");
             let location = ShardLocation::new(position, 1.0);

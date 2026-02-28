@@ -50,8 +50,8 @@ pub struct ProxyRoute {
     /// Route type
     pub route_type: RouteType,
     
-    /// Trust level required
-    pub min_trust_level: f32,
+    /// Whether this route requires authenticated nodes
+    pub requires_authentication: bool,
     
     /// Privacy level compatibility
     pub privacy_level: PrivacyMode,
@@ -151,22 +151,19 @@ impl Default for RouteMetrics {
 pub struct RoutingConfig {
     /// Maximum route cost to consider
     pub max_route_cost: u32,
-    
-    /// Minimum trust score for routing
-    pub min_trust_score: f32,
-    
+
+    /// Whether authentication is required for routing
+    pub require_authentication: bool,
+
     /// Load balancing algorithm
     pub load_balance_algorithm: LoadBalanceAlgorithm,
-    
+
     /// Route refresh interval
     pub route_refresh_interval: Duration,
-    
+
     /// Maximum hops allowed
     pub max_hops: u8,
-    
-    /// Enable trust-based routing
-    pub trust_based_routing: bool,
-    
+
     /// Enable performance-based routing
     pub performance_based_routing: bool,
 }
@@ -186,9 +183,6 @@ pub enum LoadBalanceAlgorithm {
     /// Least latency
     LeastLatency,
     
-    /// Trust score based
-    TrustBased,
-    
     /// Performance based
     PerformanceBased,
 }
@@ -197,11 +191,10 @@ impl Default for RoutingConfig {
     fn default() -> Self {
         Self {
             max_route_cost: 100,
-            min_trust_score: 0.5,
+            require_authentication: true,
             load_balance_algorithm: LoadBalanceAlgorithm::PerformanceBased,
             route_refresh_interval: Duration::from_secs(300), // 5 minutes
             max_hops: 3,
-            trust_based_routing: true,
             performance_based_routing: true,
         }
     }
@@ -245,18 +238,18 @@ pub struct PerformanceRequirements {
     pub max_load: f64,
 }
 
-/// Trust requirements for routing
+/// Trust requirements for routing (binary authentication)
 #[derive(Clone, Debug)]
 pub struct TrustRequirements {
-    /// Minimum trust score
-    pub min_trust_score: f32,
-    
+    /// Whether authentication is required
+    pub require_authentication: bool,
+
     /// Required certificate validation
     pub require_certificate_validation: bool,
-    
+
     /// Require quantum security
     pub require_quantum_security: bool,
-    
+
     /// Maximum trust chain length
     pub max_trust_chain_length: u8,
 }
@@ -341,8 +334,8 @@ impl ProxyRouter {
                 continue;
             }
             
-            // Check trust level
-            if route.min_trust_level < request.trust_requirements.min_trust_score {
+            // Check authentication requirement
+            if request.trust_requirements.require_authentication && !route.requires_authentication {
                 continue;
             }
             
@@ -370,7 +363,7 @@ impl ProxyRouter {
             
             // Check node availability
             if let Some(node_info) = registry.get(&route.next_hop) {
-                if node_info.trust_score < request.trust_requirements.min_trust_score {
+                if !node_info.is_authenticated {
                     continue;
                 }
             }
@@ -393,9 +386,6 @@ impl ProxyRouter {
         match self.config.load_balance_algorithm {
             LoadBalanceAlgorithm::PerformanceBased => {
                 self.select_performance_based_route(routes, &metrics).await
-            },
-            LoadBalanceAlgorithm::TrustBased => {
-                self.select_trust_based_route(routes, &registry).await
             },
             LoadBalanceAlgorithm::LeastLatency => {
                 self.select_least_latency_route(routes, &metrics).await
@@ -446,29 +436,6 @@ impl ProxyRouter {
         })
     }
     
-    /// Select route based on trust scores
-    async fn select_trust_based_route(
-        &self,
-        routes: &[ProxyRoute],
-        registry: &HashMap<String, ProxyNodeInfo>,
-    ) -> AssetResult<ProxyRoute> {
-        let mut best_route = None;
-        let mut best_trust_score = 0.0;
-        
-        for route in routes {
-            if let Some(node_info) = registry.get(&route.next_hop) {
-                if node_info.trust_score > best_trust_score {
-                    best_trust_score = node_info.trust_score;
-                    best_route = Some(route.clone());
-                }
-            }
-        }
-        
-        best_route.ok_or_else(|| AssetError::AdapterError {
-            message: "No route found with trust information".to_string()
-        })
-    }
-    
     /// Select route with least latency
     async fn select_least_latency_route(
         &self,
@@ -508,9 +475,11 @@ impl ProxyRouter {
             // Route cost (lower is better)
             weight += (100.0 - route.cost as f64) / 100.0 * 0.2;
             
-            // Trust score
+            // Authentication status (binary: 0.3 if authenticated, 0.0 if not)
             if let Some(node_info) = registry.get(&route.next_hop) {
-                weight += node_info.trust_score as f64 * 0.3;
+                if node_info.is_authenticated {
+                    weight += 0.3;
+                }
             }
             
             // Performance metrics
@@ -619,7 +588,7 @@ mod tests {
         ProxyRouter::new().await.unwrap()
     }
     
-    fn create_test_node_info(node_id: &str, trust_score: f32) -> ProxyNodeInfo {
+    fn create_test_node_info(node_id: &str, authenticated: bool) -> ProxyNodeInfo {
         // Convert string to [u8; 8] for node_id
         let mut node_id_bytes = [0u8; 8];
         let bytes = node_id.as_bytes();
@@ -638,7 +607,7 @@ mod tests {
                 bandwidth_mbps: 1000,
                 protocols: vec!["HTTP".to_string(), "SOCKS5".to_string()],
             },
-            trust_score,
+            is_authenticated: authenticated,
             last_heartbeat: SystemTime::now(),
             certificate_fingerprint: format!("{}-cert", node_id),
         }
@@ -653,13 +622,13 @@ mod tests {
     #[tokio::test]
     async fn test_add_proxy_node() {
         let router = create_test_router().await;
-        let node_info = create_test_node_info("test-node-1", 0.8);
-        
+        let node_info = create_test_node_info("test-node-1", true);
+
         router.add_proxy_node(&node_info).await.unwrap();
-        
+
         let registry = router.node_registry.read().await;
         assert!(registry.contains_key("test-node-1"));
-        assert_eq!(registry["test-node-1"].trust_score, 0.8);
+        assert!(registry["test-node-1"].is_authenticated);
     }
     
     #[tokio::test]

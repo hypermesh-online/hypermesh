@@ -31,7 +31,7 @@ fn create_test_node(id: u8) -> NodeId {
         id: [id; 32],
         ipv6_address: format!("2001:db8::{}",id).parse().unwrap(),
         public_key: vec![id; 64],
-        trust_score: 0.95,
+        is_authenticated: true,
     }
 }
 

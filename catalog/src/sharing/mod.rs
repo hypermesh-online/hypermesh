@@ -114,8 +114,8 @@ pub struct PeerInfo {
     pub storage_capacity: u64,
     /// Peer's bandwidth capacity
     pub bandwidth_capacity: u64,
-    /// Peer's reputation score
-    pub reputation: f64,
+    /// Peer's trust weight (bandwidth/availability metric, not reputation)
+    pub trust_weight: f64,
     /// Last seen timestamp
     pub last_seen: SystemTime,
     /// Geographic location
@@ -554,8 +554,8 @@ impl SharingManager {
             if let Some(peer) = peers.get(node_id) {
                 let mut score = 0.0;
 
-                // Factor 1: Reputation
-                score += peer.reputation * 0.3;
+                // Factor 1: Trust weight
+                score += peer.trust_weight * 0.3;
 
                 // Factor 2: Bandwidth capacity
                 let bandwidth_score = (peer.bandwidth_capacity as f64 / (10 * 1024 * 1024) as f64).min(1.0);

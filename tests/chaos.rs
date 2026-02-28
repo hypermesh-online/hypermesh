@@ -9,7 +9,6 @@ use anyhow::Result;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
-use tokio::sync::RwLock;
 use tokio::time;
 
 /// Test network partition scenarios

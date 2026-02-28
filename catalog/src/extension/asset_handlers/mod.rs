@@ -30,4 +30,4 @@ pub(crate) use blockmatrix::extensions::{
 
 pub(crate) use blockmatrix::assets::core::{AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain};
 pub(crate) use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
-pub(crate) use sha2::Digest;
+// BLAKE3 used via blake3::hash() for domain hashes

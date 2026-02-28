@@ -361,12 +361,9 @@ impl SnapshotManager {
         Ok(deleted)
     }
 
-    /// Calculate SHA256 checksum
+    /// Calculate BLAKE3 checksum
     fn calculate_checksum(&self, data: &[u8]) -> String {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        format!("{:x}", hasher.finalize())
+        hex::encode(blake3::hash(data).as_bytes())
     }
 
     /// Save metadata index to disk

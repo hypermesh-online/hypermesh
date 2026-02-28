@@ -11,7 +11,7 @@ use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
 
 use anyhow::Result;
-use tracing::{info, debug};
+use tracing::info;
 
 use trustchain::ca::{CertificateRequest};
 use trustchain::consensus::{
@@ -234,7 +234,7 @@ async fn test_corrupted_proof() -> Result<()> {
     let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
 
     // Create proof with corrupted/invalid data
-    let mut corrupted_proof = ConsensusProof::new_for_testing();
+    let corrupted_proof = ConsensusProof::new_for_testing();
     // Corrupt the proof data (implementation-specific)
     // For now, we use a valid proof but in production we'd corrupt it
 

@@ -44,12 +44,31 @@ export const crateStatuses: CrateStatus[] = [
         "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)",
         "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
         "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
-        "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)"
+        "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
+        "BLAKE3 content hashing (whitepaper-aligned)",
+        "Capability-based GPU detection (honest fallback, no fake hardware)",
+        "StateAuthenticator trait (renamed from ConsensusValidator)",
+        "Shard commitment (BLAKE3 hash anchoring blocks to spatial shard evidence)",
+        "PoSPing spatial verification (epoch-seeded bilateral probes, scope-gated, binary result)",
+        "IPv6 asset addressing (AssetAddress: fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
+        "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
+        "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)"
       ],
-      "inDevelopment": [],
-      "planned": []
+      "inDevelopment": [
+        "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)"
+      ],
+      "planned": [
+        "Genesis capability assessment — instantiate CPU/GPU/RAM/Storage/Network/Transmission as IPv6-addressed assets with PoS at boot (R1, R10)",
+        "Swarm distribution protocol — announce/discover/serve shards, consumers become providers, O(log N) per-node load (R12)",
+        "Adaptive erasure coding — Reed-Solomon parameters scale with asset size, no post-creation shard splitting (R14)",
+        "Streaming shard reconstruction — reconstruct as shards arrive, not buffer-all-then-reconstruct (R13)",
+        "Shard migration — copy-then-redirect without blocking reads or causing fault intolerance (R14)",
+        "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
+        "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
+        "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)"
+      ]
     },
-    "completion": 100
+    "completion": 78
   },
   {
     "id": "caesar",
@@ -143,7 +162,9 @@ export const crateStatuses: CrateStatus[] = [
         "Asset SDK (clean public API facade)",
         "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
         "Caesar contribution reward integration (CatalogRewardAdapter, ContributionTracker)",
-        "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)"
+        "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
+        "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
+        "BLAKE3 content hashing (whitepaper-aligned)"
       ],
       "inDevelopment": [],
       "planned": []
@@ -173,12 +194,19 @@ export const crateStatuses: CrateStatus[] = [
         "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
         "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
         "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
-        "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)"
+        "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
+        "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)"
       ],
       "inDevelopment": [],
-      "planned": []
+      "planned": [
+        "Swarm analytics — shard popularity tracking, consumer demand patterns, replication demand detection (R12)",
+        "Replication triggers — detect when shard replicas are insufficient for demand, signal BlockMatrix to amplify (R12)",
+        "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
+        "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
+        "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)"
+      ]
     },
-    "completion": 100
+    "completion": 78
   },
   {
     "id": "gateway",
@@ -219,23 +247,24 @@ export const crateStatuses: CrateStatus[] = [
     "description": "Cross-cutting repository-wide milestones and meta-tasks",
     "phase": "alpha",
     "features": {
-      "working": [],
+      "working": [
+        "Refactor / consolidation — removed Docker/Terraform/K8s/CloudFormation (system-level daemon model), fixed CI workflows, workspace lint config",
+        "Documentation 100% correct — all 11 crate READMEs, ARCHITECTURE.md, root README accurate with correct stats, models, and IPv6 coverage",
+        "Benchmarks — Criterion benchmarks for blockmatrix (phase1, retrieval, transfer), stoq (throughput), trustchain (certificates)",
+        "Full development/contributions pipeline — CONTRIBUTING.md, SECURITY.md, CHANGELOG.md, pre-commit hooks, PR workflow documented",
+        "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
+        "Integrations and end-to-end tests — 17 cross-crate integration tests (asset_pipeline, blockchain_scope, privacy_consistency)"
+      ],
       "inDevelopment": [],
       "planned": [
-        "Refactor / consolidation — deduplicate shared patterns, unify error handling, reduce tech debt across all crates",
-        "Integrations and end-to-end tests — cross-crate integration suites, full workflow validation (boot→asset→transfer→settle)",
-        "Benchmarks — standardized performance baselines for STOQ throughput, consensus latency, asset pipeline, and eBPF paths",
         "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
-        "Documentation 100% correct — audit and fix all README, API, and architecture docs to match current implementation",
-        "Full development/contributions pipeline and procedures — contributor guide, PR templates, code review process, issue triage workflow",
         "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
         "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
-        "Bug tracking/reporting — structured issue templates, severity labels, triage SLA, and public bug tracker",
         "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
         "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration"
       ]
     },
-    "completion": 0
+    "completion": 55
   },
   {
     "id": "hypermesh-ebpf",
@@ -285,12 +314,16 @@ export const crateStatuses: CrateStatus[] = [
         "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
         "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
         "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
-        "KeyPairId and AssetMetadata structs"
+        "KeyPairId and AssetMetadata structs",
+        "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)"
       ],
       "inDevelopment": [
         "BlockMatrix/TrustChain migration to canonical asset types"
       ],
       "planned": [
+        "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
+        "Adaptive Reed-Solomon parameters type (R14 — shard count scales with asset size)",
+        "Genesis asset inventory types (R1 — CPU/GPU/RAM/Storage/Network capability structs)",
         "Cross-crate validation helpers",
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
         "Shared serialization formats (canonical binary encoding via postcard/bincode)",
@@ -298,7 +331,7 @@ export const crateStatuses: CrateStatus[] = [
         "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 67
+    "completion": 59
   },
   {
     "id": "stoq",
@@ -322,12 +355,16 @@ export const crateStatuses: CrateStatus[] = [
         "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
         "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
         "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
-        "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads"
+        "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
+        "BLAKE3 content hashing (whitepaper-aligned)"
       ],
       "inDevelopment": [],
-      "planned": []
+      "planned": [
+        "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
+        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)"
+      ]
     },
-    "completion": 100
+    "completion": 89
   },
   {
     "id": "trustchain",
@@ -345,7 +382,9 @@ export const crateStatuses: CrateStatus[] = [
         "DNS resolver with STOQ transport",
         "STOQ-based API server",
         "SecurityIntegratedCA with mandatory consensus and real metrics",
-        "Trust scoring / reputation system with time decay",
+        "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
+        "StateAuthenticator (renamed from ConsensusValidator)",
+        "BLAKE3 consensus content hashing",
         "Certificate rotation scheduler with background task",
         "OCSP responder with FALCON-1024 signed responses",
         "CRL generator and distributor",

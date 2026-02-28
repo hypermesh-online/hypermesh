@@ -52,8 +52,11 @@ impl Vector3D {
     ///
     /// # Example
     /// ```
-    /// let from = MatrixCoordinate::new(0, 0, 0)?;
-    /// let to = MatrixCoordinate::new(10, 5, 2)?;
+    /// use blockmatrix::matrix::tensor::Vector3D;
+    /// use blockmatrix::matrix::MatrixCoordinate;
+    ///
+    /// let from = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+    /// let to = MatrixCoordinate::new(10, 5, 2).expect("test: valid coord");
     /// let direction = Vector3D::from_coordinates(&from, &to);
     /// assert_eq!(direction.x, 10.0);
     /// ```

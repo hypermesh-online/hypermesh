@@ -6,17 +6,14 @@
 // Validates quantum-resistant crypto, certificate validation, and attack resilience
 
 use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
-use stoq::transport::falcon::{FalconEngine, FalconVariant};
 use stoq::transport::certificates::{CertificateManager, CertificateConfig, CertificateMode};
 use std::net::Ipv6Addr;
 use std::sync::Arc;
 use tokio::time::{Duration, timeout};
-use bytes::Bytes;
 
 // Import FALCON crypto traits if needed for signing
 #[cfg(feature = "quantum-resistant")]
 use pqcrypto_falcon::falcon1024;
-use pqcrypto_traits::sign::{PublicKey, SecretKey};
 
 mod quantum_crypto_tests {
     use super::*;

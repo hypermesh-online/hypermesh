@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use blake3;
 
 use super::{AssetRegistration, AssetResult, AssetError};
 pub use crate::assets::proxy::ProxyNetworkConfig;
@@ -65,16 +65,13 @@ impl ProxyAddress {
     
     /// Generate FALCON-1024 signed access token
     fn generate_access_token(network_id: &[u8; 16], node_id: &[u8; 8], asset_port: u16) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(network_id);
         hasher.update(node_id);
         hasher.update(&asset_port.to_le_bytes());
         hasher.update(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_le_bytes());
-        
-        let result = hasher.finalize();
-        let mut token = [0u8; 32];
-        token.copy_from_slice(&result);
-        token
+
+        *hasher.finalize().as_bytes()
     }
     
     /// Convert to IPv6 socket address representation
@@ -218,8 +215,8 @@ pub struct ProxyNodeInfo {
     pub network_address: String,
     /// Node capabilities
     pub capabilities: ProxyCapabilities,
-    /// Trust score (0.0 - 1.0)
-    pub trust_score: f32,
+    /// Whether this node is authenticated (binary pass/fail)
+    pub is_authenticated: bool,
     /// Last heartbeat timestamp
     pub last_heartbeat: SystemTime,
     /// Certificate fingerprint for TrustChain integration
@@ -310,35 +307,30 @@ impl ProxyAddressResolver {
         nodes.insert(node_info.node_id, node_info);
     }
     
-    /// Update proxy node trust score
-    pub async fn update_trust_score(&self, node_id: &[u8; 8], trust_score: f32) {
+    /// Update proxy node authentication status
+    pub async fn update_authentication(&self, node_id: &[u8; 8], authenticated: bool) {
         let mut nodes = self.proxy_nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
-            node.trust_score = trust_score;
+            node.is_authenticated = authenticated;
         }
     }
-    
-    /// Select best proxy node based on trust and capabilities
+
+    /// Select best proxy node based on authentication and capabilities
     async fn select_best_proxy_node(&self) -> AssetResult<ProxyNodeInfo> {
         let nodes = self.proxy_nodes.read().await;
-        
+
         let best_node = nodes
             .values()
-            .filter(|node| node.trust_score >= self.network_config.min_trust_score)
+            .filter(|node| node.is_authenticated)
             .max_by(|a, b| {
-                // Primary: trust score
-                // Secondary: bandwidth capacity
-                // Tertiary: max connections
-                a.trust_score.partial_cmp(&b.trust_score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| {
-                        a.capabilities.bandwidth_mbps.cmp(&b.capabilities.bandwidth_mbps)
-                    })
+                // Primary: bandwidth capacity
+                // Secondary: max connections
+                a.capabilities.bandwidth_mbps.cmp(&b.capabilities.bandwidth_mbps)
                     .then_with(|| {
                         a.capabilities.max_connections.cmp(&b.capabilities.max_connections)
                     })
             });
-        
+
         best_node.cloned().ok_or_else(|| AssetError::AdapterError {
             message: "No suitable proxy node available".to_string()
         })
@@ -380,9 +372,9 @@ impl ProxyAddressResolver {
         ProxyStatistics {
             total_mappings: forward.len(),
             total_proxy_nodes: nodes.len(),
-            average_trust_score: nodes.values()
-                .map(|node| node.trust_score)
-                .sum::<f32>() / nodes.len() as f32,
+            authenticated_nodes: nodes.values()
+                .filter(|node| node.is_authenticated)
+                .count(),
             active_nodes: nodes.values()
                 .filter(|node| {
                     SystemTime::now().duration_since(node.last_heartbeat).unwrap_or_default().as_secs() < 300
@@ -406,8 +398,8 @@ pub struct ProxyStatistics {
     pub total_mappings: usize,
     /// Total number of registered proxy nodes
     pub total_proxy_nodes: usize,
-    /// Average trust score across all nodes
-    pub average_trust_score: f32,
+    /// Number of authenticated proxy nodes
+    pub authenticated_nodes: usize,
     /// Number of active proxy nodes
     pub active_nodes: usize,
 }

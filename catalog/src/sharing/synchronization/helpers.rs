@@ -5,7 +5,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use sha2::{Sha256, Digest};
+// BLAKE3 used for sync hashing
 use chrono::{DateTime, Utc};
 
 use crate::{AssetPackage, AssetMetadata};
@@ -61,17 +61,17 @@ impl super::SyncManager {
     }
 
     pub(super) fn hash_package(&self, package: &AssetPackage) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(package.id().to_string().as_bytes());
         hasher.update(package.metadata().version.as_bytes());
-        format!("{:x}", hasher.finalize())
+        hasher.finalize().to_hex().to_string()
     }
 
     pub(super) fn hash_pair(&self, left: &str, right: &str) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(left.as_bytes());
         hasher.update(right.as_bytes());
-        format!("{:x}", hasher.finalize())
+        hasher.finalize().to_hex().to_string()
     }
 
     pub(super) fn calculate_merkle_root(&self, tree: &HashMap<String, MerkleNode>) -> String {

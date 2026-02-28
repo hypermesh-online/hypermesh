@@ -8,13 +8,13 @@
 //! with real, reproducible measurements. No hardcoded values - only measured reality.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use stoq::{StoqBuilder, StoqConfig, transport::{StoqTransport, TransportConfig, Endpoint, Connection}};
+use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use tokio::runtime::Runtime;
 use std::time::{Instant, Duration};
 use std::net::Ipv6Addr;
 use bytes::Bytes;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Semaphore;
 
 /// Initialize crypto provider for Rustls
@@ -31,12 +31,12 @@ fn benchmark_real_throughput(c: &mut Criterion) {
 
     // Test various data sizes to understand performance characteristics
     for size_mb in [1, 10, 100, 500].iter() {
-        let size_bytes = size_mb * 1024 * 1024;
-        group.throughput(Throughput::Bytes(*size_bytes as u64));
+        let size_bytes: usize = size_mb * 1024 * 1024;
+        group.throughput(Throughput::Bytes(size_bytes as u64));
 
         group.bench_with_input(
             BenchmarkId::new("actual_transfer", format!("{}MB", size_mb)),
-            size_bytes,
+            &size_bytes,
             |b, &size| {
                 b.to_async(&rt).iter(|| async move {
                     // Setup real server
@@ -105,7 +105,7 @@ fn benchmark_real_throughput(c: &mut Criterion) {
 
                     let mut stream = conn.open_stream().await.unwrap();
                     stream.send(&test_data).await.unwrap();
-                    stream.finish().await.unwrap();
+                    drop(stream);
 
                     let duration = start.elapsed();
 
@@ -239,7 +239,7 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
                     let server_config = TransportConfig {
                         bind_address: Ipv6Addr::LOCALHOST,
                         port: server_port,
-                        max_concurrent_streams: *num as u32 * 2,
+                        max_concurrent_streams: num as u32 * 2,
                         ..Default::default()
                     };
 
@@ -273,7 +273,7 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
                     let client_config = TransportConfig {
                         bind_address: Ipv6Addr::LOCALHOST,
                         port: 0,
-                        connection_pool_size: *num,
+                        connection_pool_size: num,
                         ..Default::default()
                     };
 
@@ -285,7 +285,7 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
                     let semaphore = Arc::new(Semaphore::new(50)); // Limit concurrent attempts
 
                     let mut handles = Vec::new();
-                    for _ in 0..*num {
+                    for _ in 0..num {
                         let client_clone = client.clone();
                         let endpoint_clone = endpoint.clone();
                         let sem = semaphore.clone();
@@ -315,7 +315,7 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
                     }
 
                     let total_duration = start.elapsed();
-                    let connections_per_sec = *num as f64 / total_duration.as_secs_f64();
+                    let connections_per_sec = num as f64 / total_duration.as_secs_f64();
 
                     // Cleanup
                     shutdown.store(true, Ordering::Relaxed);

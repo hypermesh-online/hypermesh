@@ -10,11 +10,10 @@ mod common;
 
 use catalog::security::{
     SecurityManager, SecurityConfig, TrustLevel,
-    PackageSigner, SignatureVerifier, PublisherReputation,
-    PolicyEngine, TrustPolicy
+    PolicyEngine
 };
 use catalog::assets::AssetPackage;
-use catalog::distribution::{P2PDistribution, DistributionConfig};
+use catalog::distribution::DistributionConfig;
 
 use anyhow::Result;
 use tokio;
@@ -52,7 +51,7 @@ async fn test_package_signing_and_verification() -> Result<()> {
     };
 
     let security_manager = SecurityManager::new(config).await?;
-    let mut package = create_test_package("test-signed-package");
+    let package = create_test_package("test-signed-package");
 
     // In a real scenario, we would:
     // 1. Get a certificate from TrustChain
@@ -69,7 +68,7 @@ async fn test_package_signing_and_verification() -> Result<()> {
 
 #[tokio::test]
 async fn test_trust_policies() -> Result<()> {
-    let mut engine = PolicyEngine::new(TrustLevel::Strict);
+    let engine = PolicyEngine::new(TrustLevel::Strict);
 
     // Test that strict policy is available
     let policies = engine.list_policies().await;
@@ -91,24 +90,21 @@ async fn test_trust_policies() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_reputation_system() -> Result<()> {
-    use catalog::security::ReputationSystem;
+async fn test_binary_publisher_authentication() -> Result<()> {
+    use catalog::security::PublisherAuthenticator;
 
-    let reputation_system = ReputationSystem::new().await?;
+    let authenticator = PublisherAuthenticator::new();
 
-    // Test initial reputation
-    let initial_score = reputation_system.get_publisher_score("new-publisher").await?;
-    assert_eq!(initial_score, 0.5); // Default initial score
+    // Non-revoked publisher is authenticated
+    let result = authenticator.verify("new-publisher-fp").await?;
+    assert!(result.authenticated);
+    assert!(result.certificate_valid);
 
-    // Record successful install
-    reputation_system.update_reputation("test-publisher", true, Some(5)).await?;
-    let score = reputation_system.get_publisher_score("test-publisher").await?;
-    assert!(score > 0.5);
-
-    // Record failed install
-    reputation_system.update_reputation("test-publisher", false, Some(2)).await?;
-    let new_score = reputation_system.get_publisher_score("test-publisher").await?;
-    assert!(new_score < score);
+    // Revoked publisher is not authenticated
+    authenticator.revoke("bad-fp", "compromised").await;
+    let result = authenticator.verify("bad-fp").await?;
+    assert!(!result.authenticated);
+    assert!(!result.certificate_valid);
 
     Ok(())
 }
@@ -133,7 +129,7 @@ async fn test_distribution_with_security() -> Result<()> {
 
 #[tokio::test]
 async fn test_certificate_validation_flow() -> Result<()> {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::TrustChainConfig;
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -160,7 +156,7 @@ async fn test_security_policy_evaluation() -> Result<()> {
         signature_valid: false,
         certificate_valid: false,
         publisher: None,
-        reputation_score: Some(0.3),
+        publisher_authenticated: false,
         policy_result: PolicyResult {
             allowed: false,
             trust_level: TrustLevel::Moderate,

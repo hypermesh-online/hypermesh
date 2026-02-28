@@ -232,7 +232,7 @@ impl HyperMeshExtension for CatalogExtension {
             version: 1,
             metadata: self.metadata.clone(),
             state_data: state_data.to_string().into_bytes(),
-            checksum: "sha256_checksum_here".to_string(),
+            checksum: "blake3_checksum_here".to_string(),
             exported_at: std::time::SystemTime::now(),
         })
     }

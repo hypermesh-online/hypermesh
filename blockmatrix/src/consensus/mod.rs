@@ -149,32 +149,32 @@ impl Default for ConsensusConfig {
 // Real validation service implementation using TrustChain's Proof of State
 pub mod validation_service {
     use super::*;
-    use crate::consensus::validation::{ConsensusValidator, DefaultConsensusValidator};
+    use crate::consensus::validation::{StateAuthenticator, DefaultStateAuthenticator};
     use std::sync::Arc;
 
     pub struct ValidationService {
-        validator: Arc<dyn ConsensusValidator>,
+        validator: Arc<dyn StateAuthenticator>,
         requirements: ConsensusRequirements,
     }
 
     impl ValidationService {
         pub fn new() -> Self {
             Self {
-                validator: Arc::new(DefaultConsensusValidator::new()),
+                validator: Arc::new(DefaultStateAuthenticator::new()),
                 requirements: ConsensusRequirements::default(),
             }
         }
 
         pub fn with_requirements(requirements: ConsensusRequirements) -> Self {
             Self {
-                validator: Arc::new(DefaultConsensusValidator::with_requirements(requirements.clone())),
+                validator: Arc::new(DefaultStateAuthenticator::with_requirements(requirements.clone())),
                 requirements,
             }
         }
 
         pub fn for_production() -> Self {
             Self {
-                validator: Arc::new(DefaultConsensusValidator::with_requirements(ConsensusRequirements::production())),
+                validator: Arc::new(DefaultStateAuthenticator::with_requirements(ConsensusRequirements::production())),
                 requirements: ConsensusRequirements::production(),
             }
         }

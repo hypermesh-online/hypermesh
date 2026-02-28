@@ -245,7 +245,7 @@ pub enum DependencySource {
     Registry { registry: String, namespace: Option<String> },
     Git { url: String, reference: String, path: Option<String> },
     Local { path: String },
-    Http { url: String, sha256: String },
+    Http { url: String, blake3_hash: String },
 }
 
 /// Resolved asset content with all files loaded

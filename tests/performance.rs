@@ -5,19 +5,19 @@
 // Performance Testing Module
 // Benchmarks and performance validation for all components
 
-use anyhow::Result;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::time;
 
 /// Performance targets based on documented requirements
+#[allow(dead_code)]
 pub struct PerformanceTargets {
-    pub stoq_throughput_gbps: f64,      // 2.95 Gbps current, 40 Gbps target
-    pub trustchain_ops_ms: f64,         // 35ms current (143x target)
-    pub catalog_ops_ms: f64,            // 1.69ms current (500x target)
-    pub consensus_latency_ms: f64,      // Target: <100ms
-    pub memory_usage_mb: f64,           // Target: <500MB per component
-    pub connection_capacity: usize,     // Target: 10,000+ concurrent
+    pub stoq_throughput_gbps: f64,
+    pub trustchain_ops_ms: f64,
+    pub catalog_ops_ms: f64,
+    pub consensus_latency_ms: f64,
+    pub memory_usage_mb: f64,
+    pub connection_capacity: usize,
 }
 
 impl Default for PerformanceTargets {
@@ -238,7 +238,7 @@ pub fn validate_metrics(metrics: &HashMap<String, f64>) -> bool {
     passed
 }
 
-/// Check for performance regression
+#[allow(dead_code)]
 pub fn check_regression(metrics: &HashMap<String, f64>) -> Vec<String> {
     let mut warnings = Vec::new();
 
@@ -407,6 +407,7 @@ async fn test_memory_under_load() -> f64 {
     750.0 // MB under full load
 }
 
+#[allow(dead_code)]
 fn get_performance_baseline() -> HashMap<String, f64> {
     let mut baseline = HashMap::new();
     baseline.insert("stoq_throughput_large_mbps".to_string(), 2800.0);

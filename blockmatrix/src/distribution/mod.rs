@@ -22,26 +22,26 @@
 //!
 //! ```no_run
 //! use blockmatrix::distribution::{distribute_shards_pos_aware, NodeInfo};
-//! use blockmatrix::assets::core::{Asset, ConsensusProof};
-//! use blockmatrix::assets::pipeline::sharding::Shard;
+//! use blockmatrix::assets::pipeline::sharding::{Shard, ShardMetadata};
 //! use blockmatrix::matrix::coordinate::MatrixCoordinate;
-//! use blockmatrix::consensus::validation::DefaultConsensusValidator;
+//! use blockmatrix::consensus::validation::DefaultStateAuthenticator;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create test data
-//! let asset = create_test_asset();
-//! let shards = vec![/* shards */];
-//! let nodes = vec![/* node info */];
-//! let matrix = MatrixFoundation::new();
-//! let consensus = DefaultConsensusValidator::new();
+//! let nodes = vec![
+//!     NodeInfo::new(
+//!         "node1".into(), MatrixCoordinate::new(10, 10, 10)?,
+//!         "PrivateNetwork".into(), 1_000_000_000, "net1".into(),
+//!     ),
+//! ];
+//! let shards = vec![Shard { data: vec![0u8; 64], metadata: ShardMetadata::default() }];
+//! let consensus = DefaultStateAuthenticator::for_testing();
 //!
-//! // Distribute with PoS validation
-//! let placements = distribute_shards_pos_aware(
+//! let result = distribute_shards_pos_aware(
 //!     shards,
-//!     &asset,
+//!     "asset-1",
+//!     "PrivateNetwork",
 //!     &nodes,
-//!     &matrix,
-//!     &consensus
+//!     &consensus,
 //! ).await?;
 //! # Ok(())
 //! # }
@@ -161,7 +161,7 @@ pub async fn distribute_shards_pos_aware<C>(
     consensus: &C,
 ) -> AssetResult<DistributionResult>
 where
-    C: pos_validator::ConsensusValidator,
+    C: pos_validator::StateAuthenticator,
 {
     // Step 1: Query PoS validation for eligible nodes
     let eligible_nodes = get_eligible_nodes(
@@ -196,7 +196,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::validation::DefaultConsensusValidator;
+    use crate::consensus::validation::DefaultStateAuthenticator;
     #[tokio::test]
     async fn test_distribution_with_eligible_nodes() {
         // Create test nodes
@@ -223,7 +223,7 @@ mod tests {
             create_test_shard(1),
         ];
 
-        let consensus = DefaultConsensusValidator::for_testing();
+        let consensus = DefaultStateAuthenticator::for_testing();
 
         let result = distribute_shards_pos_aware(
             shards,

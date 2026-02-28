@@ -10,7 +10,6 @@ use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use tokio::time::{Duration, Instant};
-use bytes::Bytes;
 
 mod throughput_benchmarks {
     use super::*;
@@ -350,7 +349,7 @@ mod scalability_benchmarks {
 
 #[cfg(test)]
 mod benchmark_utils {
-    use super::*;
+    
 
     pub fn calculate_percentiles(mut values: Vec<u128>) -> (u128, u128, u128, u128) {
         values.sort_unstable();

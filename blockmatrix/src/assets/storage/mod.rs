@@ -25,7 +25,7 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use sha2::{Sha256, Digest};
+use blake3;
 use anyhow::Result;
 
 // Sub-modules
@@ -197,11 +197,9 @@ impl ContentAddressedStorage {
     }
 }
 
-/// Compute SHA-256 hash of data
+/// Compute BLAKE3 hash of data
 pub fn compute_hash(data: &[u8]) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
+    *blake3::hash(data).as_bytes()
 }
 
 /// Extract bucket ID from hash (first 2 hex chars)

@@ -22,7 +22,7 @@ pub struct ProofData<T = ()> {
     pub storage_commitment: Vec<u8>,
     pub location: String,
     pub size_bytes: u64,
-    pub merkle_root: Vec<u8>,
+    pub content_hash: Vec<u8>,
     pub stake_amount: u64,
     pub owner_pubkey: Vec<u8>,
     pub lock_period_blocks: u64,
@@ -44,7 +44,7 @@ impl Default for ProofData {
             storage_commitment: Vec::new(),
             location: String::new(),
             size_bytes: 0,
-            merkle_root: Vec::new(),
+            content_hash: Vec::new(),
             stake_amount: 0,
             owner_pubkey: Vec::new(),
             lock_period_blocks: 0,
@@ -573,9 +573,7 @@ mod tests {
 
         let stats = validator.get_metrics();
         assert_eq!(stats.total_validations, 5);
-        // Average time might be 0 on very fast systems or with caching
-        // Just verify it's been initialized (>= 0)
-        assert!(stats.avg_validation_time_us >= 0);
+        let _ = stats.avg_validation_time_us;
     }
 
 }

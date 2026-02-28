@@ -1,167 +1,182 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Performance benchmarks for TrustChain certificate operations
+//! Performance benchmarks for TrustChain certificate and consensus operations.
+//!
+//! Benchmarks real FALCON-1024 key generation, signing, verification,
+//! BinaryAuthenticator pass/fail, and ConsensusProof validation latency.
 
-use std::time::{Duration, Instant};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::time::Duration;
 
-/// Benchmark certificate generation performance
-fn bench_certificate_generation() {
-    let iterations = 100;
-    let mut durations = Vec::with_capacity(iterations);
+use pqcrypto_falcon::falcon1024;
 
-    for _ in 0..iterations {
-        let start = Instant::now();
+use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
+use trustchain::security::BinaryAuthenticator;
 
-        // Simulate certificate generation
-        // In real benchmark, this would use actual certificate generation
-        let _cert = generate_mock_certificate();
-
-        durations.push(start.elapsed());
-    }
-
-    // Calculate statistics
-    let total: Duration = durations.iter().sum();
-    let avg = total / iterations as u32;
-    let min = durations.iter().min().unwrap();
-    let max = durations.iter().max().unwrap();
-
-    println!("Certificate Generation Performance:");
-    println!("  Iterations: {}", iterations);
-    println!("  Average: {:?}", avg);
-    println!("  Min: {:?}", min);
-    println!("  Max: {:?}", max);
-    println!("  Total: {:?}", total);
+/// Benchmark FALCON-1024 key-pair generation.
+fn bench_falcon_keygen(c: &mut Criterion) {
+    c.bench_function("falcon1024_keygen", |b| {
+        b.iter(|| {
+            let (pk, sk) = falcon1024::keypair();
+            black_box((&pk, &sk));
+        });
+    });
 }
 
-/// Benchmark signature verification performance
-fn bench_signature_verification() {
-    let iterations = 1000;
-    let mut durations = Vec::with_capacity(iterations);
+/// Benchmark FALCON-1024 detached signing on a 256-byte message.
+fn bench_falcon_sign(c: &mut Criterion) {
+    let (_pk, sk) = falcon1024::keypair();
+    let message: Vec<u8> = (0..256).map(|i| i as u8).collect();
 
-    // Prepare test data
-    let data = b"test data for signature verification";
-    let signature = generate_mock_signature(data);
-
-    for _ in 0..iterations {
-        let start = Instant::now();
-
-        // Simulate signature verification
-        let _valid = verify_mock_signature(data, &signature);
-
-        durations.push(start.elapsed());
-    }
-
-    // Calculate statistics
-    let total: Duration = durations.iter().sum();
-    let avg = total / iterations as u32;
-    let min = durations.iter().min().unwrap();
-    let max = durations.iter().max().unwrap();
-
-    println!("\nSignature Verification Performance:");
-    println!("  Iterations: {}", iterations);
-    println!("  Average: {:?}", avg);
-    println!("  Min: {:?}", min);
-    println!("  Max: {:?}", max);
-    println!("  Total: {:?}", total);
-    println!("  Throughput: {} verifications/sec",
-             (iterations as f64) / total.as_secs_f64());
+    c.bench_function("falcon1024_sign_256B", |b| {
+        b.iter(|| {
+            let sig = falcon1024::detached_sign(black_box(&message), &sk);
+            black_box(sig);
+        });
+    });
 }
 
-/// Benchmark FALCON-1024 operations
-fn bench_falcon_operations() {
-    let iterations = 50;
-    let mut key_gen_durations = Vec::with_capacity(iterations);
-    let mut sign_durations = Vec::with_capacity(iterations);
-    let mut verify_durations = Vec::with_capacity(iterations);
+/// Benchmark FALCON-1024 detached signature verification.
+fn bench_falcon_verify(c: &mut Criterion) {
+    let (pk, sk) = falcon1024::keypair();
+    let message: Vec<u8> = (0..256).map(|i| i as u8).collect();
+    let sig = falcon1024::detached_sign(&message, &sk);
 
-    for _ in 0..iterations {
-        // Key generation
-        let start = Instant::now();
-        let (sk, vk) = generate_falcon_keypair();
-        key_gen_durations.push(start.elapsed());
-
-        // Signing
-        let data = b"test data for FALCON signing";
-        let start = Instant::now();
-        let signature = sign_falcon(&sk, data);
-        sign_durations.push(start.elapsed());
-
-        // Verification
-        let start = Instant::now();
-        let _valid = verify_falcon(&vk, data, &signature);
-        verify_durations.push(start.elapsed());
-    }
-
-    // Calculate statistics for key generation
-    let total_keygen: Duration = key_gen_durations.iter().sum();
-    let avg_keygen = total_keygen / iterations as u32;
-
-    // Calculate statistics for signing
-    let total_sign: Duration = sign_durations.iter().sum();
-    let avg_sign = total_sign / iterations as u32;
-
-    // Calculate statistics for verification
-    let total_verify: Duration = verify_durations.iter().sum();
-    let avg_verify = total_verify / iterations as u32;
-
-    println!("\nFALCON-1024 Performance:");
-    println!("  Iterations: {}", iterations);
-    println!("\n  Key Generation:");
-    println!("    Average: {:?}", avg_keygen);
-    println!("    Total: {:?}", total_keygen);
-    println!("\n  Signing:");
-    println!("    Average: {:?}", avg_sign);
-    println!("    Total: {:?}", total_sign);
-    println!("    Throughput: {} signatures/sec",
-             (iterations as f64) / total_sign.as_secs_f64());
-    println!("\n  Verification:");
-    println!("    Average: {:?}", avg_verify);
-    println!("    Total: {:?}", total_verify);
-    println!("    Throughput: {} verifications/sec",
-             (iterations as f64) / total_verify.as_secs_f64());
+    c.bench_function("falcon1024_verify_256B", |b| {
+        b.iter(|| {
+            let result = falcon1024::verify_detached_signature(
+                black_box(&sig),
+                black_box(&message),
+                black_box(&pk),
+            );
+            let _ = black_box(result);
+        });
+    });
 }
 
-// Mock functions for benchmarking
-// In real implementation, these would use actual TrustChain functions
+/// Benchmark BinaryAuthenticator pass path (node not revoked).
+fn bench_binary_auth_pass(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let authenticator = BinaryAuthenticator::new();
 
-fn generate_mock_certificate() -> Vec<u8> {
-    vec![0u8; 2048]
+    c.bench_function("binary_auth_pass", |b| {
+        b.to_async(&rt).iter(|| {
+            let auth = &authenticator;
+            async move {
+                let result = auth
+                    .authenticate(black_box("bench_node_42"))
+                    .await
+                    .expect("auth should succeed");
+                black_box(result);
+            }
+        });
+    });
 }
 
-fn generate_mock_signature(data: &[u8]) -> Vec<u8> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+/// Benchmark BinaryAuthenticator fail path (node revoked, lookup in map).
+fn bench_binary_auth_revoked(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let authenticator = BinaryAuthenticator::new();
 
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    vec![hasher.finish() as u8; 64]
+    // Pre-populate 1000 revoked nodes so the lookup is non-trivial
+    rt.block_on(async {
+        for i in 0..1000 {
+            let node = format!("revoked_node_{}", i);
+            // Use is_revoked just to confirm map access works;
+            // we need to revoke via the available API
+            authenticator
+                .revoke(
+                    &node,
+                    &trustchain::security::ByzantineViolation::InvalidStakeSignature {
+                        stake_holder_id: node.clone(),
+                    },
+                )
+                .await
+                .expect("revoke should succeed");
+        }
+    });
+
+    c.bench_function("binary_auth_revoked_1k", |b| {
+        b.to_async(&rt).iter(|| {
+            let auth = &authenticator;
+            async move {
+                let result = auth
+                    .authenticate(black_box("revoked_node_500"))
+                    .await
+                    .expect("auth should succeed");
+                black_box(result);
+            }
+        });
+    });
 }
 
-fn verify_mock_signature(_data: &[u8], _signature: &[u8]) -> bool {
-    true
+/// Benchmark ConsensusProof local (synchronous) four-proof validation.
+fn bench_pos_validate_sync(c: &mut Criterion) {
+    let proof = ConsensusProof::new_for_testing();
+
+    c.bench_function("pos_validate_sync", |b| {
+        b.iter(|| {
+            let valid = black_box(&proof).validate();
+            black_box(valid);
+        });
+    });
 }
 
-fn generate_falcon_keypair() -> (Vec<u8>, Vec<u8>) {
-    (vec![0u8; 1024], vec![0u8; 1024])
+/// Benchmark ConsensusProof validation against requirements.
+fn bench_pos_validate_with_requirements(c: &mut Criterion) {
+    let proof = ConsensusProof::new_for_testing();
+    let requirements = ConsensusRequirements::localhost_testing();
+
+    c.bench_function("pos_validate_requirements", |b| {
+        b.iter(|| {
+            let valid = black_box(&proof)
+                .validate_with_requirements(black_box(&requirements));
+            black_box(valid);
+        });
+    });
 }
 
-fn sign_falcon(_sk: &[u8], _data: &[u8]) -> Vec<u8> {
-    vec![0u8; 690]
+/// Benchmark ConsensusProof serialization round-trip (to_bytes + from_bytes).
+fn bench_pos_serde_roundtrip(c: &mut Criterion) {
+    let proof = ConsensusProof::new_for_testing();
+
+    c.bench_function("pos_serde_roundtrip", |b| {
+        b.iter(|| {
+            let bytes = black_box(&proof).to_bytes().expect("serialize");
+            let decoded = ConsensusProof::from_bytes(black_box(&bytes)).expect("deserialize");
+            black_box(decoded);
+        });
+    });
 }
 
-fn verify_falcon(_vk: &[u8], _data: &[u8], _signature: &[u8]) -> bool {
-    true
+/// Benchmark BLAKE3 hashing of a ConsensusProof.
+fn bench_pos_hash(c: &mut Criterion) {
+    let proof = ConsensusProof::new_for_testing();
+
+    c.bench_function("pos_hash_blake3", |b| {
+        b.iter(|| {
+            let hash = black_box(&proof).hash().expect("hash");
+            black_box(hash);
+        });
+    });
 }
 
-fn main() {
-    println!("TrustChain Performance Benchmarks");
-    println!("==================================");
-
-    bench_certificate_generation();
-    bench_signature_verification();
-    bench_falcon_operations();
-
-    println!("\nBenchmarks complete!");
+criterion_group! {
+    name = benches;
+    config = Criterion::default()
+        .measurement_time(Duration::from_secs(5))
+        .warm_up_time(Duration::from_secs(2));
+    targets = bench_falcon_keygen,
+              bench_falcon_sign,
+              bench_falcon_verify,
+              bench_binary_auth_pass,
+              bench_binary_auth_revoked,
+              bench_pos_validate_sync,
+              bench_pos_validate_with_requirements,
+              bench_pos_serde_roundtrip,
+              bench_pos_hash
 }
+
+criterion_main!(benches);

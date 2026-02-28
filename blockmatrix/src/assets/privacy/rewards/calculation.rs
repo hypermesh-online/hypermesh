@@ -260,7 +260,7 @@ impl CaesarRewardCalculator {
                     min_utilization_rate: 0.5,
                     min_consensus_success_rate: 0.9,
                     min_stake_amount: 1000,
-                    min_trust_score: 0.7,
+                    require_authentication: true,
                 },
                 base_multiplier: 1.2,
                 benefits: TierBenefits {
@@ -280,7 +280,7 @@ impl CaesarRewardCalculator {
                     min_utilization_rate: 0.7,
                     min_consensus_success_rate: 0.95,
                     min_stake_amount: 5000,
-                    min_trust_score: 0.85,
+                    require_authentication: true,
                 },
                 base_multiplier: 1.5,
                 benefits: TierBenefits {

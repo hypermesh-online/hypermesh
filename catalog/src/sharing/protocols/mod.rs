@@ -64,11 +64,8 @@ impl SharingProtocol {
     /// Connect to peer
     pub async fn connect(&self, address: &str) -> Result<PeerInfo> {
         // Deterministic node ID from address for reproducible identity.
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(address.as_bytes());
-        let hash = hasher.finalize();
-        let peer_id = format!("peer_{}", hex::encode(&hash[..8]));
+        let hash = blake3::hash(address.as_bytes());
+        let peer_id = format!("peer_{}", hex::encode(&hash.as_bytes()[..8]));
 
         let connection = PeerConnection {
             _peer_id: peer_id.clone(),
@@ -89,7 +86,7 @@ impl SharingProtocol {
             available_packages: Default::default(),
             storage_capacity: 10 * 1024 * 1024 * 1024,
             bandwidth_capacity: self.fair_use_limit,
-            reputation: 0.5,
+            trust_weight: 0.5,
             last_seen: SystemTime::now(),
             location: None,
             supported_protocols: vec!["stoq".to_string()],

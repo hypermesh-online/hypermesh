@@ -4,11 +4,10 @@
 
 //! Integration validation test for STOQ transport with PoS validation
 
-use stoq::api::service_discovery::{ServiceDiscovery, ServiceType, ServiceEndpoint, ServiceMetadata};
+use stoq::api::service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata};
 use stoq::protocol::pos_validator::{PosToken, PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
 use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use anyhow::Result;
 

@@ -283,7 +283,7 @@ impl ProxySelector {
             match self.validator.validate_certificate(&proxy.certificate).await {
                 Ok(validation) => {
                     // Check if validation meets requirement
-                    validation.trust_score >= required_level.to_score()
+                    validation.trust_level >= required_level.to_score()
                 }
                 Err(_) => false,
             }

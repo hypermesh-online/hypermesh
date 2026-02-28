@@ -5,7 +5,7 @@
 //! Integration tests for TrustChain certificate management
 
 use std::time::Duration;
-use trustchain::ca::{CertificateManager, CertificateConfig, CertificateMode, create_certificate_manager};
+use trustchain::ca::{CertificateConfig, CertificateMode, create_certificate_manager};
 use trustchain::ca::{TrustChainCA, CAConfig, CAMode, CertificateRequest};
 
 /// Test certificate generation

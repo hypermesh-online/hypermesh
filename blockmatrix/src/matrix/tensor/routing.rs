@@ -17,8 +17,11 @@ use super::vector::Vector3D;
 ///
 /// # Example
 /// ```
-/// let source = MatrixCoordinate::new(0, 0, 0)?;
-/// let dest = MatrixCoordinate::new(100, 50, 25)?;
+/// use blockmatrix::matrix::tensor::calculate_routing_vector;
+/// use blockmatrix::matrix::MatrixCoordinate;
+///
+/// let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+/// let dest = MatrixCoordinate::new(100, 50, 25).expect("test: valid coord");
 /// let direction = calculate_routing_vector(&source, &dest);
 /// ```
 pub fn calculate_routing_vector(

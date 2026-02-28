@@ -4,10 +4,9 @@
 
 //! Tests for adaptive connection optimization
 
-use std::sync::Arc;
 use std::time::Duration;
 use stoq::transport::{
-    TransportConfig, StoqTransport, NetworkTier, Endpoint, adaptive::*
+    TransportConfig, StoqTransport, NetworkTier, Endpoint
 };
 use std::net::Ipv6Addr;
 use tokio::time::{sleep, timeout};

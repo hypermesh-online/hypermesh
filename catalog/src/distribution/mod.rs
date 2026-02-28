@@ -166,7 +166,7 @@ pub struct ContentIndex {
 pub struct ContentMetadata {
     /// Content size in bytes
     pub size: u64,
-    /// Content hash (SHA-256)
+    /// Content hash (BLAKE3)
     pub hash: String,
     /// Content type
     pub content_type: String,
@@ -428,12 +428,8 @@ impl P2PDistribution {
                 return Err(anyhow::anyhow!("Package from unverified publisher not allowed"));
             }
 
-            // Update publisher reputation based on successful download
-            if let Some(publisher) = verification_result.publisher {
-                self.security_manager
-                    .update_reputation(&publisher.trustchain_id, true, None)
-                    .await?;
-            }
+            // Publisher authentication already verified above; no reputation to update.
+            let _publisher = verification_result.publisher;
         }
 
         // Update transfer state

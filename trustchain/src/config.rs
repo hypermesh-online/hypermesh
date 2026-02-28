@@ -503,7 +503,7 @@ impl TrustChainConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+    
 
     #[test]
     fn test_default_config() {

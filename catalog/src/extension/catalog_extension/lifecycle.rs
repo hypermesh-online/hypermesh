@@ -8,7 +8,7 @@
 //! search, publish, and verify.
 
 use async_trait::async_trait;
-use sha2::Digest;
+// BLAKE3 used via blake3::hash() for domain and package hashes
 use std::collections::HashMap;
 use std::sync::Arc;
 use semver::Version;
@@ -121,11 +121,7 @@ impl AssetLibraryExtension for CatalogExtension {
                         NetworkScope::Global,
                         AssetCategory::Application(ApplicationDomain {
                             domain_name: "catalog".to_string(),
-                            domain_hash: {
-                                let mut hasher = sha2::Sha256::new();
-                                hasher.update(b"catalog");
-                                hasher.finalize().into()
-                            },
+                            domain_hash: *blake3::hash(b"catalog").as_bytes(),
                         }),
                     )
                 })
@@ -267,7 +263,7 @@ impl AssetLibraryExtension for CatalogExtension {
             description: Some(package.description.clone()),
             asset_type: "library".to_string(),
             size: package.contents.len() as u64,
-            hash: format!("{:x}", sha2::Sha256::digest(&package.contents)),
+            hash: blake3::hash(&package.contents).to_hex().to_string(),
             content: String::new(),
             metadata: None,
             spec: None,

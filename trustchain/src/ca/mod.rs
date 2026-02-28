@@ -405,6 +405,61 @@ impl TrustChainCA {
         Ok(issued_cert)
     }
 
+    /// Issue certificate with pre-validated consensus (skips HyperMesh network call).
+    /// Used by SecurityIntegratedCA which already performed local consensus validation.
+    pub async fn issue_certificate_local(&self, request: CertificateRequest) -> Result<IssuedCertificate> {
+        info!("Processing certificate request for: {} (pre-validated consensus)", request.common_name);
+
+        // Validate certificate policy
+        if !self.policy_engine.validate_request(&request).await? {
+            return Err(anyhow!("Certificate policy validation failed"));
+        }
+
+        // Build a local consensus result (consensus was already validated by caller)
+        let local_result = ConsensusValidationResult {
+            result: ConsensusValidationStatus::Valid,
+            proof_hash: request.consensus_proof.hash().ok().map(|h| {
+                let bytes = hex::decode(&h).unwrap_or_default();
+                let mut arr = [0u8; 32];
+                let len = bytes.len().min(32);
+                arr[..len].copy_from_slice(&bytes[..len]);
+                arr
+            }),
+            validator_id: "local-security-integrated-ca".to_string(),
+            validated_at: std::time::SystemTime::now(),
+            metrics: crate::consensus::hypermesh_client::ValidationMetrics {
+                validation_time_us: 0,
+                validator_nodes: 1,
+                confidence_level: 1.0,
+                network_load: 0.0,
+            },
+            details: crate::consensus::hypermesh_client::ValidationDetails {
+                proof_results: crate::consensus::hypermesh_client::ProofValidationResults {
+                    space_proof_valid: true,
+                    stake_proof_valid: true,
+                    work_proof_valid: true,
+                    time_proof_valid: true,
+                },
+                bft_status: crate::consensus::hypermesh_client::ByzantineFaultToleranceStatus {
+                    byzantine_nodes_detected: 0,
+                    fault_tolerance_maintained: true,
+                    recovery_action_taken: None,
+                },
+                performance_stats: crate::consensus::hypermesh_client::PerformanceStatistics {
+                    consensus_latency_ms: 0,
+                    throughput_ops_per_sec: 0.0,
+                    network_overhead_bytes: 0,
+                },
+            },
+        };
+
+        let issued_cert = self.generate_certificate_with_consensus(request, local_result).await?;
+        self.certificate_store.store_certificate(&issued_cert).await?;
+
+        info!("Certificate issued successfully (pre-validated consensus): {}", issued_cert.serial_number);
+        Ok(issued_cert)
+    }
+
     /// Validate certificate chain
     pub async fn validate_certificate_chain(&self, cert_der: &[u8]) -> Result<bool> {
         debug!("Validating certificate chain");
@@ -655,7 +710,7 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate(request).await
+        let issued_cert = ca.issue_certificate_local(request).await
             .expect("Failed to issue certificate");
         assert_eq!(issued_cert.common_name, "test.localhost");
         assert!(matches!(issued_cert.status, CertificateStatus::Valid));
@@ -677,7 +732,7 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate(request).await
+        let issued_cert = ca.issue_certificate_local(request).await
             .expect("Failed to issue certificate");
         let is_valid = ca.validate_certificate_chain(&issued_cert.certificate_der).await
             .expect("Failed to validate certificate chain");

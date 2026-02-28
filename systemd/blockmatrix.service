@@ -1,0 +1,26 @@
+[Unit]
+Description=HyperMesh Block-MATRIX Node
+Documentation=https://github.com/hypermesh-online/core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/blockmatrix
+WorkingDirectory=/var/lib/hypermesh/blockmatrix
+Restart=on-failure
+RestartSec=5
+User=hypermesh
+Group=hypermesh
+LimitNOFILE=65536
+Environment=RUST_LOG=info
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hypermesh/blockmatrix /var/log/hypermesh
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

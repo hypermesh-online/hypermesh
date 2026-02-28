@@ -1,51 +1,84 @@
-# HyperMesh Shared Library
+# HyperMesh Shared Library (`hypermesh-lib`)
 
-Core shared types and systems used across all HyperMesh components.
+Canonical shared types for the HyperMesh ecosystem. All crates depend on this library as the single source of truth for identifiers, enums, and cross-cutting type definitions.
 
-## Components
+**Status**: Alpha (68% complete) | 12 files | ~3,200 lines | 97 tests
 
-### Proof of State (Consensus System)
+## Core Types
 
-The universal consensus system that validates all operations across the HyperMesh ecosystem. Every asset and operation requires validation through all four proofs:
+### Identifiers (`types.rs`)
+- `NodeId(String)` -- unique node identifier in the Block-MATRIX topology
+- `AssetId(String)` -- blockchain-registered universal asset identifier
+- `NetworkId([u8; 16])` -- 128-bit network identifier
+- `ContentHash([u8; 32])` -- 256-bit BLAKE3 digest
+- `KeyPairId` -- cryptographic key pair reference
+- `AssetAddress([u8; 16])` -- IPv6 asset address (`fd48:4d00` prefix, matrix coords, content fingerprint, shard sub-addressing)
 
-- **Proof of Space (PoSp)**: WHERE - Storage location and physical/network location
-- **Proof of Stake (PoSt)**: WHO - Ownership, access rights, and economic stake
-- **Proof of Work (PoWk)**: WHAT/HOW - Computational resources and processing
-- **Proof of Time (PoTm)**: WHEN - Temporal ordering and timestamp validation
+### Enums (`types.rs`)
+- `BlockchainScope` -- binary: `Device` (local-only, always running) | `Network` (synchronized via reflector/swarm)
+- `ProofType` -- `PoSpace` | `PoStake` | `PoWork` | `PoTime`
+- `PipelineStage` -- asset processing pipeline stages
+- `CryptoAlgorithm` -- `Falcon` | `Kyber` | `Aes`
 
-**Combined**: These create a unified "Consensus Proof" that answers WHERE/WHO/WHAT/WHEN for every block and asset.
+### Privacy (`types.rs`)
+- `PrivacyMode` -- struct with 2 axes: `scope: AccessScope` + `tracked: bool`
+- `AccessScope` -- `Bounded` | `Unbounded`
+- Three canonical presets: `ANONYMOUS` (Unbounded, untracked), `PRIVATE` (Bounded, tracked), `PUBLIC` (Unbounded, tracked)
 
-### Asset System
+### Asset System (`asset.rs`)
+- `SystemAssetKind` -- 9 variants: `Cpu`, `Gpu`, `Memory`, `Storage`, `Network`, `Container`, `Economic`, `Blockchain`, `Dns`
+- `AssetMetadata` -- common metadata for all assets
+- `BaseState` / `AssetStatusTrait` -- asset lifecycle states
+- `AssetAdapter` -- trait for specialized asset handling (three-pillar system)
 
-Universal asset types and identifiers used throughout HyperMesh:
+### Consensus Proofs (`proof.rs`)
+- `SpaceProof`, `StakeProof`, `WorkProof`, `TimeProof` -- individual proof structs
+- `ProofOfState` -- combined four-proof validation (WHERE/WHO/WHAT/WHEN)
+- `Validatable` trait -- shared validation interface
 
-- `AssetId`: Blockchain-registered universal identifiers
-- `AssetType`: CPU, GPU, Memory, Storage, Network, Container, Economic
-- `AssetMetadata`: Common metadata for all assets
+### Economic Types (`economic.rs`)
+- `PacketId`, `GoldGrams`, `MarketTier`, `PacketState`, `DemurrageRate` -- Caesar EVP types
 
-### Common Utilities
-
-Shared error types, result wrappers, and utility functions.
+### Position (`types.rs`)
+- `MatrixPosition` -- (x, y, z) coordinate in the Block-MATRIX topology
 
 ## Usage
 
 ```rust
-use hypermesh_lib::{AssetId, AssetType, ConsensusProof};
+use hypermesh_lib::{
+    AssetId, NodeId, ContentHash, NetworkId,
+    PrivacyMode, BlockchainScope, ProofType,
+    MatrixPosition, AssetAddress,
+};
+use hypermesh_lib::asset::SystemAssetKind;
+use hypermesh_lib::proof::ProofOfState;
 
-// Create an asset
-let asset_id = AssetId::new(AssetType::Cpu);
+// Identifiers
+let node = NodeId::from("node-alpha");
+let asset = AssetId::from("asset-001");
 
-// Access Proof of State system
-use hypermesh_lib::proof_of_state::*;
+// Privacy (struct, not enum -- use constants)
+let mode = PrivacyMode::ANONYMOUS;
+
+// Blockchain scope (binary)
+let scope = BlockchainScope::Device;
 ```
 
 ## Architecture
 
-This library is dependency-free of other HyperMesh components and serves as the foundation:
+This library has zero dependencies on other HyperMesh crates and serves as the foundation layer:
 
 ```
 hypermesh-lib (this crate)
-    ├── Proof of State ← Used by all components
-    ├── Asset System ← Used by blockmatrix
-    └── Common Types ← Used everywhere
+    |- Identifiers    (NodeId, AssetId, NetworkId, ContentHash, AssetAddress)
+    |- Enums          (BlockchainScope, ProofType, PipelineStage, CryptoAlgorithm)
+    |- Privacy        (PrivacyMode struct with 3 presets)
+    |- Asset System   (SystemAssetKind, BaseState, AssetAdapter trait)
+    |- Proofs         (SpaceProof, StakeProof, WorkProof, TimeProof, ProofOfState)
+    |- Economic       (PacketId, GoldGrams, MarketTier, PacketState)
+    '- Error          (HypermeshError unified error type)
 ```
+
+## License
+
+Business Source License 1.1

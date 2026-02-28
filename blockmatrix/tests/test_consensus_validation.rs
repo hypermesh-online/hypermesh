@@ -12,7 +12,7 @@
 use blockmatrix::consensus::{
     ConsensusProof, ConsensusRequirements, ConsensusError,
     StakeProof, TimeProof, SpaceProof, WorkProof,
-    validation::{ConsensusValidator, DefaultConsensusValidator, ProductionConsensusValidator},
+    validation::{StateAuthenticator, DefaultStateAuthenticator, ProductionStateAuthenticator},
     validation_service::{ValidationService, ConsensusValidationService},
 };
 use anyhow::Result;
@@ -79,7 +79,7 @@ fn create_invalid_work_proof() -> ConsensusProof {
 
 #[tokio::test]
 async fn test_valid_proof_validation() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let proof = create_valid_test_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -90,7 +90,7 @@ async fn test_valid_proof_validation() {
 
 #[tokio::test]
 async fn test_empty_proof_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let result = validator.validate(&[]).await;
 
     assert!(result.is_ok(), "Empty proof should not error");
@@ -99,7 +99,7 @@ async fn test_empty_proof_rejection() {
 
 #[tokio::test]
 async fn test_malformed_proof_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let garbage = vec![0xFF, 0xDE, 0xAD, 0xBE, 0xEF];
 
     let result = validator.validate(&garbage).await;
@@ -109,7 +109,7 @@ async fn test_malformed_proof_rejection() {
 
 #[tokio::test]
 async fn test_oversized_proof_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let huge_proof = vec![0u8; 2 * 1024 * 1024]; // 2MB
 
     let result = validator.validate(&huge_proof).await;
@@ -119,7 +119,7 @@ async fn test_oversized_proof_rejection() {
 
 #[tokio::test]
 async fn test_insufficient_stake_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let proof = create_invalid_stake_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -130,7 +130,7 @@ async fn test_insufficient_stake_rejection() {
 
 #[tokio::test]
 async fn test_excessive_time_offset_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let proof = create_invalid_time_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -141,7 +141,7 @@ async fn test_excessive_time_offset_rejection() {
 
 #[tokio::test]
 async fn test_insufficient_storage_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let proof = create_invalid_space_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -152,7 +152,7 @@ async fn test_insufficient_storage_rejection() {
 
 #[tokio::test]
 async fn test_insufficient_compute_rejection() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
     let proof = create_invalid_work_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -171,7 +171,7 @@ async fn test_custom_requirements_validation() {
         byzantine_tolerance: 0.25,
     };
 
-    let validator = DefaultConsensusValidator::with_requirements(custom_requirements.clone());
+    let validator = DefaultStateAuthenticator::with_requirements(custom_requirements.clone());
     let proof = create_valid_test_proof(); // This won't meet custom requirements
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -182,7 +182,7 @@ async fn test_custom_requirements_validation() {
 
 #[tokio::test]
 async fn test_production_validator_strict_requirements() {
-    let validator = ProductionConsensusValidator::new();
+    let validator = ProductionStateAuthenticator::new();
     let proof = create_valid_test_proof(); // Won't meet production requirements
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -193,7 +193,7 @@ async fn test_production_validator_strict_requirements() {
 
 #[tokio::test]
 async fn test_testing_requirements_validation() {
-    let validator = DefaultConsensusValidator::for_testing();
+    let validator = DefaultStateAuthenticator::for_testing();
 
     // Create a minimal proof that would normally fail
     let mut proof = create_valid_test_proof();
@@ -243,7 +243,7 @@ fn test_validation_service_production_mode() {
 
 #[tokio::test]
 async fn test_all_four_proofs_required() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
 
     // Test that all four proofs are validated
     let proof = create_valid_test_proof();
@@ -272,7 +272,7 @@ async fn test_all_four_proofs_required() {
 #[tokio::test]
 async fn test_verbose_logging() {
     // Test that verbose mode provides detailed logging
-    let validator = DefaultConsensusValidator::new().verbose(true);
+    let validator = DefaultStateAuthenticator::new().verbose(true);
     let proof = create_valid_test_proof();
     let proof_bytes = proof.to_bytes().expect("Should serialize");
 
@@ -284,7 +284,7 @@ async fn test_verbose_logging() {
 
 #[tokio::test]
 async fn test_validate_with_custom_requirements() {
-    let validator = DefaultConsensusValidator::new();
+    let validator = DefaultStateAuthenticator::new();
 
     // Create lenient requirements
     let lenient_requirements = ConsensusRequirements {
@@ -342,7 +342,7 @@ fn test_consensus_requirements_localhost() {
 /// Test that the validator properly identifies which proof failed
 #[tokio::test]
 async fn test_detailed_failure_reporting() {
-    let validator = DefaultConsensusValidator::for_testing().verbose(true);
+    let validator = DefaultStateAuthenticator::for_testing().verbose(true);
 
     // Test each type of failure
     let test_cases = vec![
@@ -358,7 +358,7 @@ async fn test_detailed_failure_reporting() {
 
         // The test validator has relaxed requirements, so these might pass
         // Let's use production validator instead
-        let prod_validator = ProductionConsensusValidator::new();
+        let prod_validator = ProductionStateAuthenticator::new();
         let prod_result = prod_validator.validate(&proof_bytes).await;
 
         assert!(prod_result.is_ok(), "Should handle {} failure gracefully", expected_failure);

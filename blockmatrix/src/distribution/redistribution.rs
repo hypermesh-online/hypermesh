@@ -10,7 +10,7 @@
 use crate::assets::core::{AssetError, AssetResult};
 use crate::assets::pipeline::sharding::Shard;
 use crate::distribution::{
-    NodeInfo, ShardPlacement, pos_validator::ConsensusValidator,
+    NodeInfo, ShardPlacement, pos_validator::StateAuthenticator,
     matrix_optimizer::distribute_across_octants, audit_trail::record_redistribution,
 };
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ pub async fn handle_pos_revocation<C>(
     strategy: RedistributionStrategy,
 ) -> AssetResult<RedistributionResult>
 where
-    C: ConsensusValidator,
+    C: StateAuthenticator,
 {
     // Find affected shards
     let affected_shards: Vec<_> = current_placements
@@ -168,7 +168,7 @@ pub async fn redistribute_shards<C>(
     strategy: RedistributionStrategy,
 ) -> AssetResult<RedistributionResult>
 where
-    C: ConsensusValidator,
+    C: StateAuthenticator,
 {
     match &trigger {
         RedistributionTrigger::PosRevocation { node_id, .. } => {
@@ -329,7 +329,7 @@ fn redistribute_nearest(
 mod tests {
     use super::*;
     use crate::assets::pipeline::sharding::{Shard, ShardMetadata};
-    use crate::distribution::pos_validator::MockConsensusValidator;
+    use crate::distribution::pos_validator::MockStateAuthenticator;
     use crate::matrix::coordinate::MatrixCoordinate;
 
     fn create_test_shard(index: usize) -> Shard {
@@ -393,7 +393,7 @@ mod tests {
             },
         ];
 
-        let consensus = MockConsensusValidator::new(true);
+        let consensus = MockStateAuthenticator::new(true);
 
         let result = handle_pos_revocation(
             "test-asset",
@@ -425,7 +425,7 @@ mod tests {
             distance_from_origin: 17.32,
         }];
 
-        let consensus = MockConsensusValidator::new(true);
+        let consensus = MockStateAuthenticator::new(true);
 
         let result = handle_pos_revocation(
             "test-asset",
@@ -465,7 +465,7 @@ mod tests {
             },
         ];
 
-        let consensus = MockConsensusValidator::new(true);
+        let consensus = MockStateAuthenticator::new(true);
 
         // Test each strategy
         for strategy in [

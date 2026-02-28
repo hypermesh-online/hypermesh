@@ -145,9 +145,6 @@ impl Default for ServiceMeshConfig {
 /// API module with STOQ consensus server
 pub mod api;
 
-/// HTTP/3 server infrastructure
-pub mod http3;
-
 // Real asset module from the codebase
 pub mod assets;
 
@@ -214,6 +211,16 @@ pub mod dns;
 /// Orchestration layer for moving assets between Device and Network blockchain
 /// scopes. Handles locking, proof validation, and rollback.
 pub mod gateway;
+
+// Spatial Verification - Shard Commitment + PoSPing Protocol
+/// Shard commitment anchors each block to its spatial shard evidence.
+/// PoSPing provides epoch-seeded bilateral probes for lightweight verification.
+pub mod verification;
+
+// Asset Transfer Protocol - IPv6 addressing + PoS-authenticated transfers
+/// Orchestrates asset ownership transfers between matrix positions with
+/// full Proof of State authentication and blockchain receipts on both chains.
+pub mod transfer;
 
 // Re-export main asset types for easy access
 pub use assets::core::{

@@ -205,8 +205,7 @@ pub struct GetPackageResponse {
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     pub dependencies: Vec<String>,
-    pub publisher_score: Option<f64>,
-    pub publisher_tier: Option<String>,
+    pub publisher_authenticated: Option<bool>,
     /// Schema for this type definition (JSON Schema)
     pub schema: Option<serde_json::Value>,
     /// Validation rules count
@@ -223,11 +222,9 @@ pub struct GetPublisherRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetPublisherResponse {
     pub publisher_id: String,
-    pub reputation_score: f64,
-    pub tier: String,
+    pub authenticated: bool,
     pub total_packages: u64,
     pub total_downloads: u64,
-    pub average_rating: Option<f64>,
     pub member_since: Option<String>,
 }
 
@@ -371,7 +368,7 @@ impl ApiHandler for GetPublisherHandler {
             ApiError::InvalidRequest(format!("Invalid publisher request: {}", e))
         })?;
 
-        // Publisher not found — real lookup via ReputationSystem
+        // Publisher not found — real lookup via PublisherAuthenticator
         Err(ApiError::NotFound(format!(
             "Publisher '{}' not found",
             req.publisher_id

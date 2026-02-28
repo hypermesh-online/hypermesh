@@ -8,7 +8,7 @@
 
 use super::{DnsError, DnsResult, Domain};
 use crate::consensus::{ConsensusProof, ConsensusRequirements};
-use crate::consensus::validation::{ConsensusValidator, DefaultConsensusValidator};
+use crate::consensus::validation::{StateAuthenticator, DefaultStateAuthenticator};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tracing::{debug, warn};
@@ -27,7 +27,7 @@ pub struct ValidationResult {
 /// DNS validator with PoS integration
 pub struct DnsValidator {
     /// Consensus validator
-    consensus_validator: Arc<dyn ConsensusValidator>,
+    consensus_validator: Arc<dyn StateAuthenticator>,
     /// Consensus requirements for DNS operations
     requirements: ConsensusRequirements,
     /// Enable strict validation
@@ -48,7 +48,7 @@ impl DnsValidator {
         };
 
         Self {
-            consensus_validator: Arc::new(DefaultConsensusValidator::with_requirements(
+            consensus_validator: Arc::new(DefaultStateAuthenticator::with_requirements(
                 requirements.clone(),
             )),
             requirements,
@@ -125,36 +125,38 @@ impl DnsValidator {
         self.validate_dns_access(domain, proof).await
     }
 
-    /// Validate network access for federated domains
+    /// Validate network access for federated domains.
+    ///
+    /// Public domains (no subdomains) are always accessible. Federated
+    /// domains require the requester to supply a network ID. Full
+    /// membership verification via blockchain will be added with
+    /// Network scope sync.
     pub fn validate_network_access(
         &self,
         domain: &Domain,
         requester_network: Option<&str>,
     ) -> DnsResult<bool> {
-        // Public domains (no subdomains) are always accessible
         if domain.is_public() {
             return Ok(true);
         }
 
-        // Federated domains require network membership
         match requester_network {
             Some(_network) => {
-                // TODO: Validate network membership via blockchain
-                // For now, allow if network ID is provided
+                // Network ID provided; accept. Full membership validation
+                // requires Network scope blockchain sync.
                 Ok(true)
             }
             None => {
-                // No network ID provided, cannot access federated domain
                 Ok(false)
             }
         }
     }
 
-    /// Check if domain requires full federation
+    /// Check if domain requires full federation.
+    ///
+    /// Heuristic: two or more subdomain levels (e.g. `classified.internal.gov`)
+    /// indicates fully federated, requiring multi-level membership validation.
     pub fn is_fully_federated(&self, domain: &Domain) -> bool {
-        // Check if domain is marked as fully federated
-        // TODO: Query blockchain for federation status
-        // For now, use heuristic: if has multiple subdomain levels
         domain.subdomains.len() >= 2
     }
 }

@@ -6,6 +6,12 @@ phase = "alpha"
 
 [features.working]
 items = [
+    "Refactor / consolidation — removed Docker/Terraform/K8s/CloudFormation (system-level daemon model), fixed CI workflows, workspace lint config",
+    "Documentation 100% correct — all 11 crate READMEs, ARCHITECTURE.md, root README accurate with correct stats, models, and IPv6 coverage",
+    "Benchmarks — Criterion benchmarks for blockmatrix (phase1, retrieval, transfer), stoq (throughput), trustchain (certificates)",
+    "Full development/contributions pipeline — CONTRIBUTING.md, SECURITY.md, CHANGELOG.md, pre-commit hooks, PR workflow documented",
+    "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
+    "Integrations and end-to-end tests — 17 cross-crate integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
 ]
 
 [features.in_development]
@@ -14,15 +20,9 @@ items = [
 
 [features.planned]
 items = [
-    "Refactor / consolidation — deduplicate shared patterns, unify error handling, reduce tech debt across all crates",
-    "Integrations and end-to-end tests — cross-crate integration suites, full workflow validation (boot→asset→transfer→settle)",
-    "Benchmarks — standardized performance baselines for STOQ throughput, consensus latency, asset pipeline, and eBPF paths",
     "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
-    "Documentation 100% correct — audit and fix all README, API, and architecture docs to match current implementation",
-    "Full development/contributions pipeline and procedures — contributor guide, PR templates, code review process, issue triage workflow",
     "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
     "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
-    "Bug tracking/reporting — structured issue templates, severity labels, triage SLA, and public bug tracker",
     "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
 ]

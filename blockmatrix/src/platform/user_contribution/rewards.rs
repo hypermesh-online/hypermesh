@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Reward calculation engine and reputation system
+//! Reward calculation engine and authentication config
 
 use std::collections::HashMap;
 use crate::assets::core::AssetType;
@@ -11,7 +11,7 @@ use crate::assets::core::AssetType;
 pub struct RewardEngine {
     pub base_rates: HashMap<AssetType, f64>,
     pub performance_multipliers: PerformanceMultipliers,
-    pub reputation_system: ReputationSystem,
+    pub authentication_config: AuthenticationConfig,
 }
 
 /// Performance multipliers for reward calculation
@@ -23,14 +23,11 @@ pub struct PerformanceMultipliers {
     pub response_time_multiplier: f64,
 }
 
-/// Reputation system for users
+/// Binary authentication config for reward eligibility
 #[derive(Debug, Clone)]
-pub struct ReputationSystem {
-    pub base_reputation: f64,
-    pub uptime_weight: f64,
-    pub performance_weight: f64,
-    pub user_feedback_weight: f64,
-    pub tenure_weight: f64,
+pub struct AuthenticationConfig {
+    /// Whether authentication is required for rewards
+    pub require_authentication: bool,
 }
 
 impl RewardEngine {
@@ -50,12 +47,8 @@ impl RewardEngine {
                 user_satisfaction_multiplier: 1.15,
                 response_time_multiplier: 1.05,
             },
-            reputation_system: ReputationSystem {
-                base_reputation: 1.0,
-                uptime_weight: 0.3,
-                performance_weight: 0.3,
-                user_feedback_weight: 0.25,
-                tenure_weight: 0.15,
+            authentication_config: AuthenticationConfig {
+                require_authentication: true,
             },
         }
     }

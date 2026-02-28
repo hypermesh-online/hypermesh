@@ -13,7 +13,7 @@ use hypermesh_lib::PrivacyMode;
 use stoq::transport::{StoqTransport, TransportConfig};
 use stoq::transport::certificate_strategy::NetworkType;
 use stoq::protocol::{
-    MatrixPosition, PosToken, ProofOfSpace, ProofOfStake,
+    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake,
     ProofOfWork, ProofOfTime,
 };
 use tracing::{info, Level};
@@ -188,11 +188,8 @@ async fn demo_asset_verification(transport: &StoqTransport) -> Result<()> {
     let asset_data = b"Example asset data for verification";
     let asset_id = b"asset_demo_123";
 
-    // Compute hash
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(asset_data);
-    let content_hash: [u8; 32] = hasher.finalize().into();
+    // Compute BLAKE3 hash (matching library implementation)
+    let content_hash: [u8; 32] = *blake3::hash(asset_data).as_bytes();
 
     info!("Asset ID: {:?}", String::from_utf8_lossy(asset_id));
     info!("Asset size: {} bytes", asset_data.len());

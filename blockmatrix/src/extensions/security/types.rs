@@ -101,8 +101,8 @@ pub struct SecurityPolicy {
     /// Require signed code
     pub require_signed: bool,
 
-    /// Minimum trust score
-    pub min_trust_score: f32,
+    /// Whether the extension must be authenticated
+    pub require_authentication: bool,
 }
 
 impl Default for SecurityPolicy {
@@ -116,7 +116,7 @@ impl Default for SecurityPolicy {
             allowed_paths: Vec::new(),
             max_execution_time: Duration::from_secs(300),
             require_signed: true,
-            min_trust_score: 0.5,
+            require_authentication: true,
         }
     }
 }

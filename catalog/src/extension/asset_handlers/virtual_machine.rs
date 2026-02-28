@@ -9,7 +9,7 @@ use super::{
     AssetOperation, OperationResult, DeploymentResult, ExecutionResult,
     ResourceUsageReport,
     AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof, Digest,
+    ConsensusProof,
 };
 
 /// Handler for Virtual Machine assets (Lua, WASM, etc.)
@@ -70,11 +70,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
                 domain_name: "catalog_vm".to_string(),
-                domain_hash: {
-                    let mut hasher = sha2::Sha256::new();
-                    hasher.update(b"catalog_vm");
-                    hasher.finalize().into()
-                },
+                domain_hash: *blake3::hash(b"catalog_vm").as_bytes(),
             }),
         );
 

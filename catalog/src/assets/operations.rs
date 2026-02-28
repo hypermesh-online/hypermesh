@@ -124,11 +124,9 @@ impl AssetPackage {
         Ok(())
     }
 
-    /// Compute package hash for integrity verification
+    /// Compute package hash for integrity verification (BLAKE3)
     fn compute_hash(&mut self) -> Result<()> {
-        use sha2::{Sha256, Digest};
-
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         let spec_json = serde_json::to_string(&self.spec)?;
         hasher.update(spec_json.as_bytes());
         hasher.update(self.content.main_content.as_bytes());
@@ -144,7 +142,7 @@ impl AssetPackage {
         }
 
         let result = hasher.finalize();
-        self.package_hash = hex::encode(result);
+        self.package_hash = result.to_hex().to_string();
 
         Ok(())
     }
@@ -232,7 +230,7 @@ spec:
   security:
     consensus_required: false
     certificate_pinning: false
-    hash_validation: "sha256"
+    hash_validation: "blake3"
     sandbox_level: "standard"
     allowed_syscalls: []
     network_access:
@@ -313,7 +311,7 @@ spec:
                     security: AssetSecurity {
                         consensus_required: false,
                         certificate_pinning: false,
-                        hash_validation: "sha256".to_string(),
+                        hash_validation: "blake3".to_string(),
                         sandbox_level: "standard".to_string(),
                         allowed_syscalls: vec![],
                         network_access: NetworkAccess {

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet, BTreeMap};
 use std::time::{Duration, SystemTime};
-use sha2::{Sha256, Digest};
+// BLAKE3 used via blake3::hash() for DHT node identity
 
 use crate::assets::AssetPackageId;
 use super::stoq_transport::{StoqTransportLayer, RequestType, ResponseData, PackageAnnouncement};
@@ -44,12 +44,8 @@ impl DhtNodeId {
 
     /// Create node ID from address
     pub fn from_address(addr: &std::net::SocketAddr) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(addr.to_string().as_bytes());
-        let result = hasher.finalize();
-        let mut id = [0u8; 32];
-        id.copy_from_slice(&result[..32]);
-        Self { id }
+        let hash = blake3::hash(addr.to_string().as_bytes());
+        Self { id: *hash.as_bytes() }
     }
 
     /// Calculate XOR distance between two node IDs
@@ -181,22 +177,14 @@ struct ValueKey([u8; 32]);
 impl ValueKey {
     /// Create key from package ID
     fn from_package_id(id: &AssetPackageId) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(id.as_bytes());
-        let result = hasher.finalize();
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&result[..32]);
-        Self(key)
+        let hash = blake3::hash(id.as_bytes());
+        Self(*hash.as_bytes())
     }
 
     /// Create key from search query
     fn from_query(query: &str) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(query.as_bytes());
-        let result = hasher.finalize();
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&result[..32]);
-        Self(key)
+        let hash = blake3::hash(query.as_bytes());
+        Self(*hash.as_bytes())
     }
 }
 

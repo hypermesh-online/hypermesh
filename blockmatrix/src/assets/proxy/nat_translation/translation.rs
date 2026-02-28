@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use sha2::{Digest, Sha256};
+use blake3;
 use libc::{mmap, munmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FAILED};
 
 use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ProxyAddress};
@@ -293,7 +293,7 @@ impl NATTranslator {
 
     /// Generate local node ID
     fn generate_local_node_id() -> [u8; 8] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
 
         let time_secs = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -305,7 +305,7 @@ impl NATTranslator {
 
         let result = hasher.finalize();
         let mut node_id = [0u8; 8];
-        node_id.copy_from_slice(&result[..8]);
+        node_id.copy_from_slice(&result.as_bytes()[..8]);
         node_id
     }
 

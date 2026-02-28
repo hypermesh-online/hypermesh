@@ -65,8 +65,8 @@ pub struct TierRequirements {
     /// Minimum stake amount
     pub min_stake_amount: u64,
 
-    /// Minimum trust score
-    pub min_trust_score: f32,
+    /// Whether authentication is required
+    pub require_authentication: bool,
 }
 
 /// Benefits provided by reward tier
@@ -186,7 +186,7 @@ pub enum PerformanceMetric {
     Throughput,
     ResourceUtilization,
     SecurityScore,
-    TrustScore,
+    AuthenticationRate,
     ConsensusParticipation,
     PeerRating,
 }

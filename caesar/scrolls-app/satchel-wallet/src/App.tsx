@@ -165,7 +165,7 @@ function App() {
           <div className="text-3xl font-bold mb-1">{ecosystem.total_entities}</div>
           <div className="text-green-200 text-sm">Connected Entities</div>
           <div className="mt-2 text-xs text-green-200">
-            Trust Score: {(ecosystem.overall_trust_score * 100).toFixed(0)}%
+            Auth Rate: {(ecosystem.authentication_rate * 100).toFixed(0)}%
           </div>
         </div>
 

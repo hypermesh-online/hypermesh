@@ -615,8 +615,8 @@ impl DnsOverStoq {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::Ipv6Addr;
-    use trust_dns_proto::rr::{RecordType, DNSClass};
+    
+    
 
     async fn create_test_resolver() -> Result<DnsOverStoq, Box<dyn std::error::Error>> {
         // Create a mock STOQ client for testing

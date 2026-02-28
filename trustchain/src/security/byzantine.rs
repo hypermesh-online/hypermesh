@@ -541,7 +541,7 @@ impl ByzantineDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::{ConsensusProof, StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+    use crate::consensus::ConsensusProof;
 
     #[tokio::test]
     async fn test_byzantine_detector_creation() {

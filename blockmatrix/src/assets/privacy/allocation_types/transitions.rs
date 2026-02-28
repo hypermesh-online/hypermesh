@@ -70,7 +70,7 @@ pub struct ValidationCriterion {
 /// Types of validation criteria
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ValidationCriterionType {
-    TrustScore,
+    AuthenticationCheck,
     StakeAmount,
     HistoryCheck,
     PerformanceMetric,

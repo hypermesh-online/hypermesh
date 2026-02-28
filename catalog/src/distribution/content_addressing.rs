@@ -8,10 +8,9 @@
 
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
-use sha2::{Sha256, Digest};
 use crate::assets::AssetPackage;
 
-/// Content address (SHA-256 hash)
+/// Content address (BLAKE3 hash)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContentAddress {
     hash: [u8; 32],
@@ -20,12 +19,8 @@ pub struct ContentAddress {
 impl ContentAddress {
     /// Create content address from data
     pub fn from_data(data: &[u8]) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result[..32]);
-        Self { hash }
+        let hash_output = blake3::hash(data);
+        Self { hash: *hash_output.as_bytes() }
     }
 
     /// Convert to hex string
@@ -125,13 +120,11 @@ impl MerkleTree {
 
     /// Hash two nodes together
     fn hash_pair(left: &ContentAddress, right: &ContentAddress) -> ContentAddress {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(left.as_bytes());
         hasher.update(right.as_bytes());
         let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result[..32]);
-        ContentAddress { hash }
+        ContentAddress { hash: *result.as_bytes() }
     }
 
     /// Convert package to chunks

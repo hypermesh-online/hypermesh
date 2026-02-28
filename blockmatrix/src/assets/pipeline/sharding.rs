@@ -100,10 +100,7 @@ pub struct Shard {
 impl Shard {
     /// Calculate hash of shard data
     fn calculate_hash(data: &[u8]) -> String {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        hex::encode(hasher.finalize())
+        hex::encode(blake3::hash(data).as_bytes())
     }
 
     /// Verify shard integrity

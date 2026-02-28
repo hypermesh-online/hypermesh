@@ -276,7 +276,7 @@ pub struct VpnRestrictions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserConditions {
     pub required_groups: Vec<String>,
-    pub min_trust_score: f32,
+    pub require_authentication: bool,
     pub required_certificates: Vec<String>,
     pub mfa_requirements: MfaRequirements,
 }

@@ -216,7 +216,8 @@ fn bench_shard_map_operations(c: &mut Criterion) {
 }
 
 fn bench_replica_selection(c: &mut Criterion) {
-    use blockmatrix::retrieval::{FallbackManager, SelectionCriteria, FallbackStrategy};
+    use blockmatrix::retrieval::{FallbackManager, FallbackStrategy};
+    use blockmatrix::retrieval::fallback::SelectionCriteria;
 
     let mut group = c.benchmark_group("replica_selection");
 

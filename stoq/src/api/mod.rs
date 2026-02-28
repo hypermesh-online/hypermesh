@@ -396,7 +396,7 @@ impl StoqApiClient {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     // TODO: Add STOQ API integration tests
 }

@@ -106,7 +106,7 @@ spec:
   security:
     consensus_required: false
     certificate_pinning: false
-    hash_validation: "sha256"
+    hash_validation: "blake3"
     sandbox_level: "{{sandbox_level}}"
     allowed_syscalls: []
     network_access:

@@ -224,10 +224,8 @@ async fn search_result_has_publisher_score_and_tier_fields() {
     let results = reg.search_types(&query).await.expect("test: search");
     let result = &results.results[0];
 
-    // publisher_score and publisher_tier are Option — should exist on the struct
-    // They default to None until a reputation system wires them in
-    assert!(result.publisher_score.is_none() || result.publisher_score.is_some());
-    assert!(result.publisher_tier.is_none() || result.publisher_tier.is_some());
+    // publisher_authenticated is binary authentication (whitepaper-aligned)
+    let _auth = result.publisher_authenticated; // Option<bool> — exists on struct
 }
 
 #[tokio::test]

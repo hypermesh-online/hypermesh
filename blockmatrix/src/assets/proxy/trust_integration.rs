@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use blake3;
 
 use crate::assets::core::{AssetResult, AssetError, ProxyNodeInfo, ProxyCapabilities};
 
@@ -166,8 +166,8 @@ pub struct ValidationResult {
     /// Trust level determined (0.0 - 1.0)
     pub trust_level: f32,
 
-    /// Trust score (alias for trust_level for compatibility)
-    pub trust_score: f32,
+    /// Chain validation depth (alias for trust_level)
+    pub chain_depth: f32,
 
     /// Validation reason/message
     pub validation_message: String,
@@ -422,7 +422,7 @@ impl TrustChainIntegration {
             certificate_fingerprint: trust_chain.end_entity_fingerprint.clone(),
             is_valid,
             trust_level,
-            trust_score: trust_level, // Use same value for compatibility
+            chain_depth: trust_level, // Same value as trust_level
             validation_message,
             errors: if is_valid { Vec::new() } else { vec![validation_message_clone] },
             validated_at: SystemTime::now(),
@@ -474,7 +474,7 @@ impl TrustChainIntegration {
     
     /// Generate chain ID
     fn generate_chain_id(&self, certificate_fingerprint: &str) -> AssetResult<String> {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(certificate_fingerprint.as_bytes());
         let nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -484,7 +484,7 @@ impl TrustChainIntegration {
             .as_nanos();
         hasher.update(&nanos.to_le_bytes());
         let hash = hasher.finalize();
-        Ok(hex::encode(&hash[..16]))
+        Ok(hex::encode(&hash.as_bytes()[..16]))
     }
     
     /// Add certificate to revocation list
@@ -528,7 +528,7 @@ impl TrustChainIntegration {
                 bandwidth_mbps: 0,
                 protocols: vec![],
             },
-            trust_score: 0.0,
+            is_authenticated: false,
             last_heartbeat: SystemTime::now(),
             certificate_fingerprint: certificate_fingerprint.to_string(),
         };
@@ -598,7 +598,7 @@ impl CertificateValidator {
             certificate_fingerprint: certificate_fingerprint.to_string(),
             is_valid: true,
             trust_level: 0.0,
-            trust_score: 0.0,
+            chain_depth: 0.0,
             validation_message: String::new(),
             errors: Vec::new(),
             validated_at: SystemTime::now(),
@@ -608,7 +608,7 @@ impl CertificateValidator {
         // Check if it's a known root CA
         if self.root_cas.contains_key(certificate_fingerprint) {
             result.trust_level = 1.0;
-            result.trust_score = 1.0;
+            result.chain_depth = 1.0;
             result.validation_message = "Root CA certificate".to_string();
             return Ok(result);
         }
@@ -618,11 +618,11 @@ impl CertificateValidator {
             // Validate chain to root
             if self.root_cas.contains_key(&intermediate.parent_ca_id) {
                 result.trust_level = 0.9;
-                result.trust_score = 0.9;
+                result.chain_depth = 0.9;
                 result.validation_message = "Valid intermediate CA with trusted root".to_string();
             } else {
                 result.trust_level = 0.7;
-                result.trust_score = 0.7;
+                result.chain_depth = 0.7;
                 result.validation_message = "Intermediate CA with unverified root".to_string();
             }
             return Ok(result);
@@ -631,12 +631,12 @@ impl CertificateValidator {
         // For unknown certificates in non-strict mode, assign basic trust
         if !self.validation_config.strict_mode || self.validation_config.allow_self_signed {
             result.trust_level = 0.5;
-            result.trust_score = 0.5;
+            result.chain_depth = 0.5;
             result.validation_message = "Self-signed or unknown certificate accepted in non-strict mode".to_string();
         } else {
             result.is_valid = false;
             result.trust_level = 0.0;
-            result.trust_score = 0.0;
+            result.chain_depth = 0.0;
             result.validation_message = "Certificate validation failed".to_string();
             result.errors.push("Unknown certificate in strict mode".to_string());
         }
@@ -669,7 +669,7 @@ mod tests {
                 bandwidth_mbps: 1000,
                 protocols: vec!["HTTP".to_string(), "SOCKS5".to_string()],
             },
-            trust_score: 0.8,
+            is_authenticated: true,
             last_heartbeat: SystemTime::now(),
             certificate_fingerprint: "test-cert-fingerprint".to_string(),
         }

@@ -234,8 +234,7 @@ impl CatalogRegistry {
                 type_name: type_name.clone(),
                 asset_id: asset_id.clone(),
                 score: total_score,
-                publisher_score: None,
-                publisher_tier: None,
+                publisher_authenticated: None,
             });
         }
 
@@ -405,13 +404,9 @@ pub struct SearchResult {
     /// Relevance score (0.0 - 1.0)
     pub score: f64,
 
-    /// Publisher reputation score (0.0 - 1.0), if available
+    /// Publisher authentication status
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub publisher_score: Option<f64>,
-
-    /// Publisher tier
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub publisher_tier: Option<String>,
+    pub publisher_authenticated: Option<bool>,
 }
 
 /// Search results

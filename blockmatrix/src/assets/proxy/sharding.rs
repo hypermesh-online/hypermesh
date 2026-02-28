@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use blake3;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
 use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
@@ -413,18 +413,12 @@ impl ShardedDataAccess {
     
     /// Calculate checksum for integrity verification
     fn calculate_checksum(&self, data: &[u8]) -> [u8; 32] {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        
-        let result = hasher.finalize();
-        let mut checksum = [0u8; 32];
-        checksum.copy_from_slice(&result);
-        checksum
+        *blake3::hash(data).as_bytes()
     }
-    
+
     /// Generate session ID
     fn generate_session_id(&self, asset_id: &AssetRegistration) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&asset_id.content_hash[..16]);
 
         let time_nanos = SystemTime::now()
@@ -436,7 +430,7 @@ impl ShardedDataAccess {
         hasher.update(&fastrand::u64(..).to_le_bytes());
 
         let hash = hasher.finalize();
-        hex::encode(&hash[..16])
+        hex::encode(&hash.as_bytes()[..16])
     }
     
     /// Get session progress
@@ -544,14 +538,7 @@ impl ShardManager {
             let encrypted_data = self.encrypt_shard_data(shard_data, &mut encryption_metadata).await?;
             
             // Calculate checksum
-            let checksum = {
-                let mut hasher = Sha256::new();
-                hasher.update(shard_data);
-                let result = hasher.finalize();
-                let mut checksum = [0u8; 32];
-                checksum.copy_from_slice(&result);
-                checksum
-            };
+            let checksum = *blake3::hash(shard_data).as_bytes();
             
             // Create shard
             let shard = EncryptedShard {
@@ -678,12 +665,12 @@ impl ShardManager {
         Ok(buffer)
     }
 
-    /// Derive AES-256 key from Kyber shared secret via SHA-256
+    /// Derive AES-256 key from Kyber shared secret via BLAKE3
     fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(b"KYBER-1024-SHARD-AES-KEY:");
         hasher.update(shared_secret);
-        hasher.finalize().into()
+        *hasher.finalize().as_bytes()
     }
 }
 

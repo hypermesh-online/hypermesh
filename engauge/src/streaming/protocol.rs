@@ -71,6 +71,8 @@ pub enum MetricsPayload {
     Routing(RoutingSnapshot),
     /// Economic activity metrics (in-flight float, settlement rate, packets).
     Economic(EconomicSnapshot),
+    /// Spatial verification results from PoSPing probes.
+    Verification(VerificationSnapshot),
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,21 @@ pub struct EconomicSnapshot {
     pub settlement_rate_per_epoch: f64,
     /// Number of active CAES packets.
     pub active_packets: u32,
+}
+
+/// Point-in-time spatial verification results from PoSPing probes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationSnapshot {
+    /// Number of PoSPing probes sent this epoch.
+    pub probes_sent: u32,
+    /// Number of probes that returned consistent.
+    pub probes_passed: u32,
+    /// Average response time in microseconds.
+    pub avg_response_time_us: u64,
+    /// Consistency ratio (probes_passed / probes_sent), 0.0 to 1.0.
+    pub consistency_ratio: f64,
+    /// Epoch number these results cover.
+    pub epoch: u64,
 }
 
 // ===========================================================================
@@ -275,6 +292,41 @@ mod tests {
                 assert_eq!(e.active_packets, 7);
             }
             _ => panic!("test: expected Economic payload"),
+        }
+    }
+
+    fn verification_frame() -> MetricsFrame {
+        MetricsFrame {
+            source_node: test_node(),
+            timestamp_us: 1_700_000_000_000_004,
+            privacy_mode: PrivacyMode::PUBLIC,
+            payload: MetricsPayload::Verification(VerificationSnapshot {
+                probes_sent: 100,
+                probes_passed: 95,
+                avg_response_time_us: 1200,
+                consistency_ratio: 0.95,
+                epoch: 42,
+            }),
+            sequence: 5,
+        }
+    }
+
+    #[test]
+    fn encode_decode_verification_roundtrip() {
+        let frame = verification_frame();
+        let bytes = frame.encode().expect("test: encode frame");
+        let decoded = MetricsFrame::decode(&bytes)
+            .expect("test: decode verification frame");
+        assert_eq!(decoded.sequence, 5);
+        match &decoded.payload {
+            MetricsPayload::Verification(v) => {
+                assert_eq!(v.probes_sent, 100);
+                assert_eq!(v.probes_passed, 95);
+                assert_eq!(v.avg_response_time_us, 1200);
+                assert!((v.consistency_ratio - 0.95).abs() < 1e-9);
+                assert_eq!(v.epoch, 42);
+            }
+            _ => unreachable!("test: expected Verification payload"), // test-only
         }
     }
 

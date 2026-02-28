@@ -32,7 +32,7 @@ impl Default for TierRequirements {
             min_utilization_rate: 0.0,
             min_consensus_success_rate: 0.0,
             min_stake_amount: 0,
-            min_trust_score: 0.0,
+            require_authentication: false,
         }
     }
 }

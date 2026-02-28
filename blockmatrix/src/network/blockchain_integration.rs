@@ -486,12 +486,11 @@ impl MatrixPositionValidator {
 
     /// Hash a matrix position for inclusion in proofs
     fn hash_position(&self, coordinate: &MatrixCoordinate) -> String {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&coordinate.x.to_le_bytes());
         hasher.update(&coordinate.y.to_le_bytes());
         hasher.update(&coordinate.z.to_le_bytes());
-        format!("{:x}", hasher.finalize())
+        hex::encode(hasher.finalize().as_bytes())
     }
 
     /// Get a registered position

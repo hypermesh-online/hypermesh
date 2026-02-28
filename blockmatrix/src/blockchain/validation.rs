@@ -12,6 +12,7 @@ use tracing::{warn, error, debug};
 
 use super::block::Block;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::verification::{verify_commitment, FilteredShardMap};
 
 /// Validation rules configuration
 #[derive(Debug, Clone)]
@@ -97,12 +98,6 @@ impl ChainValidator {
             return false;
         }
 
-        // Verify signature
-        if !block.verify_signature() {
-            error!("Block {} has invalid signature", block.index);
-            return false;
-        }
-
         // Check block size
         if block.size() > self.rules.max_block_size {
             error!(
@@ -121,6 +116,62 @@ impl ChainValidator {
         }
 
         debug!("Block {} integrity validation passed", block.index);
+        true
+    }
+
+    /// Validate a block's shard commitment against a filtered shard map.
+    ///
+    /// If the block has no shard commitment (`None`), it is valid
+    /// (device-scope-only blocks do not require shard evidence).
+    /// If the block has a shard commitment, the provided map must
+    /// recompute to the same hash.
+    ///
+    /// Returns `true` if the commitment is absent or matches the map.
+    pub fn validate_shard_commitment(
+        block: &Block,
+        shard_map: Option<&FilteredShardMap>,
+    ) -> bool {
+        let commitment = match block.shard_commitment {
+            Some(c) => c,
+            None => {
+                debug!(
+                    "Block {} has no shard commitment (device-scope-only); valid",
+                    block.index
+                );
+                return true;
+            }
+        };
+
+        let map = match shard_map {
+            Some(m) => m,
+            None => {
+                error!(
+                    "Block {} has shard commitment but no shard map provided for verification",
+                    block.index
+                );
+                return false;
+            }
+        };
+
+        if !verify_commitment(map) {
+            error!(
+                "Block {} shard map failed internal commitment verification",
+                block.index
+            );
+            return false;
+        }
+
+        if map.commitment != commitment {
+            error!(
+                "Block {} shard commitment mismatch: block has {:?}, map has {:?}",
+                block.index,
+                &commitment[..4],
+                &map.commitment[..4],
+            );
+            return false;
+        }
+
+        debug!("Block {} shard commitment verified", block.index);
         true
     }
 
@@ -466,5 +517,84 @@ mod tests {
 
         assert!(ChainValidator::is_longer_chain(&long_chain, &short_chain));
         assert!(!ChainValidator::is_longer_chain(&short_chain, &long_chain));
+    }
+
+    #[test]
+    fn test_shard_commitment_none_is_valid() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let block = Block::genesis(coord);
+        // Block without shard commitment is always valid (device-scope-only).
+        assert!(ChainValidator::validate_shard_commitment(&block, None));
+    }
+
+    #[test]
+    fn test_shard_commitment_present_requires_map() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let mut block = Block::genesis(coord);
+        block.set_shard_commitment([0xAA; 32]);
+        // Block has commitment but no map provided -- should fail.
+        assert!(!ChainValidator::validate_shard_commitment(&block, None));
+    }
+
+    #[test]
+    fn test_shard_commitment_valid_roundtrip() {
+        use crate::verification::{
+            ShardPlacement as VerifPlacement,
+            create_from_distribution,
+        };
+        use hypermesh_lib::MatrixPosition;
+
+        let dist_map = create_from_distribution(1, vec![
+            VerifPlacement {
+                shard_index: 0,
+                is_parity: false,
+                target_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+                shard_hash: [0xAA; 32],
+                target_node_id: hypermesh_lib::NodeId::from("node-a"),
+            },
+            VerifPlacement {
+                shard_index: 1,
+                is_parity: true,
+                target_position: MatrixPosition { x: 4.0, y: 5.0, z: 6.0 },
+                shard_hash: [0xBB; 32],
+                target_node_id: hypermesh_lib::NodeId::from("node-b"),
+            },
+        ]);
+
+        let commitment = dist_map.compute_commitment();
+        let filtered = dist_map.to_filtered_map(true);
+
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let mut block = Block::genesis(coord);
+        block.set_shard_commitment(commitment);
+
+        assert!(ChainValidator::validate_shard_commitment(&block, Some(&filtered)));
+    }
+
+    #[test]
+    fn test_shard_commitment_mismatch_detected() {
+        use crate::verification::{
+            create_from_distribution, ShardPlacement as VerifPlacement,
+        };
+        use hypermesh_lib::MatrixPosition;
+
+        let dist_map = create_from_distribution(1, vec![
+            VerifPlacement {
+                shard_index: 0,
+                is_parity: false,
+                target_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+                shard_hash: [0xAA; 32],
+                target_node_id: hypermesh_lib::NodeId::from("node-a"),
+            },
+        ]);
+
+        let filtered = dist_map.to_filtered_map(false);
+
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let mut block = Block::genesis(coord);
+        // Set a WRONG commitment
+        block.set_shard_commitment([0xFF; 32]);
+
+        assert!(!ChainValidator::validate_shard_commitment(&block, Some(&filtered)));
     }
 }

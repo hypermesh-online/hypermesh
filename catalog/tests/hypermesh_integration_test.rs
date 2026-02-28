@@ -248,7 +248,7 @@ fn create_test_asset_package(id: &str, name: &str, version: &str) -> AssetPackag
             binary_contents: HashMap::new(),
         },
         validation: AssetValidation {
-            hash_algorithm: "sha256".to_string(),
+            hash_algorithm: "blake3".to_string(),
             content_hash: format!("hash-{}", id),
             signature: None,
             verified: false,

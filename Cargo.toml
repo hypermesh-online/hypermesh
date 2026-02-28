@@ -243,6 +243,7 @@ tokio-test = { workspace = true }
 lazy_static = { workspace = true }
 trustchain = { path = "trustchain", features = ["localhost-testing"] }
 blockmatrix = { path = "blockmatrix" }
+hypermesh-lib = { workspace = true }
 
 [features]
 default = ["blockmatrix-full", "high-performance"]

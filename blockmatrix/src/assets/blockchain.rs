@@ -112,34 +112,29 @@ impl HyperMeshAssetRecord {
 
     /// Get asset record hash for blockchain inclusion
     pub fn calculate_hash(&self) -> [u8; 32] {
-        use sha2::{Sha256, Digest};
-        
-        let mut hasher = Sha256::new();
-        
+        let mut hasher = blake3::Hasher::new();
+
         // Hash asset ID
         hasher.update(self.asset_id.to_hex_string().as_bytes());
-        
+
         // Hash record type
         hasher.update(self.record_type.to_string().as_bytes());
-        
+
         // Hash authority
         hasher.update(self.issuing_authority.as_bytes());
-        
+
         // Hash data payload
         hasher.update(&self.data_payload);
-        
+
         // Hash timestamp
         if let Ok(duration) = self.timestamp.duration_since(SystemTime::UNIX_EPOCH) {
             hasher.update(&duration.as_micros().to_le_bytes());
         }
-        
+
         // Hash privacy level
         hasher.update(&[asset_privacy_to_u8(&self.privacy_level)]);
-        
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result);
-        hash
+
+        *hasher.finalize().as_bytes()
     }
 
     /// Check if asset record meets privacy requirements.

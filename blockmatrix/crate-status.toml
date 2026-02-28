@@ -29,12 +29,29 @@ items = [
     "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
     "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
     "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
+    "BLAKE3 content hashing (whitepaper-aligned)",
+    "Capability-based GPU detection (honest fallback, no fake hardware)",
+    "StateAuthenticator trait (renamed from ConsensusValidator)",
+    "Shard commitment (BLAKE3 hash anchoring blocks to spatial shard evidence)",
+    "PoSPing spatial verification (epoch-seeded bilateral probes, scope-gated, binary result)",
+    "IPv6 asset addressing (AssetAddress: fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
+    "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
+    "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
 ]
 
 [features.in_development]
 items = [
+    "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
 ]
 
 [features.planned]
 items = [
+    "Genesis capability assessment — instantiate CPU/GPU/RAM/Storage/Network/Transmission as IPv6-addressed assets with PoS at boot (R1, R10)",
+    "Swarm distribution protocol — announce/discover/serve shards, consumers become providers, O(log N) per-node load (R12)",
+    "Adaptive erasure coding — Reed-Solomon parameters scale with asset size, no post-creation shard splitting (R14)",
+    "Streaming shard reconstruction — reconstruct as shards arrive, not buffer-all-then-reconstruct (R13)",
+    "Shard migration — copy-then-redirect without blocking reads or causing fault intolerance (R14)",
+    "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
+    "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
+    "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
 ]

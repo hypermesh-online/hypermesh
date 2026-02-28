@@ -9,7 +9,6 @@
 
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration};
-use sha2::{Sha256, Digest};
 use anyhow::{Result, anyhow};
 use rand::Rng;
 use std::fs;
@@ -56,10 +55,10 @@ async fn query_system_storage() -> Result<(u64, u64)> {
     }
 }
 
-/// Generate storage commitment hash
+/// Generate storage commitment hash (BLAKE3)
 async fn generate_storage_commitment(storage_path: &str) -> Result<String> {
     // Generate cryptographic commitment to storage
-    let mut hasher = Sha256::new();
+    let mut hasher = blake3::Hasher::new();
     hasher.update(storage_path.as_bytes());
 
     let timestamp = SystemTime::now()
@@ -68,7 +67,7 @@ async fn generate_storage_commitment(storage_path: &str) -> Result<String> {
         .as_secs();
     hasher.update(&timestamp.to_le_bytes());
 
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 /// Query system computational power
@@ -82,13 +81,13 @@ async fn query_system_compute_power() -> Result<u64> {
     Ok(compute_power)
 }
 
-/// Generate actual work challenges
+/// Generate actual work challenges (BLAKE3)
 async fn generate_work_challenges() -> Result<Vec<String>> {
     let mut challenges = Vec::new();
 
     // Generate cryptographic challenges
     for i in 0..3 {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&(i as u32).to_le_bytes());
 
         let timestamp_nanos = SystemTime::now()
@@ -98,7 +97,7 @@ async fn generate_work_challenges() -> Result<Vec<String>> {
         hasher.update(&timestamp_nanos.to_le_bytes());
         hasher.update(&rand::thread_rng().gen::<u64>().to_le_bytes());
 
-        challenges.push(format!("{:x}", hasher.finalize()));
+        challenges.push(hasher.finalize().to_hex().to_string());
     }
 
     Ok(challenges)
@@ -170,7 +169,7 @@ impl StakeProof {
     }
 
     pub fn sign(&self) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
 
         let timestamp = self.stake_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -181,8 +180,8 @@ impl StakeProof {
             self.stake_holder_id,
             self.stake_amount,
             timestamp
-        ));
-        format!("{:x}", hasher.finalize())
+        ).as_bytes());
+        hasher.finalize().to_hex().to_string()
     }
 }
 
@@ -243,9 +242,9 @@ impl TimeProof {
         let time_verification_timestamp = SystemTime::now();
         let nonce = rand::thread_rng().gen::<u64>();
 
-        // Generate cryptographic proof hash
+        // Generate cryptographic proof hash (BLAKE3)
         let proof_hash = {
-            let mut hasher = Sha256::new();
+            let mut hasher = blake3::Hasher::new();
             hasher.update(&network_time_offset.as_micros().to_le_bytes());
 
             let timestamp_micros = time_verification_timestamp
@@ -254,7 +253,7 @@ impl TimeProof {
                 .unwrap_or(0);
             hasher.update(&timestamp_micros.to_le_bytes());
             hasher.update(&nonce.to_le_bytes());
-            hasher.finalize().to_vec()
+            hasher.finalize().as_bytes().to_vec()
         };
 
         Self {
@@ -342,8 +341,8 @@ impl TimeProof {
 
 impl Proof for TimeProof {
     fn validate(&self) -> bool {
-        // Validate proof hash
-        let mut hasher = Sha256::new();
+        // Validate proof hash (BLAKE3)
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&self.network_time_offset.as_micros().to_le_bytes());
 
         let timestamp_micros = self.time_verification_timestamp
@@ -353,7 +352,7 @@ impl Proof for TimeProof {
         hasher.update(&timestamp_micros.to_le_bytes());
         hasher.update(&self.nonce.to_le_bytes());
 
-        let expected_hash = hasher.finalize().to_vec();
+        let expected_hash = hasher.finalize().as_bytes().to_vec();
         expected_hash == self.proof_hash
     }
 }

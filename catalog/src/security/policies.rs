@@ -39,8 +39,8 @@ pub struct TrustPolicy {
     pub required_checks: RequiredChecks,
     /// Allowed publisher types
     pub allowed_publisher_types: Vec<super::PublisherType>,
-    /// Minimum reputation score
-    pub min_reputation_score: Option<f64>,
+    /// Require publisher certificate authentication
+    pub require_publisher_auth: bool,
     /// Maximum vulnerability severity allowed
     pub max_vulnerability_severity: Option<Severity>,
     /// Allow unsigned packages
@@ -79,8 +79,8 @@ pub enum RuleCondition {
     HasDependency(String),
     /// Certificate issuer matches
     CertificateIssuer(String),
-    /// Reputation below threshold
-    ReputationBelow(f64),
+    /// Publisher not certificate-authenticated
+    PublisherNotAuthenticated,
     /// Contains file pattern
     ContainsFilePattern(String),
     /// Custom condition
@@ -115,8 +115,8 @@ pub struct RequiredChecks {
     pub revocation_check: bool,
     /// Require vulnerability scan
     pub vulnerability_scan: bool,
-    /// Require reputation check
-    pub reputation_check: bool,
+    /// Require publisher authentication check
+    pub publisher_auth_check: bool,
     /// Require consensus validation
     pub consensus_validation: bool,
     /// Require post-quantum signatures
@@ -131,7 +131,7 @@ impl Default for RequiredChecks {
             certificate_chain: true,
             revocation_check: true,
             vulnerability_scan: true,
-            reputation_check: true,
+            publisher_auth_check: true,
             consensus_validation: false,
             pqc_signatures: false,
         }
@@ -189,7 +189,7 @@ impl PolicyEngine {
                 certificate_chain: true,
                 revocation_check: true,
                 vulnerability_scan: true,
-                reputation_check: true,
+                publisher_auth_check: true,
                 consensus_validation: true,
                 pqc_signatures: true,
             },
@@ -197,7 +197,7 @@ impl PolicyEngine {
                 super::PublisherType::Official,
                 super::PublisherType::Organization,
             ],
-            min_reputation_score: Some(0.7),
+            require_publisher_auth: true,
             max_vulnerability_severity: Some(Severity::Low),
             allow_unsigned: false,
             allow_expired_certs: false,
@@ -217,7 +217,7 @@ impl PolicyEngine {
                 super::PublisherType::Community,
                 super::PublisherType::Individual,
             ],
-            min_reputation_score: Some(0.3),
+            require_publisher_auth: true,
             max_vulnerability_severity: Some(Severity::High),
             allow_unsigned: false,
             allow_expired_certs: false,
@@ -236,7 +236,7 @@ impl PolicyEngine {
                 certificate_chain: false,
                 revocation_check: false,
                 vulnerability_scan: true,
-                reputation_check: false,
+                publisher_auth_check: false,
                 consensus_validation: false,
                 pqc_signatures: false,
             },
@@ -247,7 +247,7 @@ impl PolicyEngine {
                 super::PublisherType::Individual,
                 super::PublisherType::Unknown,
             ],
-            min_reputation_score: None,
+            require_publisher_auth: false,
             max_vulnerability_severity: None,
             allow_unsigned: true,
             allow_expired_certs: true,
@@ -313,25 +313,20 @@ impl PolicyEngine {
             }
         }
 
-        // Check reputation score
-        if let Some(min_score) = policy.min_reputation_score {
-            if let Some(score) = verification.reputation_score {
-                if score < min_score {
-                    result.violations.push(PolicyViolation {
-                        violation_type: ViolationType::LowReputation,
-                        severity: Severity::Medium,
-                        description: format!("Publisher reputation {:.2} below required {:.2}",
-                                           score, min_score),
-                        remediation: Some("Wait for publisher to build reputation".to_string()),
-                    });
-                    if policy.level == TrustLevel::Strict {
-                        result.allowed = false;
-                    } else {
-                        result.recommendations.push(
-                            "Warning: Publisher has low reputation score".to_string()
-                        );
-                    }
-                }
+        // Binary publisher authentication check
+        if policy.require_publisher_auth && !verification.publisher_authenticated {
+            result.violations.push(PolicyViolation {
+                violation_type: ViolationType::UnauthenticatedPublisher,
+                severity: Severity::High,
+                description: "Publisher is not certificate-authenticated".to_string(),
+                remediation: Some("Publisher must obtain a valid TrustChain certificate".to_string()),
+            });
+            if policy.level == TrustLevel::Strict {
+                result.allowed = false;
+            } else {
+                result.recommendations.push(
+                    "Warning: Publisher is not certificate-authenticated".to_string()
+                );
             }
         }
 
@@ -440,7 +435,7 @@ impl PolicyEngine {
                 super::PublisherType::Organization,
                 super::PublisherType::Community,
             ],
-            min_reputation_score: Some(0.5),
+            require_publisher_auth: true,
             max_vulnerability_severity: Some(Severity::Medium),
             allow_unsigned: false,
             allow_expired_certs: false,
@@ -452,10 +447,8 @@ impl PolicyEngine {
     /// Evaluate a single rule
     fn evaluate_rule(&self, rule: &PolicyRule, verification: &VerificationResult) -> bool {
         match &rule.condition {
-            RuleCondition::ReputationBelow(threshold) => {
-                verification.reputation_score
-                    .map(|score| score < *threshold)
-                    .unwrap_or(true)
+            RuleCondition::PublisherNotAuthenticated => {
+                !verification.publisher_authenticated
             }
             RuleCondition::PublisherPattern(pattern) => {
                 verification.publisher.as_ref()
@@ -544,7 +537,7 @@ mod tests {
             rules: vec![],
             required_checks: RequiredChecks::default(),
             allowed_publisher_types: vec![crate::security::PublisherType::Official],
-            min_reputation_score: Some(0.9),
+            require_publisher_auth: true,
             max_vulnerability_severity: None,
             allow_unsigned: false,
             allow_expired_certs: false,

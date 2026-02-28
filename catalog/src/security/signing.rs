@@ -10,7 +10,7 @@ use anyhow::{Result, Context, anyhow};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tracing::{info, debug, warn};
-use sha2::{Sha256, Sha512, Digest};
+use sha2::{Sha256, Digest as ShaDigest};
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_traits::sign::SignedMessage;
 
@@ -63,8 +63,10 @@ pub struct PackageHash {
 /// Actual signatures use FALCON at STOQ transport level
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum HashAlgorithm {
+    /// BLAKE3 (primary, whitepaper-aligned)
+    Blake3,
+    /// SHA-256 (legacy, cert fingerprints only)
     Sha256,
-    Sha512,
 }
 
 /// Content included in hash
@@ -184,15 +186,13 @@ impl PackageSigner {
         // Serialize package for hashing
         let package_bytes = self.serialize_package_for_signing(package)?;
 
-        // Use SHA256 for content digest (integrity checking only)
+        // Use BLAKE3 for content digest (integrity checking only)
         // The actual cryptographic signature is done with FALCON-1024
-        let mut hasher = Sha256::new();
-        hasher.update(&package_bytes);
-        let hash = hasher.finalize().to_vec();
+        let hash = blake3::hash(&package_bytes);
 
         Ok(PackageHash {
-            algorithm: HashAlgorithm::Sha256,
-            hash,
+            algorithm: HashAlgorithm::Blake3,
+            hash: hash.as_bytes().to_vec(),
             content_type: ContentHashType::FullPackage,
         })
     }
@@ -420,13 +420,11 @@ impl SignatureVerifier {
 
         // Calculate hash using same algorithm
         let hash = match hash_info.algorithm {
+            HashAlgorithm::Blake3 => {
+                blake3::hash(&package_bytes).as_bytes().to_vec()
+            }
             HashAlgorithm::Sha256 => {
                 let mut hasher = Sha256::new();
-                hasher.update(&package_bytes);
-                hasher.finalize().to_vec()
-            }
-            HashAlgorithm::Sha512 => {
-                let mut hasher = Sha512::new();
                 hasher.update(&package_bytes);
                 hasher.finalize().to_vec()
             }
@@ -544,7 +542,7 @@ impl SignatureVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::{AssetMetadata, AssetContent};
+    
 
     #[test]
     fn test_signature_algorithm_selection() {
@@ -557,32 +555,22 @@ mod tests {
 
     #[test]
     fn test_hash_calculation() {
-        let package = create_test_package();
+        let _package = create_test_package();
 
-        // Test SHA-256 hash
-        let sha256_hasher = |data: &[u8]| -> Vec<u8> {
-            let mut h = Sha256::new();
-            h.update(data);
-            h.finalize().to_vec()
-        };
-
+        // Test BLAKE3 hash
         let data = b"test data";
-        let sha256_hash = sha256_hasher(data);
-        assert_eq!(sha256_hash.len(), 32); // SHA-256 produces 32 bytes
-
-        // Test SHA-512 hash
-        let sha512_hasher = |data: &[u8]| -> Vec<u8> {
-            let mut h = Sha512::new();
-            h.update(data);
-            h.finalize().to_vec()
-        };
-
-        let sha512_hash = sha512_hasher(data);
-        assert_eq!(sha512_hash.len(), 64); // SHA-512 produces 64 bytes
+        let blake3_hash = blake3::hash(data);
+        assert_eq!(blake3_hash.as_bytes().len(), 32); // BLAKE3 produces 32 bytes
 
         // Verify consistent hashing
-        let sha256_hash2 = sha256_hasher(data);
-        assert_eq!(sha256_hash, sha256_hash2);
+        let blake3_hash2 = blake3::hash(data);
+        assert_eq!(blake3_hash, blake3_hash2);
+
+        // Verify SHA-256 still works for cert fingerprints
+        let mut sha_hasher = Sha256::new();
+        sha_hasher.update(data);
+        let sha256_hash = sha_hasher.finalize();
+        assert_eq!(sha256_hash.len(), 32);
     }
 
     #[test]
@@ -640,7 +628,7 @@ mod tests {
                     security: AssetSecurity {
                         consensus_required: false,
                         certificate_pinning: false,
-                        hash_validation: "sha256".to_string(),
+                        hash_validation: "blake3".to_string(),
                         sandbox_level: "standard".to_string(),
                         allowed_syscalls: vec![],
                         network_access: NetworkAccess {

@@ -15,14 +15,14 @@ use trustchain::errors::Result as TrustChainResult;
 
 /// Mock STOQ server for testing
 struct MockStoqServer {
-    bind_addr: Ipv6Addr,
+    _bind_addr: Ipv6Addr,
     port: u16,
 }
 
 impl MockStoqServer {
     fn new() -> Self {
         Self {
-            bind_addr: Ipv6Addr::LOCALHOST,
+            _bind_addr: Ipv6Addr::LOCALHOST,
             port: 0, // Use ephemeral port
         }
     }
@@ -164,7 +164,7 @@ async fn test_connection_pooling() {
         // Get transport stats instead of pool stats
         let stats = client.get_transport_stats();
         // Transport stats always exist, no need for is_ok() check
-        assert!(stats.total_connections >= 0, "Should have transport statistics");
+        let _ = stats.total_connections;
     }
 }
 

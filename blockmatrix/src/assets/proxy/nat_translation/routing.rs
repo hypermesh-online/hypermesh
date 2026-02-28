@@ -6,7 +6,7 @@
 
 use std::net::{Ipv6Addr, SocketAddrV6};
 use std::time::SystemTime;
-use sha2::{Digest, Sha256};
+use blake3;
 
 use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 use super::types::{GlobalAddress, GlobalAddressType};
@@ -134,16 +134,13 @@ impl GlobalAddress {
 
     /// Generate address hash for validation
     pub fn hash(&self) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&self.network_prefix);
         hasher.update(&self.node_id);
         hasher.update(&self.asset_id);
         hasher.update(&self.service_port.to_le_bytes());
         hasher.update(&format!("{:?}", self.address_type).as_bytes());
 
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result);
-        hash
+        *hasher.finalize().as_bytes()
     }
 }

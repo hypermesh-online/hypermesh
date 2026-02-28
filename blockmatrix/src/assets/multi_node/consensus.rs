@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use sha2::{Digest, Sha256};
+use blake3;
 
 use crate::assets::core::{
     AssetRegistration, AssetResult, AssetError,
@@ -541,14 +541,14 @@ impl ConsensusManager {
                 network_time_offset: Duration::from_secs(0),
                 time_verification_timestamp: SystemTime::now(),
                 nonce: rand::random(),
-                proof_hash: Sha256::digest(&proposal.signature).to_vec(),
+                proof_hash: blake3::hash(&proposal.signature).as_bytes().to_vec(),
             },
             SpaceProof {
                 node_id: hex::encode(&self.local_node.id[..8]),
                 storage_path: "/consensus".to_string(),
                 total_size: 1024,
                 total_storage: 10240,
-                file_hash: hex::encode(Sha256::digest(&proposal.signature)),
+                file_hash: hex::encode(blake3::hash(&proposal.signature).as_bytes()),
                 proof_timestamp: SystemTime::now(),
             },
             WorkProof {

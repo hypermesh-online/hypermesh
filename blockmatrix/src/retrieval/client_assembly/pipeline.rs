@@ -105,12 +105,7 @@ impl ClientAssembler {
 
         for (&idx, fetched_shard) in fetched.iter() {
             let is_parity = idx >= data_shard_count;
-            let hash_hex = {
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(&fetched_shard.data);
-                hex::encode(hasher.finalize())
-            };
+            let hash_hex = hex::encode(blake3::hash(&fetched_shard.data).as_bytes());
 
             let original_size = if !is_parity && idx == data_shard_count - 1 {
                 plan.metadata.encrypted_blob_size

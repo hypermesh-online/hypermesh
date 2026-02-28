@@ -16,7 +16,7 @@
 use bytes::{Bytes, BytesMut, BufMut};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use sha2::{Sha256, Digest};
+// BLAKE3 for all content hashing (whitepaper mandate)
 use anyhow::{Result, anyhow};
 
 /// STOQ protocol extension trait - defines the core protocol enhancements
@@ -43,7 +43,7 @@ pub trait StoqProtocolExtension {
 /// Cryptographic token for packet validation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PacketToken {
-    /// SHA-256 hash of packet data
+    /// BLAKE3 hash of packet data
     pub hash: [u8; 32],
     /// Packet sequence number
     pub sequence: u64,
@@ -54,9 +54,7 @@ pub struct PacketToken {
 impl PacketToken {
     /// Create a new packet token
     pub fn new(data: &[u8], sequence: u64) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let hash = hasher.finalize().into();
+        let hash = *blake3::hash(data).as_bytes();
 
         Self {
             hash,
@@ -70,9 +68,7 @@ impl PacketToken {
 
     /// Validate token against data
     pub fn validate(&self, data: &[u8]) -> bool {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let computed_hash: [u8; 32] = hasher.finalize().into();
+        let computed_hash = *blake3::hash(data).as_bytes();
         computed_hash == self.hash
     }
 }
@@ -284,9 +280,7 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
             return Err(anyhow!("Maximum shard size must be greater than 0"));
         }
 
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let packet_hash = hasher.finalize().into();
+        let packet_hash = *blake3::hash(data).as_bytes();
 
         let total_shards = (data.len() + max_shard_size - 1) / max_shard_size;
         let shard_id = rand::random::<u32>();
@@ -373,9 +367,7 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
         let result = reassembled.freeze();
 
         // Validate reassembled data
-        let mut hasher = Sha256::new();
-        hasher.update(&result);
-        let computed_hash: [u8; 32] = hasher.finalize().into();
+        let computed_hash = *blake3::hash(&result).as_bytes();
 
         if computed_hash != packet_hash {
             if let Some(ref metrics) = self.metrics {

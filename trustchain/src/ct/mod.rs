@@ -201,8 +201,8 @@ impl CertificateTransparency {
             }.into());
         }
 
-        // Create log entry
-        let sequence_number = self.get_next_sequence_number().await?;
+        // Reserve the next sequence number (atomically reads and increments)
+        let sequence_number = self.storage.reserve_sequence_number().await?;
         let timestamp = SystemTime::now();
         let entry_id = self.calculate_entry_id(sequence_number, cert_der, &timestamp);
         
@@ -351,7 +351,7 @@ impl CertificateTransparency {
     /// Get CT log statistics
     pub async fn get_log_stats(&self) -> TrustChainResult<CTLogStats> {
         let next_seq = self.get_next_sequence_number().await?;
-        let total_entries = if next_seq > 0 { next_seq - 1 } else { 0 };
+        let total_entries = next_seq; // next_seq equals count of entries (0-indexed sequence)
         let shard_count = self.logs.len() as u64;
         
         let mut shard_stats = Vec::new();

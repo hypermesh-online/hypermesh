@@ -130,12 +130,11 @@ impl AssetTypeDefinition {
             ),
         );
 
-        // Compute UserAssetKind hash from type_name + schema
-        use sha2::{Sha256, Digest};
-        let mut kind_hasher = Sha256::new();
+        // Compute UserAssetKind hash from type_name + schema (BLAKE3)
+        let mut kind_hasher = blake3::Hasher::new();
         kind_hasher.update(type_name.as_bytes());
-        kind_hasher.update(serde_json::to_vec(&schema).unwrap_or_default());
-        let hash_bytes: [u8; 32] = kind_hasher.finalize().into();
+        kind_hasher.update(&serde_json::to_vec(&schema).unwrap_or_default());
+        let hash_bytes: [u8; 32] = *kind_hasher.finalize().as_bytes();
 
         let asset_kind = hypermesh_lib::AssetKind::UserDefined(hypermesh_lib::UserAssetKind {
             type_name: type_name.clone(),

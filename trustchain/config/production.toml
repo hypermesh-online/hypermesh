@@ -76,7 +76,7 @@ truschain_domains = [
 
 [trust]
 # HyperMesh Trust Integration
-min_trust_score = 0.7
+require_authentication = true
 byzantine_sensitivity = 0.8
 trust_cache_ttl_seconds = 3600
 max_proxy_hops = 3
@@ -85,7 +85,7 @@ monitoring_interval_seconds = 60
 # Alert thresholds for Byzantine detection
 [trust.alerts]
 byzantine_confidence = 0.8
-trust_score_degradation = 0.3
+auth_failure_threshold = 3
 performance_degradation = 0.5
 availability_threshold = 0.95
 

@@ -16,7 +16,7 @@ use crate::consensus::proof::*;
 
 /// Production consensus validator with Byzantine fault detection
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConsensusValidator {
+pub struct StateAuthenticator {
     /// Byzantine node detection
     byzantine_detector: ByzantineDetector,
     /// Validation metrics
@@ -119,7 +119,7 @@ impl Default for ByzantineThresholds {
     }
 }
 
-impl ConsensusValidator {
+impl StateAuthenticator {
     pub fn new() -> Self {
         Self {
             byzantine_detector: ByzantineDetector::new(),
@@ -138,7 +138,7 @@ impl ConsensusValidator {
     }
 }
 
-impl Default for ConsensusValidator {
+impl Default for StateAuthenticator {
     fn default() -> Self {
         Self::new()
     }
@@ -351,7 +351,7 @@ pub struct StorageNodeInfo {
     node_id: String,
     verified_capacity: u64,
     last_verified: SystemTime,
-    trust_score: f64,
+    is_verified: bool,
 }
 
 impl ProofOfSpaceValidator {
@@ -420,7 +420,7 @@ impl ProofOfSpaceValidator {
             node_id: proof.node_id.clone(),
             verified_capacity: proof.total_storage,
             last_verified: SystemTime::now(),
-            trust_score: 1.0,
+            is_verified: true,
         });
 
         info!("✅ Space proof validation PASSED for node: {}", proof.node_id);

@@ -581,44 +581,10 @@ impl Default for super::ProxyConfiguration {
 impl Default for super::TrustRequirements {
     fn default() -> Self {
         Self {
-            min_trust_score: 0.7,
             require_certificate_validation: true,
             require_consensus_validation: false,
-            trust_decay: super::TrustDecayConfig::default(),
-            reputation_requirements: super::ReputationRequirements::default(),
-        }
-    }
-}
-
-impl Default for super::TrustDecayConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            decay_rate_per_day: 0.01, // 1% per day
-            minimum_trust_floor: 0.1, // 10% minimum
-            refresh_requirements: super::TrustRefreshRequirements::default(),
-        }
-    }
-}
-
-impl Default for super::TrustRefreshRequirements {
-    fn default() -> Self {
-        Self {
-            refresh_frequency: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
-            refresh_actions: vec!["successful_operation".to_string()],
-            success_boost: 0.05, // 5% boost
-            failure_penalty: 0.1, // 10% penalty
-        }
-    }
-}
-
-impl Default for super::ReputationRequirements {
-    fn default() -> Self {
-        Self {
-            min_reputation_score: 0.8,
+            reauth_interval: Duration::from_secs(3600),
             min_successful_operations: 10,
-            max_failure_rate: 0.05, // 5% failure rate max
-            recent_performance_weight: 0.7, // 70% weight on recent performance
         }
     }
 }
@@ -660,7 +626,7 @@ impl Default for super::ConnectionPersistenceConfig {
 impl Default for super::ProxyNodeSelection {
     fn default() -> Self {
         Self {
-            min_trust_score: 0.8,
+            require_authentication: true,
             required_capabilities: vec!["http_proxy".to_string()],
             geographic_preferences: Vec::new(),
             min_bandwidth_mbps: 100,

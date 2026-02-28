@@ -23,7 +23,7 @@ pub struct MigrationState {
     /// Asset states that need to be preserved
     pub asset_states: HashMap<[u8; 32], AssetState>,
     /// Reputation data (if applicable)
-    pub reputation_data: Option<ReputationData>,
+    pub authentication_data: Option<AuthenticationData>,
 }
 
 /// Connection information for migration
@@ -70,10 +70,10 @@ pub struct AssetState {
     pub current_tier: PrivacyMode,
 }
 
-/// Reputation data for public tier
+/// Authentication data for public tier
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReputationData {
-    pub reputation_score: f32,
+pub struct AuthenticationData {
+    pub is_authenticated: bool,
     pub validated_count: u64,
     pub last_validation: u64,
 }
@@ -104,7 +104,7 @@ impl TierSwitcher {
                 active_connections: Vec::new(),
                 pending_transactions: Vec::new(),
                 asset_states: HashMap::new(),
-                reputation_data: None,
+                authentication_data: None,
             },
             transition_history: Vec::new(),
             anonymous_tier: None,
@@ -255,9 +255,9 @@ impl TierSwitcher {
         }
 
         // Migrate reputation data if moving to public mode
-        if to == PrivacyMode::PUBLIC && self.migration_state.reputation_data.is_none() {
-            self.migration_state.reputation_data = Some(ReputationData {
-                reputation_score: 0.5,
+        if to == PrivacyMode::PUBLIC && self.migration_state.authentication_data.is_none() {
+            self.migration_state.authentication_data = Some(AuthenticationData {
+                is_authenticated: true,
                 validated_count: 0,
                 last_validation: 0,
             });
@@ -474,19 +474,19 @@ mod tests {
     }
 
     #[test]
-    fn test_reputation_data_creation() {
+    fn test_authentication_data_creation() {
         let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // Initially no reputation
-        assert!(switcher.migration_state().reputation_data.is_none());
+        assert!(switcher.migration_state().authentication_data.is_none());
 
         // Switch to Public
         switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
 
-        // Reputation data should be created
-        assert!(switcher.migration_state().reputation_data.is_some());
-        if let Some(rep) = &switcher.migration_state().reputation_data {
-            assert_eq!(rep.reputation_score, 0.5);
+        // Authentication data should be created
+        assert!(switcher.migration_state().authentication_data.is_some());
+        if let Some(auth) = &switcher.migration_state().authentication_data {
+            assert!(auth.is_authenticated);
         }
     }
 

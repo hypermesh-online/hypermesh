@@ -156,7 +156,7 @@ impl LibraryAssetPackage {
                     security: AssetSecurity {
                         consensus_required: self.spec.as_ref().map(|s| s.security.consensus_required).unwrap_or(false),
                         certificate_pinning: false,
-                        hash_validation: "sha256".to_string(),
+                        hash_validation: "blake3".to_string(),
                         sandbox_level: self.spec.as_ref().map(|s| match s.security.sandbox_level {
                             SandboxLevel::None => "none".to_string(),
                             SandboxLevel::Standard => "standard".to_string(),

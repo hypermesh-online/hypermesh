@@ -14,9 +14,8 @@
 
 use anyhow::{Context, Result};
 use bytes::{Bytes, Buf};
-use h3::client::SendRequest;
 use h3_quinn::quinn;
-use http::{HeaderMap, Method, Request, Response, StatusCode};
+use http::{HeaderMap, Method, Request, StatusCode};
 use quinn::{ClientConfig, Endpoint, TransportConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -24,7 +23,6 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::time::timeout;
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 

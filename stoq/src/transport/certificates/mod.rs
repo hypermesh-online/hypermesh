@@ -27,7 +27,7 @@ use super::certificate_strategy;
 mod tests {
     use super::*;
     use anyhow::Result;
-    use std::net::Ipv6Addr;
+    
 
     #[tokio::test]
     async fn test_localhost_certificate_manager() -> Result<()> {

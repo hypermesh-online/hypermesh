@@ -1,161 +1,101 @@
-# HTTP/3 Gateway
+# Gateway
 
-Unified HTTP/3 gateway for the HyperMesh ecosystem, routing requests to backend services.
+HTTP/3 + STOQ gateway for `*.hypermesh.online`, serving as the clearnet entry point and inter-network bridge for the HyperMesh ecosystem.
+
+**Status**: 100% Complete (alpha) | 24 files | ~7,000 lines | 155 tests
+
+## Four Roles
+
+| Role | Protocol | Purpose |
+|------|----------|---------|
+| **Bootstrap** | HTTP/3 -> STOQ | Initial STOQ connection info + bootstrap tokens at `trust.hypermesh.online` |
+| **Inbound Proxy** | HTTP/3 -> HyperMesh | Clearnet access to HyperMesh dashboards (resource, engauge, caesar, catalog) |
+| **Outbound Proxy** | HyperMesh -> HTTP/3 | Bridge HyperMesh resources to non-HyperMesh clearnet endpoints |
+| **Inter-Network** | STOQ <-> STOQ | Bridge between federated/private/public HyperMesh networks |
 
 ## Architecture
 
 ```
-                    ┌─────────────────┐
-                    │   UI (5173)     │
-                    └────────┬────────┘
-                             │
-                         HTTP/3
-                             │
-                    ┌────────▼────────┐
-                    │  Gateway (8443) │
-                    │                  │
-                    │  - Routing       │
-                    │  - CORS          │
-                    │  - Pooling       │
-                    │  - Retry         │
-                    └────┬───────┬────┘
-                         │       │
-                    HTTP/3      HTTP/3
-                         │       │
-            ┌────────────▼───┐ ┌─▼──────────────┐
-            │ TrustChain     │ │ BlockMatrix    │
-            │   (50053)      │ │    (8446)      │
-            └────────────────┘ └────────────────┘
+                Internet (HTTP/3)
+                      |
+          +-----------+-----------+
+          |                       |
+    HTTP/3 :8443            STOQ :8444
+          |                       |
+    +-----v-----------------------v-----+
+    |            Gateway                 |
+    |                                    |
+    |  Router -> Auth -> Rate Limiter    |
+    |  -> Load Balancer -> Backend       |
+    |                                    |
+    |  ScopeRouter (Device <-> Network)  |
+    |  FederationBridge (cross-network)  |
+    +------------------------------------+
 ```
 
-## Features
+Dual-listener: HTTP/3 on port 8443 + STOQ on port 8444 via `tokio::select`.
 
-- **HTTP/3 over QUIC**: Modern, efficient protocol
-- **Service Routing**: Path-based routing to backend services
-- **Connection Pooling**: 10 persistent connections per backend
-- **Automatic Retry**: Exponential backoff with max 3 attempts
-- **Circuit Breaker**: Prevents cascading failures
-- **CORS Support**: Full CORS for browser compatibility
-- **Request Tracing**: X-Request-ID propagation
-- **Health Checks**: Real-time backend status monitoring
+## 20 Modules
+
+`auth`, `bootstrap`, `config`, `domain_router`, `error`, `federation`, `gateway_mode`, `health`, `inbound`, `load_balancer`, `middleware`, `outbound`, `pool`, `proxy`, `rate_limiter`, `router`, `scope_bridge_proxy`, `scope_router`, `stoq_bridge`, `stoq_listener`, `tls`
+
+## Key Features
+
+### TLS
+- `TlsProvider` supports three certificate sources: File (PEM/DER), TrustChain (FALCON-1024), SelfSigned (rcgen)
+- Multi-domain SNI routing for `*.hypermesh.online` wildcard
+
+### Authentication
+- PoS authentication and session management
+- Bootstrap token flow (HTTP/3 to STOQ transition)
+- `AuthResult`: Authenticated | BootstrapRequired | Rejected | Anonymous
+
+### Cross-Scope Routing
+- `ScopeRouter` routes between Device and Network blockchain scopes
+- `ScopeBridge` manages Lock -> Transfer -> Unlock lifecycle for cross-scope asset transfers
+- `RouteDecision`: Direct | ViaGateway | ViaFederation | Denied
+
+### Rate Limiting and DDoS Protection
+- Token bucket algorithm: per-IP (100 rps), per-identity (200 burst), global (10K rps)
+- Payload limit: 10 MB
+- Connection limit: 50 per IP
+
+### Load Balancing
+- RoundRobin, LeastConnections, WeightedRoundRobin, HealthAware
+
+### Federation
+- `FederationBridge` with trust levels: Full, Conditional, Untrusted
+- Max peers limit, policy gates per trust level
+
+### Resilience
+- Connection pool with health checks (10 persistent connections per backend)
+- Circuit breaker (opens after 5 failures, 30s cooldown)
+- Automatic retry with exponential backoff (3 attempts)
+- CORS middleware and request ID propagation
+
+## Domain Routing
+
+| Domain/Path | Backend |
+|-------------|---------|
+| `trust.hypermesh.online` | TrustChain |
+| `caesar.hypermesh.online` | Caesar |
+| `catalog.hypermesh.online` | Catalog |
+| `/health` | Gateway internal |
+
+## Quick Start
+
+```bash
+cargo build -p gateway --release
+cargo test -p gateway
+```
 
 ## Configuration
 
-Environment variables:
-- `GATEWAY_LISTEN_ADDR`: Gateway listening address (default: `[::]:8443`)
-- `TRUSTCHAIN_ADDR`: TrustChain backend (default: `[::1]:50053`)
-- `BLOCKMATRIX_ADDR`: BlockMatrix backend (default: `[::1]:8446`)
-- `CERT_PATH`: TLS certificate path
-- `KEY_PATH`: TLS private key path
-- `LOG_LEVEL`: Logging level (default: `info`)
+- `GatewayMode`: Bootstrap | InboundProxy | OutboundProxy | InterNetwork
+- `CertificateSource`: File | TrustChain | SelfSigned
+- Outbound proxy with allowlist filtering
+- Privacy-mode-aware forwarding (Anonymous/Private/Public)
 
-## Routing Rules
+## License
 
-| Path Pattern | Backend | Port |
-|--------------|---------|------|
-| `/api/v1/trustchain/*` | TrustChain | 50053 |
-| `/api/v1/blockmatrix/*` | BlockMatrix | 8446 |
-| `/api/v1/hypermesh/*` | BlockMatrix | 8446 |
-| `/api/v1/stoq/*` | BlockMatrix | 8446 |
-| `/api/v1/caesar/*` | BlockMatrix | 8446 |
-| `/health` | Gateway | - |
-
-## API Endpoints
-
-### Health Check
-```
-GET /health
-
-Response:
-{
-  "status": "healthy",
-  "backends": {
-    "trustchain": { "status": "up", "latency_ms": 2 },
-    "blockmatrix": { "status": "up", "latency_ms": 1 }
-  },
-  "version": "0.1.0",
-  "statistics": { ... }
-}
-```
-
-## Performance Characteristics
-
-- **Gateway Overhead**: <5ms per request
-- **Concurrent Connections**: 1000+ supported
-- **Connection Pool**: 10 connections per backend
-- **Reconnection Time**: <100ms on failure
-- **Request Timeout**: 10 seconds default
-- **Retry Delay**: 100ms base, exponential backoff
-
-## Building
-
-```bash
-cd gateway
-cargo build --release
-```
-
-## Running
-
-```bash
-# Start the gateway
-cargo run --release
-
-# Or with custom configuration
-GATEWAY_LISTEN_ADDR=[::]:8443 \
-TRUSTCHAIN_ADDR=[::1]:50053 \
-BLOCKMATRIX_ADDR=[::1]:8446 \
-cargo run --release
-```
-
-## Testing
-
-```bash
-# Run all tests
-cargo test
-
-# Run with logging
-RUST_LOG=gateway=debug cargo test -- --nocapture
-```
-
-## Deployment
-
-1. Ensure TLS certificates are available at `/home/persist/repos/projects/web3/certs/`
-2. Start backend services (TrustChain on 50053, BlockMatrix on 8446)
-3. Start the gateway: `./target/release/gateway`
-4. Verify health: `curl https://localhost:8443/health`
-
-## Monitoring
-
-The gateway exposes detailed metrics through the `/health` endpoint:
-- Backend health status
-- Connection pool statistics
-- Request counts and latencies
-- Circuit breaker status
-
-## Security
-
-- TLS 1.3 with strong ciphers
-- Certificate validation for backends
-- Request ID tracking for audit trails
-- No sensitive data in logs
-- CORS configured for specific origins only
-
-## Architecture Details
-
-### Connection Pooling
-- Maintains persistent HTTP/3 connections
-- Automatic health checks and reconnection
-- Load balancing across connections
-- Connection reuse for efficiency
-
-### Circuit Breaker
-- Opens after 5 consecutive failures
-- 30-second cooldown period
-- Automatic recovery attempts
-- Prevents cascade failures
-
-### Retry Logic
-- Maximum 3 attempts per request
-- Exponential backoff: 100ms, 200ms, 400ms
-- Only retries on network errors
-- Preserves request ID across retries
+Business Source License 1.1

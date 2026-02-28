@@ -15,7 +15,7 @@ use std::time::Instant;
 
 /// Consensus validator trait
 #[async_trait]
-pub trait ConsensusValidator: Send + Sync {
+pub trait StateAuthenticator: Send + Sync {
     /// Validate a consensus proof
     async fn validate(&self, proof: &[u8]) -> Result<bool>;
 
@@ -27,14 +27,14 @@ pub trait ConsensusValidator: Send + Sync {
 }
 
 /// Default consensus validator implementation using TrustChain's Proof of State
-pub struct DefaultConsensusValidator {
+pub struct DefaultStateAuthenticator {
     /// Requirements for consensus validation
     requirements: ConsensusRequirements,
     /// Enable detailed validation logging
     verbose: bool,
 }
 
-impl DefaultConsensusValidator {
+impl DefaultStateAuthenticator {
     /// Create new default validator with production requirements
     pub fn new() -> Self {
         Self {
@@ -67,7 +67,7 @@ impl DefaultConsensusValidator {
 }
 
 #[async_trait]
-impl ConsensusValidator for DefaultConsensusValidator {
+impl StateAuthenticator for DefaultStateAuthenticator {
     async fn validate(&self, proof: &[u8]) -> Result<bool> {
         // Start validation timer
         let start = Instant::now();
@@ -190,7 +190,7 @@ impl ConsensusValidator for DefaultConsensusValidator {
 
     async fn validate_with_requirements(&self, proof: &[u8], requirements: &ConsensusRequirements) -> Result<bool> {
         // Create a temporary validator with custom requirements
-        let validator = DefaultConsensusValidator::with_requirements(requirements.clone())
+        let validator = DefaultStateAuthenticator::with_requirements(requirements.clone())
             .verbose(self.verbose);
         validator.validate(proof).await
     }
@@ -201,20 +201,20 @@ impl ConsensusValidator for DefaultConsensusValidator {
 }
 
 /// Production consensus validator with strict requirements
-pub struct ProductionConsensusValidator {
-    inner: DefaultConsensusValidator,
+pub struct ProductionStateAuthenticator {
+    inner: DefaultStateAuthenticator,
 }
 
-impl ProductionConsensusValidator {
+impl ProductionStateAuthenticator {
     pub fn new() -> Self {
         Self {
-            inner: DefaultConsensusValidator::with_requirements(ConsensusRequirements::production()),
+            inner: DefaultStateAuthenticator::with_requirements(ConsensusRequirements::production()),
         }
     }
 }
 
 #[async_trait]
-impl ConsensusValidator for ProductionConsensusValidator {
+impl StateAuthenticator for ProductionStateAuthenticator {
     async fn validate(&self, proof: &[u8]) -> Result<bool> {
         self.inner.validate(proof).await
     }
@@ -229,7 +229,7 @@ impl ConsensusValidator for ProductionConsensusValidator {
 }
 
 /// Export the trait
-pub use ConsensusValidator as Validator;
+pub use StateAuthenticator as Validator;
 
 #[cfg(test)]
 mod tests {
@@ -237,7 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_proof_validation() {
-        let validator = DefaultConsensusValidator::new();
+        let validator = DefaultStateAuthenticator::new();
         let result = validator.validate(&[]).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), false);
@@ -245,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_oversized_proof_validation() {
-        let validator = DefaultConsensusValidator::new();
+        let validator = DefaultStateAuthenticator::new();
         let huge_proof = vec![0u8; 2 * 1024 * 1024]; // 2MB
         let result = validator.validate(&huge_proof).await;
         assert!(result.is_ok());
@@ -254,7 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_malformed_proof_validation() {
-        let validator = DefaultConsensusValidator::new();
+        let validator = DefaultStateAuthenticator::new();
         let malformed = vec![0xFF, 0xBA, 0xDC, 0x0D, 0xE5];
         let result = validator.validate(&malformed).await;
         assert!(result.is_err());

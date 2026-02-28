@@ -1,256 +1,55 @@
-# BlockMatrix Vision & Core Functionality
+# BlockMatrix Development Context
 
-## ⚠️ DEVELOPMENT STATUS WARNING
+## Status: Alpha (~40-50% complete)
 
-**Current Implementation: ~40-50% Complete (with STOQ providing transport)**
+See README.md for current feature list and test counts.
 
-This document describes the VISION and ARCHITECTURE for BlockMatrix. Most features described are planned functionality, not current capabilities. See README.md for actual current state.
+## Core Innovation: Block-MATRIX Topology
 
-### Reality Check:
-- **What exists**: ✅ **PHASE 1 COMPLETE** - Matrix coordinate system (Sprint 1.1), Tensor operations library (Sprint 1.2), Every-node-blockchain (Sprint 1.3), Geospatial integration (Sprint 1.4), Matrix persistence (Sprint 1.5), Phase 1 Integration (Sprint 1.6)
-- **What works**:
-  - ✅ Matrix Coordinate System (x,y,z positioning, 4 distance metrics, transformations, neighbor finding - 104 tests)
-  - ✅ Tensor Operations Library (Vector3D, Matrix3x3, routing algorithms, A* pathfinding - 108 tests)
-  - ✅ Every-Node-Blockchain (independent chains, starts immediately on boot, NO merkle consolidation, matrix propagation - 55+ tests)
-  - ✅ Geospatial Integration (GPS↔matrix conversion, 50+ locations, 3 clustering algorithms, 5 load balancing - 75+ tests)
-  - ✅ Matrix Persistence Layer (WAL recovery, incremental snapshots, zero data loss - 51+ tests)
-  - ✅ Phase 1 Integration (MatrixFoundation unified API, 100-node E2E tests, benchmarks - 24 tests)
-  - ✅ **Total: 417+ tests, 100% pass rate, all performance targets exceeded by 2-3x**
-- **What doesn't work**: Container runtime, multi-node production deployment, eBPF, Phase 2+ features
-- **CLI Status**: No CLI currently implemented. Future CLI will support matrix topology queries and tensor-based resource management
-- **Phase 1 Status**: ✅ **COMPLETE** - Production-ready matrix foundation (417+ tests)
-- **Phase 2 Status**: ✅ **COMPLETE** - Intelligence layer fully integrated (All 6 sprints complete, 20+ integration tests)
+Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive routing, resource allocation, and shard placement.
 
-## 🎯 Core Innovation: Block-MATRIX Topology
+### What's Implemented
+- Matrix coordinate system (4 distance metrics, neighbor finding)
+- Tensor operations (Vector3D, Matrix3x3, A* pathfinding)
+- Every-node blockchain (independent chain from boot, no network required)
+- Geospatial integration (GPS-to-matrix, clustering, load balancing)
+- Matrix persistence (WAL, snapshots, recovery)
+- Asset adapters (CPU, GPU, Memory, Storage, Network, Container)
+- Asset pipeline: Compress (Brotli) -> Encrypt (Kyber-1024 KEM) -> Shard (Reed-Solomon 10+4) -> Distribute (tensor)
+- Instruction-based retrieval (send shard maps, not data)
+- IPv6 asset addressing (AssetAddress, TransferEngine)
+- NAT-like remote proxy system
+- Privacy-aware resource allocation
+- Network sync (SyncManager, ReflectorPool)
+- Cross-scope routing (Device <-> Network via gateway)
+- Shard rebalancing on node join/leave
+- CLI (CommandExecutor with topology/node/asset commands)
+- Cross-platform OS abstraction (Linux/Windows/macOS/BSD)
 
-**BlockMatrix is NOT traditional cloud infrastructure** - it's a revolutionary matrix-based distributed computing platform:
+## Architectural Truths
 
-### Matrix Topology (LITERAL Matrix)
-- **Each Node = Matrix Cell**: Nodes have geospatial positions (x,y,z coordinates)
-- **Every Node = Own Blockchain**: Independent blockchain per node (starts immediately on boot, no network required)
-- **Tensor Operations**: Mathematical matrix operations for routing, resource allocation, path finding
-- **Neighbor Discovery**: Based on matrix position and distance calculations
-- **Intelligent Routing**: Matrix-aware shard distribution and data flow
-- **Self-Sufficient Nodes**: Each node fully functional from genesis, network participation optional
+1. **Local blockchain starts on boot** -- no network required, node is self-sufficient
+2. **Node is its own DNS provider** -- bootstraps independently before network registration
+3. **PrivacyMode (transport) is independent from BlockchainScope (consensus)** -- any combination valid
+4. **Users can create private networks** across their own devices with shared blockchain
+5. **trust.hypermesh.online** is the global Public Gateway -- private networks work without it
 
-### Revolutionary Concepts
-1. **Immediate Blockchain Start** - Local blockchain starts on boot, no network required
-2. **Node-as-DNS-Provider First** - Bootstraps independently before optional network registration
-3. **DNS-as-Asset** - DNS registration requires full Proof of State (only for public rewards)
-4. **Four Privacy Tiers** - Anonymous | Private P2P | Federated | Public
-5. **User-Owned Networks** - Multiple devices sharing same blockchain, complete privacy
-6. **Privacy Flexibility** - Network transport layer independent from blockchain consensus
-7. **Multi-Network Participation** - Single node joins multiple isolated networks simultaneously
-8. **STOQ Protocol Intelligence** - Validates PoS tokens/hashes at protocol level
-9. **Instruction-Based Retrieval** - Send shard maps, not files
-10. **Bucket Deduplication** - Content-addressed storage with hash buckets
-11. **Asset Pipeline** - Compression (Brotli) → Encryption (Kyber-1024) → Sharding (Reed-Solomon) → Distribution (tensor-based) — code currently wrong order, needs fix
+## Key Modules
 
-## 🔑 Critical Architectural Truths
-
-### 1. Local Blockchain Lifecycle
-- **TRUTH**: Local BlockMatrix blockchain starts IMMEDIATELY when node comes online
-- **TRUTH**: Blockchain initialization happens REGARDLESS of network connectivity
-- **TRUTH**: Node does NOT need to connect to global network to have its own blockchain
-- **TRUTH**: Blockchain exists independently of Public/Federated/P2P/Anonymous network participation
-
-### 2. User-Owned Distributed Networks
-- **TRUTH**: Users can create distributed private networks across their own devices/systems
-- **TRUTH**: User devices can run the SAME blockchain for maximum connectivity and resource sharing
-- **Example**: User's HyperMesh dashboard + personal devices + assets all running shared blockchain
-- **TRUTH**: This is a private federated system (not global Public network)
-
-### 3. Privacy Flexibility Matrix
-- **TRUTH**: Private blockchains CAN communicate over Anonymous network for maximum security
-- **TRUTH**: Network layer (transport) is INDEPENDENT from blockchain layer (consensus)
-- **Example**: User's private blockchain nodes communicate via Anonymous network (untraceable transport + private consensus)
-- **TRUTH**: This enables maximum security: encrypted blockchain + untraceable communication
-
-### 4. Public Network Bootstrap
-- **TRUTH**: `trust.hypermesh.online` is the global HyperMesh Public Gateway
-- **TRUTH**: Public network nodes bootstrap via this gateway to join global network
-- **TRUTH**: After bootstrap, nodes register on global BlockMatrix blockchain (DNS-as-Asset)
-- **TRUTH**: Local blockchain still exists independently (can participate in global AND run private blockchain simultaneously)
-
-## Primary Mission
-Create a **matrix-topology-based distributed computing platform** that provides:
-- **Matrix Architecture**: Geospatial node positioning with tensor-based operations
-- **Native Security**: Security built into protocol (STOQ intelligence layer)
-- **Every-Node-Blockchain**: Distributed consensus at every level, independent chains
-- **Privacy Tiers**: Four network privacy levels with independent asset privacy
-- **Multi-Network Participation**: Single node joins multiple isolated networks (bank public + private + federated), complete isolation, cross-network asset validation
-- **Instruction-Based Distribution**: Revolutionary data retrieval using shard maps
-
-## Core Vision
-Create a distributed computing platform that provides:
-- **Native Security**: Security built into the protocol and transport layers, not bolted on
-- **Infinite Scalability**: True horizontal and vertical scaling without architectural limits
-- **Resource Efficiency**: Zero-waste computing with predictable performance characteristics
-- **P2P Capability**: Direct peer-to-peer connectivity without relying on centralized infrastructure
-- **Developer Experience**: Intuitive APIs and tooling that make distributed computing accessible
-
-## Fundamental Design Principles
-
-### 1. Security by Design
-- **Transport Security**: QUIC over IPv6 with certificate-based authentication baked into every connection
-- **Memory Safety**: Rust core eliminates entire vulnerability classes (buffer overflows, use-after-free)
-- **Kernel Integration**: eBPF planned to provide secure, efficient system-level operations (not yet implemented)
-- **Zero Trust**: Triple validation (user + system + certificate) for all operations
-- **Isolation**: Hardware-assisted virtualization with capability-based security models
-
-### 2. Performance Without Compromise  
-- **Protocol Efficiency**: Full-duplex QUIC eliminates TCP handshake overhead and provides built-in multiplexing
-- **Zero-Cost Abstractions**: Rust's compile-time guarantees enable high-level programming without runtime penalty
-- **Kernel Bypass**: Future eBPF programs will run in kernel space (not yet implemented)
-- **Predictable Latency**: No garbage collection pauses or unexpected runtime overhead
-- **Resource Awareness**: Real-time monitoring and adaptive resource allocation
-
-### 3. Distributed-First Architecture
-- **P2P Mesh Networks**: Nodes will be able to discover and connect directly (currently single-node only)
-- **Byzantine Fault Tolerance**: Framework exists but not production-ready (experimental only)
-- **Geographic Distribution**: Data locality and edge computing built into the core design
-- **Network Partitions**: Graceful degradation and automatic healing when connectivity is lost
-- **Multi-Cloud**: Abstract away infrastructure providers for true cloud portability
-
-### Block-MATRIX Topology Integration
-- **Geospatial Node Organization**: Nodes positioned in x,y,z matrix coordinates
-- **Tensor-Based Routing**: Mathematical matrix operations for optimal paths
-- **Matrix-Aware Sharding**: Intelligent shard placement based on topology
-- **Distance Calculations**: Routing decisions based on matrix distance metrics
-
-## Core Functional Components
-
-### Transport Layer (QUIC/IPv6 Stack)
-**Primary Functions:**
-- Establish secure, authenticated connections with zero-round-trip resumption
-- Provide full-duplex communication channels with independent flow control
-- Handle connection migration seamlessly as devices move between networks  
-- Implement rate limiting and traffic shaping at the protocol level
-- Support massive connection multiplexing without head-of-line blocking
-
-**Key Innovations:**
-- Certificate rotation and revocation integrated into transport protocol
-- Per-connection resource quotas will be enforced by eBPF (future feature)
-- Automatic quality-of-service adaptation based on network conditions
-- Built-in support for multipath networking and load balancing
-
-### Container Runtime - PLANNED FEATURE
-**Planned Functions:** (Not Yet Implemented)
-- Will launch and manage containerized workloads with hardware-enforced isolation
-- Future secure inter-container communication without network overhead
-- Planned resource quota enforcement with microsecond-level precision
-- Future live migration of running containers across nodes
-- Planned snapshot and restore functionality for fault tolerance
-
-**Planned Innovations:** (Design Phase)
-- Future microkernel-based isolation using Intel VT-x/AMD-V hardware features
-- Planned capability-based security with fine-grained permission management
-- Future copy-on-write filesystem layers for container workflows
-- Planned direct memory mapping for high-performance IPC
-
-### Distributed State Engine (etcd Replacement)
-**Primary Functions:**
-- Maintain globally consistent state across potentially millions of nodes
-- Provide ACID transactions with strong consistency guarantees  
-- Handle automatic sharding and rebalancing as the cluster grows
-- Support real-time subscriptions to state changes with minimal latency
-- Enable offline operation with eventual consistency when partitioned
-
-**Key Innovations:**
-- Raft consensus with BFT framework (experimental only, not production-ready)
-- Encrypted state replication with forward secrecy guarantees
-- Automatic backup and point-in-time recovery capabilities
-- Multi-master writes with conflict-free replicated data types (CRDTs)
-
-### Service Mesh (P2P Networking)
-**Primary Functions:**
-- Enable service-to-service communication with automatic load balancing
-- Provide circuit breaking, retries, and timeout handling
-- Support canary deployments and traffic splitting for safe rollouts
-- Implement distributed tracing and observability across all services
-- Handle service discovery and registration without centralized registry
-
-**Key Innovations:**
-- Distributed hash table (DHT) for decentralized service discovery
-- Machine learning-based routing decisions using historical performance data
-- Automatic TLS certificate provisioning and rotation for all service communication
-- Real-time traffic analytics with anomaly detection and automatic remediation
-
-### Resource Scheduler (Intelligent Orchestration)
-**Primary Functions:**
-- Place workloads optimally across available compute resources
-- Automatically scale applications based on demand predictions
-- Handle node failures and workload rescheduling with minimal disruption
-- Support batch processing, streaming, and interactive workloads simultaneously
-- Provide cost optimization across multiple cloud providers
-
-**Key Innovations:**
-- Multi-objective optimization considering performance, cost, and availability
-- Machine learning models trained on workload patterns for predictive scaling
-- Support for heterogeneous hardware (CPU, GPU, FPGA, custom ASICs)
-- Real-time bin packing algorithms with live migration capabilities
-
-## Secondary Vision: Complete Platform
-Once core functionality is proven and stable, extend the platform to provide:
-
-### Developer Experience
-- **CLI Tools**: Future command-line interface (not yet developed)
-- **Web Dashboard**: Real-time monitoring and control interface for cluster management
-- **APIs**: REST and GraphQL APIs with OpenAPI/schema documentation
-- **SDKs**: Client libraries in major programming languages with idiomatic interfaces
-- **IDE Integration**: Extensions for popular development environments
-
-### Advanced Features  
-- **Multi-Tenancy**: Complete isolation between different organizations or teams
-- **Compliance**: Built-in audit logging and compliance reporting for regulated industries
-- **Disaster Recovery**: Automated backup, replication, and recovery across geographic regions
-- **Cost Management**: Real-time cost tracking and optimization recommendations
-- **Security Scanning**: Integrated vulnerability scanning and policy enforcement
-
-### Platform Integration
-- **CI/CD Pipelines**: Native GitOps integration with security policy enforcement
-- **Monitoring Stack**: Prometheus-compatible metrics with distributed tracing
-- **Log Aggregation**: High-performance log collection and analysis
-- **Secret Management**: HSM integration with automatic key rotation
-- **Image Registry**: Distributed container image storage with deduplication
-
-## STOQ Integration: Protocol Intelligence
-
-BlockMatrix uses STOQ not as simple transport, but as an **intelligence layer**:
-- **Protocol-Level Validation**: PoS token and asset hash verification
-- **Matrix Shard Addressing**: Provides matrix positions for shard storage
-- **Privacy Tier Enforcement**: Different protocol behavior per tier
-- **Tensor-Aware Routing**: Smart routing based on matrix topology
-
-## Success Metrics (Future Goals)
-
-### Performance Targets (Not Yet Achieved)
-- **Connection Establishment**: Target <10ms for new connections, <1ms for resumed connections
-- **Container Startup**: Goal <100ms from request to running container (containers not implemented)
-- **Service Discovery**: Target <1ms average lookup time (not implemented)
-- **Scaling Response**: Goal of autoscaling within 5 seconds (no scaling yet)
-- **Network Throughput**: Target >95% bandwidth utilization (not measured)
-
-### Security Goals
-- **Zero Remote Code Execution**: Memory safety eliminates RCE via buffer overflows
-- **Certificate Rotation**: Automatic rotation every 24 hours with zero downtime
-- **Vulnerability Response**: Automated patching and remediation within 1 hour of CVE publication
-- **Compliance**: SOC2 Type II, FedRAMP, and PCI DSS compliance out-of-the-box
-- **Incident Response**: Automated isolation and forensics collection for security events
-
-### Developer Experience
-- **Learning Curve**: Developers productive within 1 day of first contact
-- **Deployment Speed**: From code commit to production in <5 minutes
-- **Debugging**: Real-time application introspection without performance impact
-- **Documentation**: Complete API documentation with runnable examples
-- **Community**: Active open-source ecosystem with third-party integrations
-
-## Long-Term Impact
-BlockMatrix represents a fundamental shift toward infrastructure that is:
-- **Secure by Default**: Eliminates common vulnerability classes through design choices
-- **Globally Distributed**: Enables true edge computing with consistent developer experience  
-- **Resource Efficient**: Maximizes hardware utilization while minimizing energy consumption
-- **Democratically Accessible**: Lowers barriers to entry for distributed computing applications
-- **Future-Proof**: Architected to evolve with emerging hardware and networking technologies
-
-This vision guides every architectural decision and implementation choice, ensuring BlockMatrix becomes the foundation for the next generation of cloud-native applications.
+| Module | Purpose |
+|--------|---------|
+| `matrix/` | Coordinate system, tensor ops, geospatial, pathfinding |
+| `blockchain/` | Per-node chain, block validation, sync manager |
+| `assets/` | 6 adapters, pipeline, proxy/NAT, privacy allocation |
+| `transfer/` | IPv6 asset addressing, TransferEngine |
+| `consensus/` | PoS orchestration (re-exports from TrustChain) |
+| `distribution/` | PoS validator integration, redistribution |
+| `retrieval/` | Instruction-based shard reconstruction |
+| `persistence/` | WAL, snapshots, matrix state recovery |
+| `network/` | Blockchain integration, membership |
+| `dns/` | DNS record registration and validation |
+| `gateway/` | Cross-scope bridge (Device <-> Network) |
+| `privacy/` | Privacy mode switching, tier enforcement |
+| `cli/` | Command executor, output formatting |
+| `os_integration/` | Cross-platform abstraction |
+| `container/` | Basic process isolation, cluster management |

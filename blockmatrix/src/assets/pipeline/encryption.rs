@@ -20,7 +20,7 @@ use aes_gcm::{
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use rand::RngCore;
-use sha2::{Digest, Sha256};
+use blake3;
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -354,13 +354,13 @@ impl Encryptor {
 
 // ── Shared utility ───────────────────────────────────────────────────────────
 
-/// Derive AES-256 key from Kyber shared secret via SHA-256.
+/// Derive AES-256 key from Kyber shared secret via BLAKE3.
 /// Domain-separated with "KYBER-1024-AES-KEY:" prefix (same as trustchain).
 fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
+    let mut hasher = blake3::Hasher::new();
     hasher.update(b"KYBER-1024-AES-KEY:");
     hasher.update(shared_secret);
-    hasher.finalize().into()
+    *hasher.finalize().as_bytes()
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

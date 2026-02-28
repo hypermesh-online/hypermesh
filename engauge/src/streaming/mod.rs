@@ -18,7 +18,7 @@ pub mod subscriber;
 pub mod aggregator;
 
 // Re-export primary types at module root.
-pub use protocol::{MetricsFrame, MetricsPayload, CapacitySnapshot, CongestionSnapshot, RoutingSnapshot, EconomicSnapshot, ProtocolError};
+pub use protocol::{MetricsFrame, MetricsPayload, CapacitySnapshot, CongestionSnapshot, RoutingSnapshot, EconomicSnapshot, VerificationSnapshot, ProtocolError};
 pub use privacy_filter::DifferentialPrivacyFilter;
 pub use publisher::MetricsPublisher;
 pub use subscriber::MetricsSubscriber;

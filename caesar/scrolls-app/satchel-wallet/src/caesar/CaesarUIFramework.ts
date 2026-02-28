@@ -74,7 +74,7 @@ export interface HyperMeshAsset {
   type: 'CPU' | 'GPU' | 'Memory' | 'Storage' | 'VM' | 'Container';
   owner_id: string;
   location: string;
-  trust_score: number;
+  is_authenticated: boolean;
   privacy_level: PrivacyLevel;
   available: boolean;
   specifications: AssetSpecifications;
@@ -84,7 +84,7 @@ export interface HyperMeshAsset {
 export interface AssetFilter {
   types: string[];
   privacy_levels: PrivacyLevel[];
-  min_trust_score?: number;
+  require_authentication?: boolean;
   location_preference?: string;
   consensus_required?: boolean;
 }
@@ -189,7 +189,7 @@ export interface EcosystemState {
     total_entities: number;
     total_assets: number;
     active_connections: number;
-    overall_trust_score: number;
+    authentication_rate: number;
     performance_score: number;
   };
 }
@@ -259,7 +259,7 @@ export class CaesarUIFramework {
         total_entities: 0,
         total_assets: 0,
         active_connections: 0,
-        overall_trust_score: 0,
+        authentication_rate: 0,
         performance_score: 0
       }
     };
@@ -331,7 +331,7 @@ export class CaesarUIFramework {
         type: 'CPU',
         owner_id: 'user_sf_datacenter',
         location: 'San Francisco, CA',
-        trust_score: 0.94,
+        is_authenticated: true,
         privacy_level: 'PublicNetwork',
         available: true,
         specifications: { cpu_cores: 32, memory_gb: 128 },
@@ -342,7 +342,7 @@ export class CaesarUIFramework {
         type: 'GPU',
         owner_id: 'user_austin_lab',
         location: 'Austin, TX',
-        trust_score: 0.91,
+        is_authenticated: true,
         privacy_level: 'P2P',
         available: true,
         specifications: { gpu_memory_gb: 80, cpu_cores: 16 },
@@ -429,7 +429,7 @@ export class CaesarUIFramework {
       total_entities: matrix.connected_entities.length,
       total_assets: hypermesh.discovered_assets.length,
       active_connections: stoq.connections.filter(c => c.status === 'connected').length,
-      overall_trust_score: matrix.connected_entities.reduce((sum, e) => sum + e.trust_score, 0) / matrix.connected_entities.length || 0,
+      authentication_rate: matrix.connected_entities.length > 0 ? matrix.connected_entities.filter(e => e.is_authenticated).length / matrix.connected_entities.length : 0,
       performance_score: Math.min(100, (stoq.performance.throughput_gbps / 40) * 100) // Target 40 Gbps
     };
     

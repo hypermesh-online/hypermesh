@@ -187,7 +187,7 @@ async fn test_gate3_proxy_routing() {
             bandwidth_mbps: 1000,
             protocols: vec!["HTTP".to_string(), "QUIC".to_string()],
         },
-        trust_score: 0.85,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "node1-cert-fingerprint".to_string(),
     };
@@ -204,7 +204,7 @@ async fn test_gate3_proxy_routing() {
             bandwidth_mbps: 2000,
             protocols: vec!["HTTP".to_string(), "QUIC".to_string(), "STOQ".to_string()],
         },
-        trust_score: 0.95,
+        is_authenticated: true,
         last_heartbeat: SystemTime::now(),
         certificate_fingerprint: "node2-cert-fingerprint".to_string(),
     };
@@ -213,8 +213,8 @@ async fn test_gate3_proxy_routing() {
     router.add_proxy_node(&node2).await.unwrap();
 
     println!("Added proxy nodes:");
-    println!("  - {} (trust: {}, bandwidth: {} Mbps)", node1.node_id, node1.trust_score, node1.capabilities.bandwidth_mbps);
-    println!("  - {} (trust: {}, bandwidth: {} Mbps)", node2.node_id, node2.trust_score, node2.capabilities.bandwidth_mbps);
+    println!("  - {:?} (authenticated: {}, bandwidth: {} Mbps)", node1.node_id, node1.is_authenticated, node1.capabilities.bandwidth_mbps);
+    println!("  - {:?} (authenticated: {}, bandwidth: {} Mbps)", node2.node_id, node2.is_authenticated, node2.capabilities.bandwidth_mbps);
 
     println!("✓ Proxy routing working correctly");
 }

@@ -37,7 +37,7 @@ pub struct UserProfile {
     pub email: String,
     pub hardware_config: HardwareConfiguration,
     pub sharing_preferences: SharingPreferences,
-    pub reputation_score: f64,
+    pub is_authenticated: bool,
     pub total_earnings: u64,
     pub account_status: AccountStatus,
     pub registered_at: SystemTime,
@@ -51,7 +51,7 @@ pub struct PlatformConfig {
     pub verification_timeout: Duration,
     pub session_timeout: Duration,
     pub payout_frequency: PaymentFrequency,
-    pub minimum_reputation: f64,
+    pub require_authentication: bool,
     pub maximum_resource_allocation: f64,
 }
 
@@ -62,7 +62,7 @@ impl Default for PlatformConfig {
             verification_timeout: Duration::from_secs(3600),
             session_timeout: Duration::from_secs(86400),
             payout_frequency: PaymentFrequency::Daily,
-            minimum_reputation: 0.5,
+            require_authentication: true,
             maximum_resource_allocation: 0.8,
         }
     }
@@ -102,7 +102,7 @@ impl UserContributionPlatform {
             email,
             hardware_config,
             sharing_preferences,
-            reputation_score: 1.0,
+            is_authenticated: true,
             total_earnings: 0,
             account_status: AccountStatus::PendingVerification,
             registered_at: SystemTime::now(),
@@ -263,8 +263,8 @@ impl UserContributionPlatform {
             AccountStatus::Closed => return Err(anyhow!("Account closed")),
         }
 
-        if user_profile.reputation_score < self.config.minimum_reputation {
-            return Err(anyhow!("Reputation score too low"));
+        if self.config.require_authentication && !user_profile.is_authenticated {
+            return Err(anyhow!("User not authenticated"));
         }
 
         match user_profile.hardware_config.verification_status {

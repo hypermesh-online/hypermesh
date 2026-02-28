@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use blake3;
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::sign::{PublicKey as SignPublicKey, SecretKey as SignSecretKey, DetachedSignature};
@@ -242,7 +242,7 @@ impl QuantumSecurity {
     
     /// Generate unique token ID
     fn generate_token_id(&self, proxy_addr: &ProxyAddress) -> AssetResult<String> {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&proxy_addr.network_id);
         hasher.update(&proxy_addr.node_id);
         hasher.update(&proxy_addr.asset_port.to_le_bytes());
@@ -255,7 +255,7 @@ impl QuantumSecurity {
         hasher.update(&nanos.to_le_bytes());
 
         let hash = hasher.finalize();
-        Ok(hex::encode(&hash[..16])) // Use first 16 bytes as token ID
+        Ok(hex::encode(&hash.as_bytes()[..16])) // Use first 16 bytes as token ID
     }
     
     /// Store active token
@@ -466,12 +466,12 @@ impl KyberEncryption {
         Ok(buffer)
     }
 
-    /// Derive AES-256 key from Kyber shared secret
+    /// Derive AES-256 key from Kyber shared secret via BLAKE3
     fn derive_aes_key(shared_secret: &[u8]) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(b"KYBER-1024-AES-KEY:");
         hasher.update(shared_secret);
-        hasher.finalize().into()
+        *hasher.finalize().as_bytes()
     }
 
     /// Get public key bytes for encryption

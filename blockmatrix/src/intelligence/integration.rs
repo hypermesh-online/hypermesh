@@ -550,10 +550,7 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
     ) -> Result<ContentAddress> {
         // Implementation would create network-specific content address
         // This is a placeholder implementation
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(asset_id.as_bytes());
-        let hash: [u8; 32] = hasher.finalize().into();
+        let hash: [u8; 32] = *blake3::hash(asset_id.as_bytes()).as_bytes();
 
         Ok(ContentAddress::new(
             hash,

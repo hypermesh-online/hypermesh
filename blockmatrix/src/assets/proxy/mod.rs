@@ -54,10 +54,8 @@ pub struct ProxyNetworkConfig {
     pub port_ranges: HashMap<String, PortRange>,
     /// Default port range (for backwards compatibility)
     pub default_port_range: Option<PortRange>,
-    /// Trust-based proxy selection enabled
-    pub trust_based_selection: bool,
-    /// Minimum trust score required
-    pub min_trust_score: f32,
+    /// Whether authentication is required for proxy nodes
+    pub require_authentication: bool,
     /// Quantum security enabled
     pub quantum_security_enabled: bool,
     /// Sharded data access enabled
@@ -85,8 +83,7 @@ impl Default for ProxyNetworkConfig {
             hypermesh_network_id: Some("hypermesh-main".to_string()),
             port_ranges: port_ranges.clone(),
             default_port_range: port_ranges.get("memory").cloned(),
-            trust_based_selection: true,
-            min_trust_score: 0.5,
+            require_authentication: true,
             quantum_security_enabled: true,
             sharded_access_enabled: true,
         }

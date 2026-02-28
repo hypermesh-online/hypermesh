@@ -16,9 +16,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::{MatrixCoordinate, find_k_nearest, find_neighbors, find_neighbors_cubic};
-use blockmatrix::matrix::tensor::{Vector3D, Matrix3x3, find_path_astar};
-use blockmatrix::matrix::geospatial::{GpsCoordinate, GpsConverter, ConverterConfig};
-use blockmatrix::blockchain::PropagationStrategy;
+use blockmatrix::matrix::tensor::{Vector3D, Matrix3x3, PathFinder};
+use blockmatrix::matrix::geospatial::{GpsCoordinate, GpsConverter, ScaleResolution};
 use tempfile::TempDir;
 use std::sync::Arc;
 
@@ -184,7 +183,7 @@ fn bench_tensor_operations(c: &mut Criterion) {
 
     group.bench_function("matrix_multiply_vector", |b| {
         b.iter(|| {
-            matrix.multiply_vector(black_box(&v1))
+            matrix.transform_vector(black_box(&v1))
         })
     });
 
@@ -194,20 +193,23 @@ fn bench_tensor_operations(c: &mut Criterion) {
         })
     });
 
-    // A* pathfinding
-    let start = Vector3D::new(0.0, 0.0, 0.0);
-    let goal = Vector3D::new(10.0, 10.0, 0.0);
-    let obstacles = vec![
-        Vector3D::new(5.0, 5.0, 0.0),
-    ];
+    // A* pathfinding using MatrixCoordinate-based PathFinder
+    let path_start = MatrixCoordinate::new(0, 0, 0).unwrap();
+    let path_goal = MatrixCoordinate::new(10, 10, 0).unwrap();
+    let finder = PathFinder::new();
 
     group.bench_function("astar_pathfinding", |b| {
+        let grid_neighbors = |coord: &MatrixCoordinate| -> Vec<MatrixCoordinate> {
+            let deltas: [(i64, i64, i64); 4] = [(1,0,0), (-1,0,0), (0,1,0), (0,-1,0)];
+            deltas.iter().filter_map(|(dx, dy, dz)| {
+                MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz).ok()
+            }).collect()
+        };
         b.iter(|| {
-            find_path_astar(
-                black_box(&start),
-                black_box(&goal),
-                black_box(&obstacles),
-                black_box(1.5)
+            finder.find_path(
+                black_box(&path_start),
+                black_box(&path_goal),
+                &grid_neighbors,
             )
         })
     });
@@ -219,14 +221,10 @@ fn bench_tensor_operations(c: &mut Criterion) {
 fn bench_geospatial_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("geospatial_operations");
 
-    let converter = GpsConverter::new(ConverterConfig {
-        origin_lat: 40.7128,
-        origin_lon: -74.0060,
-        scale_factor: 1.0,
-        z_offset: 0,
-    });
+    let origin = GpsCoordinate::new(40.7128, -74.0060, 0.0).unwrap();
+    let converter = GpsConverter::with_origin(ScaleResolution::Standard, origin);
 
-    let gps = GpsCoordinate::new(51.5074, -0.1278).unwrap();
+    let gps = GpsCoordinate::new(51.5074, -0.1278, 0.0).unwrap();
     let matrix = MatrixCoordinate::new(1000, 2000, 0).unwrap();
 
     group.bench_function("gps_to_matrix", |b| {

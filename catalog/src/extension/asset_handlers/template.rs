@@ -8,7 +8,7 @@ use super::{
     AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
     AssetOperation, OperationResult,
     AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof, Digest,
+    ConsensusProof,
 };
 
 /// Handler for Template assets (asset generation templates)
@@ -52,11 +52,7 @@ impl AssetExtensionHandler for TemplateHandler {
             NetworkScope::Global,
             AssetCategory::Application(ApplicationDomain {
                 domain_name: "catalog_template".to_string(),
-                domain_hash: {
-                    let mut hasher = sha2::Sha256::new();
-                    hasher.update(b"catalog_template");
-                    hasher.finalize().into()
-                },
+                domain_hash: *blake3::hash(b"catalog_template").as_bytes(),
             }),
         );
 

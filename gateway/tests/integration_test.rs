@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use bytes::{Bytes, Buf};
-use h3::client::SendRequest;
 use http::{Method, Request, StatusCode};
 use quinn::{ClientConfig, Endpoint};
 use std::net::SocketAddr;

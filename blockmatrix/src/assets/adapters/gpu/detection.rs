@@ -66,31 +66,9 @@ impl GpuAssetAdapter {
             }
         }
 
-        // Fallback: simulate a reasonable configuration if detection fails
-        let total_devices = 2;
-        let mut gpu_devices = HashMap::new();
-
-        for device_id in 0..total_devices {
-            gpu_devices.insert(device_id, GpuDevice {
-                device_id,
-                device_name: format!("NVIDIA RTX 4080 #{}", device_id),
-                compute_capability: "8.9".to_string(),
-                total_memory_bytes: 16 * 1024 * 1024 * 1024,
-                available_memory_bytes: 16 * 1024 * 1024 * 1024,
-                vulkan_compute_units: 9728,
-                nova_execution_units: 76,
-                base_clock_mhz: 2205,
-                memory_clock_mhz: 11400,
-                pci_bus_id: format!("0000:0{}:00.0", device_id + 1),
-                status: GpuStatus::Available,
-                allocated_to: None,
-                temperature_celsius: Some(35.0 + (device_id as f32 * 5.0)),
-                power_watts: Some(220.0),
-            });
-        }
-
-        tracing::info!("Using fallback GPU configuration: {} devices", total_devices);
-        (total_devices, gpu_devices)
+        // Fallback: report zero GPUs when detection fails (no fake hardware)
+        tracing::info!("No GPUs detected (OS abstraction unavailable), reporting zero devices");
+        (0, HashMap::new())
     }
 
     /// Detect compute capability from GPU model and capabilities

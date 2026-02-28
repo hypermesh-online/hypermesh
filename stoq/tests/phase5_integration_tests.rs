@@ -6,11 +6,9 @@
 // End-to-end validation of complete system functionality
 
 use stoq::transport::{StoqTransport, TransportConfig, NetworkTier, Endpoint};
-use std::net::{SocketAddr, Ipv6Addr};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use tokio::sync::Barrier;
-use tokio::time::{timeout, Duration};
-use bytes::Bytes;
 
 mod connection_tests {
     use super::*;

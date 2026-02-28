@@ -44,7 +44,7 @@ pub enum DistributionProofType {
 
 /// Consensus validator trait for PoS queries
 #[async_trait]
-pub trait ConsensusValidator: Send + Sync {
+pub trait StateAuthenticator: Send + Sync {
     /// Validate storage access for a node
     async fn validate_storage_access(
         &self,
@@ -86,7 +86,7 @@ pub async fn get_eligible_nodes<C>(
     consensus: &C,
 ) -> AssetResult<Vec<NodeInfo>>
 where
-    C: ConsensusValidator,
+    C: StateAuthenticator,
 {
     let mut eligible = Vec::new();
 
@@ -144,7 +144,7 @@ pub async fn validate_node_eligibility<C>(
     consensus: &C,
 ) -> AssetResult<bool>
 where
-    C: ConsensusValidator,
+    C: StateAuthenticator,
 {
     // Privacy level check
     if !privacy_level_allows_node(asset_privacy_level, node_privacy_level) {
@@ -193,15 +193,15 @@ fn privacy_level_allows_node(asset_privacy: &str, node_privacy: &str) -> bool {
     }
 }
 
-/// Mock ConsensusValidator for testing only.
+/// Mock StateAuthenticator for testing only.
 /// Gated behind cfg(test) so it is never included in production builds.
 #[cfg(test)]
-pub struct MockConsensusValidator {
+pub struct MockStateAuthenticator {
     pub allow_all: bool,
 }
 
 #[cfg(test)]
-impl MockConsensusValidator {
+impl MockStateAuthenticator {
     pub fn new(allow_all: bool) -> Self {
         Self { allow_all }
     }
@@ -209,7 +209,7 @@ impl MockConsensusValidator {
 
 #[cfg(test)]
 #[async_trait]
-impl ConsensusValidator for MockConsensusValidator {
+impl StateAuthenticator for MockStateAuthenticator {
     async fn validate_storage_access(
         &self,
         _node_id: &str,
@@ -251,9 +251,9 @@ impl ConsensusValidator for MockConsensusValidator {
     }
 }
 
-/// Implementation for DefaultConsensusValidator
+/// Implementation for DefaultStateAuthenticator
 #[async_trait]
-impl ConsensusValidator for crate::consensus::validation::DefaultConsensusValidator {
+impl StateAuthenticator for crate::consensus::validation::DefaultStateAuthenticator {
     async fn validate_storage_access(
         &self,
         node_id: &str,
@@ -347,7 +347,7 @@ mod tests {
         ];
 
         let shards = vec![];
-        let consensus = MockConsensusValidator::new(true);
+        let consensus = MockStateAuthenticator::new(true);
 
         // Test PrivateNetwork asset
         let eligible = get_eligible_nodes(
@@ -367,7 +367,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_node_eligibility() {
-        let consensus = MockConsensusValidator::new(true);
+        let consensus = MockStateAuthenticator::new(true);
 
         let result = validate_node_eligibility(
             "node1",

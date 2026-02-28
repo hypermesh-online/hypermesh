@@ -240,11 +240,8 @@ impl StoqPosIntegration {
             );
         }
 
-        // Compute hash of received data
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let computed_hash: [u8; 32] = hasher.finalize().into();
+        // Compute BLAKE3 hash of received data
+        let computed_hash = *blake3::hash(data).as_bytes();
 
         // Compare hashes
         if &computed_hash != content_hash {
@@ -591,11 +588,8 @@ mod tests {
 
         let data = b"test asset data";
 
-        // Compute correct hash
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let hash: [u8; 32] = hasher.finalize().into();
+        // Compute correct BLAKE3 hash
+        let hash = *blake3::hash(data).as_bytes();
 
         let result = integration.validate_asset_hash(
             "conn1",

@@ -40,11 +40,12 @@ pub struct Block {
     /// The node's matrix coordinate that owns this block
     pub node_coordinate: MatrixCoordinate,
 
-    /// Node signature (placeholder for now)
-    pub node_signature: Vec<u8>,
-
     /// Block nonce for additional entropy
     pub nonce: u64,
+
+    /// Optional shard commitment anchoring this block to its spatial shard evidence.
+    /// BLAKE3 hash of the canonical shard distribution map (position-based, not identity-based).
+    pub shard_commitment: Option<[u8; 32]>,
 }
 
 impl Block {
@@ -68,15 +69,12 @@ impl Block {
             previous_hash: previous_hash.clone(),
             hash: String::new(),
             node_coordinate: node_coordinate.clone(),
-            node_signature: Vec::new(),
             nonce,
+            shard_commitment: None,
         };
 
         // Calculate hash
         block.hash = block.calculate_hash();
-
-        // Generate signature (placeholder - would use real cryptography in production)
-        block.node_signature = block.generate_signature();
 
         block
     }
@@ -113,6 +111,10 @@ impl Block {
         hasher.update(&self.node_coordinate.z.to_le_bytes());
         hasher.update(&self.nonce.to_le_bytes());
 
+        if let Some(commitment) = &self.shard_commitment {
+            hasher.update(commitment);
+        }
+
         let hash = hasher.finalize();
         format!("{}", hash)
     }
@@ -122,26 +124,15 @@ impl Block {
         self.hash == self.calculate_hash()
     }
 
-    /// Generate a signature for the block (placeholder implementation)
-    fn generate_signature(&self) -> Vec<u8> {
-        // In production, this would use real cryptographic signatures
-        // For now, we'll use a simple hash-based pseudo-signature
-        let mut hasher = Hasher::new();
-        hasher.update(self.hash.as_bytes());
-        hasher.update(b"node_signature");
-        hasher.finalize().as_bytes().to_vec()
-    }
-
-    /// Verify the block's signature
-    pub fn verify_signature(&self) -> bool {
-        // Placeholder verification - always returns true for now
-        // In production, this would verify using the node's public key
-        !self.node_signature.is_empty()
-    }
-
     /// Check if this block belongs to the specified node
     pub fn belongs_to_node(&self, node_coordinate: &MatrixCoordinate) -> bool {
         self.node_coordinate == *node_coordinate
+    }
+
+    /// Set the shard commitment and recalculate the block hash.
+    pub fn set_shard_commitment(&mut self, commitment: [u8; 32]) {
+        self.shard_commitment = Some(commitment);
+        self.hash = self.calculate_hash();
     }
 
     /// Get the block size in bytes
@@ -152,8 +143,8 @@ impl Block {
         64 + // previous_hash (hex string)
         64 + // hash (hex string)
         12 + // node_coordinate (3 * i32)
-        self.node_signature.len() +
-        8 // nonce
+        8 + // nonce
+        if self.shard_commitment.is_some() { 32 } else { 0 } // shard_commitment
     }
 
     /// Get the assets in this block
@@ -202,7 +193,6 @@ mod tests {
         assert!(genesis.is_genesis());
         assert_eq!(genesis.node_coordinate, coord);
         assert!(genesis.verify_hash());
-        assert!(genesis.verify_signature());
     }
 
     #[test]
@@ -336,7 +326,6 @@ mod tests {
         assert!(genesis.assets.len() > 0); // Has genesis asset
         assert_eq!(genesis.asset_count(), 1); // Exactly one genesis asset
         assert!(genesis.verify_hash());
-        assert!(genesis.verify_signature());
     }
 
     #[test]

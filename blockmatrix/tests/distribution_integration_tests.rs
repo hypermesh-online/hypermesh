@@ -15,7 +15,7 @@
 use blockmatrix::{
     distribution::{
         distribute_shards_pos_aware, NodeInfo,
-        pos_validator::{ConsensusValidator, StorageAccessValidation, DistributionProofType},
+        pos_validator::{StateAuthenticator, StorageAccessValidation, DistributionProofType},
     },
     assets::pipeline::sharding::{Sharder, ShardingConfig},
     assets::core::AssetResult,
@@ -25,18 +25,18 @@ use async_trait::async_trait;
 use std::time::SystemTime;
 
 /// Local mock for integration tests (the library-side mock is #[cfg(test)] only)
-struct MockConsensusValidator {
+struct MockStateAuthenticator {
     allow_all: bool,
 }
 
-impl MockConsensusValidator {
+impl MockStateAuthenticator {
     fn new(allow_all: bool) -> Self {
         Self { allow_all }
     }
 }
 
 #[async_trait]
-impl ConsensusValidator for MockConsensusValidator {
+impl StateAuthenticator for MockStateAuthenticator {
     async fn validate_storage_access(
         &self,
         _node_id: &str,
@@ -160,7 +160,7 @@ async fn test_car_purchase_scenario_bank_loan_document() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let all_nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     // Filter to only bank network nodes (simulating PoS network filtering)
     let nodes: Vec<_> = all_nodes
@@ -199,7 +199,7 @@ async fn test_car_purchase_scenario_dealer_invoice() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     // Distribute with PrivateNetwork privacy level
     let result = distribute_shards_pos_aware(
@@ -237,7 +237,7 @@ async fn test_car_purchase_scenario_dmv_title() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     // Distribute with PublicNetwork privacy level
     let result = distribute_shards_pos_aware(
@@ -302,7 +302,7 @@ async fn test_car_purchase_scenario_credit_report() {
         ),
     ];
 
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     // Distribute with PrivateNetwork privacy level (for bank network)
     let result = distribute_shards_pos_aware(
@@ -335,7 +335,7 @@ async fn test_cross_boundary_violation_prevention() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
         shards,
@@ -372,7 +372,7 @@ async fn test_octant_distribution_quality() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
         shards,
@@ -412,7 +412,7 @@ async fn test_golden_ratio_spacing() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
         shards,
@@ -455,7 +455,7 @@ async fn test_pos_validation_integration() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
         shards,
@@ -469,7 +469,7 @@ async fn test_pos_validation_integration() {
     assert!(result.is_ok(), "PoS validation failed");
 
     // Test with denying consensus
-    let deny_consensus = MockConsensusValidator::new(false);
+    let deny_consensus = MockStateAuthenticator::new(false);
     let sharder2 = create_sharder();
     let (shards2, _) = sharder2.shard(&data).unwrap();
 
@@ -499,7 +499,7 @@ async fn test_distribution_statistics() {
     let (shards, _) = sharder.shard(&data).unwrap();
 
     let nodes = create_car_purchase_nodes();
-    let consensus = MockConsensusValidator::new(true);
+    let consensus = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
         shards.clone(),

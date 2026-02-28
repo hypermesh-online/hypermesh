@@ -8,7 +8,7 @@
 //! with detailed error reporting and BlockMatrix AssetId integration.
 
 use trustchain::consensus::{
-    ConsensusProof, ProofValidation, AssetValidationContext, AssetProofRequirements,
+    ConsensusProof, AssetValidationContext, AssetProofRequirements,
 };
 use std::time::Duration;
 

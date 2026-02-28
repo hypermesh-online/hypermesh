@@ -41,7 +41,7 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
                 security: AssetSecurity {
                     consensus_required: false,
                     certificate_pinning: false,
-                    hash_validation: "sha256".to_string(),
+                    hash_validation: "blake3".to_string(),
                     sandbox_level: "standard".to_string(),
                     allowed_syscalls: vec![],
                     network_access: NetworkAccess {

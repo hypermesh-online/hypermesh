@@ -19,6 +19,7 @@ pub mod monitoring;
 pub mod byzantine;
 pub mod alerts;
 pub mod types;
+pub mod trust_scoring;
 
 #[allow(ambiguous_glob_reexports)]
 pub use monitoring::*;
@@ -26,6 +27,7 @@ pub use byzantine::*;
 #[allow(ambiguous_glob_reexports)]
 pub use alerts::*;
 pub use types::*;
+pub use trust_scoring::*;
 
 /// Security monitoring system with consensus integration
 pub struct SecurityMonitor {

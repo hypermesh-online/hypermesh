@@ -317,7 +317,7 @@ async fn test_sync_manager_selective_sync() {
         available_packages: std::collections::HashSet::new(),
         storage_capacity: 1024 * 1024 * 1024,
         bandwidth_capacity: 10 * 1024 * 1024,
-        reputation: 0.9,
+        trust_weight: 0.9,
         last_seen: std::time::SystemTime::now(),
         location: None,
         supported_protocols: vec!["stoq".to_string()],

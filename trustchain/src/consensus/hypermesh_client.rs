@@ -510,7 +510,7 @@ impl ConsensusValidationService for HyperMeshConsensusClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
+    
 
     #[test]
     fn test_client_config_creation() {

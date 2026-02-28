@@ -49,7 +49,8 @@
 //! ```
 //!
 //! ## Geographic Clustering
-//! ```no_run
+//! ```ignore
+//! // Requires pre-existing `nodes: &[MatrixCoordinate]` slice.
 //! use blockmatrix::matrix::geospatial::GeographicClustering;
 //!
 //! let mut clustering = GeographicClustering::new();
@@ -58,7 +59,8 @@
 //! ```
 //!
 //! ## Load Balancing with Geography
-//! ```no_run
+//! ```ignore
+//! // Requires pre-existing `source: &MatrixCoordinate`.
 //! use blockmatrix::matrix::geospatial::{GeographicLoadBalancer, LoadBalancingStrategy};
 //!
 //! let mut balancer = GeographicLoadBalancer::new();

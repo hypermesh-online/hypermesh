@@ -8,7 +8,6 @@
 //! Replaces all mock implementations with real security checks.
 
 use anyhow::{Result, anyhow};
-use sha2::{Sha256, Digest};
 use std::time::{SystemTime, Duration, Instant};
 use std::collections::HashMap;
 use tracing::{info, warn, error, debug};
@@ -59,20 +58,20 @@ impl CryptoVerifier {
             return false;
         };
 
-        // For now, use HMAC-like verification (in production, use Ed25519 or FALCON)
-        let mut hasher = Sha256::new();
+        // For now, use HMAC-like verification with BLAKE3 (in production, use FALCON-1024)
+        let mut hasher = blake3::Hasher::new();
         hasher.update(data);
         hasher.update(public_key);
         hasher.update(node_id.as_bytes());
         let expected = hasher.finalize();
 
         // Constant-time comparison to prevent timing attacks
-        if signature.len() != expected.len() {
+        if signature.len() != expected.as_bytes().len() {
             return false;
         }
 
         let mut result = 0u8;
-        for (a, b) in signature.iter().zip(expected.iter()) {
+        for (a, b) in signature.iter().zip(expected.as_bytes().iter()) {
             result |= a ^ b;
         }
 
@@ -298,16 +297,17 @@ impl RealWorkValidator {
     }
 
     fn verify_challenge_solution(&self, challenge: &str, workload_id: &str, index: usize) -> bool {
-        // Verify the challenge was solved with sufficient difficulty
-        let mut hasher = Sha256::new();
-        hasher.update(challenge);
-        hasher.update(workload_id);
+        // Verify the challenge was solved with sufficient difficulty (BLAKE3)
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(challenge.as_bytes());
+        hasher.update(workload_id.as_bytes());
         hasher.update(&(index as u32).to_le_bytes());
         let hash = hasher.finalize();
 
         // Check for required leading zeros (difficulty)
-        let leading_zeros = hash.iter().take_while(|&&b| b == 0).count() * 8;
-        let first_non_zero = hash.iter().find(|&&b| b != 0).unwrap_or(&0);
+        let hash_bytes = hash.as_bytes();
+        let leading_zeros = hash_bytes.iter().take_while(|&&b| b == 0).count() * 8;
+        let first_non_zero = hash_bytes.iter().find(|&&b| b != 0).unwrap_or(&0);
         let extra_zeros = first_non_zero.leading_zeros();
 
         let total_leading_zeros = leading_zeros + extra_zeros as usize;
@@ -368,15 +368,15 @@ impl RealTimeValidator {
     }
 
     fn verify_vdf(&self, vdf_output: &str, challenges: &[String]) -> bool {
-        // Verify VDF was computed correctly with sequential operations
+        // Verify VDF was computed correctly with sequential operations (BLAKE3)
         // This ensures time actually passed during computation
 
         let mut current = vdf_output.to_string();
         for challenge in challenges.iter().rev() {
-            let mut hasher = Sha256::new();
-            hasher.update(current);
-            hasher.update(challenge);
-            current = format!("{:x}", hasher.finalize());
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(current.as_bytes());
+            hasher.update(challenge.as_bytes());
+            current = hasher.finalize().to_hex().to_string();
         }
 
         // The final result should match a known pattern
@@ -407,7 +407,7 @@ impl RealTimeValidator {
 }
 
 /// Complete real consensus validator
-pub struct RealConsensusValidator {
+pub struct RealStateAuthenticator {
     space_validator: RealSpaceValidator,
     stake_validator: RealStakeValidator,
     work_validator: RealWorkValidator,
@@ -427,7 +427,7 @@ struct ValidationMetrics {
     time_failures: u64,
 }
 
-impl RealConsensusValidator {
+impl RealStateAuthenticator {
     pub fn new() -> Self {
         Self {
             space_validator: RealSpaceValidator::new(),
@@ -561,7 +561,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_real_consensus_validation() {
-        let mut validator = RealConsensusValidator::new();
+        let mut validator = RealStateAuthenticator::new();
 
         // Create test consensus proof
         let proof = match ConsensusProof::generate_from_network("test-node").await {
@@ -596,13 +596,13 @@ mod tests {
         let public_key = vec![1, 2, 3, 4, 5];
         verifier.add_trusted_key(node_id.to_string(), public_key.clone());
 
-        // Create test data and signature
+        // Create test data and signature (BLAKE3)
         let data = b"test data";
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(data);
         hasher.update(&public_key);
         hasher.update(node_id.as_bytes());
-        let signature = hasher.finalize().to_vec();
+        let signature = hasher.finalize().as_bytes().to_vec();
 
         // Verify signature
         assert!(verifier.verify_signature(node_id, data, &signature));

@@ -11,7 +11,7 @@ use anyhow::Result;
 use std::time::{Duration, SystemTime};
 use hypermesh_lib::PrivacyMode;
 use stoq::protocol::{
-    StoqPosIntegration, MatrixPosition, PosToken,
+    StoqPosIntegration, MatrixPosition, MatrixPositionExt, PosToken,
     ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
 };
 use stoq::transport::certificate_strategy::NetworkType;
@@ -31,9 +31,10 @@ fn create_test_pos_token() -> PosToken {
             staked_until: SystemTime::now() + Duration::from_secs(3600),
         },
         proof_of_work: ProofOfWork {
+            // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
             difficulty: 10,
             nonce: 12345,
-            work_hash: vec![13, 14, 15, 16],
+            work_hash: vec![0, 0, 0x0F, 0xFF],
         },
         proof_of_time: ProofOfTime {
             timestamp: SystemTime::now(),
@@ -162,11 +163,8 @@ async fn test_asset_hash_verification_success() -> Result<()> {
 
     let asset_data = b"test asset data for verification";
 
-    // Compute correct hash
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(asset_data);
-    let correct_hash: [u8; 32] = hasher.finalize().into();
+    // Compute correct BLAKE3 hash (matching library implementation)
+    let correct_hash: [u8; 32] = *blake3::hash(asset_data).as_bytes();
 
     // Validate with correct hash
     let result = integration.validate_asset_hash(
@@ -219,21 +217,21 @@ async fn test_shard_address_registration() -> Result<()> {
     // Register shard addresses
     integration.register_shard_address(
         1,
-        MatrixPosition::new(10, 20, 30),
+        MatrixPosition::from_i64(10, 20, 30),
         "network1".to_string(),
         Some("node1".to_string()),
     );
 
     integration.register_shard_address(
         2,
-        MatrixPosition::new(50, 60, 70),
+        MatrixPosition::from_i64(50, 60, 70),
         "network2".to_string(),
         Some("node2".to_string()),
     );
 
     integration.register_shard_address(
         3,
-        MatrixPosition::new(100, 110, 120),
+        MatrixPosition::from_i64(100, 110, 120),
         "network3".to_string(),
         None,
     );
@@ -243,7 +241,7 @@ async fn test_shard_address_registration() -> Result<()> {
     assert_eq!(addresses.len(), 3);
 
     assert_eq!(addresses[0].shard_id, 1);
-    assert_eq!(addresses[0].position, MatrixPosition::new(10, 20, 30));
+    assert_eq!(addresses[0].position, MatrixPosition::from_i64(10, 20, 30));
     assert_eq!(addresses[0].network_id, "network1");
     assert_eq!(addresses[0].node_id, Some("node1".to_string()));
 
@@ -411,8 +409,8 @@ async fn test_connection_statistics() -> Result<()> {
 #[tokio::test]
 async fn test_matrix_position_distance() -> Result<()> {
     let origin = MatrixPosition::origin();
-    let pos1 = MatrixPosition::new(3, 4, 0);
-    let pos2 = MatrixPosition::new(0, 0, 12);
+    let pos1 = MatrixPosition::from_i64(3, 4, 0);
+    let pos2 = MatrixPosition::from_i64(0, 0, 12);
 
     // 3-4-5 triangle in XY plane
     let dist1 = origin.distance_to(&pos1);

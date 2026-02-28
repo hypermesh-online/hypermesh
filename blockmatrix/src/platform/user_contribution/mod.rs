@@ -52,7 +52,7 @@ pub use session::{
 };
 
 pub use rewards::{
-    RewardEngine, PerformanceMultipliers, ReputationSystem, PlatformMetrics,
+    RewardEngine, PerformanceMultipliers, AuthenticationConfig, PlatformMetrics,
 };
 
 pub use platform::{

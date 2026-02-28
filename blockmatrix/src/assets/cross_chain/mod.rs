@@ -15,7 +15,7 @@ pub use types::*;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
-use sha2::{Digest, Sha256};
+use blake3;
 
 use crate::assets::core::asset_id::AssetRegistration;
 use super::matrix_blockchain::{
@@ -361,7 +361,7 @@ impl CrossChainValidationManager {
 
     /// Generate unique validation ID
     fn generate_validation_id(&self, validator: &CrossNetworkValidator) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(validator.source_network.as_bytes());
         hasher.update(validator.asset_identifier.to_hex_string().as_bytes());
 
@@ -372,8 +372,7 @@ impl CrossChainValidationManager {
 
         hasher.update(&time_nanos.to_le_bytes());
 
-        let result = hasher.finalize();
-        hex::encode(result)
+        hex::encode(hasher.finalize().as_bytes())
     }
 
     /// Clear expired cache entries

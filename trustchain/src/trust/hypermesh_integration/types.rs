@@ -39,7 +39,7 @@ pub struct NodeId {
     pub node_type: NodeType,
 }
 
-/// Entity ID for trust scoring (assets or nodes)
+/// Entity ID for authentication (assets or nodes)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntityId {
     Asset(AssetId),
@@ -64,24 +64,19 @@ pub enum NodeType {
     Bridge,
 }
 
-/// Trust score for assets and nodes
+/// Binary authentication status for assets and nodes
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrustScore {
-    pub overall_score: f64,
-    pub confidence: f64,
-    pub components: TrustComponents,
-    pub last_updated: SystemTime,
+pub struct AuthenticationStatus {
+    /// Whether the entity passed authentication
+    pub authenticated: bool,
+    /// Whether the certificate is valid
+    pub certificate_valid: bool,
+    /// Whether consensus verification passed
+    pub consensus_verified: bool,
+    /// When this status was last checked
+    pub last_checked: SystemTime,
+    /// When this status expires
     pub expiry: SystemTime,
-}
-
-/// Components of trust score
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrustComponents {
-    pub consensus_score: f64,
-    pub reputation_score: f64,
-    pub verification_score: f64,
-    pub performance_score: f64,
-    pub availability_score: f64,
 }
 
 /// Byzantine fault detection report
@@ -154,7 +149,8 @@ pub enum AlertLevel {
 pub struct ProxyConnection {
     pub proxy_id: ProxyId,
     pub connection_type: ProxyType,
-    pub trust_level: TrustLevel,
+    /// Binary: is the proxy authenticated?
+    pub is_authenticated: bool,
     pub established_at: SystemTime,
     pub last_activity: SystemTime,
     pub performance_metrics: ProxyPerformanceMetrics,
@@ -169,53 +165,45 @@ pub enum ProxyType {
     Anonymous,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum TrustLevel {
-    Untrusted,
-    Low,
-    Medium,
-    High,
-    Verified,
-}
-
 /// Configuration for trust validator
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrustValidatorConfig {
-    pub min_trust_score: f64,
-    pub byzantine_sensitivity: f64,
-    pub trust_cache_ttl: Duration,
+    /// Whether authentication is required
+    pub require_authentication: bool,
+    /// Cache TTL for authentication results
+    pub auth_cache_ttl: Duration,
+    /// Maximum proxy hops
     pub max_proxy_hops: u32,
+    /// Monitoring interval
     pub monitoring_interval: Duration,
+    /// Alert thresholds
     pub alert_thresholds: AlertThresholds,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AlertThresholds {
     pub byzantine_confidence: f64,
-    pub trust_score_degradation: f64,
     pub performance_degradation: f64,
     pub availability_threshold: f64,
 }
 
-/// Performance metrics for trust validation
+/// Performance metrics for authentication
 #[derive(Default)]
 pub struct TrustMetrics {
-    pub trust_validations: std::sync::atomic::AtomicU64,
+    pub auth_checks: std::sync::atomic::AtomicU64,
     pub byzantine_detections: std::sync::atomic::AtomicU64,
     pub proxy_connections: std::sync::atomic::AtomicU64,
     pub average_validation_time_ms: std::sync::atomic::AtomicU32,
-    pub false_positive_rate: std::sync::atomic::AtomicU32,
     pub alert_count: std::sync::atomic::AtomicU64,
 }
 
-/// Trust validator performance metrics
+/// Validator performance metrics
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrustValidatorMetrics {
-    pub trust_validations: u64,
+    pub auth_checks: u64,
     pub byzantine_detections: u64,
     pub proxy_connections: u64,
     pub average_validation_time_ms: u32,
-    pub false_positive_rate: f64,
     pub alert_count: u64,
 }
 
@@ -225,43 +213,14 @@ pub struct ProxyPerformanceMetrics;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecurityContext;
 
-/// Trust thresholds for different operations
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct TrustThresholds {
-    pub(crate) asset_access: f64,
-    pub(crate) consensus_participation: f64,
-    pub(crate) proxy_establishment: f64,
-    pub(crate) data_validation: f64,
-}
-
-/// Node behavior tracking
+/// Node behavior tracking (binary: authenticated or byzantine)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct NodeBehavior {
-    pub(crate) consensus_participation: u64,
-    pub(crate) valid_proofs_submitted: u64,
-    pub(crate) invalid_proofs_submitted: u64,
-    pub(crate) uptime_percentage: f64,
+    pub(crate) is_authenticated: bool,
+    pub(crate) is_byzantine: bool,
     pub(crate) last_seen: SystemTime,
-    pub(crate) reputation_events: Vec<ReputationEvent>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct ReputationEvent {
-    pub(crate) event_type: ReputationEventType,
-    pub(crate) timestamp: SystemTime,
-    pub(crate) impact: f64,
-    pub(crate) details: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) enum ReputationEventType {
-    SuccessfulValidation,
-    FailedValidation,
-    ByzantineBehavior,
-    PerformanceDegradation,
-    AvailabilityIssue,
-    SecurityViolation,
-}
 
 // Supporting type stubs
 pub(crate) struct HyperMeshNetworkClient;
@@ -269,17 +228,9 @@ pub(crate) struct AssetMetadata;
 pub(crate) struct AssetVerificationEngine;
 pub(crate) struct ByzantinePatterns;
 pub(crate) struct DetectionAlgorithms;
-pub(crate) struct ReputationSystem;
 pub(crate) struct AlertSystem;
 pub(crate) struct ProxySelectionStrategy;
-pub(crate) struct TrustBasedRouter;
 pub(crate) struct ProxyPerformanceMonitor;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct TrustHistory;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct ScoringAlgorithms;
 
 /// Byzantine behavior analysis result
 pub(crate) struct ByzantineBehaviorAnalysis {
@@ -294,7 +245,7 @@ pub(crate) struct ByzantineBehaviorAnalysis {
 /// Proxy candidate for selection
 pub(crate) struct ProxyCandidate {
     pub(crate) _node_id: NodeId,
-    pub(crate) _trust_score: TrustScore,
+    pub(crate) _is_authenticated: bool,
     pub(crate) _performance_metrics: ProxyPerformanceMetrics,
     pub(crate) _distance_hops: u32,
 }
@@ -302,14 +253,12 @@ pub(crate) struct ProxyCandidate {
 impl Default for TrustValidatorConfig {
     fn default() -> Self {
         Self {
-            min_trust_score: 0.7,
-            byzantine_sensitivity: 0.8,
-            trust_cache_ttl: Duration::from_secs(3600),
+            require_authentication: true,
+            auth_cache_ttl: Duration::from_secs(3600),
             max_proxy_hops: 3,
             monitoring_interval: Duration::from_secs(60),
             alert_thresholds: AlertThresholds {
                 byzantine_confidence: 0.8,
-                trust_score_degradation: 0.3,
                 performance_degradation: 0.5,
                 availability_threshold: 0.95,
             },

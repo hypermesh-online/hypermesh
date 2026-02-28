@@ -20,7 +20,7 @@ interface SimpleAsset {
   id: string;
   type: 'CPU' | 'GPU' | 'Memory' | 'Storage';
   cost_per_hour: number;
-  trust_score: number;
+  is_authenticated: boolean;
   location: string;
   state: 'Available' | 'Allocated';
   privacy_level: string;
@@ -75,7 +75,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'cpu_001',
         type: 'CPU',
         cost_per_hour: 15,
-        trust_score: 0.92,
+        is_authenticated: true,
         location: 'San Francisco, CA',
         state: 'Available',
         privacy_level: 'PublicNetwork',
@@ -86,7 +86,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'gpu_002',
         type: 'GPU',
         cost_per_hour: 85,
-        trust_score: 0.88,
+        is_authenticated: true,
         location: 'Austin, TX',
         state: 'Available',
         privacy_level: 'P2P',
@@ -97,7 +97,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'mem_003',
         type: 'Memory',
         cost_per_hour: 8,
-        trust_score: 0.95,
+        is_authenticated: true,
         location: 'Seattle, WA',
         state: 'Available',
         privacy_level: 'PublicNetwork',
@@ -108,7 +108,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'storage_004',
         type: 'Storage',
         cost_per_hour: 3,
-        trust_score: 0.87,
+        is_authenticated: true,
         location: 'New York, NY',
         state: 'Available',
         privacy_level: 'FullPublic',
@@ -119,7 +119,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'cpu_005',
         type: 'CPU',
         cost_per_hour: 22,
-        trust_score: 0.91,
+        is_authenticated: true,
         location: 'London, UK',
         state: 'Available',
         privacy_level: 'PrivateNetwork',
@@ -130,7 +130,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
         id: 'gpu_006',
         type: 'GPU',
         cost_per_hour: 120,
-        trust_score: 0.96,
+        is_authenticated: true,
         location: 'Tokyo, JP',
         state: 'Available',
         privacy_level: 'P2P',
@@ -295,7 +295,7 @@ export const SimpleAssetBrowser: React.FC<SimpleAssetBrowserProps> = ({
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-gray-900">{asset.cost_per_hour} CAESAR/hr</p>
-                    <p className="text-sm text-gray-500">Trust: {Math.round(asset.trust_score * 100)}%</p>
+                    <p className={`text-sm ${asset.is_authenticated ? 'text-green-500' : 'text-red-500'}`}>{asset.is_authenticated ? 'Authenticated' : 'Not Authenticated'}</p>
                   </div>
                 </div>
 

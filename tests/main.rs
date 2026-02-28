@@ -8,8 +8,8 @@
 mod test_framework;
 mod security;
 mod performance;
+mod integration;
 // TODO: Re-enable when modules are implemented
-// mod integration;
 // mod chaos;
 // mod validation;
 
@@ -17,9 +17,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use test_framework::{TestConfig, TestExecutor};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]

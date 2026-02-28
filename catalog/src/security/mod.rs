@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 pub use trustchain::{TrustChainIntegration, TrustChainConfig};
 pub use signing::{PackageSigner, SignatureVerifier, PackageSignature};
-pub use reputation::{PublisherReputation, ReputationSystem};
+pub use reputation::{PublisherAuthenticator, PublisherVerification};
 pub use policies::{TrustPolicy, PolicyEngine, TrustLevel};
 
 use crate::assets::AssetPackage;
@@ -32,8 +32,8 @@ pub struct SecurityManager {
     signer: Arc<PackageSigner>,
     /// Signature verification system
     verifier: Arc<SignatureVerifier>,
-    /// Publisher reputation system
-    reputation: Arc<ReputationSystem>,
+    /// Binary publisher authenticator
+    authenticator: Arc<PublisherAuthenticator>,
     /// Trust policy engine
     policy_engine: Arc<PolicyEngine>,
     /// Security configuration
@@ -119,8 +119,8 @@ pub struct VerificationResult {
     pub certificate_valid: bool,
     /// Publisher identity
     pub publisher: Option<PublisherIdentity>,
-    /// Publisher reputation score
-    pub reputation_score: Option<f64>,
+    /// Whether publisher is certificate-authenticated
+    pub publisher_authenticated: bool,
     /// Trust policy evaluation
     pub policy_result: PolicyResult,
     /// Detected vulnerabilities
@@ -213,8 +213,8 @@ pub enum ViolationType {
     InvalidCertificate,
     /// Publisher is blacklisted
     BlacklistedPublisher,
-    /// Low reputation score
-    LowReputation,
+    /// Publisher not certificate-authenticated
+    UnauthenticatedPublisher,
     /// Package contains vulnerabilities
     Vulnerability,
     /// Certificate expired
@@ -274,8 +274,8 @@ impl SecurityManager {
         let signer = Arc::new(PackageSigner::new(trustchain.clone()).await?);
         let verifier = Arc::new(SignatureVerifier::new(trustchain.clone()).await?);
 
-        // Initialize reputation system
-        let reputation = Arc::new(ReputationSystem::new().await?);
+        // Initialize binary publisher authenticator
+        let authenticator = Arc::new(PublisherAuthenticator::new());
 
         // Initialize policy engine - clone the trust policy before moving config
         let default_trust_policy = config.default_trust_policy.clone();
@@ -285,7 +285,7 @@ impl SecurityManager {
             trustchain,
             signer,
             verifier,
-            reputation,
+            authenticator,
             policy_engine,
             config,
             metrics: Arc::new(SecurityMetrics::default()),
@@ -325,7 +325,7 @@ impl SecurityManager {
             signature_valid: false,
             certificate_valid: false,
             publisher: None,
-            reputation_score: None,
+            publisher_authenticated: false,
             policy_result: PolicyResult {
                 allowed: false,
                 trust_level: self.config.default_trust_policy.clone(),
@@ -370,23 +370,23 @@ impl SecurityManager {
                         return Ok(result);
                     }
 
-                    // Get publisher reputation
-                    let reputation_score = self.reputation
-                        .get_publisher_score(&publisher_info.trustchain_id)
+                    // Binary publisher authentication check
+                    let auth_result = self.authenticator
+                        .verify(&publisher_info.cert_fingerprint)
                         .await?;
 
                     result.publisher = Some(publisher_info.clone());
-                    result.reputation_score = Some(reputation_score);
+                    result.publisher_authenticated = auth_result.authenticated;
 
-                    // Check reputation against policy
-                    if reputation_score < 0.5 &&
+                    // Reject unauthenticated publishers under strict policy
+                    if !auth_result.authenticated &&
                        self.config.default_trust_policy == TrustLevel::Strict {
                         result.policy_result.violations.push(PolicyViolation {
-                            violation_type: ViolationType::LowReputation,
+                            violation_type: ViolationType::UnauthenticatedPublisher,
                             severity: Severity::High,
-                            description: format!("Publisher reputation score {} is below threshold",
-                                reputation_score),
-                            remediation: Some("Wait for publisher to build reputation or adjust trust policy".to_string()),
+                            description: format!("Publisher '{}' is not certificate-authenticated",
+                                publisher_info.common_name),
+                            remediation: Some("Publisher must obtain a valid TrustChain certificate".to_string()),
                         });
                     }
                 }
@@ -450,16 +450,13 @@ impl SecurityManager {
         Ok(vec![])
     }
 
-    /// Update publisher reputation after installation
-    pub async fn update_reputation(
+    /// Revoke a publisher's certificate (binary: authenticated or not)
+    pub async fn revoke_publisher(
         &self,
-        publisher_id: &str,
-        success: bool,
-        user_rating: Option<u8>,
-    ) -> Result<()> {
-        self.reputation
-            .update_reputation(publisher_id, success, user_rating)
-            .await
+        cert_fingerprint: &str,
+        reason: &str,
+    ) {
+        self.authenticator.revoke(cert_fingerprint, reason).await;
     }
 
     /// Get security metrics

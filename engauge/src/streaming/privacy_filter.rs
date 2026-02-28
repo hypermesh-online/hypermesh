@@ -9,7 +9,7 @@
 //!
 //! Privacy behavior per [`PrivacyMode`]:
 //! - **Anonymous** -- no metrics shared (returns `None`).
-//! - **Private** -- Capacity and Congestion only (no Economic), with noise.
+//! - **Private** -- Capacity, Congestion, and Verification only, with noise.
 //! - **Public** -- all payloads passed through with noise.
 
 use hypermesh_lib::PrivacyMode;
@@ -17,7 +17,7 @@ use rand::Rng;
 
 use super::protocol::{
     CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame,
-    MetricsPayload, RoutingSnapshot,
+    MetricsPayload, RoutingSnapshot, VerificationSnapshot,
 };
 
 // ---------------------------------------------------------------------------
@@ -78,6 +78,11 @@ impl DifferentialPrivacyFilter {
                     return None;
                 }
                 MetricsPayload::Economic(self.noise_economic(e))
+            }
+            MetricsPayload::Verification(v) => {
+                // Private and Public both receive Verification payloads.
+                // Anonymous was already filtered out above.
+                MetricsPayload::Verification(self.noise_verification(v))
             }
         };
 
@@ -150,6 +155,17 @@ impl DifferentialPrivacyFilter {
             .max(0.0);
         e.active_packets = self.noise_u32(e.active_packets, 1.0);
         e
+    }
+
+    fn noise_verification(&self, mut v: VerificationSnapshot) -> VerificationSnapshot {
+        v.probes_sent = self.noise_u32(v.probes_sent, 1.0);
+        v.probes_passed = self.noise_u32(v.probes_passed, 1.0);
+        v.avg_response_time_us = self.noise_u64(v.avg_response_time_us, 100.0);
+        v.consistency_ratio = self
+            .add_laplace_noise(v.consistency_ratio, 0.01)
+            .clamp(0.0, 1.0);
+        // epoch is not noised — it is a logical identifier, not a measurement.
+        v
     }
 
     // -- integer noise helpers ---------------------------------------------
@@ -228,6 +244,16 @@ mod tests {
         })
     }
 
+    fn sample_verification() -> MetricsPayload {
+        MetricsPayload::Verification(VerificationSnapshot {
+            probes_sent: 100,
+            probes_passed: 95,
+            avg_response_time_us: 1200,
+            consistency_ratio: 0.95,
+            epoch: 42,
+        })
+    }
+
     #[test]
     fn anonymous_returns_none() {
         let filter = DifferentialPrivacyFilter::new(1.0);
@@ -284,6 +310,7 @@ mod tests {
             sample_congestion(),
             sample_routing(),
             sample_economic(),
+            sample_verification(),
         ];
 
         for payload in payloads {
@@ -293,6 +320,36 @@ mod tests {
                 "Public must pass all payload variants"
             );
         }
+    }
+
+    #[test]
+    fn anonymous_suppresses_verification() {
+        let filter = DifferentialPrivacyFilter::new(1.0);
+        let frame = make_frame(PrivacyMode::ANONYMOUS, sample_verification());
+        assert!(
+            filter.filter_frame(frame).is_none(),
+            "Anonymous must suppress Verification payload"
+        );
+    }
+
+    #[test]
+    fn private_passes_verification() {
+        let filter = DifferentialPrivacyFilter::new(1.0);
+        let frame = make_frame(PrivacyMode::PRIVATE, sample_verification());
+        assert!(
+            filter.filter_frame(frame).is_some(),
+            "Private must pass Verification payload"
+        );
+    }
+
+    #[test]
+    fn public_passes_verification() {
+        let filter = DifferentialPrivacyFilter::new(1.0);
+        let frame = make_frame(PrivacyMode::PUBLIC, sample_verification());
+        assert!(
+            filter.filter_frame(frame).is_some(),
+            "Public must pass Verification payload"
+        );
     }
 
     #[test]

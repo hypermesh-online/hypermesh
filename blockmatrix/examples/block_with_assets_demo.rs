@@ -172,11 +172,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   ├─ Hash integrity: {}", if hash_valid { "✅ VALID" } else { "❌ INVALID" });
 
     println!("   │");
-    println!("   Signature Validation:");
-    let sig_valid = block.verify_signature();
-    println!("   ├─ Signature: {}", if sig_valid { "✅ VALID" } else { "❌ INVALID" });
-
-    println!("   │");
     println!("   Node Ownership:");
     let belongs = block.belongs_to_node(&node_coord);
     println!("   └─ Belongs to node: {}\n", if belongs { "✅ YES" } else { "❌ NO" });

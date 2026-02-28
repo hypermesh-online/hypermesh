@@ -1,187 +1,111 @@
-# HyperMesh eBPF Intelligence Layer
+# HyperMesh eBPF
 
-**Sprint 2.1: Intelligence Layer Separation**
+Unified eBPF intelligence layer -- the single source of truth for all packet processing in the HyperMesh ecosystem. Enforces Proof of State, asset hash verification, matrix routing, and privacy policies at kernel level with microsecond latency.
 
-## Overview
+**Status**: 100% Complete (alpha) | 19 files | ~8,200 lines | 152 tests
 
-`hypermesh-ebpf` provides kernel-level enforcement of HyperMesh intelligence policies. This crate implements HyperMesh-specific eBPF programs that validate Proof of State, Asset Hashes, Matrix Routing, and Privacy Tiers at microsecond latency.
-
-## Architecture Principle
-
-**STOQ provides MECHANISMS, HyperMesh provides POLICIES, eBPF enforces AT KERNEL LEVEL.**
+## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│   HyperMesh Application                     │
-│   - Defines validation POLICIES              │
-│   - Matrix topology, blockchain             │
-│   - Proof of State semantics                │
-└──────────────────┬──────────────────────────┘
-                   │ Policy Configuration
-                   ↓
-┌─────────────────────────────────────────────┐
-│   hypermesh-ebpf (THIS CRATE)               │
-│   - Enforces policies at kernel level      │
-│   - Packet filtering with PoS validation   │
-│   - Asset hash verification                │
-│   - Matrix routing compliance              │
-└──────────────────┬──────────────────────────┘
-                   │ Extension Headers
-                   ↓
-┌─────────────────────────────────────────────┐
-│   STOQ Protocol                             │
-│   - Generic transport (like TCP/TLS)       │
-│   - Carries extension headers               │
-│   - NO knowledge of HyperMesh semantics    │
-└─────────────────────────────────────────────┘
++-----------------------------------------------+
+|   HyperMesh Application                       |
+|   - Defines validation POLICIES                |
+|   - Matrix topology, blockchain               |
+|   - Proof of State semantics                  |
++------------------------+-----------------------+
+                         | Policy Configuration
+                         v
++-----------------------------------------------+
+|   hypermesh-ebpf (THIS CRATE)                  |
+|   - Enforces policies at kernel level          |
+|   - Packet filtering with PoS validation       |
+|   - Asset hash verification (BLAKE3)           |
+|   - Matrix routing compliance                  |
++------------------------+-----------------------+
+                         | Extension Headers
+                         v
++-----------------------------------------------+
+|   STOQ Protocol                                |
+|   - Generic transport (like TCP/TLS)           |
+|   - Carries extension headers                  |
+|   - NO knowledge of HyperMesh semantics        |
++-----------------------------------------------+
 ```
+
+**Consumer pattern**: STOQ is a thin consumer (`StoqEbpfTransport`, ~131 LOC wrapper). BlockMatrix is a configurator (policy setter). This crate is the single source of truth.
 
 ## Key Components
 
-### 1. **HyperMesh Extension Headers** (`hypermesh_headers.rs`)
+### HyperMeshEbpf Orchestrator
+Central API for eBPF lifecycle management:
+- `attach_xdp()` -- attach to network interface
+- `create_af_xdp_socket()` -- zero-copy I/O setup
+- `set_privacy_tier()` / `set_routing_rule()` / `register_asset_hash()` -- policy control
+- Capability detection and state management
 
-Defines HyperMesh-specific extension types carried in STOQ packets:
+### Three-Path Graceful Degradation
+1. **Full**: eBPF + AF_XDP (kernel-level filtering + zero-copy I/O)
+2. **Partial**: eBPF without AF_XDP (kernel filtering, userspace I/O)
+3. **Userspace**: No kernel attachment (pure userspace validation)
 
+### PacketDecision Routing
+- `Pass` -- deliver to local stack (XDP_PASS)
+- `Redirect { socket }` -- zero-copy to AF_XDP socket for STOQ consumption
+- `Forward { next_hop }` -- XDP_TX to matrix neighbor node
+- `Drop { reason }` -- reject at kernel level
+
+### AF_XDP Zero-Copy I/O
+Real zero-copy via direct libc syscalls:
+- mmap UMEM allocation
+- 4-ring setup (fill/completion/rx/tx)
+- Frame allocator with batch operations
+- Multi-queue load balancing (RoundRobin/LeastLoaded/FlowHash)
+- Drop-based cleanup
+
+### C Kernel XDP Program (`hypermesh_xdp.c`, ~457 lines)
+- 4 BPF maps for policy/PoS/asset/xsk state
+- HyperMesh extension header parsing (magic `0x484D`)
+- Structural PoS validation (difficulty, algorithm indicator, TTL-based cache)
+- Full crypto (FALCON-1024/Ed25519/ECDSA) deferred to userspace
+
+### HyperMesh Extension Headers
 - **Proof of State** (0x1000): WHO/WHAT/WHEN/WHERE consensus proofs
-- **Asset Hash** (0x1001): Content integrity validation
-- **Matrix Routing** (0x1002): Topology-aware routing paths
+- **Asset Hash** (0x1001): BLAKE3 content integrity
+- **Matrix Routing** (0x1002): Topology-aware routing paths (IPv6 + matrix position)
 - **Privacy Tier** (0x1003): Access control enforcement
 
-### 2. **Policy Maps** (`policy_maps.rs`)
+### Validation Hooks
+- STOQ registers `CertificateValidator` + `PacketValidator`
+- BlockMatrix registers `ExtensionValidator`
+- All registered via `set_validation_hooks()`
 
-Userspace-to-kernel policy configuration:
+### Policy Sync
+`sync_to_kernel()` serializes `ValidationPolicy` to 32-byte little-endian format matching the C struct `policy_value`.
 
-```rust
-let policy = ValidationPolicy {
-    requires_pos: true,
-    validate_asset_hash: true,
-    check_matrix_routing: true,
-    privacy_tier: 2, // Federated
-    max_packet_size: 9000,
-    rate_limit_per_sec: 100,
-};
-
-policy_manager.set_policy(connection_id, policy);
-```
-
-### 3. **Packet Filtering** (`packet_filter.rs`)
-
-XDP packet filtering with HyperMesh intelligence:
-
-- Kernel-level packet inspection
-- Drop invalid packets before userspace sees them
-- Zero-copy redirect for validated packets
-- Microsecond-level performance
-
-### 4. **Validation Logic** (`validation.rs`)
-
-Implements HyperMesh-specific validation:
-
-- **Proof of State Validator**: Four-proof authentication validation
-- **Asset Hash Validator**: BLAKE3 hash verification
-- **Shard Set Validator**: Multi-part asset integrity
-
-### 5. **Metrics** (`metrics.rs`)
-
-Intelligence-specific metrics:
-
-- Proof of State validation rates
-- Asset hash verification statistics
-- Matrix routing performance
-- Privacy tier enforcement metrics
-
-## Usage
-
-### Basic Setup
-
-```rust
-use hypermesh_ebpf::{HyperMeshEbpf, ValidationPolicy};
-
-// Create eBPF manager
-let mut ebpf = HyperMeshEbpf::new()?;
-
-// Configure policies
-ebpf.policy_manager_mut()
-    .set_default_policy(ValidationPolicy::strict());
-
-// Attach to network interface (requires root privileges)
-#[cfg(feature = "kernel-attach")]
-ebpf.attach("eth0")?;
-
-// Get metrics
-let metrics = ebpf.get_metrics();
-println!("{}", metrics);
-```
-
-### Validation
-
-```rust
-use hypermesh_ebpf::{ProofOfStateValidator, AssetHashValidator};
-
-// Validate Proof of State
-let validator = ProofOfStateValidator::default();
-validator.validate(&proof_header)?;
-
-// Validate asset hash
-AssetHashValidator::validate(&asset_header, payload)?;
-```
-
-## STOQ Independence
-
-**Critical**: STOQ protocol has **ZERO** HyperMesh dependencies after Sprint 2.1 refactoring.
-
-- STOQ treats extension headers as opaque byte blobs
-- STOQ provides validation hooks, applications implement validators
-- STOQ can be used by ANY application, not just HyperMesh
+### Hardware Offload
+- Driver detection (mlx5_core/nfp/bnxt_en)
+- `OffloadPolicy`: Disabled | Opportunistic | Required
+- Automatic fallback to native XDP
 
 ## Features
 
 - **`default`**: Userspace validation only (no kernel attachment)
-- **`kernel-attach`**: Enable actual eBPF program loading (requires privileges)
+- **`kernel-attach`**: Real eBPF program loading via aya/libc (requires CAP_NET_ADMIN)
+- **`ebpf-loader`**: C program compilation via build.rs
 
 ## Requirements
 
-- Rust 1.70+
-- Linux kernel 4.18+ (for AF_XDP support)
-- CAP_NET_ADMIN capability (for eBPF attachment)
-- libbpf-dev (for kernel attachment)
+- Linux kernel 4.18+ (AF_XDP support)
+- CAP_NET_ADMIN capability (eBPF attachment)
+- libbpf-dev (kernel attachment)
 
-## Status
+## Quick Start
 
-**Sprint 2.1 Complete**: ✅ Intelligence layer separated from transport
-
-- ✅ HyperMesh extension headers defined
-- ✅ Policy configuration infrastructure
-- ✅ Validation logic implemented (userspace)
-- ✅ Metrics collection framework
-- ✅ STOQ independence verified (zero deps)
-
-**Future Work (Sprint 2.2+)**:
-- Actual eBPF XDP program implementation
-- Kernel-level validation enforcement
-- Performance benchmarking vs userspace
-
-## Architecture Compliance
-
-### ✅ STOQ Remains Generic Transport
-- Zero HyperMesh dependencies in STOQ
-- Extension headers are opaque to STOQ
-- Can become internet standard (RFC-ready)
-
-### ✅ Clear Separation of Concerns
-- **STOQ**: Reliable transport, eBPF infrastructure
-- **hypermesh-ebpf**: Validation policies, intelligence enforcement
-- **HyperMesh**: Policy definitions, extension semantics
-
-### ✅ Reusable by Other Applications
-- Other apps can implement their own eBPF validators
-- STOQ validation hooks are generic
-- No HyperMesh lock-in
+```bash
+cargo build -p hypermesh-ebpf --release
+cargo test -p hypermesh-ebpf
+```
 
 ## License
 
-MIT OR Apache-2.0
-
-## Author
-
-HyperMesh Team
+Business Source License 1.1

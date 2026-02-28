@@ -17,7 +17,7 @@
 use std::fmt;
 use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use blake3;
 
 use crate::matrix::coordinate::MatrixCoordinate;
 
@@ -220,12 +220,11 @@ impl AssetRegistration {
     /// Uses a random hash for convenience in examples and tests.
     /// For production, prefer `from_asset_data` with actual content-based hashing.
     pub fn new(asset_type: AssetType) -> Self {
-        use sha2::{Sha256, Digest};
         let random_bytes: [u8; 16] = rand::random();
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&random_bytes);
         hasher.update(&[asset_type.type_id()]);
-        let hash: [u8; 32] = hasher.finalize().into();
+        let hash: [u8; 32] = *hasher.finalize().as_bytes();
 
         let base_type = match asset_type {
             AssetType::Cpu => BaseSystemType::Cpu,
@@ -280,24 +279,24 @@ impl AssetRegistration {
         network_scope: &NetworkScope,
         category: &AssetCategory,
     ) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
 
         // Hash network scope
         match network_scope {
             NetworkScope::Global => hasher.update(b"GLOBAL"),
             NetworkScope::Registry(id) => {
                 hasher.update(b"REGISTRY");
-                hasher.update(&id.0);
+                hasher.update(&id.0)
             }
             NetworkScope::Federated(id) => {
                 hasher.update(b"FEDERATED");
-                hasher.update(&id.0);
+                hasher.update(&id.0)
             }
             NetworkScope::Private(id) => {
                 hasher.update(b"PRIVATE");
-                hasher.update(&id.0);
+                hasher.update(&id.0)
             }
-        }
+        };
 
         // Hash category
         match category {
@@ -326,10 +325,7 @@ impl AssetRegistration {
         hasher.update(&data.definition);
         hasher.update(&data.metadata);
 
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result);
-        hash
+        *hasher.finalize().as_bytes()
     }
 
     /// Verify content matches hash

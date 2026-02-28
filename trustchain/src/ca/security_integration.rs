@@ -301,7 +301,7 @@ impl SecurityIntegratedCA {
             self.issue_certificate_with_falcon(&request, &operation_id).await?
         } else {
             warn!("⚠️  Using classical certificate generation (not quantum-resistant)");
-            self.ca.issue_certificate(request).await?
+            self.ca.issue_certificate_local(request).await?
         };
         
         // PHASE 4: CT LOGGING
@@ -399,8 +399,9 @@ impl SecurityIntegratedCA {
     ) -> TrustChainResult<IssuedCertificate> {
         info!("🔐 Issuing post-quantum certificate with FALCON-1024 for: {}", request.common_name);
         
-        // First issue standard certificate through core CA
-        let mut cert = self.ca.issue_certificate(request.clone()).await?;
+        // Issue certificate through core CA using pre-validated consensus path
+        // (SecurityIntegratedCA already performed consensus validation in Phases 1-2)
+        let mut cert = self.ca.issue_certificate_local(request.clone()).await?;
         
         // Add FALCON-1024 signature to certificate metadata
         let falcon_signature = self.pqc.sign_with_falcon(
@@ -608,7 +609,7 @@ mod tests {
 
         let result = integrated_ca.issue_certificate_secure(request).await;
         // Should succeed with valid consensus proof
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "test: certificate issuance failed: {:?}", result.err());
 
         let cert = result.expect("Failed to issue secure certificate");
         assert_eq!(cert.common_name, "secure.test.com");

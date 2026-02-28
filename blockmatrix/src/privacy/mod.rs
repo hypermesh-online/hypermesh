@@ -26,7 +26,7 @@ pub use flexibility_matrix::{
 pub use switching::{
     TierSwitcher, TransitionResult, TransitionError, TransitionRecord,
     MigrationState, ConnectionInfo, ConnectionType, TransactionInfo,
-    TransactionState, AssetState, ReputationData,
+    TransactionState, AssetState, AuthenticationData,
 };
 
 pub use policies::{

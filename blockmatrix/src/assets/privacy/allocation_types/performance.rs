@@ -210,7 +210,7 @@ pub enum LoadBalancingAlgorithm {
     LeastConnections,
     IpHash,
     GeographicProximity,
-    TrustScore,
+    AuthenticationBased,
 }
 
 /// Health check settings

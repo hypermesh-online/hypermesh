@@ -339,12 +339,7 @@ impl CatalogTemplateGenerator {
             let rendered_content = self.handlebars.render(&template_name_full, &template_context)
                 .context("Failed to render template content")?;
 
-            let file_hash = {
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(rendered_content.as_bytes());
-                hex::encode(hasher.finalize())
-            };
+            let file_hash = blake3::hash(rendered_content.as_bytes()).to_hex().to_string();
 
             generated_files.push(GeneratedFile {
                 path: rendered_file_name.clone(),

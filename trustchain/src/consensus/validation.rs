@@ -324,7 +324,7 @@ impl ConsensusProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof::{WorkloadType, WorkState};
+    
 
     #[test]
     fn test_proof_validation_all_valid() {

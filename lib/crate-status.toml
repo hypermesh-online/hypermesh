@@ -18,6 +18,7 @@ items = [
     "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
     "KeyPairId and AssetMetadata structs",
+    "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
 ]
 
 [features.in_development]
@@ -27,6 +28,9 @@ items = [
 
 [features.planned]
 items = [
+    "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
+    "Adaptive Reed-Solomon parameters type (R14 — shard count scales with asset size)",
+    "Genesis asset inventory types (R1 — CPU/GPU/RAM/Storage/Network capability structs)",
     "Cross-crate validation helpers",
     "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
     "Shared serialization formats (canonical binary encoding via postcard/bincode)",

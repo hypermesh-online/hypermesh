@@ -322,21 +322,21 @@ pub struct ConnectionPersistenceConfig {
 /// Proxy node selection criteria
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProxyNodeSelection {
-    /// Minimum trust score required
-    pub min_trust_score: f32,
-    
+    /// Whether authentication is required for proxy nodes
+    pub require_authentication: bool,
+
     /// Required capabilities
     pub required_capabilities: Vec<String>,
-    
+
     /// Geographic preferences
     pub geographic_preferences: Vec<String>,
-    
+
     /// Bandwidth requirements
     pub min_bandwidth_mbps: u32,
-    
+
     /// Latency requirements
     pub max_latency_ms: u32,
-    
+
     /// Load balancing preferences
     pub load_balancing: LoadBalancingPreferences,
 }
@@ -365,7 +365,7 @@ pub enum LoadBalancingStrategy {
     LeastConnections,
     WeightedRandom,
     LatencyBased,
-    TrustScoreBased,
+    AuthenticationBased,
 }
 
 /// Quantum security configuration
@@ -396,71 +396,20 @@ pub enum QuantumSecurityLevel {
     Maximum,    // Highest available security
 }
 
-/// Trust requirements for proxy selection
+/// Trust requirements for proxy selection (binary authentication)
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TrustRequirements {
-    /// Minimum trust score
-    pub min_trust_score: f32,
-    
     /// Require certificate validation
     pub require_certificate_validation: bool,
-    
+
     /// Require consensus proof validation
     pub require_consensus_validation: bool,
-    
-    /// Trust decay configuration
-    pub trust_decay: TrustDecayConfig,
-    
-    /// Reputation requirements
-    pub reputation_requirements: ReputationRequirements,
-}
 
-/// Trust decay configuration
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct TrustDecayConfig {
-    /// Enable trust decay over time
-    pub enabled: bool,
-    
-    /// Decay rate per day
-    pub decay_rate_per_day: f32,
-    
-    /// Minimum trust floor
-    pub minimum_trust_floor: f32,
-    
-    /// Trust refresh requirements
-    pub refresh_requirements: TrustRefreshRequirements,
-}
+    /// Re-authentication interval
+    pub reauth_interval: Duration,
 
-/// Trust refresh requirements
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct TrustRefreshRequirements {
-    /// Frequency of required refresh
-    pub refresh_frequency: Duration,
-    
-    /// Actions that refresh trust
-    pub refresh_actions: Vec<String>,
-    
-    /// Trust boost for successful operations
-    pub success_boost: f32,
-    
-    /// Trust penalty for failures
-    pub failure_penalty: f32,
-}
-
-/// Reputation requirements
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ReputationRequirements {
-    /// Minimum reputation score
-    pub min_reputation_score: f32,
-    
-    /// Minimum number of successful operations
+    /// Minimum successful operations before full access
     pub min_successful_operations: u64,
-    
-    /// Maximum failure rate tolerance
-    pub max_failure_rate: f32,
-    
-    /// Recent performance weight
-    pub recent_performance_weight: f32,
 }
 
 /// Default implementations

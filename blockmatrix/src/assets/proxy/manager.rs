@@ -428,8 +428,8 @@ impl RemoteProxyManager {
         let mut best_score = 0.0_f32;
         
         for node in nodes.values() {
-            // Check trust score threshold
-            if node.trust_score < self.config.min_trust_score {
+            // Check authentication status (binary pass/fail)
+            if !node.is_authenticated {
                 continue;
             }
             
@@ -456,22 +456,16 @@ impl RemoteProxyManager {
     }
     
     /// Calculate composite score for proxy node selection
+    /// Note: only called for authenticated nodes (filtered upstream)
     async fn calculate_node_score(&self, node: &ProxyNodeInfo) -> f32 {
-        // Weight factors
-        let trust_weight = 0.4;
-        let bandwidth_weight = 0.3;
-        let connection_weight = 0.2;
-        let latency_weight = 0.1;
-        
-        // Normalize scores to 0-1 range
-        let trust_score = node.trust_score;
+        let bandwidth_weight = 0.5;
+        let connection_weight = 0.3;
+        let latency_weight = 0.2;
+
         let bandwidth_score = (node.capabilities.bandwidth_mbps as f32 / 10000.0).min(1.0);
         let connection_score = (node.capabilities.max_connections as f32 / 100000.0).min(1.0);
-        
-        // TODO: Implement actual latency measurement
-        let latency_score = 0.8; // Placeholder
-        
-        trust_weight * trust_score +
+        let latency_score = 0.8; // Placeholder until real measurement
+
         bandwidth_weight * bandwidth_score +
         connection_weight * connection_score +
         latency_weight * latency_score

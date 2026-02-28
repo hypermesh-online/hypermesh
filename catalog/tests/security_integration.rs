@@ -118,7 +118,7 @@ fn test_violation_types() {
         ViolationType::InvalidSignature,
         ViolationType::InvalidCertificate,
         ViolationType::BlacklistedPublisher,
-        ViolationType::LowReputation,
+        ViolationType::UnauthenticatedPublisher,
         ViolationType::Vulnerability,
         ViolationType::ExpiredCertificate,
         ViolationType::RevokedCertificate,
@@ -129,19 +129,20 @@ fn test_violation_types() {
     assert_eq!(violations.len(), 9);
 }
 
-#[test]
-fn test_reputation_tiers() {
-    use catalog::security::reputation::PublisherTier;
+#[tokio::test]
+async fn test_binary_publisher_verification() {
+    use catalog::security::reputation::PublisherAuthenticator;
 
-    let tiers = vec![
-        PublisherTier::Unverified,
-        PublisherTier::Bronze,
-        PublisherTier::Silver,
-        PublisherTier::Gold,
-        PublisherTier::Platinum,
-    ];
+    let auth = PublisherAuthenticator::new();
 
-    assert_eq!(tiers.len(), 5);
+    // Non-revoked publisher is authenticated
+    let result = auth.verify("fp-abc").await.expect("test: verify should succeed");
+    assert!(result.authenticated);
+
+    // Revoked publisher is not authenticated
+    auth.revoke("fp-abc", "test revocation").await;
+    let result = auth.verify("fp-abc").await.expect("test: verify should succeed");
+    assert!(!result.authenticated);
 }
 
 // ===========================================================================

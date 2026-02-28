@@ -11,7 +11,7 @@ use anyhow::{Result, anyhow};
 use std::time::{SystemTime, Duration};
 use std::collections::HashMap;
 use tracing::{info, debug, warn, error};
-use sha2::{Sha256, Digest};
+// BLAKE3 for all content hashing (whitepaper mandate)
 use crate::consensus::proof::*;
 
 /// Production Proof of Work validator (WHAT)
@@ -188,15 +188,15 @@ impl ProductionProofOfTimeValidator {
             return Ok(false);
         }
 
-        // 7. Re-verify the cryptographic hash
-        let mut hasher = Sha256::new();
+        // 7. Re-verify the cryptographic hash (BLAKE3)
+        let mut hasher = blake3::Hasher::new();
         hasher.update(&proof.network_time_offset.as_micros().to_le_bytes());
         hasher.update(&proof.time_verification_timestamp.duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|e| anyhow!("Invalid timestamp: {}", e))?
             .as_micros().to_le_bytes());
         hasher.update(&proof.nonce.to_le_bytes());
-        
-        let computed_hash = hasher.finalize().to_vec();
+
+        let computed_hash = hasher.finalize().as_bytes().to_vec();
         if computed_hash != proof.proof_hash {
             error!("❌ Time proof: Hash verification failed");
             return Ok(false);

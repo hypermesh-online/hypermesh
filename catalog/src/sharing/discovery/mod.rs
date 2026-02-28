@@ -160,7 +160,7 @@ impl DiscoveryService {
             },
             security: crate::AssetSecurity {
                 consensus_required: false, certificate_pinning: false,
-                hash_validation: "sha256".to_string(),
+                hash_validation: "blake3".to_string(),
                 sandbox_level: "standard".to_string(), allowed_syscalls: vec![],
                 network_access: crate::assets::types::NetworkAccess {
                     enabled: false, allowed_domains: vec![],
@@ -316,11 +316,11 @@ impl DiscoveryService {
     }
 
     pub(super) fn get_local_node_id(&self) -> String {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
+        let mut hasher = blake3::Hasher::new();
         hasher.update(b"catalog-discovery-local-node");
-        hasher.update(self.cache_ttl.as_secs().to_le_bytes());
-        format!("node_{}", hex::encode(&hasher.finalize()[..8]))
+        hasher.update(&self.cache_ttl.as_secs().to_le_bytes());
+        let hash = hasher.finalize();
+        format!("node_{}", hex::encode(&hash.as_bytes()[..8]))
     }
 
     pub(super) fn extract_keywords(&self, metadata: &AssetMetadata) -> Vec<String> {

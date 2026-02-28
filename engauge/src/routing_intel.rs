@@ -169,6 +169,7 @@ impl RoutingIntelligence {
             MetricsPayload::Routing(r) => weight_from_routing(r),
             MetricsPayload::Capacity(c) => weight_from_capacity(c),
             MetricsPayload::Economic(e) => weight_from_economic(e),
+            MetricsPayload::Verification(v) => weight_from_verification(v),
         };
 
         TensorWeightModifier {
@@ -231,6 +232,21 @@ fn weight_from_economic(
     _snap: &crate::streaming::protocol::EconomicSnapshot,
 ) -> (f64, WeightReason) {
     (1.0, WeightReason::NoData)
+}
+
+/// Derive weight factor and reason from a verification snapshot.
+///
+/// Nodes with high spatial consistency are preferred for routing.
+fn weight_from_verification(
+    snap: &crate::streaming::protocol::VerificationSnapshot,
+) -> (f64, WeightReason) {
+    if snap.consistency_ratio < 0.5 {
+        (0.3, WeightReason::NoData)
+    } else if snap.consistency_ratio > 0.9 {
+        (1.2, WeightReason::NoData)
+    } else {
+        (1.0, WeightReason::NoData)
+    }
 }
 
 impl RoutingAdvisor for RoutingIntelligence {
@@ -425,6 +441,8 @@ mod tests {
             avg_throughput_bps: 0.0,
             total_bandwidth_bps: 0,
             avg_capacity_score: 0.0,
+            verified_node_count: 0,
+            avg_consistency_ratio: 0.0,
         };
 
         let rec = intel.recommend_path_policy(&agg);
@@ -442,6 +460,8 @@ mod tests {
             avg_throughput_bps: 500_000_000.0,
             total_bandwidth_bps: 2_500_000_000,
             avg_capacity_score: 0.5,
+            verified_node_count: 0,
+            avg_consistency_ratio: 0.0,
         };
 
         let rec = intel.recommend_path_policy(&agg);
@@ -460,6 +480,8 @@ mod tests {
             avg_throughput_bps: 800_000_000.0,
             total_bandwidth_bps: 2_400_000_000,
             avg_capacity_score: 0.7,
+            verified_node_count: 0,
+            avg_consistency_ratio: 0.0,
         };
 
         let rec = intel.recommend_path_policy(&agg);
@@ -477,6 +499,8 @@ mod tests {
             avg_throughput_bps: 1_500_000_000.0,
             total_bandwidth_bps: 6_000_000_000,
             avg_capacity_score: 0.9,
+            verified_node_count: 0,
+            avg_consistency_ratio: 0.0,
         };
 
         let rec = intel.recommend_path_policy(&agg);

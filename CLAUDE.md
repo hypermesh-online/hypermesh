@@ -1,5 +1,29 @@
 # Web3 Ecosystem - Development Project Context
 
+## Hard Protocol Requirements
+
+**Canonical source**: `papers/HYPERMESH.md` Section 3 (Protocol Requirements), R1-R14.
+
+**RULE**: Whenever the user says "this is a hard requirement" (or equivalent), check if it's already in `papers/HYPERMESH.md` Section 3. If not, add it as the next R-number. Keep requirements concrete and testable. Update this section's summary when requirements change.
+
+**Current requirements (R1-R14)**:
+- **R1** Sovereign genesis with asset instantiation — hardware assessed (not self-reported) as IPv6-addressed assets with Proof of State
+- **R2** Four-proof authentication — PoSpace/PoStake/PoWork/PoTime on every state claim, binary authentic/not
+- **R3** Pipeline ordering — Compress→Encrypt→Shard→Distribute, whole-blob encryption before sharding
+- **R4** Content-addressed dedup — privacy-scoped reference tracking (full in Device/Private, none in Anonymous), tamper detection via BLAKE3 hash
+- **R5** Erasure-coded redundancy — k-of-n reconstruction (default 10-of-14 Reed-Solomon)
+- **R6** Instruction-based retrieval — shard maps under 1KB, receiver reconstructs
+- **R7** Post-quantum storage encryption — Kyber-1024 KEM for data at rest, non-negotiable
+- **R8** Cipher suite policy — standard suite mandatory on Public, configurable on Private/Anonymous by agreement, standard is default for all
+- **R9** Privacy-scope independence — PrivacyMode and BlockchainScope are independent dimensions, no combo prohibited
+- **R10** Universal asset model with transmission — all resources are IPv6-addressed assets; Transmission is first-class for mesh relay; genesis block instantiates initial assets from hardware assessment
+- **R11** Bilateral verification — no global consensus/quorum/leader, cost scales with transaction volume not mesh size
+- **R12** Shard commitment with swarm scaling — `BLAKE3(sorted placements)` per block; consumers become providers; O(log N) per-node load for N consumers
+- **R13** Minimum device spec — 1 Mb/s network, 50GB storage, 4GB RAM, 2-core 1GHz; streaming reconstruction mandatory
+- **R14** Adaptive shard sizing — RS parameters scale with asset size, NO post-creation shard splitting (breaks content-addressing hashes), QUIC handles wire chunking, copy-then-redirect migration
+
+---
+
 ## 🎯 **Current Status: ~5-10% Implemented, Core Architecture Phase**
 
 **Development Status**: ⚠️ **EARLY DEVELOPMENT** - Core components in initial implementation phase

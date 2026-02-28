@@ -15,7 +15,7 @@ use tokio::sync::Semaphore;
 use anyhow::Result;
 use tracing::{info, warn};
 
-use trustchain::ca::{CertificateRequest, CertificateStatus};
+use trustchain::ca::CertificateRequest;
 use trustchain::consensus::{
     ConsensusProof, ConsensusRequirements,
     hypermesh_client::{HyperMeshConsensusClient, HyperMeshClientConfig},

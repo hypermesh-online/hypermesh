@@ -13,7 +13,7 @@
 export interface EntityInfo {
   domain: string;
   entity_type: 'dmv' | 'bank' | 'insurance' | 'dealer' | 'manufacturer' | 'user';
-  trust_score: number;
+  is_authenticated: boolean;
   available_services: string[];
   consensus_requirements: ProofType[];
   privacy_policy: PrivacyPolicy;
@@ -78,7 +78,7 @@ export interface ValidationResult {
 export interface EntitySignature {
   entity_domain: string;
   signature: string;
-  trust_score: number;
+  is_authenticated: boolean;
   validation_timestamp: number;
 }
 
@@ -170,7 +170,7 @@ export class MatrixChainClient {
       {
         domain: 'dmv.hypermesh.online',
         entity_type: 'dmv',
-        trust_score: 0.95,
+        is_authenticated: true,
         available_services: ['vehicle_registration', 'license_verification', 'title_transfer'],
         consensus_requirements: ['PoSpace', 'PoStake', 'PoWork', 'PoTime'],
         privacy_policy: {
@@ -185,7 +185,7 @@ export class MatrixChainClient {
       {
         domain: 'bank.hypermesh.online',
         entity_type: 'bank',
-        trust_score: 0.92,
+        is_authenticated: true,
         available_services: ['loan_approval', 'payment_processing', 'credit_verification'],
         consensus_requirements: ['PoSpace', 'PoStake', 'PoWork', 'PoTime'],
         privacy_policy: {
@@ -200,7 +200,7 @@ export class MatrixChainClient {
       {
         domain: 'insurance.hypermesh.online',
         entity_type: 'insurance',
-        trust_score: 0.89,
+        is_authenticated: true,
         available_services: ['policy_creation', 'coverage_validation', 'claim_processing'],
         consensus_requirements: ['PoSpace', 'PoStake', 'PoTime'],
         privacy_policy: {
@@ -215,7 +215,7 @@ export class MatrixChainClient {
       {
         domain: 'dealer.hypermesh.online',
         entity_type: 'dealer',
-        trust_score: 0.87,
+        is_authenticated: true,
         available_services: ['inventory_check', 'sales_processing', 'financing'],
         consensus_requirements: ['PoSpace', 'PoStake', 'PoWork'],
         privacy_policy: {
@@ -230,7 +230,7 @@ export class MatrixChainClient {
       {
         domain: 'honda.hypermesh.online',
         entity_type: 'manufacturer',
-        trust_score: 0.94,
+        is_authenticated: true,
         available_services: ['vehicle_validation', 'warranty_management', 'recalls'],
         consensus_requirements: ['PoSpace', 'PoStake', 'PoWork'],
         privacy_policy: {
@@ -320,7 +320,7 @@ export class MatrixChainClient {
         {
           entity_domain: transaction.entity,
           signature: this.generateHash('entity_sig', transaction.id),
-          trust_score: 0.92,
+          is_authenticated: true,
           validation_timestamp: Date.now()
         }
       ]
@@ -370,13 +370,13 @@ export class MatrixChainClient {
         {
           entity_domain: sourceChain,
           signature: this.generateHash('source_sig', JSON.stringify(proof)),
-          trust_score: 0.91,
+          is_authenticated: true,
           validation_timestamp: Date.now()
         },
         {
           entity_domain: targetChain,
           signature: this.generateHash('target_sig', JSON.stringify(proof)),
-          trust_score: 0.93,
+          is_authenticated: true,
           validation_timestamp: Date.now()
         }
       ]
