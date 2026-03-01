@@ -7,16 +7,12 @@ phase = "alpha"
 [features.working]
 items = [
     "Asset package types and metadata",
-    "Asset registry with publish/install/search",
+    "Asset registry with typedef registration and search (legacy publish/install are migration stubs)",
     "Template generation framework",
-    "Asset validation pipeline",
-    "Semantic versioning and dependency resolution",
-    "HyperMesh execution delegation",
+    "Semantic versioning",
     "Scripting engine (syntax validation)",
     "STOQ transport for distribution",
-    "Content-addressed storage (DHT)",
     "TrustChain security integration (FALCON-1024 cert lifecycle)",
-    "Peer-to-peer package sharing",
     "Proof of State validation for packages",
     "Asset SDK (clean public API facade)",
     "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
@@ -28,8 +24,13 @@ items = [
 
 [features.in_development]
 items = [
+    "Dependency resolution (stub returns empty list, transitive resolution TODO)",
+    "DHT distribution (refresh_routing_table, republish_values, bucket indexing are stubs)",
+    "Asset validation pipeline (scanner bodies and type-specific validation are stubs)",
+    "Peer-to-peer sharing (STOQ transport wired but DHT routing underpinning is stubbed)",
 ]
 
 [features.planned]
 items = [
+    "HyperMesh execution delegation (resource allocation, status query, termination are all stubs/TODOs)",
 ]

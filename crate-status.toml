@@ -16,6 +16,7 @@ items = [
 
 [features.in_development]
 items = [
+    "Unified cross-crate identity model (three incompatible NodeId types across lib, trustchain, blockmatrix)",
 ]
 
 [features.planned]
@@ -27,4 +28,6 @@ items = [
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
     "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
     "Real partition/chaos testing framework",
+    "Scope-aware identity system (certificates and identity respect Device vs Network scope, traceability axis)",
+    "Certificate lifecycle per scope (Anonymous=ephemeral, Private=bounded group certs, Public=full transparency chain)",
 ]

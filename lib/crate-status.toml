@@ -44,4 +44,8 @@ items = [
     "Shared serialization formats (canonical binary encoding via postcard/bincode)",
     "Common test utilities",
     "Public SDK types for third-party integration (stable API surface)",
+    "Unified NodeId type (currently opaque String, needs to derive from assessed hardware → keypair → certificate)",
+    "Scope-aware identity types (identity that respects BlockchainScope Device|Network and traceability axis)",
+    "ShardCommitment type (R12 — BLAKE3(sorted placements) type for lib)",
+    "GenesisAssetRecord type (R1 — record type for sovereign genesis with hardware-assessed assets)",
 ]

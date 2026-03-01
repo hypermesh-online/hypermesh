@@ -34,15 +34,11 @@ export const crateStatuses: CrateStatus[] = [
         "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
         "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
         "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
-        "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
-        "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
-        "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
-        "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
+        "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute placement calculation, correct order, single-node only)",
         "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
         "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
         "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)",
         "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
-        "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
         "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
         "BLAKE3 content hashing (whitepaper-aligned)",
         "Capability-based GPU detection (honest fallback, no fake hardware)",
@@ -53,10 +49,6 @@ export const crateStatuses: CrateStatus[] = [
         "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
         "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
         "Node bootstrap lifecycle (genesis block, self-signed cert, DNS init)",
-        "Service mesh controller (circuit breaker, load balancing, health tracking)",
-        "User contribution platform (hardware sharing, resource pricing, rewards)",
-        "Intelligence layer (multi-component health, event streaming)",
-        "Performance regression detector (baseline tracking, production readiness)",
         "Real hardware metrics collection (CPU/memory/network/storage from /proc)"
       ],
       "inDevelopment": [
@@ -64,7 +56,16 @@ export const crateStatuses: CrateStatus[] = [
         "Instruction-based retrieval client assembly (shard maps work, fetch_from_location is 5ms sleep stub)",
         "Asset blockchain registration (register_asset_record has TODO — consensus wiring incomplete)",
         "Distributed shard fetch over STOQ (fetch_from_location placeholder returns zeroed bytes)",
-        "Node binary Anonymous certificate strategy fix"
+        "Node binary Anonymous certificate strategy fix",
+        "Network scope sync + reflector pooling (data structures and state machines implemented, no actual network I/O)",
+        "Dynamic shard rebalancing (calculates rebalancing decisions, cannot execute — distribution is calculation-only)",
+        "Gateway cross-scope transfers (protocol logic Lock→Transfer→Unlock implemented, no network transport wired)",
+        "Multi-node deployment (ClusterManager exists, network trust modules are heavily placeholder-based)",
+        "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
+        "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
+        "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)",
+        "Distribution audit trail (record_to_blockchain is stub, verify_placement always returns true, query_audit_trail returns empty)",
+        "Network trust layer (p2p, federated, public trust modules have placeholder crypto and validation)"
       ],
       "planned": [
         "Genesis capability assessment — instantiate CPU/GPU/RAM/Storage/Network/Transmission as IPv6-addressed assets with PoS at boot (R1, R10)",
@@ -77,10 +78,14 @@ export const crateStatuses: CrateStatus[] = [
         "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
         "mDNS peer discovery (start_mdns_discovery is explicit stub)",
         "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
-        "Identity-scoped asset access (workload identity → asset permissions)"
+        "Identity-scoped asset access (workload identity → asset permissions)",
+        "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
+        "Unified cross-crate identity model (lib::NodeId, trustchain::NodeId, blockmatrix::NodeFingerprint are separate and incompatible)",
+        "Scope-aware identity and certificates (identity/certificate awareness of Device vs Network scope, traceability axis)",
+        "Real distributed shard transfer over STOQ (distribution currently computes placements but never sends bytes)"
       ]
     },
-    "completion": 69
+    "completion": 49
   },
   {
     "id": "caesar",
@@ -117,20 +122,21 @@ export const crateStatuses: CrateStatus[] = [
         "OracleFeed trait for pluggable gold price sources (ManualFeed for alpha)",
         "Node status tracking in storage (settled count, fee earnings)",
         "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
-        "Cross-chain bridge types (8 networks)",
         "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
         "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
         "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
         "Caesar CLI — packet operations + node management (commands, executor, output modules)",
         "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Cross-chain bridge types (structural type definitions only, placeholder implementation, no real chain connections)"
+      ],
       "planned": [
         "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
         "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)"
       ]
     },
-    "completion": 94
+    "completion": 92
   },
   {
     "id": "caesar-sdk",
@@ -160,16 +166,12 @@ export const crateStatuses: CrateStatus[] = [
     "features": {
       "working": [
         "Asset package types and metadata",
-        "Asset registry with publish/install/search",
+        "Asset registry with typedef registration and search (legacy publish/install are migration stubs)",
         "Template generation framework",
-        "Asset validation pipeline",
-        "Semantic versioning and dependency resolution",
-        "HyperMesh execution delegation",
+        "Semantic versioning",
         "Scripting engine (syntax validation)",
         "STOQ transport for distribution",
-        "Content-addressed storage (DHT)",
         "TrustChain security integration (FALCON-1024 cert lifecycle)",
-        "Peer-to-peer package sharing",
         "Proof of State validation for packages",
         "Asset SDK (clean public API facade)",
         "Typedef registry marketplace (browsing, multi-factor search scoring, featured listings)",
@@ -178,10 +180,17 @@ export const crateStatuses: CrateStatus[] = [
         "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
         "BLAKE3 content hashing (whitepaper-aligned)"
       ],
-      "inDevelopment": [],
-      "planned": []
+      "inDevelopment": [
+        "Dependency resolution (stub returns empty list, transitive resolution TODO)",
+        "DHT distribution (refresh_routing_table, republish_values, bucket indexing are stubs)",
+        "Asset validation pipeline (scanner bodies and type-specific validation are stubs)",
+        "Peer-to-peer sharing (STOQ transport wired but DHT routing underpinning is stubbed)"
+      ],
+      "planned": [
+        "HyperMesh execution delegation (resource allocation, status query, termination are all stubs/TODOs)"
+      ]
     },
-    "completion": 100
+    "completion": 74
   },
   {
     "id": "engauge",
@@ -275,7 +284,9 @@ export const crateStatuses: CrateStatus[] = [
         "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
         "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Unified cross-crate identity model (three incompatible NodeId types across lib, trustchain, blockmatrix)"
+      ],
       "planned": [
         "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
         "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
@@ -283,10 +294,12 @@ export const crateStatuses: CrateStatus[] = [
         "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
         "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
         "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
-        "Real partition/chaos testing framework"
+        "Real partition/chaos testing framework",
+        "Scope-aware identity system (certificates and identity respect Device vs Network scope, traceability axis)",
+        "Certificate lifecycle per scope (Anonymous=ephemeral, Private=bounded group certs, Public=full transparency chain)"
       ]
     },
-    "completion": 46
+    "completion": 38
   },
   {
     "id": "hypermesh-ebpf",
@@ -358,10 +371,14 @@ export const crateStatuses: CrateStatus[] = [
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
         "Shared serialization formats (canonical binary encoding via postcard/bincode)",
         "Common test utilities",
-        "Public SDK types for third-party integration (stable API surface)"
+        "Public SDK types for third-party integration (stable API surface)",
+        "Unified NodeId type (currently opaque String, needs to derive from assessed hardware → keypair → certificate)",
+        "Scope-aware identity types (identity that respects BlockchainScope Device|Network and traceability axis)",
+        "ShardCommitment type (R12 — BLAKE3(sorted placements) type for lib)",
+        "GenesisAssetRecord type (R1 — record type for sovereign genesis with hardware-assessed assets)"
       ]
     },
-    "completion": 67
+    "completion": 59
   },
   {
     "id": "stoq",
@@ -389,7 +406,9 @@ export const crateStatuses: CrateStatus[] = [
         "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)"
       ],
       "inDevelopment": [
-        "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)"
+        "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
+        "Certificate manager placeholder private key (uses .expect() placeholder)",
+        "Service discovery (TODO in stoq/src/api/mod.rs)"
       ],
       "planned": [
         "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
@@ -403,7 +422,7 @@ export const crateStatuses: CrateStatus[] = [
         "Graceful degradation with expired certificates"
       ]
     },
-    "completion": 63
+    "completion": 59
   },
   {
     "id": "trustchain",
@@ -414,10 +433,9 @@ export const crateStatuses: CrateStatus[] = [
       "working": [
         "FALCON-1024 post-quantum signing",
         "Kyber-1024 key encapsulation",
-        "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
         "Proof of State four-proof validation",
         "Security monitoring and Byzantine detection",
-        "DNS resolver with STOQ transport",
+        "DNS resolver (programmatic resolution works, HTTP/3 endpoint wired, STOQ transport client not fully integrated)",
         "STOQ-based API server",
         "SecurityIntegratedCA with mandatory consensus and real metrics",
         "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
@@ -428,16 +446,19 @@ export const crateStatuses: CrateStatus[] = [
         "Threshold cryptography (Shamir SSS over GF(256))",
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-        "HTTP/3 server with 8 real handler functions (issue, validate, revoke, list, get, health, metrics, dns_resolve)",
+        "HTTP/3 server with 8 real handlers (issue, validate, revoke, list, get, health, metrics, dns_resolve) + 8 stub endpoints (status, dns_zones, dns_register, etc.)",
         "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
-        "CA-signed leaf certificates (signed_by() with root CA key pair)",
         "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
         "Persistent revocation storage (JSON on disk, survives restart)",
-        "Canonical ProofType from hypermesh-lib (single source of truth)",
-        "DNS resolution handler (proper STOQ transport error, programmatic resolve_query works)"
+        "Canonical ProofType from hypermesh-lib (single source of truth)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "CA-signed leaf certificates (currently self-signed X.509 with appended FALCON-1024 signature, not true CA-signed X.509)",
+        "Certificate Transparency (Merkle tree structure exists, consistency checker and cert hash search are placeholders)",
+        "Certificate PEM encoding (DER bytes cast to UTF-8 lossy instead of proper PEM base64 encoding)",
+        "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate)"
+      ],
       "planned": [
         "Identity-typed certificates (service/agent/node distinction)",
         "KeyUsage/EKU enforcement in issued X.509 certs",
@@ -449,10 +470,13 @@ export const crateStatuses: CrateStatus[] = [
         "Cascading revocation (parent→child identity propagation)",
         "Real certificate operation metrics (issuance latency, validation throughput)",
         "CRL distribution via blockchain (offline revocation)",
-        "Field device bootstrap with intermittent connectivity"
+        "Field device bootstrap with intermittent connectivity",
+        "Cross-crate identity integration (trustchain::NodeId is independent struct, not connected to lib::NodeId or blockmatrix::NodeFingerprint)",
+        "Scope-aware certificates (no certificate awareness of Device vs Network scope, no traceability enforcement per scope)",
+        "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)"
       ]
     },
-    "completion": 69
+    "completion": 54
   },
   {
     "id": "ui",

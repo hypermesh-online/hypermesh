@@ -28,6 +28,8 @@ items = [
 [features.in_development]
 items = [
     "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
+    "Certificate manager placeholder private key (uses .expect() placeholder)",
+    "Service discovery (TODO in stoq/src/api/mod.rs)",
 ]
 
 [features.planned]

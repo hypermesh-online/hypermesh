@@ -8,10 +8,9 @@ phase = "alpha"
 items = [
     "FALCON-1024 post-quantum signing",
     "Kyber-1024 key encapsulation",
-    "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
     "Proof of State four-proof validation",
     "Security monitoring and Byzantine detection",
-    "DNS resolver with STOQ transport",
+    "DNS resolver (programmatic resolution works, HTTP/3 endpoint wired, STOQ transport client not fully integrated)",
     "STOQ-based API server",
     "SecurityIntegratedCA with mandatory consensus and real metrics",
     "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
@@ -22,18 +21,20 @@ items = [
     "Threshold cryptography (Shamir SSS over GF(256))",
     "Deployment quality gates",
     "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-    "HTTP/3 server with 8 real handler functions (issue, validate, revoke, list, get, health, metrics, dns_resolve)",
+    "HTTP/3 server with 8 real handlers (issue, validate, revoke, list, get, health, metrics, dns_resolve) + 8 stub endpoints (status, dns_zones, dns_register, etc.)",
     "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
     "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
-    "CA-signed leaf certificates (signed_by() with root CA key pair)",
     "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
     "Persistent revocation storage (JSON on disk, survives restart)",
     "Canonical ProofType from hypermesh-lib (single source of truth)",
-    "DNS resolution handler (proper STOQ transport error, programmatic resolve_query works)",
 ]
 
 [features.in_development]
 items = [
+    "CA-signed leaf certificates (currently self-signed X.509 with appended FALCON-1024 signature, not true CA-signed X.509)",
+    "Certificate Transparency (Merkle tree structure exists, consistency checker and cert hash search are placeholders)",
+    "Certificate PEM encoding (DER bytes cast to UTF-8 lossy instead of proper PEM base64 encoding)",
+    "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate)",
 ]
 
 [features.planned]
@@ -49,4 +50,7 @@ items = [
     "Real certificate operation metrics (issuance latency, validation throughput)",
     "CRL distribution via blockchain (offline revocation)",
     "Field device bootstrap with intermittent connectivity",
+    "Cross-crate identity integration (trustchain::NodeId is independent struct, not connected to lib::NodeId or blockmatrix::NodeFingerprint)",
+    "Scope-aware certificates (no certificate awareness of Device vs Network scope, no traceability enforcement per scope)",
+    "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)",
 ]

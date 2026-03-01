@@ -34,7 +34,6 @@ items = [
     "OracleFeed trait for pluggable gold price sources (ManualFeed for alpha)",
     "Node status tracking in storage (settled count, fee earnings)",
     "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
-    "Cross-chain bridge types (8 networks)",
     "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
     "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
     "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
@@ -43,7 +42,9 @@ items = [
 ]
 
 [features.in_development]
-items = []
+items = [
+    "Cross-chain bridge types (structural type definitions only, placeholder implementation, no real chain connections)",
+]
 
 [features.planned]
 items = [

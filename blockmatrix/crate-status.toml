@@ -18,15 +18,11 @@ items = [
     "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
     "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
     "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
-    "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
-    "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
-    "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
-    "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
+    "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute placement calculation, correct order, single-node only)",
     "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
     "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
     "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)",
     "Container runtime with process isolation (ProcessIsolation, real spawn/stop/resource tracking, 15 tests)",
-    "Multi-node production deployment (ClusterManager, health monitoring, node lifecycle, graceful shutdown, 16 tests)",
     "Cross-platform node binary (OsAbstraction for Linux/macOS/BSD/Windows, PlatformInfo, hardware detection, 62 tests)",
     "BLAKE3 content hashing (whitepaper-aligned)",
     "Capability-based GPU detection (honest fallback, no fake hardware)",
@@ -37,10 +33,6 @@ items = [
     "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
     "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
     "Node bootstrap lifecycle (genesis block, self-signed cert, DNS init)",
-    "Service mesh controller (circuit breaker, load balancing, health tracking)",
-    "User contribution platform (hardware sharing, resource pricing, rewards)",
-    "Intelligence layer (multi-component health, event streaming)",
-    "Performance regression detector (baseline tracking, production readiness)",
     "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
 ]
 
@@ -51,6 +43,15 @@ items = [
     "Asset blockchain registration (register_asset_record has TODO — consensus wiring incomplete)",
     "Distributed shard fetch over STOQ (fetch_from_location placeholder returns zeroed bytes)",
     "Node binary Anonymous certificate strategy fix",
+    "Network scope sync + reflector pooling (data structures and state machines implemented, no actual network I/O)",
+    "Dynamic shard rebalancing (calculates rebalancing decisions, cannot execute — distribution is calculation-only)",
+    "Gateway cross-scope transfers (protocol logic Lock→Transfer→Unlock implemented, no network transport wired)",
+    "Multi-node deployment (ClusterManager exists, network trust modules are heavily placeholder-based)",
+    "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
+    "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
+    "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)",
+    "Distribution audit trail (record_to_blockchain is stub, verify_placement always returns true, query_audit_trail returns empty)",
+    "Network trust layer (p2p, federated, public trust modules have placeholder crypto and validation)",
 ]
 
 [features.planned]
@@ -66,4 +67,8 @@ items = [
     "mDNS peer discovery (start_mdns_discovery is explicit stub)",
     "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
     "Identity-scoped asset access (workload identity → asset permissions)",
+    "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
+    "Unified cross-crate identity model (lib::NodeId, trustchain::NodeId, blockmatrix::NodeFingerprint are separate and incompatible)",
+    "Scope-aware identity and certificates (identity/certificate awareness of Device vs Network scope, traceability axis)",
+    "Real distributed shard transfer over STOQ (distribution currently computes placements but never sends bytes)",
 ]
