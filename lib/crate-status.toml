@@ -26,26 +26,26 @@ items = [
     "AssetMetadata canonical struct in lib (consolidated definition with AssetKind + state + timestamps)",
     "Dns and Transmission variants added to blockmatrix BaseSystemType",
     "VirtualMachine and Library removed from blockmatrix AssetType/BaseSystemType",
+    "Trustchain proof types linked to lib canonical ProofType (proof_type() methods)",
+    "Trustchain NodeId/AssetId renamed to AuthenticatedNode/AuthenticatedAsset (use lib newtypes)",
+    "AssetMetadata consolidated (crate-local copies renamed: PipelineInputMetadata, PackageSpecMetadata, etc.)",
+    "PacketId conflict resolved (blockmatrix network isolation uses IsolationPacketId)",
+    "ShardCommitment type (R12 — BLAKE3(sorted placements) compute/verify API)",
+    "Genesis asset inventory types (R1 — Cpu/Gpu/Storage/Network/Memory capability structs)",
+    "GenesisAssetRecord type (R1+R10 — sovereign genesis with hardware-assessed IPv6 assets)",
+    "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
 ]
 
 [features.in_development]
 items = [
-    "Replace trustchain SpaceProof/StakeProof/WorkProof/TimeProof with lib canonical types",
-    "Replace trustchain NodeId/AssetId structs with lib newtypes",
-    "Consolidate AssetMetadata duplicates across crates (lib canonical exists, blockmatrix/catalog/trustchain still have local copies)",
-    "Resolve PacketId type conflict (lib [u8;32] vs blockmatrix Uuid)",
-]
-
-[features.planned]
-items = [
-    "Genesis asset inventory types (R1 — CPU/GPU/RAM/Storage/Network capability structs)",
     "Cross-crate validation helpers",
     "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
-    "Shared serialization formats (canonical binary encoding via postcard/bincode)",
     "Common test utilities",
     "Public SDK types for third-party integration (stable API surface)",
     "Unified NodeId type (currently opaque String, needs to derive from assessed hardware → keypair → certificate)",
     "Scope-aware identity types (identity that respects BlockchainScope Device|Network and traceability axis)",
-    "ShardCommitment type (R12 — BLAKE3(sorted placements) type for lib)",
-    "GenesisAssetRecord type (R1 — record type for sovereign genesis with hardware-assessed assets)",
+]
+
+[features.planned]
+items = [
 ]
