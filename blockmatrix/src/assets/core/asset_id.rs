@@ -69,6 +69,9 @@ pub enum BaseSystemType {
     Container,
     Economic,
     Blockchain,
+    Dns,
+    /// Mesh relay bandwidth as a first-class asset (R10)
+    Transmission,
 }
 
 /// Application domain for user assets
@@ -116,7 +119,7 @@ pub struct AssetData {
     pub metadata: Vec<u8>,
 }
 
-/// Universal asset type enumeration (legacy support)
+/// Universal asset type enumeration
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AssetType {
     /// CPU cores and processing units
@@ -133,12 +136,12 @@ pub enum AssetType {
     Container,
     /// Economic system assets (Caesar tokens, wallets, stakes)
     Economic,
-    /// Virtual machine instances and execution environments
-    // STUB: Phase 3
-    VirtualMachine,
-    /// Library assets and code dependencies
-    // STUB: Phase 3
-    Library,
+    /// Blockchain state and chain data
+    Blockchain,
+    /// DNS name registration assets
+    Dns,
+    /// Mesh relay bandwidth as a first-class asset (R10)
+    Transmission,
 }
 
 impl AssetType {
@@ -152,8 +155,9 @@ impl AssetType {
             AssetType::Network => 4,
             AssetType::Container => 5,
             AssetType::Economic => 6,
-            AssetType::VirtualMachine => 7, // STUB: Phase 3
-            AssetType::Library => 8,        // STUB: Phase 3
+            AssetType::Blockchain => 7,
+            AssetType::Dns => 8,
+            AssetType::Transmission => 9,
         }
     }
 
@@ -167,8 +171,9 @@ impl AssetType {
             AssetType::Network => "Network",
             AssetType::Container => "Container",
             AssetType::Economic => "Economic",
-            AssetType::VirtualMachine => "VirtualMachine", // STUB: Phase 3
-            AssetType::Library => "Library",               // STUB: Phase 3
+            AssetType::Blockchain => "Blockchain",
+            AssetType::Dns => "Dns",
+            AssetType::Transmission => "Transmission",
         }
     }
 }
@@ -176,6 +181,76 @@ impl AssetType {
 impl fmt::Display for AssetType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.type_name())
+    }
+}
+
+// --- From impls between blockmatrix and lib types ---
+
+impl From<AssetType> for hypermesh_lib::SystemAssetKind {
+    fn from(at: AssetType) -> Self {
+        match at {
+            AssetType::Cpu => Self::Cpu,
+            AssetType::Gpu => Self::Gpu,
+            AssetType::Memory => Self::Memory,
+            AssetType::Storage => Self::Storage,
+            AssetType::Network => Self::Network,
+            AssetType::Container => Self::Container,
+            AssetType::Economic => Self::Economic,
+            AssetType::Blockchain => Self::Blockchain,
+            AssetType::Dns => Self::Dns,
+            AssetType::Transmission => Self::Transmission,
+        }
+    }
+}
+
+impl From<hypermesh_lib::SystemAssetKind> for AssetType {
+    fn from(sak: hypermesh_lib::SystemAssetKind) -> Self {
+        match sak {
+            hypermesh_lib::SystemAssetKind::Cpu => Self::Cpu,
+            hypermesh_lib::SystemAssetKind::Gpu => Self::Gpu,
+            hypermesh_lib::SystemAssetKind::Memory => Self::Memory,
+            hypermesh_lib::SystemAssetKind::Storage => Self::Storage,
+            hypermesh_lib::SystemAssetKind::Network => Self::Network,
+            hypermesh_lib::SystemAssetKind::Container => Self::Container,
+            hypermesh_lib::SystemAssetKind::Economic => Self::Economic,
+            hypermesh_lib::SystemAssetKind::Blockchain => Self::Blockchain,
+            hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
+            hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
+        }
+    }
+}
+
+impl From<BaseSystemType> for hypermesh_lib::SystemAssetKind {
+    fn from(bst: BaseSystemType) -> Self {
+        match bst {
+            BaseSystemType::Cpu => Self::Cpu,
+            BaseSystemType::Gpu => Self::Gpu,
+            BaseSystemType::Memory => Self::Memory,
+            BaseSystemType::Storage => Self::Storage,
+            BaseSystemType::Network => Self::Network,
+            BaseSystemType::Container => Self::Container,
+            BaseSystemType::Economic => Self::Economic,
+            BaseSystemType::Blockchain => Self::Blockchain,
+            BaseSystemType::Dns => Self::Dns,
+            BaseSystemType::Transmission => Self::Transmission,
+        }
+    }
+}
+
+impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
+    fn from(sak: hypermesh_lib::SystemAssetKind) -> Self {
+        match sak {
+            hypermesh_lib::SystemAssetKind::Cpu => Self::Cpu,
+            hypermesh_lib::SystemAssetKind::Gpu => Self::Gpu,
+            hypermesh_lib::SystemAssetKind::Memory => Self::Memory,
+            hypermesh_lib::SystemAssetKind::Storage => Self::Storage,
+            hypermesh_lib::SystemAssetKind::Network => Self::Network,
+            hypermesh_lib::SystemAssetKind::Container => Self::Container,
+            hypermesh_lib::SystemAssetKind::Economic => Self::Economic,
+            hypermesh_lib::SystemAssetKind::Blockchain => Self::Blockchain,
+            hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
+            hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
+        }
     }
 }
 
@@ -233,8 +308,9 @@ impl AssetRegistration {
             AssetType::Network => BaseSystemType::Network,
             AssetType::Container => BaseSystemType::Container,
             AssetType::Economic => BaseSystemType::Economic,
-            AssetType::VirtualMachine => BaseSystemType::Container,
-            AssetType::Library => BaseSystemType::Container,
+            AssetType::Blockchain => BaseSystemType::Blockchain,
+            AssetType::Dns => BaseSystemType::Dns,
+            AssetType::Transmission => BaseSystemType::Transmission,
         };
 
         Self {
@@ -312,6 +388,8 @@ impl AssetRegistration {
                     BaseSystemType::Container => 5,
                     BaseSystemType::Economic => 6,
                     BaseSystemType::Blockchain => 7,
+                    BaseSystemType::Dns => 8,
+                    BaseSystemType::Transmission => 9,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -481,7 +559,7 @@ impl AssetRegistration {
             .ok()
     }
 
-    /// Get AssetType from category (for legacy compatibility)
+    /// Get AssetType from category
     pub fn asset_type(&self) -> Option<AssetType> {
         match &self.category {
             AssetCategory::BaseSystem(base_type) => Some(match base_type {
@@ -492,9 +570,11 @@ impl AssetRegistration {
                 BaseSystemType::Network => AssetType::Network,
                 BaseSystemType::Container => AssetType::Container,
                 BaseSystemType::Economic => AssetType::Economic,
-                BaseSystemType::Blockchain => AssetType::Container, // Map to Container for legacy
+                BaseSystemType::Blockchain => AssetType::Blockchain,
+                BaseSystemType::Dns => AssetType::Dns,
+                BaseSystemType::Transmission => AssetType::Transmission,
             }),
-            AssetCategory::Application(_) => Some(AssetType::Library),
+            AssetCategory::Application(_) => None,
         }
     }
 }

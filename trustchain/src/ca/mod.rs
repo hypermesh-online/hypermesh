@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate, KeyPair};
+use rcgen::{Certificate as RcgenCertificate, CertificateParams, KeyPair};
 use x509_parser::parse_x509_certificate;
 
 use crate::consensus::{
@@ -52,6 +52,8 @@ pub use federation::{
 pub struct TrustChainCA {
     /// Root CA certificate
     root_ca: Arc<RwLock<RcgenCertificate>>,
+    /// Root CA key pair (needed to sign leaf certificates via signed_by())
+    root_key_pair: Arc<KeyPair>,
     /// Issued certificates store
     certificate_store: Arc<CertStore>,
     /// Certificate policies
@@ -369,8 +371,8 @@ impl TrustChainCA {
     pub async fn new(config: CAConfig) -> Result<Self> {
         info!("Initializing TrustChain CA: {}", config.ca_id);
 
-        // Initialize root CA certificate
-        let root_ca = match config.mode {
+        // Initialize root CA certificate and key pair
+        let (root_cert, root_key) = match config.mode {
             CAMode::LocalhostTesting => {
                 info!("Creating self-signed root CA for localhost testing");
                 Self::create_self_signed_root(&config.ca_id)?
@@ -405,7 +407,8 @@ impl TrustChainCA {
         ));
 
         let ca = Self {
-            root_ca: Arc::new(RwLock::new(root_ca)),
+            root_ca: Arc::new(RwLock::new(root_cert)),
+            root_key_pair: Arc::new(root_key),
             certificate_store,
             policy_engine,
             _consensus_context: consensus_context,
@@ -520,13 +523,7 @@ impl TrustChainCA {
         // Build a local consensus result (consensus was already validated by caller)
         let local_result = ConsensusValidationResult {
             result: ConsensusValidationStatus::Valid,
-            proof_hash: request.consensus_proof.hash().ok().map(|h| {
-                let bytes = hex::decode(h).unwrap_or_default();
-                let mut arr = [0u8; 32];
-                let len = bytes.len().min(32);
-                arr[..len].copy_from_slice(&bytes[..len]);
-                arr
-            }),
+            proof_hash: request.consensus_proof.hash().ok(),
             validator_id: "local-security-integrated-ca".to_string(),
             validated_at: std::time::SystemTime::now(),
             metrics: crate::consensus::hypermesh_client::ValidationMetrics {
@@ -647,14 +644,21 @@ impl TrustChainCA {
         self.get_ca_certificate().await
     }
 
-    /// Internal: Create self-signed root CA
-    fn create_self_signed_root(ca_id: &str) -> Result<RcgenCertificate> {
-        // rcgen 0.13: generate_simple_self_signed returns CertifiedKey
-        let certified_key = generate_simple_self_signed(vec![ca_id.to_string()])?;
-        Ok(certified_key.cert)
+    /// Internal: Create self-signed root CA with its key pair
+    fn create_self_signed_root(ca_id: &str) -> Result<(RcgenCertificate, KeyPair)> {
+        // rcgen 0.13: Create root CA with CA constraint so it can sign leaf certs
+        let mut params = CertificateParams::new(vec![ca_id.to_string()])?;
+        params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+
+        let key_pair = KeyPair::generate()?;
+        let cert = params.self_signed(&key_pair)?;
+        Ok((cert, key_pair))
     }
 
     /// Internal: Generate certificate with HyperMesh consensus validation result
+    ///
+    /// Uses rcgen `signed_by()` to produce a leaf certificate signed by the root CA,
+    /// establishing a proper Root CA (self-signed) -> Leaf cert (CA-signed) hierarchy.
     async fn generate_certificate_with_consensus(
         &self,
         request: CertificateRequest,
@@ -662,8 +666,11 @@ impl TrustChainCA {
     ) -> Result<IssuedCertificate> {
         let root_ca = self.root_ca.read().await;
 
-        // rcgen 0.13: Create certificate with requested parameters (returns Result)
+        // rcgen 0.13: Create leaf certificate parameters
         let mut params = rcgen::CertificateParams::new(vec![request.common_name.clone()])?;
+
+        // Leaf certs are NOT CAs
+        params.is_ca = rcgen::IsCa::NoCa;
 
         // Add SAN entries (rcgen 0.13: SanType uses Ia5String)
         for san in &request.san_entries {
@@ -703,22 +710,16 @@ impl TrustChainCA {
             );
         }
 
-        // rcgen 0.13: Generate key pair and create certificate
-        let key_pair = KeyPair::generate()?;
-        // TODO: Need to implement CA signing with signed_by() using root_ca
-        // For now using self_signed() - this needs to be fixed for proper CA hierarchy
-        let cert = params.self_signed(&key_pair)?;
+        // Generate leaf key pair and sign with CA root via signed_by()
+        let leaf_key_pair = KeyPair::generate()?;
+        let cert = params.signed_by(&leaf_key_pair, &root_ca, &self.root_key_pair)?;
         let cert_der = cert.der().to_vec();
 
         // Convert to PEM format for API compatibility
         let certificate_pem = cert.pem();
-        let _private_key_pem = key_pair.serialize_pem();
 
-        // Get root CA for chain
-        let _root_ca_der = root_ca.der().to_vec();
+        // Build certificate chain PEM (leaf + root)
         let root_ca_pem = root_ca.pem();
-
-        // Build certificate chain (leaf + root)
         let chain_pem = format!("{certificate_pem}\n{root_ca_pem}");
 
         // Calculate fingerprint

@@ -42,7 +42,7 @@ impl LibraryHandler {
 #[async_trait]
 impl AssetExtensionHandler for LibraryHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::Library
+        AssetType::Dns
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
@@ -168,7 +168,7 @@ impl AssetExtensionHandler for LibraryHandler {
 
         Ok(AssetMetadata {
             id: id.clone(),
-            asset_type: AssetType::Library,
+            asset_type: AssetType::Dns,
             name: package.name.clone(),
             description: Some(format!("{} library package", package.language)),
             created_at: std::time::SystemTime::now(),
@@ -256,7 +256,7 @@ mod tests {
     #[tokio::test]
     async fn test_library_handler() {
         let handler = LibraryHandler::new();
-        assert_eq!(handler.asset_type(), AssetType::Library);
+        assert_eq!(handler.asset_type(), AssetType::Dns);
 
         let spec = AssetCreationSpec {
             name: "TestLib".to_string(),

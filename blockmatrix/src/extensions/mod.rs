@@ -155,9 +155,9 @@ mod tests {
                 ExtensionCapability::TransportAccess,
             ]),
             provided_assets: vec![
-                crate::assets::core::AssetType::VirtualMachine,
+                crate::assets::core::AssetType::Blockchain,
                 crate::assets::core::AssetType::Container,
-                crate::assets::core::AssetType::Library,
+                crate::assets::core::AssetType::Dns,
             ],
             certificate_fingerprint: Some("SHA256:1234567890abcdef".to_string()),
             config_schema: None,

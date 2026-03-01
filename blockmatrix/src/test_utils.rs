@@ -24,11 +24,9 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
         AssetType::Network => AssetCategory::BaseSystem(BaseSystemType::Network),
         AssetType::Container => AssetCategory::BaseSystem(BaseSystemType::Container),
         AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
-        AssetType::Library => AssetCategory::Application(ApplicationDomain {
-            domain_name: "test".to_string(),
-            domain_hash: [0u8; 32],
-        }),
-        AssetType::VirtualMachine => AssetCategory::BaseSystem(BaseSystemType::Container),
+        AssetType::Blockchain => AssetCategory::BaseSystem(BaseSystemType::Blockchain),
+        AssetType::Dns => AssetCategory::BaseSystem(BaseSystemType::Dns),
+        AssetType::Transmission => AssetCategory::BaseSystem(BaseSystemType::Transmission),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }
@@ -56,11 +54,9 @@ pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> As
         AssetType::Network => AssetCategory::BaseSystem(BaseSystemType::Network),
         AssetType::Container => AssetCategory::BaseSystem(BaseSystemType::Container),
         AssetType::Economic => AssetCategory::BaseSystem(BaseSystemType::Economic),
-        AssetType::Library => AssetCategory::Application(ApplicationDomain {
-            domain_name: "test".to_string(),
-            domain_hash: [0u8; 32],
-        }),
-        AssetType::VirtualMachine => AssetCategory::BaseSystem(BaseSystemType::Container),
+        AssetType::Blockchain => AssetCategory::BaseSystem(BaseSystemType::Blockchain),
+        AssetType::Dns => AssetCategory::BaseSystem(BaseSystemType::Dns),
+        AssetType::Transmission => AssetCategory::BaseSystem(BaseSystemType::Transmission),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }

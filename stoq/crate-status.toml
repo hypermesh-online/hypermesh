@@ -15,7 +15,6 @@ items = [
     "Kernel eBPF program loading via hypermesh-ebpf ebpf-loader feature gate",
     "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
     "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
-    "Transport metrics collection",
     "Matrix-aware positioning via hypermesh_lib canonical types",
     "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
     "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
@@ -23,6 +22,7 @@ items = [
     "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
     "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
     "BLAKE3 content hashing (whitepaper-aligned)",
+    "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
 ]
 
 [features.in_development]
@@ -38,7 +38,6 @@ items = [
     "Partition recovery timing measurements",
     "Identity-aware connection establishment (cert identity extraction)",
     "Permission enforcement at protocol layer",
-    "Real transport metrics (bandwidth, latency, jitter, loss measurement)",
     "MetricsFrame protocol wiring to engauge",
     "Certificate store persistence across restarts",
     "Graceful degradation with expired certificates",

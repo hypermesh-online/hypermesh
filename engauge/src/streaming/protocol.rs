@@ -133,7 +133,7 @@ pub struct RoutingSnapshot {
 }
 
 /// Point-in-time economic activity metrics.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EconomicSnapshot {
     /// Total in-flight gold-gram float.
     pub in_flight_float_grams: f64,
@@ -141,6 +141,20 @@ pub struct EconomicSnapshot {
     pub settlement_rate_per_epoch: f64,
     /// Number of active CAES packets.
     pub active_packets: u32,
+    /// Holding amounts per market tier (L0, L1, L2, L3) in gold-grams.
+    ///
+    /// Index 0 = L0 (Retail), 1 = L1 (Professional), 2 = L2 (Institutional), 3 = L3 (Sovereign).
+    #[serde(default)]
+    pub holdings_by_tier_grams: [f64; 4],
+    /// Fee distribution rate (fees earned per epoch in gold-grams).
+    #[serde(default)]
+    pub fee_rate_per_epoch_grams: f64,
+    /// Number of packets in transit (not yet delivered).
+    #[serde(default)]
+    pub in_transit_count: u32,
+    /// Total value of in-transit packets in gold-grams.
+    #[serde(default)]
+    pub in_transit_value_grams: f64,
 }
 
 /// Point-in-time spatial verification results from PoSPing probes.
@@ -225,6 +239,10 @@ mod tests {
                 in_flight_float_grams: 42.5,
                 settlement_rate_per_epoch: 10.0,
                 active_packets: 7,
+                holdings_by_tier_grams: [10.0, 15.0, 12.5, 5.0],
+                fee_rate_per_epoch_grams: 0.5,
+                in_transit_count: 3,
+                in_transit_value_grams: 18.0,
             }),
             sequence: 4,
         }
@@ -286,9 +304,44 @@ mod tests {
             MetricsPayload::Economic(e) => {
                 assert!((e.in_flight_float_grams - 42.5).abs() < 1e-9);
                 assert_eq!(e.active_packets, 7);
+                // New fields
+                assert!((e.holdings_by_tier_grams[0] - 10.0).abs() < 1e-9);
+                assert!((e.holdings_by_tier_grams[3] - 5.0).abs() < 1e-9);
+                assert!((e.fee_rate_per_epoch_grams - 0.5).abs() < 1e-9);
+                assert_eq!(e.in_transit_count, 3);
+                assert!((e.in_transit_value_grams - 18.0).abs() < 1e-9);
             }
             _ => panic!("test: expected Economic payload"),
         }
+    }
+
+    #[test]
+    fn economic_snapshot_default_has_zeroed_new_fields() {
+        let snap = EconomicSnapshot::default();
+        assert!(snap.in_flight_float_grams.abs() < 1e-9);
+        assert_eq!(snap.active_packets, 0);
+        assert_eq!(snap.holdings_by_tier_grams, [0.0; 4]);
+        assert!(snap.fee_rate_per_epoch_grams.abs() < 1e-9);
+        assert_eq!(snap.in_transit_count, 0);
+        assert!(snap.in_transit_value_grams.abs() < 1e-9);
+    }
+
+    #[test]
+    fn economic_backward_compat_deserialization() {
+        // Simulate old-format JSON without new fields -- serde(default) should fill zeros
+        let old_json = r#"{
+            "in_flight_float_grams": 5.0,
+            "settlement_rate_per_epoch": 2.0,
+            "active_packets": 1
+        }"#;
+        let snap: EconomicSnapshot =
+            serde_json::from_str(old_json).expect("test: deserialize old format");
+        assert!((snap.in_flight_float_grams - 5.0).abs() < 1e-9);
+        assert_eq!(snap.active_packets, 1);
+        // New fields should default to zero
+        assert_eq!(snap.holdings_by_tier_grams, [0.0; 4]);
+        assert!(snap.fee_rate_per_epoch_grams.abs() < 1e-9);
+        assert_eq!(snap.in_transit_count, 0);
     }
 
     fn verification_frame() -> MetricsFrame {

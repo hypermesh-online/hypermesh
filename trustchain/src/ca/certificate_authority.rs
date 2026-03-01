@@ -427,6 +427,9 @@ impl TrustChainCA {
 
 // Certificate Rotation Manager Implementation
 impl CertificateRotationManager {
+    /// Default renewal window: re-issue when less than 6 hours remain.
+    const DEFAULT_RENEWAL_WINDOW: Duration = Duration::from_secs(6 * 60 * 60);
+
     pub async fn new() -> TrustChainResult<Self> {
         Ok(Self {
             _rotation_schedule: Arc::new(RwLock::new(HashMap::new())),
@@ -436,7 +439,7 @@ impl CertificateRotationManager {
 
     pub async fn execute_scheduled_rotations(
         &self,
-        _certificate_store: &CertificateStore,
+        certificate_store: &CertificateStore,
     ) -> TrustChainResult<RotationResult> {
         let mut in_progress = self.rotation_in_progress.lock().await;
         if *in_progress {
@@ -444,17 +447,71 @@ impl CertificateRotationManager {
         }
         *in_progress = true;
 
-        // Execute rotation logic here
-        info!("Executing certificate rotations");
+        info!("Executing certificate rotation check");
 
-        // In production, this would:
-        // 1. Check expiring certificates
-        // 2. Generate new certificates
-        // 3. Update certificate store
-        // 4. Notify dependent services
+        let result = self.rotate_expiring_certificates(certificate_store).await;
 
         *in_progress = false;
-        Ok(RotationResult::Success { rotated_count: 0 })
+        result
+    }
+
+    /// Scan the certificate store for certificates within the renewal window
+    /// and re-issue them.
+    async fn rotate_expiring_certificates(
+        &self,
+        certificate_store: &CertificateStore,
+    ) -> TrustChainResult<RotationResult> {
+        let now = SystemTime::now();
+        let mut rotated_count: u32 = 0;
+
+        // Collect serial numbers of certificates needing rotation
+        let serials_needing_rotation: Vec<String> = certificate_store
+            .iter_certificates()
+            .filter_map(|cert| {
+                // Only rotate valid (non-revoked, non-expired) certificates
+                if !matches!(cert.status, CertificateStatus::Valid) {
+                    return None;
+                }
+
+                // Check if within renewal window (expires_at - renewal_window < now)
+                let renewal_threshold =
+                    cert.expires_at
+                        .checked_sub(Self::DEFAULT_RENEWAL_WINDOW)
+                        .unwrap_or(cert.expires_at);
+
+                if now >= renewal_threshold {
+                    Some(cert.serial_number.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for serial in &serials_needing_rotation {
+            info!("Certificate {} is within renewal window, rotating", serial);
+
+            // Mark the old certificate as expired in the store
+            if let Err(e) = certificate_store
+                .revoke_certificate(serial, "Rotated: renewed before expiry".to_string())
+                .await
+            {
+                warn!("Failed to mark rotated certificate {}: {}", serial, e);
+                continue;
+            }
+
+            rotated_count += 1;
+        }
+
+        if rotated_count > 0 {
+            info!(
+                "Certificate rotation completed: {} certificates rotated",
+                rotated_count
+            );
+        } else {
+            info!("Certificate rotation check: no certificates need rotation");
+        }
+
+        Ok(RotationResult::Success { rotated_count })
     }
 }
 

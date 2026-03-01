@@ -116,6 +116,9 @@ pub enum DnsError {
 
     #[error("Timestamp error: {reason}")]
     TimestampError { reason: String },
+
+    #[error("Transport not available: {transport} - {detail}")]
+    TransportNotAvailable { transport: String, detail: String },
 }
 
 /// API server specific errors

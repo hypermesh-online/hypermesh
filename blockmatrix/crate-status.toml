@@ -41,6 +41,7 @@ items = [
     "User contribution platform (hardware sharing, resource pricing, rewards)",
     "Intelligence layer (multi-component health, event streaming)",
     "Performance regression detector (baseline tracking, production readiness)",
+    "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
 ]
 
 [features.in_development]
@@ -65,5 +66,4 @@ items = [
     "mDNS peer discovery (start_mdns_discovery is explicit stub)",
     "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
     "Identity-scoped asset access (workload identity → asset permissions)",
-    "Real hardware metrics collection (CPU/GPU/memory/storage/network)",
 ]

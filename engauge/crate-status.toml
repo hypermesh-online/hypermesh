@@ -24,6 +24,8 @@ items = [
     "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
     "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
     "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)",
+    "Self vs network metrics separation (SelfMetrics, PeerMetrics, node_metrics module, capacity assessment)",
+    "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)",
 ]
 
 [features.in_development]
@@ -40,7 +42,6 @@ items = [
     "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
     "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
     "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
-    "Self-node metrics vs network-wide metrics separation",
     "Real-time routing intelligence feed to STOQ adaptive tiers",
     "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)",
 ]

@@ -41,7 +41,7 @@ impl DatasetHandler {
 #[async_trait]
 impl AssetExtensionHandler for DatasetHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::Library
+        AssetType::Dns
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
@@ -160,7 +160,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(AssetMetadata {
             id: id.clone(),
             // STUB: Dataset no longer exists, using Library
-            asset_type: AssetType::Library,
+            asset_type: AssetType::Dns,
             name: dataset.name.clone(),
             description: Some(format!(
                 "{} dataset with {} records",
@@ -237,6 +237,6 @@ mod tests {
     async fn test_dataset_handler() {
         let handler = DatasetHandler::new();
         // STUB: Dataset replaced with Library
-        assert_eq!(handler.asset_type(), AssetType::Library);
+        assert_eq!(handler.asset_type(), AssetType::Dns);
     }
 }

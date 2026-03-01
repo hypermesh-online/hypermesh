@@ -161,7 +161,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(AssetMetadata {
             id: id.clone(),
             // STUB: Template no longer exists, using Library
-            asset_type: AssetType::Library,
+            asset_type: AssetType::Dns,
             name: template.name.clone(),
             description: Some(format!(
                 "{} template for {}",

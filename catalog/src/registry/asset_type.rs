@@ -16,7 +16,7 @@ use blockmatrix::assets::{AssetRegistration, ConsensusProof};
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///
-/// This itself IS a BlockMatrix Asset (type: AssetType::Library)
+/// This itself IS a BlockMatrix Asset (type: AssetType::Dns)
 /// Examples: "Vehicle", "CarInsurance", "HealthRecord", "LoanAgreement"
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetTypeDefinition {

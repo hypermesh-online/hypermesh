@@ -19,22 +19,25 @@ items = [
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
     "KeyPairId and AssetMetadata structs",
     "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
+    "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
+    "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
+    "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
+    "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash for R4)",
+    "AssetMetadata canonical struct in lib (consolidated definition with AssetKind + state + timestamps)",
+    "Dns and Transmission variants added to blockmatrix BaseSystemType",
+    "VirtualMachine and Library removed from blockmatrix AssetType/BaseSystemType",
 ]
 
 [features.in_development]
 items = [
     "Replace trustchain SpaceProof/StakeProof/WorkProof/TimeProof with lib canonical types",
     "Replace trustchain NodeId/AssetId structs with lib newtypes",
-    "Remove AssetType::VirtualMachine and AssetType::Library from blockmatrix",
-    "Add Dns variant to blockmatrix BaseSystemType",
-    "Consolidate AssetMetadata duplicates across crates",
+    "Consolidate AssetMetadata duplicates across crates (lib canonical exists, blockmatrix/catalog/trustchain still have local copies)",
     "Resolve PacketId type conflict (lib [u8;32] vs blockmatrix Uuid)",
 ]
 
 [features.planned]
 items = [
-    "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
-    "Adaptive Reed-Solomon parameters type (R14 — shard count scales with asset size)",
     "Genesis asset inventory types (R1 — CPU/GPU/RAM/Storage/Network capability structs)",
     "Cross-crate validation helpers",
     "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",

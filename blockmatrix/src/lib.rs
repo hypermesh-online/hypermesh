@@ -260,6 +260,9 @@ pub use privacy::{
     ValidationRequirements,
 };
 
+// Real hardware metrics collection from /proc filesystem
+pub mod metrics;
+
 // CLI module - matrix topology queries, node management, asset operations
 pub mod cli;
 

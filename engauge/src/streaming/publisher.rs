@@ -193,6 +193,7 @@ mod tests {
             in_flight_float_grams: 10.0,
             settlement_rate_per_epoch: 5.0,
             active_packets: 3,
+            ..Default::default()
         });
         assert!(econ.is_none(), "Private must suppress Economic payload");
     }
@@ -205,6 +206,7 @@ mod tests {
             in_flight_float_grams: 5.0,
             settlement_rate_per_epoch: 2.0,
             active_packets: 1,
+            ..Default::default()
         });
         assert!(
             result.is_none(),

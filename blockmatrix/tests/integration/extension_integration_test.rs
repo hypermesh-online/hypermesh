@@ -59,9 +59,9 @@ impl HyperMeshExtension for MockCatalogExtension {
                 ExtensionCapability::NetworkAccess,
             ]),
             provided_assets: vec![
-                AssetType::VirtualMachine,
+                AssetType::Blockchain,
                 AssetType::Container,
-                AssetType::Library,
+                AssetType::Dns,
             ],
             certificate_fingerprint: None,
             config_schema: None,
@@ -78,7 +78,7 @@ impl HyperMeshExtension for MockCatalogExtension {
 
         // Register handler for library assets
         handlers.insert(
-            AssetType::Library,
+            AssetType::Dns,
             Box::new(MockAssetHandler::new(self.assets.clone())) as Box<dyn AssetExtensionHandler>
         );
 
@@ -165,14 +165,14 @@ impl MockAssetHandler {
 #[async_trait]
 impl AssetExtensionHandler for MockAssetHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::Library
+        AssetType::Dns
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
         let id = AssetRegistration::new();
         let metadata = AssetMetadata {
             id: id.clone(),
-            asset_type: AssetType::Library,
+            asset_type: AssetType::Dns,
             name: spec.name,
             description: spec.description,
             created_at: std::time::SystemTime::now(),
@@ -297,7 +297,7 @@ async fn test_extension_asset_handler() {
     manager.load_extension(extension).await.unwrap();
 
     // Get asset handler
-    let handler = manager.get_asset_handler(&AssetType::Library).await;
+    let handler = manager.get_asset_handler(&AssetType::Dns).await;
     assert!(handler.is_some());
 
     // Create an asset through the handler
@@ -317,7 +317,7 @@ async fn test_extension_asset_handler() {
 
     // Query the created asset
     let query = AssetQuery {
-        asset_type: Some(AssetType::Library),
+        asset_type: Some(AssetType::Dns),
         name_pattern: Some("test".to_string()),
         tags: None,
         privacy_level: None,
@@ -446,7 +446,7 @@ async fn test_catalog_extension_integration() {
     assert!(response.success);
 
     // Verify the extension is providing asset management
-    let handler = manager.get_asset_handler(&AssetType::Library).await;
+    let handler = manager.get_asset_handler(&AssetType::Dns).await;
     assert!(handler.is_some());
 
     // Create a library asset
@@ -470,7 +470,7 @@ async fn test_catalog_extension_integration() {
     // Get asset metadata
     let metadata = handler.get_metadata(&asset_id).await.unwrap();
     assert_eq!(metadata.name, "julia-scientific-package");
-    assert_eq!(metadata.asset_type, AssetType::Library);
+    assert_eq!(metadata.asset_type, AssetType::Dns);
 
     // Validate with consensus
     let consensus_proof = ConsensusProof::default();

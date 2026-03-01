@@ -73,9 +73,9 @@ impl CatalogExtension {
                 ExtensionCapability::FileSystemAccess,
             ]),
             provided_assets: vec![
-                AssetType::VirtualMachine,
-                AssetType::Library,
-                AssetType::Library,
+                AssetType::Blockchain,
+                AssetType::Dns,
+                AssetType::Dns,
                 AssetType::Container,
             ],
             certificate_fingerprint: config.certificate_fingerprint.clone(),
@@ -107,15 +107,15 @@ impl CatalogExtension {
 
         let mut asset_handlers = HashMap::new();
         asset_handlers.insert(
-            AssetType::VirtualMachine,
+            AssetType::Blockchain,
             Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(
-            AssetType::Library,
+            AssetType::Dns,
             Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(
-            AssetType::Library,
+            AssetType::Dns,
             Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(

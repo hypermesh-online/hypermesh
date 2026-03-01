@@ -142,6 +142,17 @@ impl DifferentialPrivacyFilter {
             .add_laplace_noise(e.settlement_rate_per_epoch, 0.5)
             .max(0.0);
         e.active_packets = self.noise_u32(e.active_packets, 1.0);
+        // Noise per-tier holdings
+        for tier_val in &mut e.holdings_by_tier_grams {
+            *tier_val = self.add_laplace_noise(*tier_val, 0.5).max(0.0);
+        }
+        e.fee_rate_per_epoch_grams = self
+            .add_laplace_noise(e.fee_rate_per_epoch_grams, 0.1)
+            .max(0.0);
+        e.in_transit_count = self.noise_u32(e.in_transit_count, 1.0);
+        e.in_transit_value_grams = self
+            .add_laplace_noise(e.in_transit_value_grams, 1.0)
+            .max(0.0);
         e
     }
 
@@ -217,6 +228,7 @@ mod tests {
             in_flight_float_grams: 10.0,
             settlement_rate_per_epoch: 5.0,
             active_packets: 3,
+            ..Default::default()
         })
     }
 

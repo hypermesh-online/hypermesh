@@ -17,6 +17,7 @@ pub mod capacity;
 pub mod compliance;
 pub mod marketplace;
 pub mod metrics;
+pub mod node_metrics;
 pub mod organic_detection;
 pub mod receipt;
 pub mod routing_intel;
@@ -41,6 +42,9 @@ pub use routing_intel::{
 };
 pub use streaming::{
     MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator,
+};
+pub use node_metrics::{
+    assess_capacity, CapacityLevel, HardwareSummary, PeerMetrics, SelfMetrics, TransportSummary,
 };
 pub use throttle::{EngaugeThrottle, ThrottleSignal};
 pub use trending::{AggregatedCapacity, CapacityTrend, EpochRecord, EpochTracker, TrendDirection};

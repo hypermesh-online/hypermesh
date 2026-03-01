@@ -109,15 +109,15 @@ impl HyperMeshExtension for CatalogExtension {
 
         let mut handlers = HashMap::new();
         handlers.insert(
-            AssetType::VirtualMachine,
+            AssetType::Blockchain,
             Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(
-            AssetType::Library,
+            AssetType::Dns,
             Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(
-            AssetType::Library,
+            AssetType::Dns,
             Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(

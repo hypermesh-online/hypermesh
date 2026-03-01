@@ -285,33 +285,28 @@ impl DnsResolver {
         Ok(dns_resolver)
     }
 
-    /// Start DNS resolver service
+    /// Start DNS resolver service.
+    ///
+    /// Currently returns an error because DNS query serving requires STOQ
+    /// transport's `accept()` interface, which is not yet wired. The resolver
+    /// can still be used programmatically via `resolve_query()` and
+    /// `resolve_trustchain_domain()`.
+    ///
+    /// TODO(stoq-integration): Wire STOQ transport accept() loop to serve
+    /// incoming DNS-over-STOQ queries. Requires stoq::transport::StoqListener
+    /// with DNS service registration on the STOQ multiplexer.
     pub async fn start(&self) -> TrustChainResult<()> {
-        info!("Starting TrustChain DNS resolver");
+        warn!(
+            "DNS resolver service start requested but STOQ DNS listener is not yet implemented. \
+             Use resolve_query() for programmatic resolution."
+        );
 
-        // Start STOQ DNS server (proper architectural separation)
-        let _stoq_client_clone = Arc::clone(&self.stoq_client);
-        let _resolver_clone = self.clone_for_task();
-
-        let handle = tokio::spawn(async move {
-            loop {
-                // STOQ handles connection acceptance internally
-                // DNS service listens via STOQ transport
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                // TODO: Implement proper STOQ DNS service listener
-                // This should use STOQ's accept() method when available
-                // Placeholder for STOQ DNS service implementation
-                // The STOQ client will handle incoming DNS requests
-            }
-        });
-
-        {
-            let mut handles = self.task_handles.lock().await;
-            handles.push(handle);
+        Err(crate::errors::DnsError::TransportNotAvailable {
+            transport: "STOQ".to_string(),
+            detail: "DNS-over-STOQ listener requires stoq::transport accept() integration"
+                .to_string(),
         }
-
-        info!("TrustChain DNS resolver started successfully");
-        Ok(())
+        .into())
     }
 
     /// Resolve DNS query

@@ -492,3 +492,95 @@ impl fmt::Display for AssetAddress {
         write!(f, "{}", self.to_ipv6())
     }
 }
+
+// ===========================================================================
+// Tests
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_hash_roundtrip() {
+        let bytes = [42u8; 32];
+        let hash = ContentHash::from_bytes(bytes);
+        assert_eq!(hash.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn content_hash_zeroed() {
+        let hash = ContentHash::zeroed();
+        assert_eq!(hash.as_bytes(), &[0u8; 32]);
+    }
+
+    #[test]
+    fn privacy_mode_presets() {
+        assert_eq!(PrivacyMode::ANONYMOUS.scope, AccessScope::Unbounded);
+        assert!(!PrivacyMode::ANONYMOUS.tracked);
+
+        assert_eq!(PrivacyMode::PRIVATE.scope, AccessScope::Bounded);
+        assert!(PrivacyMode::PRIVATE.tracked);
+
+        assert_eq!(PrivacyMode::PUBLIC.scope, AccessScope::Unbounded);
+        assert!(PrivacyMode::PUBLIC.tracked);
+    }
+
+    #[test]
+    fn privacy_mode_caesar_multiplier() {
+        assert!((PrivacyMode::ANONYMOUS.caesar_multiplier() - 0.0).abs() < f64::EPSILON);
+        assert!((PrivacyMode::PRIVATE.caesar_multiplier() - 0.5).abs() < f64::EPSILON);
+        assert!((PrivacyMode::PUBLIC.caesar_multiplier() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn privacy_mode_serde_roundtrip() {
+        let modes = [PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC];
+        for mode in &modes {
+            let json = serde_json::to_string(mode).expect("test: serialize");
+            let back: PrivacyMode = serde_json::from_str(&json).expect("test: deserialize");
+            assert_eq!(*mode, back);
+        }
+    }
+
+    #[test]
+    fn asset_address_roundtrip() {
+        let hash = ContentHash::from_bytes([0xAB; 32]);
+        let addr = AssetAddress::new(10, -20, 30, &hash).expect("test: valid address");
+        assert_eq!(addr.matrix_coords(), (10, -20, 30));
+        assert_eq!(addr.shard_index(), 0);
+        assert!(addr.is_hypermesh());
+    }
+
+    #[test]
+    fn asset_address_shard_derivation() {
+        let hash = ContentHash::from_bytes([0xCD; 32]);
+        let parent = AssetAddress::new(0, 0, 0, &hash).expect("test: valid address");
+        let shard3 = parent.shard(3).expect("test: valid shard");
+        assert_eq!(shard3.shard_index(), 3);
+        assert_eq!(shard3.parent(), parent);
+    }
+
+    #[test]
+    fn asset_address_ipv6_roundtrip() {
+        let hash = ContentHash::from_bytes([0x11; 32]);
+        let addr = AssetAddress::new(1, 2, 3, &hash).expect("test: valid address");
+        let ipv6 = addr.to_ipv6();
+        let back = AssetAddress::from_ipv6(ipv6).expect("test: valid ipv6");
+        assert_eq!(addr, back);
+    }
+
+    #[test]
+    fn blockchain_scope_display() {
+        assert_eq!(BlockchainScope::Device.to_string(), "Device");
+        assert_eq!(BlockchainScope::Network.to_string(), "Network");
+    }
+
+    #[test]
+    fn pipeline_stage_display() {
+        assert_eq!(PipelineStage::Compress.to_string(), "Compress");
+        assert_eq!(PipelineStage::Encrypt.to_string(), "Encrypt");
+        assert_eq!(PipelineStage::Shard.to_string(), "Shard");
+        assert_eq!(PipelineStage::Distribute.to_string(), "Distribute");
+    }
+}

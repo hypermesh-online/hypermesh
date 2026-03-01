@@ -52,7 +52,7 @@ impl From<SystemAssetKind> for AssetKind {
 
 /// Built-in system asset types.
 ///
-/// Union of blockmatrix's `BaseSystemType` (8 variants) plus `Dns`.
+/// Union of blockmatrix's `BaseSystemType` (9 variants) plus `Dns` and `Transmission`.
 /// Each variant has a stable `type_id` used in serialisation and eBPF maps.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SystemAssetKind {
@@ -65,10 +65,12 @@ pub enum SystemAssetKind {
     Economic,
     Blockchain,
     Dns,
+    /// Mesh relay bandwidth as a first-class asset (R10)
+    Transmission,
 }
 
 impl SystemAssetKind {
-    /// Stable numeric identifier (0-8). Must never change once assigned.
+    /// Stable numeric identifier (0-9). Must never change once assigned.
     pub fn type_id(&self) -> u8 {
         match self {
             Self::Cpu => 0,
@@ -80,6 +82,7 @@ impl SystemAssetKind {
             Self::Economic => 6,
             Self::Blockchain => 7,
             Self::Dns => 8,
+            Self::Transmission => 9,
         }
     }
 
@@ -95,6 +98,7 @@ impl SystemAssetKind {
             Self::Economic => "Economic",
             Self::Blockchain => "Blockchain",
             Self::Dns => "Dns",
+            Self::Transmission => "Transmission",
         }
     }
 }
@@ -358,6 +362,10 @@ pub trait AssetDescriptor {
 // ---------------------------------------------------------------------------
 
 /// Metadata common to all assets regardless of kind.
+///
+/// This is the canonical shared metadata. Domain-specific crates may embed
+/// this struct or define their own richer metadata types that contain
+/// an `AssetMetadata` field (e.g. catalog's `PackageMetadata`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetMetadata {
     /// Human-readable asset name.
@@ -368,6 +376,10 @@ pub struct AssetMetadata {
     pub version: String,
     /// Content hash of the asset payload.
     pub content_hash: ContentHash,
+    /// Size of the asset payload in bytes.
+    pub size_bytes: u64,
+    /// Two-level asset classification.
+    pub kind: AssetKind,
     /// Creation timestamp (UTC milliseconds since epoch).
     pub created_at: i64,
     /// Last-modified timestamp (UTC milliseconds since epoch).
@@ -396,6 +408,7 @@ mod tests {
             SystemAssetKind::Economic,
             SystemAssetKind::Blockchain,
             SystemAssetKind::Dns,
+            SystemAssetKind::Transmission,
         ];
 
         // Verify expected IDs
@@ -408,12 +421,13 @@ mod tests {
         assert_eq!(all[6].type_id(), 6, "Economic");
         assert_eq!(all[7].type_id(), 7, "Blockchain");
         assert_eq!(all[8].type_id(), 8, "Dns");
+        assert_eq!(all[9].type_id(), 9, "Transmission");
 
         // Verify uniqueness
         let mut ids: Vec<u8> = all.iter().map(|k| k.type_id()).collect();
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), 9, "All 9 type IDs must be unique");
+        assert_eq!(ids.len(), 10, "All 10 type IDs must be unique");
     }
 
     #[test]
@@ -500,6 +514,7 @@ mod tests {
         // SystemAssetKind Display
         assert_eq!(SystemAssetKind::Blockchain.to_string(), "Blockchain");
         assert_eq!(SystemAssetKind::Storage.to_string(), "Storage");
+        assert_eq!(SystemAssetKind::Transmission.to_string(), "Transmission");
 
         // BaseState Display
         assert_eq!(BaseState::Available.to_string(), "Available");
@@ -514,6 +529,8 @@ mod tests {
             description: Some("A test asset".to_string()),
             version: "1.0.0".to_string(),
             content_hash: ContentHash::from_bytes([42u8; 32]),
+            size_bytes: 1024,
+            kind: AssetKind::System(SystemAssetKind::Storage),
             created_at: 1_700_000_000_000,
             updated_at: 1_700_000_001_000,
             tags: vec!["test".to_string(), "example".to_string()],
@@ -527,6 +544,8 @@ mod tests {
         assert_eq!(back.description.as_deref(), Some("A test asset"));
         assert_eq!(back.version, "1.0.0");
         assert_eq!(back.content_hash, ContentHash::from_bytes([42u8; 32]));
+        assert_eq!(back.size_bytes, 1024);
+        assert_eq!(back.kind, AssetKind::System(SystemAssetKind::Storage));
         assert_eq!(back.created_at, 1_700_000_000_000);
         assert_eq!(back.updated_at, 1_700_000_001_000);
         assert_eq!(back.tags, vec!["test", "example"]);

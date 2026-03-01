@@ -40,7 +40,7 @@ pub use config::{CongestionControl, NetworkTier, TransportConfig};
 pub use connection::{Connection, Endpoint, FrameBatch, MemoryPool, Stream};
 pub use falcon::{FalconTransport, FalconVariant};
 pub use manager::StoqTransport;
-pub use metrics::{IntervalMetrics, ProtocolMetrics, TransportMetrics};
+pub use metrics::{IntervalMetrics, ProtocolMetrics, TransportMetrics, TransportSnapshot};
 pub use multipath::{MultiPathConnection, MultiPathMetrics, PathInfo, PathPolicy, PathScheduler};
 pub use pos_extension_validator::StoqPosExtensionValidator;
 pub use reflector::{

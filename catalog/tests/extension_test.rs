@@ -65,8 +65,8 @@ fn test_extension_provided_assets() {
     // provided_assets has: VirtualMachine, Library, Library(overwritten by Dataset), Container
     assert!(metadata
         .provided_assets
-        .contains(&AssetType::VirtualMachine));
-    assert!(metadata.provided_assets.contains(&AssetType::Library));
+        .contains(&AssetType::Blockchain));
+    assert!(metadata.provided_assets.contains(&AssetType::Dns));
     assert!(metadata.provided_assets.contains(&AssetType::Container));
 }
 
@@ -102,8 +102,8 @@ async fn test_extension_register_assets_returns_handlers() {
         3,
         "Should have 3 distinct asset type handlers"
     );
-    assert!(handlers.contains_key(&AssetType::VirtualMachine));
-    assert!(handlers.contains_key(&AssetType::Library));
+    assert!(handlers.contains_key(&AssetType::Blockchain));
+    assert!(handlers.contains_key(&AssetType::Dns));
     assert!(handlers.contains_key(&AssetType::Container));
 }
 
@@ -387,8 +387,8 @@ mod future_extension_tests {
 
         assert!(metadata
             .provided_assets
-            .contains(&AssetType::VirtualMachine));
-        assert!(metadata.provided_assets.contains(&AssetType::Library));
+            .contains(&AssetType::Blockchain));
+        assert!(metadata.provided_assets.contains(&AssetType::Dns));
         assert!(metadata.provided_assets.contains(&AssetType::Dataset));
         assert!(metadata.provided_assets.contains(&AssetType::Template));
 
@@ -424,7 +424,7 @@ mod future_extension_tests {
         let asset_id = handler.create_asset(spec).await.unwrap();
 
         let query = AssetQuery {
-            asset_type: Some(AssetType::VirtualMachine),
+            asset_type: Some(AssetType::Blockchain),
             name_pattern: Some("lua".to_string()),
             tags: None,
             privacy_level: None,

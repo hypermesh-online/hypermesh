@@ -72,9 +72,9 @@ impl AdapterRegistry {
             AssetType::Network => Some(self.network.clone() as Arc<dyn AssetAdapter>),
             AssetType::Container => Some(self.container.clone() as Arc<dyn AssetAdapter>),
             AssetType::Economic => Some(self.economic.clone() as Arc<dyn AssetAdapter>),
-            // STUB: Phase 4b - VirtualMachine and Library adapters not yet implemented
-            AssetType::VirtualMachine => None,
-            AssetType::Library => None,
+            AssetType::Blockchain => None,
+            AssetType::Dns => None,
+            AssetType::Transmission => None,
         }
     }
 

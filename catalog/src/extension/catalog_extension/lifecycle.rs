@@ -51,7 +51,7 @@ impl AssetLibraryExtension for CatalogExtension {
             description: "Stub package for compilation".to_string(),
             author: "".to_string(),
             license: "".to_string(),
-            asset_types: vec![AssetType::Library],
+            asset_types: vec![AssetType::Dns],
             size_bytes: 0,
             install_count: 0,
             rating: 0.0,

@@ -58,7 +58,7 @@ impl VirtualMachineHandler {
 #[async_trait]
 impl AssetExtensionHandler for VirtualMachineHandler {
     fn asset_type(&self) -> AssetType {
-        AssetType::VirtualMachine
+        AssetType::Blockchain
     }
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
@@ -190,7 +190,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
 
         Ok(AssetMetadata {
             id: id.clone(),
-            asset_type: AssetType::VirtualMachine,
+            asset_type: AssetType::Blockchain,
             name: format!("{} VM", instance.language),
             description: Some(format!(
                 "{} {} Virtual Machine",
@@ -321,7 +321,7 @@ mod tests {
     #[tokio::test]
     async fn test_vm_handler() {
         let handler = VirtualMachineHandler::new();
-        assert_eq!(handler.asset_type(), AssetType::VirtualMachine);
+        assert_eq!(handler.asset_type(), AssetType::Blockchain);
 
         let spec = AssetCreationSpec {
             name: "Test VM".to_string(),

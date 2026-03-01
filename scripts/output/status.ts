@@ -56,7 +56,8 @@ export const crateStatuses: CrateStatus[] = [
         "Service mesh controller (circuit breaker, load balancing, health tracking)",
         "User contribution platform (hardware sharing, resource pricing, rewards)",
         "Intelligence layer (multi-component health, event streaming)",
-        "Performance regression detector (baseline tracking, production readiness)"
+        "Performance regression detector (baseline tracking, production readiness)",
+        "Real hardware metrics collection (CPU/memory/network/storage from /proc)"
       ],
       "inDevelopment": [
         "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
@@ -76,11 +77,10 @@ export const crateStatuses: CrateStatus[] = [
         "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
         "mDNS peer discovery (start_mdns_discovery is explicit stub)",
         "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
-        "Identity-scoped asset access (workload identity → asset permissions)",
-        "Real hardware metrics collection (CPU/GPU/memory/storage/network)"
+        "Identity-scoped asset access (workload identity → asset permissions)"
       ]
     },
-    "completion": 67
+    "completion": 69
   },
   {
     "id": "caesar",
@@ -207,7 +207,9 @@ export const crateStatuses: CrateStatus[] = [
         "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
         "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
         "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
-        "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)"
+        "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)",
+        "Self vs network metrics separation (SelfMetrics, PeerMetrics, node_metrics module, capacity assessment)",
+        "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)"
       ],
       "inDevelopment": [
         "Real network metrics collection (replace hardcoded stubs in tests)",
@@ -220,12 +222,11 @@ export const crateStatuses: CrateStatus[] = [
         "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
         "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
         "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
-        "Self-node metrics vs network-wide metrics separation",
         "Real-time routing intelligence feed to STOQ adaptive tiers",
         "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)"
       ]
     },
-    "completion": 62
+    "completion": 67
   },
   {
     "id": "gateway",
@@ -336,19 +337,22 @@ export const crateStatuses: CrateStatus[] = [
         "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
         "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
         "KeyPairId and AssetMetadata structs",
-        "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)"
+        "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
+        "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
+        "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
+        "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
+        "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash for R4)",
+        "AssetMetadata canonical struct in lib (consolidated definition with AssetKind + state + timestamps)",
+        "Dns and Transmission variants added to blockmatrix BaseSystemType",
+        "VirtualMachine and Library removed from blockmatrix AssetType/BaseSystemType"
       ],
       "inDevelopment": [
         "Replace trustchain SpaceProof/StakeProof/WorkProof/TimeProof with lib canonical types",
         "Replace trustchain NodeId/AssetId structs with lib newtypes",
-        "Remove AssetType::VirtualMachine and AssetType::Library from blockmatrix",
-        "Add Dns variant to blockmatrix BaseSystemType",
-        "Consolidate AssetMetadata duplicates across crates",
+        "Consolidate AssetMetadata duplicates across crates (lib canonical exists, blockmatrix/catalog/trustchain still have local copies)",
         "Resolve PacketId type conflict (lib [u8;32] vs blockmatrix Uuid)"
       ],
       "planned": [
-        "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
-        "Adaptive Reed-Solomon parameters type (R14 — shard count scales with asset size)",
         "Genesis asset inventory types (R1 — CPU/GPU/RAM/Storage/Network capability structs)",
         "Cross-crate validation helpers",
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
@@ -357,7 +361,7 @@ export const crateStatuses: CrateStatus[] = [
         "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 48
+    "completion": 67
   },
   {
     "id": "stoq",
@@ -375,14 +379,14 @@ export const crateStatuses: CrateStatus[] = [
         "Kernel eBPF program loading via hypermesh-ebpf ebpf-loader feature gate",
         "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
         "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
-        "Transport metrics collection",
         "Matrix-aware positioning via hypermesh_lib canonical types",
         "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
         "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
         "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
         "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
-        "BLAKE3 content hashing (whitepaper-aligned)"
+        "BLAKE3 content hashing (whitepaper-aligned)",
+        "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)"
       ],
       "inDevelopment": [
         "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)"
@@ -394,13 +398,12 @@ export const crateStatuses: CrateStatus[] = [
         "Partition recovery timing measurements",
         "Identity-aware connection establishment (cert identity extraction)",
         "Permission enforcement at protocol layer",
-        "Real transport metrics (bandwidth, latency, jitter, loss measurement)",
         "MetricsFrame protocol wiring to engauge",
         "Certificate store persistence across restarts",
         "Graceful degradation with expired certificates"
       ]
     },
-    "completion": 61
+    "completion": 63
   },
   {
     "id": "trustchain",
@@ -427,16 +430,14 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
         "HTTP/3 server with 8 real handler functions (issue, validate, revoke, list, get, health, metrics, dns_resolve)",
         "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
-        "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
+        "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
+        "CA-signed leaf certificates (signed_by() with root CA key pair)",
+        "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
+        "Persistent revocation storage (JSON on disk, survives restart)",
+        "Canonical ProofType from hypermesh-lib (single source of truth)",
+        "DNS resolution handler (proper STOQ transport error, programmatic resolve_query works)"
       ],
-      "inDevelopment": [
-        "Certificate Authority issuance (issue_certificate uses self_signed() instead of signed_by() CA root)",
-        "CA signing hierarchy (all issued certs are currently self-signed, not CA-signed)",
-        "Key rotation logic (scheduler runs, CertificateRotationManager rotates 0 certs)",
-        "Persistent revocation storage (currently in-memory only)",
-        "Canonical type migration (own SpaceProof/StakeProof/WorkProof/TimeProof conflict with lib)",
-        "DNS resolution handler (returns empty — needs STOQ transport wiring)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Identity-typed certificates (service/agent/node distinction)",
         "KeyUsage/EKU enforcement in issued X.509 certs",
@@ -451,7 +452,7 @@ export const crateStatuses: CrateStatus[] = [
         "Field device bootstrap with intermittent connectivity"
       ]
     },
-    "completion": 53
+    "completion": 69
   },
   {
     "id": "ui",

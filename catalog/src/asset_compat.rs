@@ -13,8 +13,6 @@ use hypermesh_lib::{AssetKind, ContentHash, SystemAssetKind, UserAssetKind};
 /// Convert canonical `AssetKind` -> blockmatrix `AssetType`.
 ///
 /// `UserDefined` maps to `AssetType::Container` (executed as containers in blockmatrix runtime).
-/// `Blockchain` and `Dns` map to `VirtualMachine` and `Library` respectively until
-/// blockmatrix adds the dedicated variants.
 pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
     match kind {
         AssetKind::System(sys) => match sys {
@@ -25,18 +23,15 @@ pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
             SystemAssetKind::Network => AssetType::Network,
             SystemAssetKind::Container => AssetType::Container,
             SystemAssetKind::Economic => AssetType::Economic,
-            // Temporary mappings until blockmatrix adds Blockchain/Dns variants
-            SystemAssetKind::Blockchain => AssetType::VirtualMachine,
-            SystemAssetKind::Dns => AssetType::Library,
+            SystemAssetKind::Blockchain => AssetType::Blockchain,
+            SystemAssetKind::Dns => AssetType::Dns,
+            SystemAssetKind::Transmission => AssetType::Transmission,
         },
         AssetKind::UserDefined(_) => AssetType::Container,
     }
 }
 
 /// Convert blockmatrix `AssetType` -> canonical `AssetKind`.
-///
-/// `VirtualMachine` maps to `Blockchain` and `Library` maps to `Dns` as temporary
-/// reverse mappings until blockmatrix adds the dedicated variants.
 pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
     AssetKind::System(match bm_type {
         AssetType::Cpu => SystemAssetKind::Cpu,
@@ -46,9 +41,9 @@ pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
         AssetType::Network => SystemAssetKind::Network,
         AssetType::Container => SystemAssetKind::Container,
         AssetType::Economic => SystemAssetKind::Economic,
-        // Temporary reverse mappings until blockmatrix adds Blockchain/Dns variants
-        AssetType::VirtualMachine => SystemAssetKind::Blockchain,
-        AssetType::Library => SystemAssetKind::Dns,
+        AssetType::Blockchain => SystemAssetKind::Blockchain,
+        AssetType::Dns => SystemAssetKind::Dns,
+        AssetType::Transmission => SystemAssetKind::Transmission,
     })
 }
 
@@ -68,9 +63,6 @@ pub fn _bm_category_to_asset_kind(category: &AssetCategory) -> AssetKind {
 }
 
 /// Convert blockmatrix `BaseSystemType` -> canonical `SystemAssetKind`.
-///
-/// `BaseSystemType::Blockchain` maps directly to `SystemAssetKind::Blockchain`.
-/// `Dns` is not yet a `BaseSystemType` variant; it only exists as `SystemAssetKind`.
 pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
     match base {
         BaseSystemType::Cpu => SystemAssetKind::Cpu,
@@ -81,6 +73,8 @@ pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
         BaseSystemType::Container => SystemAssetKind::Container,
         BaseSystemType::Economic => SystemAssetKind::Economic,
         BaseSystemType::Blockchain => SystemAssetKind::Blockchain,
+        BaseSystemType::Dns => SystemAssetKind::Dns,
+        BaseSystemType::Transmission => SystemAssetKind::Transmission,
     }
 }
 
@@ -99,6 +93,9 @@ pub fn _parse_asset_kind(s: &str) -> AssetKind {
         "economic" | "token" | "wallet" => AssetKind::System(SystemAssetKind::Economic),
         "blockchain" | "chain" => AssetKind::System(SystemAssetKind::Blockchain),
         "dns" => AssetKind::System(SystemAssetKind::Dns),
+        "transmission" | "relay" | "bandwidth" => {
+            AssetKind::System(SystemAssetKind::Transmission)
+        }
         other => {
             // Treat anything else as a UserDefined type with a zeroed hash
             // (callers can fill in the real hash later).
@@ -116,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_roundtrip_system_kinds() {
-        // All 9 system kinds have 1:1 mapping
+        // All 10 system kinds have 1:1 mapping
         let kinds = [
             SystemAssetKind::Cpu,
             SystemAssetKind::Gpu,
@@ -127,6 +124,7 @@ mod tests {
             SystemAssetKind::Economic,
             SystemAssetKind::Blockchain,
             SystemAssetKind::Dns,
+            SystemAssetKind::Transmission,
         ];
 
         for kind in &kinds {
@@ -154,6 +152,14 @@ mod tests {
         assert_eq!(
             _parse_asset_kind("dns"),
             AssetKind::System(SystemAssetKind::Dns)
+        );
+        assert_eq!(
+            _parse_asset_kind("transmission"),
+            AssetKind::System(SystemAssetKind::Transmission)
+        );
+        assert_eq!(
+            _parse_asset_kind("relay"),
+            AssetKind::System(SystemAssetKind::Transmission)
         );
 
         // Unknown -> UserDefined
